@@ -145,6 +145,11 @@ org_unit.level ∈ {company, division, hq, team}
 ## 앱 실행
 
 ```bash
+# 새 웹앱 실행
+./launch_webapp.command
+# 또는
+cd webapp && python3 -m http.server 4173
+
 # 개발 실행
 python3 -m streamlit run app.py --server.headless=true --server.port=8501 --server.enableStaticServing=true
 
@@ -194,3 +199,38 @@ python3 -m streamlit run app.py --server.headless=true --server.port=8501 --serv
 ---
 
 _최종 업데이트: 2026-06-15_
+
+---
+
+## 2026-06-15 웹앱 구조 전환
+
+Streamlit 프로토타입의 UI/UX 한계를 줄이기 위해 브라우저 우선 정적 웹앱을 추가했다. 기존 Python/SQLite 구현은 보존하고, 새 화면은 `webapp/` 아래에서 독립적으로 실행한다.
+
+### 새 파일 구조
+
+```text
+Culture Platform 3.0/
+├── index.html              # 저장소 루트 배포 시 webapp/으로 이동
+├── launch_webapp.command   # 로컬 웹앱 실행
+└── webapp/
+    ├── index.html
+    ├── assets/             # 배포용 로고/파비콘
+    ├── src/
+    │   ├── app.js          # 세션, 업로드, 변화량, 보고 화면 로직
+    │   └── styles.css      # 제품형 웹앱 UI 스타일
+    ├── vercel.json
+    └── netlify.toml
+```
+
+### 구현 범위
+
+- 세션 운영 대시보드, 세션 등록, CSV 검증/미리보기, 변화량 조회, 경영진 보고 화면을 웹앱 UI로 재구성
+- 데이터 저장은 우선 브라우저 `localStorage` 기반
+- 배포는 GitHub Pages, Vercel, Netlify 같은 정적 호스팅에서 가능
+- 루트 `index.html`이 `/webapp/`으로 이동하므로 저장소 루트 배포도 동작
+
+### 다음 전환 과제
+
+- 운영용 영구 저장소로 Supabase/Postgres 연결
+- 로그인/권한 제어 추가
+- 기존 `culture.db` 데이터의 웹앱 초기 데이터 또는 DB 마이그레이션 경로 정리

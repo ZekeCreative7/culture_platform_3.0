@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>조직문화 세션 설문조사</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg: #030712; /* 칠흑 같은 딥 다크 배경 */
+        --card-bg: rgba(13, 20, 45, 0.45); /* 다크 글래스 */
+        --primary: #3b82f6;
+        --primary-hover: #0072ff;
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --border: rgba(255, 255, 255, 0.08);
+        --radius: 16px;
+        --neon-blue: #0072ff;
+        --neon-purple: #9d4edd;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+        padding: 32px 16px;
+        position: relative;
+        overflow-x: hidden;
+        letter-spacing: -0.025em;
+      }
+
+      /* 몽환적인 네온 백그라운드 블러 */
+      body::before {
+        content: "";
+        position: fixed;
+        top: -15%;
+        right: -15%;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(0, 114, 255, 0.25) 0%, transparent 70%);
+        filter: blur(80px);
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        bottom: -10%;
+        left: -15%;
+        width: 350px;
+        height: 350px;
+        background: radial-gradient(circle, rgba(157, 78, 221, 0.2) 0%, transparent 70%);
+        filter: blur(90px);
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 500px;
+        background: var(--card-bg);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 24px 68px -8px rgba(0, 0, 0, 0.6);
+        padding: 36px 24px;
+        margin-top: 10px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 24px;
+        margin-bottom: 28px;
+        text-align: center;
+      }
+
+      header h1 {
+        font-size: 20px;
+        font-weight: 800;
+        color: #ffffff;
+        margin: 0 0 8px 0;
+        font-family: 'Outfit', sans-serif;
+        background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      header p {
+        font-size: 13.5px;
+        color: var(--text-muted);
+        margin: 0;
+        line-height: 1.5;
+        font-weight: 500;
+      }
+
+      .section-info {
+        background: rgba(59, 130, 246, 0.08);
+        border-left: 3.5px solid var(--neon-blue);
+        padding: 14px 18px;
+        border-radius: 8px;
+        font-size: 12.5px;
+        color: #93c5fd;
+        margin-bottom: 28px;
+        line-height: 1.6;
+        font-weight: 600;
+      }
+
+      .question-card {
+        margin-bottom: 32px;
+      }
+
+      .question-card label.q-title {
+        display: block;
+        font-size: 14.5px;
+        font-weight: 700;
+        color: #f1f5f9;
+        margin-bottom: 14px;
+        line-height: 1.5;
+      }
+
+      .input-text, select {
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 14px;
+        color: #ffffff;
+        background-color: rgba(255, 255, 255, 0.03);
+        outline: none;
+        transition: all 0.2s;
+      }
+
+      .input-text:focus, select:focus {
+        border-color: var(--neon-blue);
+        background-color: rgba(255, 255, 255, 0.06);
+        box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.2);
+      }
+
+      select option {
+        background-color: #0b1129;
+        color: #ffffff;
+      }
+
+      textarea.input-text {
+        height: 110px;
+        resize: vertical;
+      }
+
+      .scale-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .scale-option {
+        display: flex;
+        align-items: center;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .scale-option:hover {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+
+      .scale-option input[type="radio"] {
+        margin-right: 14px;
+        width: 20px;
+        height: 20px;
+        accent-color: var(--neon-blue);
+        cursor: pointer;
+      }
+
+      .scale-option span {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-muted);
+      }
+
+      .scale-option.active {
+        background: rgba(0, 114, 255, 0.1);
+        border-color: var(--neon-blue);
+        box-shadow: 0 0 12px rgba(0, 114, 255, 0.2);
+      }
+
+      .scale-option.active span {
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      .submit-btn {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(135deg, var(--neon-blue) 0%, #0056cc 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 24px;
+        box-shadow: 0 4px 14px rgba(0, 114, 255, 0.25);
+      }
+
+      .submit-btn:hover {
+        transform: translateY(-1.5px);
+        box-shadow: 0 6px 18px rgba(0, 114, 255, 0.4);
+      }
+
+      .success-view {
+        text-align: center;
+        padding: 40px 10px;
+      }
+
+      .success-icon {
+        width: 72px;
+        height: 72px;
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #10b981;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        margin: 0 auto 24px auto;
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+      }
+
+      .success-view h2 {
+        font-size: 22px;
+        font-weight: 800;
+        color: #ffffff;
+        margin: 0 0 12px 0;
+        font-family: 'Outfit', sans-serif;
+      }
+
+      .success-view p {
+        font-size: 15px;
+        color: var(--text-muted);
+        line-height: 1.6;
+        margin: 0;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container" id="survey-content">
+      <div id="loading" style="text-align:center; color:var(--text-muted); padding:20px;">설문 양식을 불러오는 중입니다...</div>
+    </div>
+
+    <script>
+      const STORE_KEY = "culture-platform-webapp-v1";
+      const SCORE_VALUES = {
+        "매우 그렇다": 5,
+        "그렇다": 4,
+        "보통": 3,
+        "그렇지 않다": 2,
+        "전혀 그렇지 않다": 1,
+        "모름/해당없음": null
+      };
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const surveyId = urlParams.get('surveyId');
+
+      window.addEventListener('DOMContentLoaded', () => {
+        if (!surveyId) {
+          showError("설문 ID가 누락되었습니다. 정상적인 링크를 이용해 주세요.");
+          return;
+        }
+
+        const storeData = JSON.parse(localStorage.getItem(STORE_KEY)) || { sessions: [], responses: [], surveys: [] };
+        const survey = (storeData.surveys || []).find(s => s.id === surveyId);
+        const session = (storeData.sessions || []).find(s => s.id === (survey ? survey.sessionId : ""));
+
+        if (!survey || !session) {
+          showError("해당 설문조사를 찾을 수 없거나 만료되었습니다.");
+          return;
+        }
+
+        renderSurveyForm(survey, session);
+      });
+
+      function showError(msg) {
+        document.getElementById('survey-content').innerHTML = `
+          <div style="text-align: center; padding: 30px 0;">
+            <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+            <h2 style="font-size: 18px; margin-bottom: 12px; color: #ef4444; font-family: 'Outfit', sans-serif;">오류 발생</h2>
+            <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">${msg}</p>
+          </div>
+        `;
+      }
+
+      function renderSurveyForm(survey, session) {
+        const container = document.getElementById('survey-content');
+        
+        let html = `
+          <header>
+            <h1>${escapeHtml(survey.title)}</h1>
+            <p>${escapeHtml(session.type)} · ${escapeHtml(session.cohort)}기 대상을 위한 익명 설문조사입니다.</p>
+          </header>
+          
+          <div class="section-info">
+            본 설문조사는 완전히 익명으로 진행되며, 답변 내용은 통계적으로 합산하여 분석에만 활용됩니다. 개인 식별 정보는 일절 수집하지 않습니다.
+          </div>
+
+          <form id="survey-form">
+            <div class="question-card">
+              <label class="q-title" for="cohort-select">본인의 참여 기수를 선택해 주세요. *</label>
+              <select id="cohort-select" required>
+                <option value="${session.cohort}">${session.cohort}기</option>
+              </select>
+            </div>
+        `;
+
+        survey.questions.forEach((q, idx) => {
+          const qId = q.id;
+          const isQuant = q.type === 'quant';
+
+          html += `<div class="question-card">`;
+          html += `<label class="q-title">${idx + 1}. ${escapeHtml(q.text)} *</label>`;
+
+          if (isQuant) {
+            html += `<div class="scale-container">`;
+            Object.keys(SCORE_VALUES).forEach((label) => {
+              html += `
+                <label class="scale-option" onclick="selectRadio(this)">
+                  <input type="radio" name="${qId}" value="${label}" required />
+                  <span>${label}</span>
+                </label>
+              `;
+            });
+            html += `</div>`;
+          } else {
+            html += `
+              <textarea class="input-text" name="${qId}" placeholder="답변을 입력해 주세요." required></textarea>
+            `;
+          }
+          html += `</div>`;
+        });
+
+        html += `
+            <button type="submit" class="submit-btn">설문 제출하기</button>
+          </form>
+        `;
+
+        container.innerHTML = html;
+
+        const form = document.getElementById('survey-form');
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          submitSurvey(survey, session);
+        });
+      }
+
+      function selectRadio(element) {
+        const siblings = element.parentNode.querySelectorAll('.scale-option');
+        siblings.forEach(s => s.classList.remove('active'));
+        element.classList.add('active');
+        element.querySelector('input').checked = true;
+      }
+
+      function submitSurvey(survey, session) {
+        const storeData = JSON.parse(localStorage.getItem(STORE_KEY)) || { sessions: [], responses: [], surveys: [] };
+        const form = document.getElementById('survey-form');
+        const formData = new FormData(form);
+        const cohort = parseInt(document.getElementById('cohort-select').value);
+
+        const response = {
+          id: Math.floor(Date.now() + Math.random() * 100000).toString(36),
+          sessionId: survey.sessionId,
+          phase: survey.phase,
+          cohort: cohort,
+          createdAt: new Date().toISOString()
+        };
+
+        survey.questions.forEach(q => {
+          const val = formData.get(q.id);
+          if (q.type === 'quant') {
+            response[q.id] = val ? SCORE_VALUES[val] : null;
+          } else {
+            response[q.id] = val || "";
+          }
+        });
+
+        storeData.responses.push(response);
+        localStorage.setItem(STORE_KEY, JSON.stringify(storeData));
+
+        document.getElementById('survey-content').innerHTML = `
+          <div class="success-view">
+            <div class="success-icon">✓</div>
+            <h2>제출 완료</h2>
+            <p>설문조사에 응해주셔서 대단히 감사합니다.<br />입력하신 답변이 성공적으로 기록되었습니다.</p>
+          </div>
+        `;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+    </script>
+  </body>
+</html>

@@ -46,7 +46,7 @@ const SCORE_MAP = {
   "": null,
 };
 const VIEWS = [
-  ["dashboard", "Overview"],
+  ["dashboard", "Home"],
   ["sessions", "Sessions"],
   ["upload", "Upload"],
   ["analytics", "Change"],
@@ -216,17 +216,31 @@ function render() {
         <img src="./assets/lina_logo_square.png" alt="" />
         <div>
           <strong>Culture Platform</strong>
-          <span>Session Logger</span>
+          <span>Operator OS</span>
         </div>
       </div>
-      <nav>${VIEWS.map(([id, label]) => `<button class="${state.activeView === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}</nav>
+      <nav>
+        <span class="nav-label">Workspace</span>
+        ${VIEWS.map(([id, label]) => `<button class="${state.activeView === id ? "active" : ""}" data-view="${id}"><i></i>${label}</button>`).join("")}
+      </nav>
       <div class="sidebar-note">
-        <span>Local browser app</span>
-        <b>${new Date().toLocaleDateString("ko-KR")}</b>
+        <span>Workspace</span>
+        <b>Private operator</b>
+        <small>${new Date().toLocaleDateString("ko-KR")}</small>
       </div>
     </aside>
     <main>
-      ${renderView()}
+      <header class="topbar">
+        <div class="searchbox">Search sessions, cohorts, uploads</div>
+        <div class="topbar-actions">
+          <span>${state.sessions.length} sessions</span>
+          <button class="ghost" data-view="upload">Import CSV</button>
+          <button class="primary compact" data-view="sessions">New session</button>
+        </div>
+      </header>
+      <div class="canvas">
+        ${renderView()}
+      </div>
     </main>
   `;
   bindGlobal();
@@ -252,20 +266,42 @@ function renderDashboard() {
   const ready = state.sessions.filter((session) => ["사전", "사후"].every((phase) => phasesForSession(session.id).includes(phase))).length;
 
   return `
-    <section class="hero">
-      <div class="eyebrow">Culture Platform 3.0</div>
-      <h1>운영, 측정, 보고가 하나의 흐름으로 보이도록.</h1>
-      <p>세션 등록부터 설문 업로드, 변화량 확인, 경영진 보고까지 같은 화면 언어로 이어지는 브라우저 기반 운영 앱입니다.</p>
-      <div class="hero-actions">
-        <button class="primary" data-view="sessions">세션 만들기</button>
-        <button class="secondary" data-view="upload">CSV 업로드</button>
+    <section class="hero dashboard-hero">
+      <div class="hero-copy">
+        <div class="eyebrow">Culture Platform 3.0</div>
+        <h1>Culture sessions, measured from plan to report.</h1>
+        <p>세션 운영과 설문 변화량을 한 흐름으로 연결해, 운영자는 다음 액션을 보고 경영진은 안전하게 결과를 봅니다.</p>
+        <div class="hero-actions">
+          <button class="primary" data-view="sessions">세션 만들기</button>
+          <button class="secondary" data-view="upload">CSV 업로드</button>
+        </div>
+      </div>
+      <div class="flow-canvas" aria-hidden="true">
+        <div class="flow-toolbar">
+          <span></span><span></span><span></span>
+          <b>Session flow</b>
+        </div>
+        <div class="flow-line"></div>
+        <div class="flow-node node-plan"><strong>Plan</strong><small>target teams</small></div>
+        <div class="flow-node node-run"><strong>Run</strong><small>round schedule</small></div>
+        <div class="flow-node node-pulse"><strong>Measure</strong><small>pre · mid · post</small></div>
+        <div class="flow-node node-report"><strong>Report</strong><small>N&lt;3 masked</small></div>
+        <div class="flow-card mini-a"><span>Active</span><b>${active}</b></div>
+        <div class="flow-card mini-b"><span>Ready</span><b>${ready}</b></div>
       </div>
     </section>
-    <section class="metric-grid">
+    <section class="metric-grid command-grid">
       ${metricCard("전체 세션", state.sessions.length, "등록된 운영 단위")}
       ${metricCard("진행중", active, "일정이 열린 세션")}
       ${metricCard("이번 주 일정", weekItems.length, "7일 이내 확정")}
       ${metricCard("보고 준비", ready, "사전/사후 적재 완료")}
+    </section>
+    <section class="feature-band">
+      <div>
+        <span>Next operating loop</span>
+        <strong>세션 설계 → CSV 검증 → 변화량 확인 → 경영진 보고</strong>
+      </div>
+      <button data-view="upload">업로드로 이동</button>
     </section>
     <section class="workspace-grid">
       <div>
@@ -289,9 +325,9 @@ function renderSessions() {
     <section class="page-head">
       <div>
         <span class="eyebrow">Session operations</span>
-        <h1>세션을 설계하고 일정 상태를 정리합니다.</h1>
+        <h1>Build each session as a clear operating track.</h1>
       </div>
-      <button class="secondary" id="reset-demo">로컬 데이터 초기화</button>
+      <button class="secondary" id="reset-demo">Reset data</button>
     </section>
     <section class="panel">
       <div class="form-grid">
@@ -333,7 +369,7 @@ function renderUpload() {
     <section class="page-head">
       <div>
         <span class="eyebrow">Upload</span>
-        <h1>익명 설문 CSV를 검증한 뒤 저장합니다.</h1>
+        <h1>Validate anonymous survey files before they enter analysis.</h1>
       </div>
     </section>
     <section class="panel">
@@ -365,7 +401,7 @@ function renderAnalytics() {
     <section class="page-head">
       <div>
         <span class="eyebrow">Change analysis</span>
-        <h1>사전과 사후의 변화 방향을 봅니다.</h1>
+        <h1>Read the direction of culture change by cohort.</h1>
       </div>
     </section>
     ${cohort ? `
@@ -392,7 +428,7 @@ function renderReport() {
     <section class="page-head">
       <div>
         <span class="eyebrow">Executive report</span>
-        <h1>개인 식별 위험을 줄인 보고 화면입니다.</h1>
+        <h1>A masked report surface for executive review.</h1>
       </div>
       ${cohort ? `<button class="primary" id="download-report">CSV 보고서 다운로드</button>` : ""}
     </section>

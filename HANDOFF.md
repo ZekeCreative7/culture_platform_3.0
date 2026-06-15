@@ -19,7 +19,7 @@ main...origin/main
 Latest relevant commit:
 
 ```text
-c220f97 Migrate to browser web app
+593e7f1 Add Claude handoff notes
 ```
 
 ## What Changed
@@ -126,3 +126,17 @@ The user strongly disliked the previous Streamlit UI quality. Continue with a pr
 - less explanatory clutter
 - no Streamlit-looking controls as the main experience
 
+## Latest Design Reference Direction
+
+The user later provided three Pinterest dashboard references and said the design still looked too amateur.
+
+Current redesign direction in `webapp/src/styles.css`:
+
+- dark left navigation inside a rounded app shell
+- top search/action bar
+- dark hero feature band
+- `Session flow` visual canvas on the home screen
+- flatter 8px operational cards
+- denser B2B SaaS dashboard rhythm
+
+Keep future UI work aligned with integration/settings dashboards, service-map dashboards, and education dashboard layouts rather than generic white-card dashboards.

@@ -251,3 +251,30 @@ Culture Platform 3.0/
 - 현재 데이터 저장은 `localStorage`
 - 운영용 다음 단계는 Supabase/Postgres + auth
 - GitHub Pages는 `main` branch, `/root` folder로 설정하면 루트 `index.html`이 `/webapp/`으로 이동
+
+---
+
+## 2026-06-15 Pinterest 레퍼런스 기반 디자인 리프레시
+
+사용자가 제공한 Pinterest 대시보드 레퍼런스 3개를 확인하고 `webapp/` UI를 다시 조정했다.
+
+참고 무드:
+
+- AI integrations/settings dashboard: 짙은 feature band, 얇은 제품 내비게이션, integration card/row 레이어
+- Infrastructure/service map dashboard: 상단 컨트롤 바, 중앙 flow canvas, 하단 분석 패널
+- Education dashboard: 어두운 사이드바, 밝은 메인 캔버스, 오른쪽 정보 패널, 작은 pill/status 요소
+
+변경 내용:
+
+- 앱 전체를 하나의 둥근 shell로 감싸고, 어두운 사이드바 + 상단 검색/액션 바 구조로 재설계
+- Overview 히어로를 짙은 feature band + `Session flow` visual canvas로 변경
+- KPI 카드, 리스트 카드, type 카드, form panel을 더 납작하고 정교한 B2B SaaS 스타일로 재정리
+- `Local prototype` 문구를 `Private operator`로 교체
+- 버튼 줄바꿈 문제 수정
+
+검증:
+
+- `http://localhost:4174` 루트 배포 경로에서 `/webapp/` 이동 확인
+- Home 화면, Sessions 화면 브라우저 렌더링 확인
+- 로고 로딩 확인
+- 콘솔 오류 없음

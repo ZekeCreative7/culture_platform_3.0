@@ -234,3 +234,20 @@ Culture Platform 3.0/
 - 운영용 영구 저장소로 Supabase/Postgres 연결
 - 로그인/권한 제어 추가
 - 기존 `culture.db` 데이터의 웹앱 초기 데이터 또는 DB 마이그레이션 경로 정리
+
+---
+
+## 2026-06-15 Claude Code 인계 기록
+
+다음 작업자가 바로 이어받을 수 있도록 `CLAUDE.md`와 `HANDOFF.md`를 추가했다.
+
+- `CLAUDE.md`: Claude Code가 먼저 읽을 프로젝트 방향, 실행 방법, 디자인 방향, 배포/검증 기록
+- `HANDOFF.md`: 현재 상태, 최신 커밋, 남은 작업, GitHub Pages 배포 절차
+
+핵심 인계 내용:
+
+- Streamlit은 레거시 프로토타입으로 보존
+- 실제 제품 표면은 `webapp/` 기준으로 계속 개발
+- 현재 데이터 저장은 `localStorage`
+- 운영용 다음 단계는 Supabase/Postgres + auth
+- GitHub Pages는 `main` branch, `/root` folder로 설정하면 루트 `index.html`이 `/webapp/`으로 이동

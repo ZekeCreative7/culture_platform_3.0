@@ -26,9 +26,7 @@
 body {
   margin: 0;
   min-width: 320px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 280px),
-    var(--page);
+  background: var(--shell);
   color: var(--ink);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   letter-spacing: 0;
@@ -46,20 +44,20 @@ button {
 }
 
 #app {
-  min-height: calc(100vh - 44px);
-  width: min(1380px, calc(100vw - 48px));
-  margin: 22px auto;
+  min-height: 100vh;
+  width: 100%;
+  margin: 0;
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
   overflow: hidden;
   background: var(--shell);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 18px;
-  box-shadow: var(--shadow-high);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .sidebar {
-  min-height: calc(100vh - 44px);
+  min-height: 100vh;
   padding: 20px 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
@@ -1117,9 +1115,6 @@ tr:last-child td {
 @media (max-width: 1120px) {
   #app {
     width: 100%;
-    min-height: 100vh;
-    margin: 0;
-    border-radius: 0;
   }
 
   .hero {

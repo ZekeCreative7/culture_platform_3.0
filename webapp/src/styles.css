@@ -98,6 +98,8 @@
 body {
   margin: 0;
   min-width: 320px;
+  max-width: 100%;
+  overflow-x: hidden;
   background: var(--page);
   color: var(--ink);
   font-family: var(--font-main);
@@ -918,6 +920,7 @@ input,
 select,
 textarea {
   width: 100%;
+  min-width: 0;
   min-height: 44px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
@@ -970,6 +973,7 @@ select option {
 .schedule-table {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .schedule-row {
@@ -982,6 +986,11 @@ select option {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 0;
+}
+
+.schedule-row > * {
+  min-width: 0;
 }
 
 .schedule-row:hover {
@@ -2624,12 +2633,12 @@ td.minus {
   .topbar {
     height: 52px;
     min-height: 52px;
-    padding: 0 14px;
+    padding: 0 12px;
     position: sticky;
     top: 0;
     z-index: 50;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
   }
 
   .menu-toggle {
@@ -2672,17 +2681,32 @@ td.minus {
   }
 
   .topbar-actions {
-    width: 100%;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 6px;
   }
 
   .topbar-actions span {
     display: none;
   }
 
+  .topbar-actions .ghost,
+  .topbar-actions .primary {
+    min-width: 0;
+    min-height: 38px;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .topbar-actions .ghost {
+    padding-inline: 6px;
+  }
+
   .canvas {
     padding: 14px;
+    min-width: 0;
   }
 
   .metric-grid,
@@ -2742,6 +2766,18 @@ td.minus {
     grid-template-columns: 1fr;
     gap: 8px;
     padding: 12px;
+    overflow: hidden;
+  }
+
+  .schedule-row input {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .schedule-row input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
   }
 
   .org-workspace {
@@ -2757,10 +2793,15 @@ td.minus {
   .form-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+    min-width: 0;
   }
 
   .form-grid.compact {
     grid-template-columns: 1fr;
+  }
+
+  .form-grid > [style*="grid-column"] {
+    grid-column: 1 / -1 !important;
   }
 
   .tab-header {

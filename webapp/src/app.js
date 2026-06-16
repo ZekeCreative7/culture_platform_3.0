@@ -681,7 +681,7 @@ function render() {
   const app = document.querySelector("#app");
   const classes = [];
   if (state.mobileNavOpen) classes.push("mobile-nav-open");
-  if (state.sidebarCollapsed) classes.push("sidebar-collapsed");
+  if (state.sidebarCollapsed && window.innerWidth > 767) classes.push("sidebar-collapsed");
   app.className = classes.join(" ");
 
   const toggleIcon = state.sidebarCollapsed

@@ -1044,8 +1044,8 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
   .mobile-nav-backdrop { position: fixed; inset: 0; display: block; opacity: 0; pointer-events: none; border: 0; padding: 0; background: rgba(12,35,64,0.45); z-index: 110; transition: opacity 0.22s ease; }
   .mobile-nav-open .mobile-nav-backdrop { opacity: 1; pointer-events: auto; }
   main { min-height: 100vh; }
-  .topbar { height: 52px; min-height: 52px; padding: 0 12px; position: sticky; top: 0; z-index: 50; justify-content: space-between; gap: 8px; }
-  .menu-toggle { width: 40px; height: 40px; flex: 0 0 40px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 1.5px solid #bae6fd; border-radius: 11px; background: #ffffff; color: var(--ink); box-shadow: var(--shadow-low); }
+  .topbar { height: 52px; min-height: 52px; padding: 0 12px; position: sticky; top: 0; z-index: 115; justify-content: space-between; gap: 8px; }
+  .menu-toggle { width: 44px; height: 44px; flex: 0 0 44px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 1.5px solid #bae6fd; border-radius: 11px; background: #ffffff; color: var(--ink); box-shadow: var(--shadow-low); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .menu-toggle span { width: 16px; height: 2px; border-radius: 99px; background: currentColor; transition: transform 0.2s ease, opacity 0.2s ease; }
   .mobile-nav-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .mobile-nav-open .menu-toggle span:nth-child(2) { opacity: 0; }

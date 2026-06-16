@@ -287,7 +287,10 @@
         // Primary: read survey data encoded in URL (works on any device)
         if (encodedData) {
           try {
-            const payload = JSON.parse(decodeURIComponent(escape(atob(encodedData))));
+            // Restore standard base64 from URL-safe base64 (- → +, _ → /, re-pad)
+            const b64 = encodedData.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+            const payload = JSON.parse(decodeURIComponent(escape(atob(padded))));
             const session = { id: payload.sessionId, type: payload.sessionType || '', cohort: payload.sessionCohort || '' };
             renderSurveyForm(payload, session);
             return;

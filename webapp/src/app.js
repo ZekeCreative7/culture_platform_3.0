@@ -1616,16 +1616,19 @@ function renderSurveyCreator() {
             const sessLabel = sess ? `${sess.type} · ${sessionLabel(sess)}` : "만료된 세션";
             
             const qrHost = (state.qrBaseUrl || new URL('.', window.location.href).href).replace(/\/$/, '');
-            // Encode survey+session data into URL so any device can render the survey without shared localStorage
-            const surveyPayload = btoa(unescape(encodeURIComponent(JSON.stringify({
+            // Encode survey data into URL using URL-safe base64 so any device can render without shared localStorage
+            const surveyJson = JSON.stringify({
               id: s.id,
               title: s.title,
               phase: s.phase,
               sessionId: s.sessionId,
               sessionType: sess ? sess.type : '',
               sessionCohort: sess ? (sess.cohort || '') : '',
-              questions: s.questions || []
-            }))));
+              questions: (s.questions || []).map(q => ({ id: q.id, text: q.text, type: q.type }))
+            });
+            // URL-safe base64: replace +/= that break URL query params
+            const surveyPayload = btoa(unescape(encodeURIComponent(surveyJson)))
+              .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
             const surveyLink = `${qrHost}/survey.html?d=${surveyPayload}`;
             
             // Generate QR Code locally using qrcode.min.js

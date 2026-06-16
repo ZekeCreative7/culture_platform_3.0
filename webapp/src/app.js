@@ -1719,8 +1719,14 @@ function renderUpload() {
   `;
 }
 
+function allCohorts() {
+  const fromResponses = state.responses.map(r => Number(r.cohort)).filter(Boolean);
+  const fromSessions  = (state.sessions || []).map(s => Number(s.cohort)).filter(Boolean);
+  return [...new Set([...fromResponses, ...fromSessions])].sort((a, b) => a - b);
+}
+
 function renderAnalytics() {
-  const cohorts = [...new Set(state.responses.map((row) => row.cohort))].filter(Boolean).sort((a, b) => a - b);
+  const cohorts = allCohorts();
   
   // Auto-populate active cohort filter if empty
   if (!state.selectedAnalyticsCohort && cohorts.length > 0) {
@@ -1771,7 +1777,7 @@ function renderAnalytics() {
 }
 
 function renderReport() {
-  const cohorts = [...new Set(state.responses.map((row) => row.cohort))].filter(Boolean).sort((a, b) => a - b);
+  const cohorts = allCohorts();
   
   if (!state.selectedReportCohort && cohorts.length > 0) {
     state.selectedReportCohort = cohorts[0].toString();
@@ -3001,9 +3007,20 @@ async function initApp() {
 
   // Real-time listener for responses — updates dashboard whenever a phone submits
   onSnapshot(collection(db, 'responses'), (snap) => {
+    const surveyMap = Object.fromEntries((state.surveys || []).map(s => [s.id, s]));
+    const sessionMap = Object.fromEntries((state.sessions || []).map(s => [s.id, s]));
+
     const firestoreResponses = snap.docs.map(d => {
       const data = d.data();
-      return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString() };
+      let cohort = Number(data.cohort) || 0;
+      // Fill missing cohort from linked survey → session
+      if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
+        cohort = Number(surveyMap[data.surveyId].sessionCohort) || 0;
+      }
+      if (!cohort && data.sessionId && sessionMap[data.sessionId]) {
+        cohort = Number(sessionMap[data.sessionId].cohort) || 0;
+      }
+      return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString() };
     });
     const firestoreIds = new Set(firestoreResponses.map(r => r.id));
     const localOnly = (state.responses || []).filter(r => !firestoreIds.has(r.id));

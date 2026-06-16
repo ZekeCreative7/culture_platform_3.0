@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDocs, deleteDoc, onSnapshot, serverTimestamp } from './firebase.js';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp } from './firebase.js';
 
 const PHASES = ["사전", "중간", "사후"];
 const QUANT_LABELS = {
@@ -1028,7 +1028,10 @@ function renderSessions() {
         <span class="eyebrow">Session operations</span>
         <h1>조직문화 세션 스케줄 및 운영 관리</h1>
       </div>
-      <button class="secondary" id="reset-demo">Reset data</button>
+      <div style="display:flex; gap:8px;">
+        <button class="secondary" id="btn-db-download">DB 다운로드</button>
+        <button class="primary compact" id="btn-db-upload">DB 전송</button>
+      </div>
     </section>
     <div class="tab-container">
       <div class="tab-header">
@@ -2843,13 +2846,8 @@ function bindSessions() {
     saveState();
     render();
   });
-  document.querySelector("#reset-demo")?.addEventListener("click", () => {
-    if (confirm("브라우저에 저장된 로컬 데이터를 초기화할까요?")) {
-      localStorage.removeItem(STORE_KEY);
-      state = blankState();
-      initApp();
-    }
-  });
+  document.querySelector("#btn-db-upload")?.addEventListener("click", uploadStateToDb);
+  document.querySelector("#btn-db-download")?.addEventListener("click", downloadStateFromDb);
 }
 
 function bindUpload() {
@@ -3377,6 +3375,49 @@ async function saveSurveyToFirestore(survey) {
 
 async function deleteSurveyFromFirestore(id) {
   await deleteDoc(doc(db, 'surveys', id));
+}
+
+async function uploadStateToDb() {
+  const btn = document.querySelector("#btn-db-upload");
+  if (btn) { btn.disabled = true; btn.textContent = '전송 중...'; }
+  try {
+    await setDoc(doc(db, 'appState', 'main'), {
+      sessions:    state.sessions    || [],
+      surveys:     state.surveys     || [],
+      orgUnits:    state.orgUnits    || [],
+      orgMembers:  state.orgMembers  || [],
+      qualAnalysis: state.qualAnalysis || {},
+      savedAt:     serverTimestamp(),
+    });
+    alert('현재 상태가 DB에 저장되었습니다.');
+  } catch (e) {
+    alert('DB 전송 실패: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'DB 전송'; }
+  }
+}
+
+async function downloadStateFromDb() {
+  const btn = document.querySelector("#btn-db-download");
+  if (btn) { btn.disabled = true; btn.textContent = '다운로드 중...'; }
+  try {
+    const snap = await getDoc(doc(db, 'appState', 'main'));
+    if (!snap.exists()) { alert('저장된 DB 상태가 없습니다. 먼저 DB 전송을 해주세요.'); return; }
+    const data = snap.data();
+    const savedAt = data.savedAt?.toDate?.()?.toLocaleString('ko-KR') || '알 수 없음';
+    if (!confirm(`저장 시각: ${savedAt}\n\n현재 로컬 데이터를 DB 상태로 덮어쓸까요?`)) return;
+    if (data.sessions)    state.sessions    = data.sessions;
+    if (data.surveys)     state.surveys     = data.surveys;
+    if (data.orgUnits)    state.orgUnits    = data.orgUnits;
+    if (data.orgMembers)  state.orgMembers  = data.orgMembers;
+    if (data.qualAnalysis) state.qualAnalysis = data.qualAnalysis;
+    saveState();
+    render();
+  } catch (e) {
+    alert('DB 다운로드 실패: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'DB 다운로드'; }
+  }
 }
 
 // ── Async Startup Initializer ───────────────────────────────────

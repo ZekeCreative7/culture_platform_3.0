@@ -2947,8 +2947,17 @@ async function deleteSurveyFromFirestore(id) {
 }
 
 // ── Async Startup Initializer ───────────────────────────────────
+function computeQrBaseUrl() {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.origin.startsWith('file')) {
+    return 'https://zekecreative7.github.io/culture_platform_3.0/webapp';
+  }
+  return new URL('.', window.location.href).href.replace(/\/$/, '');
+}
+
 async function initApp() {
   state = loadState();
+  // Always recompute qrBaseUrl — stale localhost values from localStorage break mobile QR
+  state.qrBaseUrl = computeQrBaseUrl();
   if (!state.orgUnits || state.orgUnits.length < 10 || !state.orgMembers || state.orgMembers.length < 10) {
     try {
       const response = await fetch('./src/org_data.json');

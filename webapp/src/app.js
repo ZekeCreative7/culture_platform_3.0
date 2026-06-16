@@ -1776,53 +1776,231 @@ function renderAnalytics() {
   `;
 }
 
+// ── Report Analysis Helpers ──────────────────────────────────────
+const REPORT_DIMS = [
+  { key: 'psych',      label: '심리적 안전감', qs: ['q1','q2','q3'], color: '#0ea5e9' },
+  { key: 'silo',       label: '사일로 해소',   qs: ['q4','q5','q6'], color: '#14b8a6' },
+  { key: 'resilience', label: '회복탄력성',    qs: ['q7'],           color: '#f59e0b' },
+  { key: 'mood',       label: '전반 분위기',   qs: ['q8'],           color: '#8b5cf6' },
+];
+
+function dimAvg(phaseStats, qs) {
+  if (!phaseStats) return null;
+  const vals = qs.map(q => phaseStats[`${q}_avg`]).filter(v => typeof v === 'number');
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+
+function ragInfo(score) {
+  if (score === null) return { label:'데이터 없음', color:'#94a3b8', bg:'#f8fafc', bar:'#e2e8f0' };
+  if (score >= 4.0)   return { label:'양호',       color:'#059669', bg:'#f0fdf4', bar:'#10b981' };
+  if (score >= 3.0)   return { label:'주의',       color:'#d97706', bg:'#fffbeb', bar:'#f59e0b' };
+  return               { label:'위험',       color:'#dc2626', bg:'#fef2f2', bar:'#ef4444' };
+}
+
+function dimRecommendation(key, score) {
+  if (score === null) return '사전 설문 데이터가 충분하지 않습니다. 사전 설문을 진행한 후 분석이 가능합니다.';
+  const recs = {
+    psych: [
+      [3.0, '구성원들이 의견 표현에 심리적 부담을 느끼고 있습니다. 세션 초반 "심리적 안전 계약" 수립에 충분한 시간을 배분하고, 판단 없이 듣기 규칙을 팀이 함께 설정하게 하세요.'],
+      [3.5, '심리적 안전감이 형성 중입니다. 소규모 그룹 대화와 경청 훈련을 반복 강화하고, 리더의 취약성 공유가 선행되면 효과가 큽니다.'],
+      [4.0, '심리적 안전감은 양호합니다. 더 심층적인 취약성 공유와 건설적 이의제기 문화로 발전시키세요.'],
+      [6.0, '심리적 안전감이 매우 높습니다. 이를 토대로 심층 피드백 문화와 실험 친화적 환경을 조직 전반에 확산하세요.'],
+    ],
+    silo: [
+      [3.0, '부서·팀 간 협업 장벽이 높습니다. 타 팀 업무 이해 세션과 공동 목표 설정 워크숍을 우선 편성하고, 크로스팀 접점 기회를 구조적으로 만드세요.'],
+      [3.5, '사일로가 일부 존재합니다. 크로스팀 미션 시뮬레이션을 포함하고, 협업 저해 요인을 팀이 직접 도출하게 하세요.'],
+      [4.0, '횡적 소통이 원활합니다. 협업 성공 사례를 세션에서 공유·확산하여 긍정 모멘텀을 유지하세요.'],
+      [6.0, '사일로가 매우 낮습니다. 협업 모범 사례를 경영진 공유 아젠다로 활용하고 조직 학습 자산화하세요.'],
+    ],
+    resilience: [
+      [3.0, '구성원 소진(번아웃) 위험 신호가 감지됩니다. 회복 루틴 설계와 심리 자원 점검 워크숍을 세션 최우선 아젠다로 배치하세요.'],
+      [3.5, '긴장감이 있으나 관리 가능 수준입니다. 스트레스 대처 전략 공유 시간을 확보하고, 자기돌봄 계획을 작성하도록 안내하세요.'],
+      [4.0, '양호한 회복력을 보입니다. 구성원 간 회복 방식을 공유하며 팀 차원의 상호지지 체계를 강화하세요.'],
+      [6.0, '높은 회복탄력성을 보입니다. 이 에너지를 팀 도전 과제 해결에 적극 활용하고 회복 문화를 명문화하세요.'],
+    ],
+    mood: [
+      [3.0, '전반적 팀 분위기가 침체되어 있습니다. 세션 초반 소소한 성공 경험 공유와 진심 어린 인정 활동으로 긍정 에너지를 먼저 충전하세요.'],
+      [3.5, '분위기 개선의 여지가 있습니다. 구성원 간 Recognition 활동과 비공식 유대 기회를 늘리고, 함께하는 즐거운 경험을 의도적으로 설계하세요.'],
+      [4.0, '팀 분위기가 좋습니다. 이를 유지하는 팀 문화 요소를 명시적으로 언어화하고 새로운 구성원에게도 전달될 수 있게 문서화하세요.'],
+      [6.0, '매우 긍정적인 팀 분위기입니다. 이 에너지를 조직 전체에 전파하는 방안을 논의하고 문화 앰배서더 역할을 부여하세요.'],
+    ],
+  };
+  const list = recs[key] || [];
+  const match = list.find(([t]) => score < t);
+  return match ? match[1] : (list[list.length-1]?.[1] || '');
+}
+
 function renderReport() {
   const cohorts = allCohorts();
-  
   if (!state.selectedReportCohort && cohorts.length > 0) {
     state.selectedReportCohort = cohorts[0].toString();
   }
   const cohort = Number(state.selectedReportCohort || (cohorts.length ? cohorts[0] : 0));
   const type = state.selectedReportType || "팀장";
   const stats = cohort ? statsForCohort(cohort, type) : [];
+  const pre  = stats[0] || null;
+  const mid  = stats[1] || null;
+  const post = stats[2] || null;
+
+  const hasPreData  = pre  && pre.n  >= 1;
+  const hasPostData = post && post.n >= 1;
 
   return `
     <section class="page-head">
       <div>
-        <span class="eyebrow">Executive report</span>
-        <h1>경영진 보고서 (마스킹 적용)</h1>
-        <p>익명성 보장을 위해 응답 수 N < 3인 결과는 자동 마스킹 처리된 보고서 뷰입니다.</p>
+        <span class="eyebrow">Expert Report</span>
+        <h1>전문가 분석 리포트</h1>
+        <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
       </div>
-      ${cohort ? `<button class="primary" id="download-report">CSV 보고서 다운로드</button>` : ""}
+      ${cohort ? `<button class="primary" id="download-report">CSV 다운로드</button>` : ""}
     </section>
 
     <section class="panel filters-panel" style="margin-bottom:18px;">
       <div class="form-grid compact" style="grid-template-columns: repeat(2, 1fr); gap:16px;">
-        <label>대상 기수 선택
+        <label>대상 기수
           <select id="report-cohort-select" onchange="updateReportFilter('selectedReportCohort', this.value)">
-            ${cohorts.length ? cohorts.map(c => `<option value="${c}" ${cohort === c ? "selected" : ""}>${c}기</option>`).join("") : `<option value="">응답 없음</option>`}
+            ${cohorts.length ? cohorts.map(c=>`<option value="${c}" ${cohort===c?"selected":""}>${c}기</option>`).join("") : `<option value="">세션 없음</option>`}
           </select>
         </label>
-        <label>세션 유형 선택
+        <label>세션 유형
           <select id="report-type-select" onchange="updateReportFilter('selectedReportType', this.value)">
-            ${Object.keys(SESSION_TYPES).map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${t}</option>`).join("")}
+            ${Object.keys(SESSION_TYPES).map(t=>`<option value="${t}" ${type===t?"selected":""}>${t}</option>`).join("")}
           </select>
         </label>
       </div>
     </section>
 
-    ${cohort ? `
-      <section class="panel executive">
-        <div class="report-summary">
-          <div><span>대상 기수</span><strong>${cohort}기</strong></div>
-          <div><span>세션 유형</span><strong>${type}</strong></div>
-          <div><span>사전 N</span><strong>${stats[0] ? stats[0].n : 0}</strong></div>
-          <div><span>사후 N</span><strong>${stats[2] ? stats[2].n : 0}</strong></div>
-        </div>
-        <p class="muted" style="margin-top:12px;">N이 3 미만인 셀은 익명 보장을 위해 마스킹 처리(N<3 마스킹)합니다. 수치는 통계적 유의성이 아니라 방향과 크기를 설명하는 운영 지표입니다.</p>
-        ${renderStatsTable(stats, true, cohort, type)}
-      </section>
-    ` : emptyCard("보고 가능한 응답 데이터가 없습니다.")}
+    ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
+
+    <!-- ① 현 상황 진단 -->
+    <section style="margin-bottom:28px;">
+      <div class="section-title" style="margin-bottom:16px;">
+        <h2>① 현 상황 진단</h2>
+        <span>사전 설문 기준 · ${cohort}기 ${type} · N=${pre ? pre.n : 0}</span>
+      </div>
+      ${!hasPreData ? `<div class="empty">사전 설문 응답이 없습니다. 사전 설문을 진행한 후 진단이 가능합니다.</div>` : `
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:14px;">
+        ${REPORT_DIMS.map(dim => {
+          const score = dimAvg(pre, dim.qs);
+          const rag = ragInfo(score);
+          const pct = score ? Math.round((score/5)*100) : 0;
+          return `
+            <div style="background:${rag.bg}; border:1.5px solid ${rag.bar}33; border-radius:12px; padding:18px 20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
+                <span style="font-size:11px; font-weight:800; color:${rag.color}; background:${rag.color}18; padding:3px 10px; border-radius:99px;">${rag.label}</span>
+              </div>
+              <div style="font-size:28px; font-weight:800; color:${rag.color}; margin-bottom:8px;">${score !== null ? score.toFixed(2) : '—'}<span style="font-size:13px; color:#94a3b8; font-weight:500;"> / 5.00</span></div>
+              <div style="background:#e2e8f0; border-radius:99px; height:6px; overflow:hidden;">
+                <div style="width:${pct}%; height:100%; background:${rag.bar}; border-radius:99px; transition:width 0.6s;"></div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+      <div class="panel" style="margin-top:16px; padding:18px 22px;">
+        <p style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin:0 0 10px 0;">종합 진단 요약</p>
+        <p style="font-size:13.5px; line-height:1.8; color:#0c2340; margin:0;">
+          ${cohort}기 ${type} 세션 대상 사전 설문(N=${pre.n}) 결과,
+          ${REPORT_DIMS.map(dim => {
+            const score = dimAvg(pre, dim.qs);
+            const rag = ragInfo(score);
+            return score !== null ? `<strong>${dim.label}</strong>(${score.toFixed(1)}: ${rag.label})` : null;
+          }).filter(Boolean).join(' · ')}.
+          ${(() => {
+            const scores = REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(pre, d.qs) })).filter(d => d.score !== null);
+            const lowest = scores.sort((a,b) => a.score - b.score)[0];
+            const highest = scores.sort((a,b) => b.score - a.score)[0];
+            if (!lowest) return '';
+            return `가장 집중이 필요한 영역은 <strong>${lowest.label}(${lowest.score.toFixed(1)})</strong>이며, 상대적 강점은 <strong>${highest.label}(${highest.score.toFixed(1)})</strong>입니다.`;
+          })()}
+        </p>
+      </div>
+      `}
+    </section>
+
+    <!-- ② 세션 운영 제안 -->
+    <section style="margin-bottom:28px;">
+      <div class="section-title" style="margin-bottom:16px;">
+        <h2>② 세션 운영 제안</h2>
+        <span>사전 진단 기반 퍼실리테이션 가이드</span>
+      </div>
+      ${!hasPreData ? `<div class="empty">사전 설문 데이터가 있어야 제안을 생성할 수 있습니다.</div>` : `
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        ${REPORT_DIMS.map((dim, idx) => {
+          const score = dimAvg(pre, dim.qs);
+          const rag = ragInfo(score);
+          const priority = score !== null && score < 3.5 ? '우선 집중' : score !== null && score < 4.0 ? '강화 권장' : '강점 유지';
+          const priorityColor = score !== null && score < 3.5 ? '#dc2626' : score !== null && score < 4.0 ? '#d97706' : '#059669';
+          return `
+            <div class="panel" style="padding:16px 20px; display:flex; gap:16px; align-items:flex-start;">
+              <div style="min-width:32px; height:32px; border-radius:8px; background:${dim.color}18; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; color:${dim.color};">${idx+1}</div>
+              <div style="flex:1;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                  <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
+                  <span style="font-size:10.5px; font-weight:800; color:${priorityColor}; background:${priorityColor}12; padding:2px 8px; border-radius:99px;">${priority}</span>
+                  ${score !== null ? `<span style="font-size:11.5px; color:#64748b;">${score.toFixed(2)} / 5.00</span>` : ''}
+                </div>
+                <p style="font-size:13px; line-height:1.7; color:#334155; margin:0;">${dimRecommendation(dim.key, score)}</p>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+      `}
+    </section>
+
+    <!-- ③ 변화 분석 -->
+    <section style="margin-bottom:28px;">
+      <div class="section-title" style="margin-bottom:16px;">
+        <h2>③ 변화 분석</h2>
+        <span>사전 → 사후 비교 · N<3 마스킹 적용</span>
+      </div>
+      ${!hasPreData && !hasPostData ? `<div class="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>` : `
+      <div class="panel" style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="border-bottom:2px solid #e2e8f0;">
+              <th style="text-align:left; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px; text-transform:uppercase;">영역</th>
+              <th style="text-align:center; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">사전 (N=${pre ? pre.n : 0})</th>
+              <th style="text-align:center; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">중간 (N=${mid ? mid.n : 0})</th>
+              <th style="text-align:center; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">사후 (N=${post ? post.n : 0})</th>
+              <th style="text-align:center; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">변화량</th>
+              <th style="text-align:left; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">해석</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${REPORT_DIMS.map(dim => {
+              const preScore  = pre  && pre.n  >= 3 ? dimAvg(pre,  dim.qs) : null;
+              const midScore  = mid  && mid.n  >= 3 ? dimAvg(mid,  dim.qs) : null;
+              const postScore = post && post.n >= 3 ? dimAvg(post, dim.qs) : null;
+              const delta = (preScore !== null && postScore !== null) ? postScore - preScore : null;
+              const arrow = delta === null ? '—' : delta > 0.2 ? '↑ 개선' : delta < -0.2 ? '↓ 하락' : '→ 유지';
+              const arrowColor = delta === null ? '#94a3b8' : delta > 0.2 ? '#059669' : delta < -0.2 ? '#dc2626' : '#d97706';
+              const interpretation = delta === null ? (hasPreData || hasPostData ? 'N<3 마스킹' : '데이터 없음')
+                : delta > 0.5 ? '뚜렷한 긍정 변화 — 세션 효과가 확인됩니다.'
+                : delta > 0.2 ? '긍정적 변화 — 세션 방향성이 적절합니다.'
+                : delta > -0.2 ? '변화 미미 — 추가 개입 또는 측정 시기 검토가 필요합니다.'
+                : '점수 하락 — 세션 내용 또는 환경 요인을 점검하세요.';
+              return `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                  <td style="padding:12px 14px; font-weight:700; color:#0c2340;">${dim.label}</td>
+                  <td style="text-align:center; padding:12px 14px; color:${ragInfo(preScore).color}; font-weight:700;">${preScore !== null ? preScore.toFixed(2) : '<span style="color:#94a3b8">N<3</span>'}</td>
+                  <td style="text-align:center; padding:12px 14px; color:${ragInfo(midScore).color}; font-weight:700;">${midScore !== null ? midScore.toFixed(2) : '<span style="color:#94a3b8">N<3</span>'}</td>
+                  <td style="text-align:center; padding:12px 14px; color:${ragInfo(postScore).color}; font-weight:700;">${postScore !== null ? postScore.toFixed(2) : '<span style="color:#94a3b8">N<3</span>'}</td>
+                  <td style="text-align:center; padding:12px 14px; font-weight:800; color:${arrowColor};">${delta !== null ? (delta > 0 ? '+' : '') + delta.toFixed(2) + ' ' + arrow : arrow}</td>
+                  <td style="padding:12px 14px; font-size:12px; color:#64748b;">${interpretation}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+        <p style="font-size:11.5px; color:#94a3b8; margin:12px 14px 4px; line-height:1.6;">N이 3 미만인 셀은 익명 보장을 위해 마스킹 처리됩니다. 수치는 통계적 유의성이 아닌 운영 방향 지표입니다.</p>
+      </div>
+      `}
+    </section>
+
+    `}
   `;
 }
 

@@ -149,7 +149,7 @@ const blankState = () => ({
   draftSurveyPhase: "사전",
   draftSurveySessionId: "",
   draftSurveyQuestions: defaultQuestions("사전"),
-  qrBaseUrl: window.location.origin.startsWith("file") ? "http://localhost:4173" : window.location.origin,
+  qrBaseUrl: window.location.origin.startsWith("file") ? "http://localhost:4173" : new URL('.', window.location.href).href.replace(/\/$/, ''),
   selectedAnalyticsCohort: "",
   selectedAnalyticsType: "팀장",
   selectedReportCohort: "",
@@ -1615,8 +1615,18 @@ function renderSurveyCreator() {
             const sess = state.sessions.find(session => session.id === s.sessionId);
             const sessLabel = sess ? `${sess.type} · ${sessionLabel(sess)}` : "만료된 세션";
             
-            const qrHost = state.qrBaseUrl || window.location.origin;
-            const surveyLink = `${qrHost}/survey.html?surveyId=${s.id}`;
+            const qrHost = (state.qrBaseUrl || new URL('.', window.location.href).href).replace(/\/$/, '');
+            // Encode survey+session data into URL so any device can render the survey without shared localStorage
+            const surveyPayload = btoa(unescape(encodeURIComponent(JSON.stringify({
+              id: s.id,
+              title: s.title,
+              phase: s.phase,
+              sessionId: s.sessionId,
+              sessionType: sess ? sess.type : '',
+              sessionCohort: sess ? (sess.cohort || '') : '',
+              questions: s.questions || []
+            }))));
+            const surveyLink = `${qrHost}/survey.html?d=${surveyPayload}`;
             
             // Generate QR Code locally using qrcode.min.js
             let qrUrl = "";

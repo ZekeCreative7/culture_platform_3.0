@@ -280,20 +280,33 @@
       };
 
       const urlParams = new URLSearchParams(window.location.search);
+      const encodedData = urlParams.get('d');
       const surveyId = urlParams.get('surveyId');
 
       window.addEventListener('DOMContentLoaded', () => {
+        // Primary: read survey data encoded in URL (works on any device)
+        if (encodedData) {
+          try {
+            const payload = JSON.parse(decodeURIComponent(escape(atob(encodedData))));
+            const session = { id: payload.sessionId, type: payload.sessionType || '', cohort: payload.sessionCohort || '' };
+            renderSurveyForm(payload, session);
+            return;
+          } catch (e) {
+            console.error('URL 데이터 파싱 실패, localStorage로 대체 시도', e);
+          }
+        }
+
+        // Fallback: read from localStorage (same device only)
         if (!surveyId) {
           showError("설문 ID가 누락되었습니다. 정상적인 링크를 이용해 주세요.");
           return;
         }
-
         const storeData = JSON.parse(localStorage.getItem(STORE_KEY)) || { sessions: [], responses: [], surveys: [] };
         const survey = (storeData.surveys || []).find(s => s.id === surveyId);
         const session = (storeData.sessions || []).find(s => s.id === (survey ? survey.sessionId : ""));
 
         if (!survey || !session) {
-          showError("해당 설문조사를 찾을 수 없거나 만료되었습니다.");
+          showError("해당 설문조사를 찾을 수 없거나 만료되었습니다.<br/>설문지를 다시 배포하거나 운영자에게 문의해 주세요.");
           return;
         }
 

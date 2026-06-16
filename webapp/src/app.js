@@ -172,6 +172,8 @@ const blankState = () => ({
   draftCrossRandomCount: 6,
   orgEditor: null,
   qualAnalysis: {},
+  showQualModal: false,
+  activeQualKey: null,
 });
 
 let state = loadState();
@@ -2031,34 +2033,22 @@ function renderReport() {
     ${(() => {
       const qualKey = `${cohort}-${type}`;
       const saved = (state.qualAnalysis || {})[qualKey] || '';
-      const prompt = buildQualPrompt(cohort, type);
-      const hasQual = prompt.includes('응답 1.');
       return `
     <section style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>④ 정성 응답 AI 분석</h2>
-        <span>프롬프트 자동 생성 → Claude / ChatGPT 붙여넣기 → 결과 저장</span>
+        <button class="secondary compact" onclick="openQualModal('${qualKey}')">
+          ${saved ? '✏️ 분석 수정' : '🤖 AI 분석 시작'}
+        </button>
       </div>
-      ${!hasQual ? `<div class="empty">주관식 응답이 없습니다. 설문 응답이 적재된 후 분석이 가능합니다.</div>` : `
-      <div class="panel" style="padding:18px 22px; margin-bottom:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <p style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin:0;">Step 1 — 프롬프트 복사 후 AI에 붙여넣기</p>
-          <button class="secondary compact" onclick="copyQualPrompt('${qualKey}')">프롬프트 복사</button>
-        </div>
-        <textarea id="qual-prompt-${qualKey}" readonly style="width:100%; height:180px; font-size:11.5px; font-family:monospace; resize:vertical; border:1px solid var(--line); border-radius:8px; padding:12px; background:#f8fafc; color:#334155; box-sizing:border-box;">${escapeHtml(prompt)}</textarea>
-      </div>
-      <div class="panel" style="padding:18px 22px;">
-        <p style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin:0 0 10px 0;">Step 2 — AI 분석 결과 붙여넣고 저장</p>
-        <textarea id="qual-result-${qualKey}" style="width:100%; height:160px; font-size:13px; resize:vertical; border:1.5px solid var(--line); border-radius:8px; padding:12px; box-sizing:border-box;" placeholder="AI 분석 결과를 여기에 붙여넣으세요...">${escapeHtml(saved)}</textarea>
-        <button class="primary compact" style="margin-top:10px;" onclick="saveQualAnalysis('${qualKey}')">결과 저장</button>
-      </div>
-      ${saved ? `
-      <div class="panel" style="margin-top:14px; padding:20px 24px;">
-        <p style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin:0 0 12px 0;">저장된 분석 결과</p>
-        <div style="font-size:13.5px; line-height:1.9; color:#0c2340; white-space:pre-wrap;">${escapeHtml(saved)}</div>
-      </div>` : ''}
-      `}
+      ${saved
+        ? `<div class="panel" style="padding:22px 26px;">
+            <div style="font-size:13.5px; line-height:2; color:#0c2340; white-space:pre-wrap;">${escapeHtml(saved)}</div>
+           </div>`
+        : `<div class="empty">아직 AI 분석 결과가 없습니다. <button class="ghost compact" style="margin-left:6px;" onclick="openQualModal('${qualKey}')">분석 시작</button></div>`
+      }
     </section>
+    ${state.showQualModal && state.activeQualKey === qualKey ? renderQualModal(qualKey, cohort, type) : ''}
       `;
     })()}
 
@@ -3469,6 +3459,42 @@ async function initApp() {
   });
 }
 
+// ── Qualitative Analysis Modal ────────────────────────────────────
+function renderQualModal(qualKey, cohort, type) {
+  const saved = (state.qualAnalysis || {})[qualKey] || '';
+  const prompt = buildQualPrompt(cohort, type);
+  const hasQual = prompt.includes('응답 1.');
+  return `
+    <div class="modal-overlay" id="qual-modal-overlay">
+      <div class="modal-card" style="max-width:640px; width:96%;">
+        <div class="modal-header">
+          <h2>정성 응답 AI 분석 — ${cohort}기 ${type}</h2>
+          <button type="button" class="close-btn" onclick="closeQualModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px; max-height:70vh; overflow-y:auto;">
+          ${!hasQual ? `<p style="color:var(--muted); font-size:13px;">주관식 응답 데이터가 없습니다. 설문 응답이 적재된 후 사용 가능합니다.</p>` : `
+          <div style="background:#f8fafc; border:1px solid var(--line); border-radius:10px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-size:11.5px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.06em;">Step 1 — 프롬프트 복사 후 Claude / ChatGPT에 붙여넣기</span>
+              <button class="secondary compact" onclick="copyQualPrompt('${qualKey}')">복사</button>
+            </div>
+            <textarea id="qual-prompt-${qualKey}" readonly style="width:100%; height:160px; font-size:11.5px; font-family:monospace; resize:vertical; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; background:#ffffff; color:#334155; box-sizing:border-box;">${escapeHtml(prompt)}</textarea>
+          </div>
+          <div style="border:1.5px solid var(--line); border-radius:10px; padding:16px;">
+            <span style="font-size:11.5px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:10px;">Step 2 — AI 분석 결과 붙여넣기</span>
+            <textarea id="qual-result-input" style="width:100%; height:160px; font-size:13px; resize:vertical; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 12px; box-sizing:border-box;" placeholder="AI 분석 결과를 여기에 붙여넣으세요...">${escapeHtml(saved)}</textarea>
+          </div>
+          `}
+        </div>
+        <div class="modal-footer">
+          <button class="secondary" type="button" onclick="closeQualModal()">취소</button>
+          ${hasQual ? `<button class="primary" type="button" onclick="saveQualAnalysisFromModal('${qualKey}')">저장</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // ── Qualitative Analysis Helpers ─────────────────────────────────
 function buildQualPrompt(cohort, type) {
   const sessionIds = new Set(
@@ -3505,6 +3531,18 @@ function buildQualPrompt(cohort, type) {
   return prompt;
 }
 
+window.openQualModal = function(qualKey) {
+  state.showQualModal = true;
+  state.activeQualKey = qualKey;
+  render();
+};
+
+window.closeQualModal = function() {
+  state.showQualModal = false;
+  state.activeQualKey = null;
+  render();
+};
+
 window.copyQualPrompt = function(qualKey) {
   const el = document.getElementById(`qual-prompt-${qualKey}`);
   if (!el) return;
@@ -3513,11 +3551,13 @@ window.copyQualPrompt = function(qualKey) {
   alert('프롬프트가 복사되었습니다. Claude 또는 ChatGPT에 붙여넣으세요.');
 };
 
-window.saveQualAnalysis = function(qualKey) {
-  const el = document.getElementById(`qual-result-${qualKey}`);
+window.saveQualAnalysisFromModal = function(qualKey) {
+  const el = document.getElementById('qual-result-input');
   if (!el) return;
   if (!state.qualAnalysis) state.qualAnalysis = {};
   state.qualAnalysis[qualKey] = el.value.trim();
+  state.showQualModal = false;
+  state.activeQualKey = null;
   saveState();
   render();
 };

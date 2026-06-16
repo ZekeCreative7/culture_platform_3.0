@@ -70,15 +70,35 @@ const SCORE_MAP = {
   "": null,
 };
 const VIEWS = [
-  ["dashboard", "Home"],
-  ["sessions", "Sessions"],
-  ["org", "Organization"],
-  ["survey", "Survey Creator"],
-  ["upload", "Upload"],
-  ["analytics", "Change"],
-  ["report", "Report"],
+  ["dashboard", "Home", "홈"],
+  ["sessions", "Sessions", "세션"],
+  ["org", "Organization", "조직"],
+  ["survey", "Survey Creator", "설문지"],
+  ["upload", "Upload", "데이터 업로드"],
+  ["analytics", "Change", "변화 분석"],
+  ["report", "Report", "리포트"],
 ];
+const NAV_ICONS = {
+  dashboard: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M2 10a8 8 0 1 1 16 0A8 8 0 0 1 2 10Zm8-5a1 1 0 0 1 1 1v4.586l2.707 2.707a1 1 0 0 1-1.414 1.414l-3-3A1 1 0 0 1 9 11V6a1 1 0 0 1 1-1Z"/></svg>`,
+  sessions: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M5 3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5Zm0 2h10v10H5V5Zm2 2a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2H7Zm0 4a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2H7Z" clip-rule="evenodd"/></svg>`,
+  org: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM1.5 14.5c0-1.38 1.343-2.5 3-2.5h.5a3.5 3.5 0 0 0-1 2.43V15H1.5v-.5ZM18.5 14.5c0-1.38-1.343-2.5-3-2.5h-.5a3.5 3.5 0 0 1 1 2.43V15h2.5v-.5ZM6.5 12a3.5 3.5 0 0 0-3.5 3.5V16h14v-.5A3.5 3.5 0 0 0 13.5 12h-7Z"/></svg>`,
+  survey: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M4 4a2 2 0 0 1 2-2h4.586A2 2 0 0 1 12 2.586L15.414 6A2 2 0 0 1 16 7.414V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm2 7a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1Zm1 3a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H7Z" clip-rule="evenodd"/></svg>`,
+  upload: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M3 17a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1ZM6.293 9.293a1 1 0 0 1 1.414 0L9 10.586V3a1 1 0 0 1 2 0v7.586l1.293-1.293a1 1 0 1 1 1.414 1.414l-3 3a1 1 0 0 1-1.414 0l-3-3a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>`,
+  analytics: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M2 11a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-5ZM8 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V7ZM14 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V4Z"/></svg>`,
+  report: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 15.414 6L12 2.586A2 2 0 0 0 10.586 2H6Zm2 6a1 1 0 0 0 0 2h4a1 1 0 1 0 0-2H8Zm-1 4a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1Z" clip-rule="evenodd"/></svg>`,
+};
 const STORE_KEY = "culture-platform-webapp-v1";
+
+let dbStatus = 'connecting';
+function setDbStatus(status) {
+  dbStatus = status;
+  const dot = document.querySelector('.db-dot');
+  const txt = document.querySelector('.db-status-text');
+  if (dot) { dot.className = `db-dot ${status}`; }
+  if (txt) {
+    txt.textContent = status === 'connected' ? 'DB 연결됨' : status === 'error' ? 'DB 오류' : '연결 중...';
+  }
+}
 
 const todayISO = () => {
   const d = new Date();
@@ -174,6 +194,7 @@ const blankState = () => ({
   qualAnalysis: {},
   showQualModal: false,
   activeQualKey: null,
+  sidebarCollapsed: false,
 });
 
 let state = loadState();
@@ -200,7 +221,7 @@ function saveState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis
+    qualAnalysis, sidebarCollapsed
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, responses, draftType, draftSchedule,
@@ -211,7 +232,7 @@ function saveState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis
+    qualAnalysis, sidebarCollapsed
   }));
 }
 
@@ -657,24 +678,44 @@ function parseCSVLine(line) {
 
 function render() {
   const app = document.querySelector("#app");
-  app.className = state.mobileNavOpen ? "mobile-nav-open" : "";
+  const classes = [];
+  if (state.mobileNavOpen) classes.push("mobile-nav-open");
+  if (state.sidebarCollapsed) classes.push("sidebar-collapsed");
+  app.className = classes.join(" ");
+
+  const toggleIcon = state.sidebarCollapsed
+    ? `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 0 1 0-1.414L10.586 10 7.293 6.707a1 1 0 0 1 1.414-1.414l4 4a1 1 0 0 1 0 1.414l-4 4a1 1 0 0 1-1.414 0Z" clip-rule="evenodd"/></svg>`
+    : `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 0 1 0 1.414L9.414 10l3.293 3.293a1 1 0 0 1-1.414 1.414l-4-4a1 1 0 0 1 0-1.414l4-4a1 1 0 0 1 1.414 0Z" clip-rule="evenodd"/></svg>`;
+
+  const dbStatusLabel = dbStatus === 'connected' ? 'DB 연결됨' : dbStatus === 'error' ? 'DB 오류' : '연결 중...';
+
   app.innerHTML = `
     <aside class="sidebar">
       <div class="brand">
         <img src="./assets/lina_logo_square.png" alt="" />
-        <div>
+        <div class="brand-text">
           <strong>Culture Platform</strong>
           <span>Operator OS</span>
         </div>
+        <button type="button" class="sidebar-toggle-btn" id="toggle-sidebar" title="${state.sidebarCollapsed ? '메뉴 펼치기' : '메뉴 접기'}">${toggleIcon}</button>
       </div>
       <nav>
         <span class="nav-label">Workspace</span>
-        ${VIEWS.map(([id, label]) => `<button class="${state.activeView === id ? "active" : ""}" data-view="${id}"><i></i>${label}</button>`).join("")}
+        ${VIEWS.map(([id, en, ko]) => `
+          <button class="${state.activeView === id ? "active" : ""}" data-view="${id}" title="${ko}">
+            <span class="nav-icon">${NAV_ICONS[id] || ''}</span>
+            <span class="nav-text"><span class="nav-en">${en}</span><span class="nav-ko">${ko}</span></span>
+          </button>`).join("")}
       </nav>
       <div class="sidebar-note">
-        <span>Workspace</span>
-        <b>Private operator</b>
-        <small>${new Date().toLocaleDateString("ko-KR")}</small>
+        <div class="db-status">
+          <div class="db-dot ${dbStatus}"></div>
+          <span class="db-status-text">${dbStatusLabel}</span>
+        </div>
+        <div class="sidebar-note-meta">
+          <b>Private operator</b>
+          <small>${new Date().toLocaleDateString("ko-KR")}</small>
+        </div>
       </div>
     </aside>
     <button type="button" class="mobile-nav-backdrop" aria-label="메뉴 닫기"></button>
@@ -2300,6 +2341,11 @@ function bindGlobal() {
     state.mobileNavOpen = false;
     render();
   });
+  document.querySelector("#toggle-sidebar")?.addEventListener("click", () => {
+    state.sidebarCollapsed = !state.sidebarCollapsed;
+    saveState();
+    render();
+  });
   bindSessions();
   bindOrg();
   bindUpload();
@@ -2766,6 +2812,7 @@ function bindSessions() {
         }
 
         state.sessions[idx] = updatedSession;
+        saveSessionToFirestore(updatedSession);
       }
       state.editingSessionId = null;
       state.draftSchedule = makeSchedule(type);
@@ -2844,6 +2891,7 @@ function bindSessions() {
     state.sessions.unshift(session);
     state.draftSchedule = makeSchedule(type);
     saveState();
+    saveSessionToFirestore(session);
     render();
   });
   document.querySelector("#btn-db-upload")?.addEventListener("click", uploadStateToDb);
@@ -3084,6 +3132,7 @@ window.deleteSession = function(id) {
   state.sessions = state.sessions.filter(s => s.id !== id);
   if (state.editingSessionId === id) state.editingSessionId = null;
   saveState();
+  deleteSessionFromFirestore(id);
   render();
 };
 
@@ -3357,6 +3406,42 @@ async function loadResponsesFromFirestore() {
   }
 }
 
+async function loadSessionsFromFirestore() {
+  try {
+    const snap = await getDocs(collection(db, 'sessions'));
+    if (snap.docs.length > 0) {
+      const firestoreSessions = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      const firestoreIds = new Set(firestoreSessions.map(s => s.id));
+      const localOnly = (state.sessions || []).filter(s => !firestoreIds.has(s.id));
+      state.sessions = [...firestoreSessions, ...localOnly];
+      saveState();
+    }
+    setDbStatus('connected');
+  } catch (e) {
+    console.error('Firestore 세션 로드 실패:', e);
+    setDbStatus('error');
+  }
+}
+
+async function saveSessionToFirestore(session) {
+  try {
+    const { id, ...data } = session;
+    await setDoc(doc(db, 'sessions', id), { ...data, updatedAt: serverTimestamp() });
+    setDbStatus('connected');
+  } catch (e) {
+    console.error('Firestore 세션 저장 실패:', e);
+    setDbStatus('error');
+  }
+}
+
+async function deleteSessionFromFirestore(id) {
+  try {
+    await deleteDoc(doc(db, 'sessions', id));
+  } catch (e) {
+    console.error('Firestore 세션 삭제 실패:', e);
+  }
+}
+
 async function saveResponsesToFirestore(rows) {
   await Promise.all(rows.map(row => {
     const { id, ...data } = row;
@@ -3470,7 +3555,8 @@ async function initApp() {
 
   render();
 
-  // Load surveys once on startup
+  // Load sessions and surveys from Firestore on startup
+  loadSessionsFromFirestore().then(() => render());
   loadSurveysFromFirestore().then(() => render());
 
   // Real-time listener for responses — updates dashboard whenever a phone submits

@@ -2910,18 +2910,19 @@ window.updateSurveyDraftQuestionType = function(qid, type) {
 
 window.addSurveyDraftQuestion = function() {
   const current = state.draftSurveyQuestions || [];
-  const nextId = "q" + (current.length + 1);
-  current.push({
-    id: nextId,
-    type: "quant",
-    text: ""
-  });
+  const maxNum = current.reduce((max, q) => {
+    const n = parseInt(q.id.replace(/\D/g, ''), 10);
+    return isNaN(n) ? max : Math.max(max, n);
+  }, 0);
+  current.push({ id: `q${maxNum + 1}`, type: "quant", text: "" });
   saveState();
   render();
 };
 
 window.deleteSurveyDraftQuestion = function(qid) {
-  state.draftSurveyQuestions = (state.draftSurveyQuestions || []).filter(q => q.id !== qid);
+  state.draftSurveyQuestions = (state.draftSurveyQuestions || [])
+    .filter(q => q.id !== qid)
+    .map((q, idx) => ({ ...q, id: `q${idx + 1}` }));
   saveState();
   render();
 };

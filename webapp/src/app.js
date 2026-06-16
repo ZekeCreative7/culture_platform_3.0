@@ -149,6 +149,7 @@ const blankState = () => ({
   draftSurveyPhase: "사전",
   draftSurveySessionId: "",
   draftSurveyQuestions: defaultQuestions("사전"),
+  draftGoogleFormUrl: "",
   qrBaseUrl: window.location.origin.startsWith("file") ? "http://localhost:4173" : new URL('.', window.location.href).href.replace(/\/$/, ''),
   selectedAnalyticsCohort: "",
   selectedAnalyticsType: "팀장",
@@ -1570,18 +1571,32 @@ function renderSurveyCreator() {
             </select>
           </label>
 
-          <label>QR 코드용 베이스 주소
-            <input id="survey-qr-base-url" value="${escapeHtml(state.qrBaseUrl)}" placeholder="예: http://[컴퓨터IP]:4173 (모바일 접속용)" oninput="updateSurveyDraftField('qrBaseUrl', this.value)" />
-            <small style="color:var(--muted); font-size:10px; font-weight:normal;">모바일 테스트 시 컴퓨터의 공유기 IP(예: http://192.168.0.15:4173)를 적어주세요.</small>
-          </label>
-          
+          <!-- Google Form URL (primary method) -->
+          <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #bae6fd; border-radius:10px; padding:16px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+              <span style="font-size:16px;">🔗</span>
+              <strong style="font-size:13px; color:var(--ink);">구글 폼 URL 연결 (권장)</strong>
+            </div>
+            <p style="font-size:11.5px; color:var(--muted); margin:0 0 10px 0; line-height:1.6;">구글 폼에서 설문을 직접 만들고 배포용 링크를 붙여넣으세요. 해당 링크로 QR 코드가 생성됩니다.</p>
+            <label style="font-size:12px; font-weight:700; color:var(--ink-2);">구글 폼 URL
+              <input id="survey-google-form-url" value="${escapeHtml(state.draftGoogleFormUrl)}" placeholder="https://forms.gle/... 또는 https://docs.google.com/forms/..." oninput="updateSurveyDraftField('draftGoogleFormUrl', this.value)" style="margin-top:6px;" />
+            </label>
+          </div>
+
+          <!-- Divider -->
+          <div style="display:flex; align-items:center; gap:10px; color:var(--muted); font-size:11px; font-weight:700;">
+            <div style="flex:1; height:1px; background:var(--line);"></div>
+            또는 자체 설문 직접 설계
+            <div style="flex:1; height:1px; background:var(--line);"></div>
+          </div>
+
           <!-- Questions Editor -->
-          <div class="survey-questions-preview" style="background:var(--surface-soft); border-radius:8px; padding:16px; border:1px solid var(--line);">
+          <div class="survey-questions-preview" style="background:var(--surface-soft); border-radius:8px; padding:16px; border:1px solid var(--line); ${state.draftGoogleFormUrl ? 'opacity:0.45; pointer-events:none;' : ''}">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
               <h4 style="margin:0;">설문지 질문 구성 (${draftQuestions.length}문항)</h4>
               <button class="secondary small compact" onclick="addSurveyDraftQuestion()">+ 질문 추가</button>
             </div>
-            
+
             <div class="draft-questions-list" style="display:flex; flex-direction:column; gap:10px; max-height:360px; overflow-y:auto; padding-right:4px;">
               ${draftQuestions.map((q, idx) => `
                 <div class="draft-q-row">
@@ -1602,8 +1617,8 @@ function renderSurveyCreator() {
               `).join("")}
             </div>
           </div>
-          
-          <button class="primary" id="btn-create-survey-submit">설문지 배포 및 QR 생성</button>
+
+          <button class="primary" id="btn-create-survey-submit">배포 및 QR 생성</button>
         </div>
       </div>
 
@@ -1615,21 +1630,25 @@ function renderSurveyCreator() {
             const sess = state.sessions.find(session => session.id === s.sessionId);
             const sessLabel = sess ? `${sess.type} · ${sessionLabel(sess)}` : "만료된 세션";
             
-            const qrHost = (state.qrBaseUrl || new URL('.', window.location.href).href).replace(/\/$/, '');
-            // Encode survey data into URL using URL-safe base64 so any device can render without shared localStorage
-            const surveyJson = JSON.stringify({
-              id: s.id,
-              title: s.title,
-              phase: s.phase,
-              sessionId: s.sessionId,
-              sessionType: sess ? sess.type : '',
-              sessionCohort: sess ? (sess.cohort || '') : '',
-              questions: (s.questions || []).map(q => ({ id: q.id, text: q.text, type: q.type }))
-            });
-            // URL-safe base64: replace +/= that break URL query params
-            const surveyPayload = btoa(unescape(encodeURIComponent(surveyJson)))
-              .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-            const surveyLink = `${qrHost}/survey.html?d=${surveyPayload}`;
+            // If Google Form URL is set, use it directly for QR
+            let surveyLink;
+            if (s.googleFormUrl) {
+              surveyLink = s.googleFormUrl;
+            } else {
+              const qrHost = (state.qrBaseUrl || new URL('.', window.location.href).href).replace(/\/$/, '');
+              const surveyJson = JSON.stringify({
+                id: s.id,
+                title: s.title,
+                phase: s.phase,
+                sessionId: s.sessionId,
+                sessionType: sess ? sess.type : '',
+                sessionCohort: sess ? (sess.cohort || '') : '',
+                questions: (s.questions || []).map(q => ({ id: q.id, text: q.text, type: q.type }))
+              });
+              const surveyPayload = btoa(unescape(encodeURIComponent(surveyJson)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+              surveyLink = `${qrHost}/survey.html?d=${surveyPayload}`;
+            }
             
             // Generate QR Code locally using qrcode.min.js
             let qrUrl = "";
@@ -1647,7 +1666,7 @@ function renderSurveyCreator() {
               <div class="survey-deploy-card">
                 <div class="survey-deploy-info">
                   <strong>${escapeHtml(s.title)}</strong>
-                  <span>${escapeHtml(sessLabel)} [${escapeHtml(s.phase)}]</span>
+                  <span>${escapeHtml(sessLabel)} [${escapeHtml(s.phase)}]${s.googleFormUrl ? ' · <span style="color:#0ea5e9;font-weight:800;">구글 폼</span>' : ''}</span>
                   <input class="input-text compact-url" readonly value="${surveyLink}" onclick="this.select(); document.execCommand('copy'); alert('링크가 복사되었습니다!');" title="클릭 시 주소 복사" />
                   <div style="margin-top:6px; display:flex; gap:6px;">
                     <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
@@ -2281,6 +2300,7 @@ function bindSessions() {
     const sessionId = state.draftSurveySessionId;
     const phase = state.draftSurveyPhase;
     const questions = state.draftSurveyQuestions || [];
+    const googleFormUrl = (state.draftGoogleFormUrl || "").trim();
 
     if (!title) {
       alert("설문 제목을 입력해 주세요.");
@@ -2288,6 +2308,10 @@ function bindSessions() {
     }
     if (!sessionId) {
       alert("대상 세션을 선택해 주세요.");
+      return;
+    }
+    if (!googleFormUrl && questions.length === 0) {
+      alert("구글 폼 URL을 입력하거나 질문을 추가해 주세요.");
       return;
     }
 
@@ -2298,10 +2322,12 @@ function bindSessions() {
       title,
       sessionId,
       phase,
-      questions: JSON.parse(JSON.stringify(questions)) // deep clone
+      googleFormUrl: googleFormUrl || null,
+      questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
     });
 
     state.draftSurveyTitle = "";
+    state.draftGoogleFormUrl = "";
     state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
     saveState();
     render();

@@ -1694,6 +1694,7 @@ function renderSurveyCreator() {
                     <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
                     <button class="ghost compact" onclick="copySurveyLink('${surveyLink}')">링크 복사</button>
                     ${!s.googleFormUrl ? `<button class="ghost compact" style="font-size:11px;" onclick="downloadSurveyTemplate('${s.id}')">CSV 템플릿 ↓</button>` : ''}
+                    <button class="ghost compact" style="font-size:11px; color:#0071e3; font-weight:700;" onclick="uploadSurveyResults('${s.id}')">결과 CSV 업로드 ↑</button>
                   </div>
                 </div>
                 <div class="survey-deploy-qr">
@@ -2930,6 +2931,32 @@ window.addSurveyDraftQuestion = function() {
   current.push({ id: `q${maxNum + 1}`, type: "quant", text: "" });
   saveState();
   render();
+};
+
+window.uploadSurveyResults = function(surveyId) {
+  const survey = (state.surveys || []).find(s => s.id === surveyId);
+  if (!survey) { alert('설문 정보를 찾을 수 없습니다.'); return; }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,text/csv';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const { parsed, errors } = parseCSV(text, survey.sessionId, survey.phase);
+    if (errors.length) {
+      alert('CSV 오류:\n' + errors.join('\n'));
+      return;
+    }
+    if (!confirm(`${file.name}\n\n${parsed.length}행의 응답을 저장할까요?\n세션: ${survey.title} [${survey.phase}]`)) return;
+    state.responses.push(...parsed);
+    saveState();
+    render();
+    saveResponsesToFirestore(parsed).catch(e => console.error('Firestore 저장 실패:', e));
+  };
+  document.body.appendChild(input);
+  input.click();
+  document.body.removeChild(input);
 };
 
 window.loadSurveyTemplate = function() {

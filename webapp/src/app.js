@@ -847,17 +847,31 @@ function renderTeamBuildingPanel(divisionList, hqList, teamList) {
         <span>한 팀을 선택하면 팀장과 팀원 데이터를 불러옵니다.</span>
       </div>
       ${renderOrgSelectRow(divisionList, hqList, teamList)}
-      ${state.draftTeamId ? `
+      ${state.draftTeamId ? (() => {
+          const divUnit = state.orgUnits.find(u => u.id === state.draftDivisionId);
+          const hqUnit  = state.orgUnits.find(u => u.id === state.draftHqId);
+          const divLeader = divUnit?.leader || '미지정';
+          const hqLeader  = hqUnit?.leader  || '미지정';
+          return `
         <div class="selected-team-wrap">
-          <div class="selected-team-badge">
-            <strong>선택된 조직:</strong> ${escapeHtml(state.draftDivision)} &gt; ${escapeHtml(state.draftHq)} &gt; ${escapeHtml(state.draftTeam)}
-            <button type="button" class="ghost compact" id="open-org-picker" style="margin-left:12px;">조직도에서 보기</button>
-            <div style="margin-top: 6px; font-size:12px; color:var(--muted);">
-              팀장: ${escapeHtml(state.draftLeader || "미지정")} ${state.draftLeaderTitle ? `(${escapeHtml(state.draftLeaderTitle)})` : ""} | 팀원: ${state.draftMembers.length}명
+          <div class="selected-team-badge" style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                ${escapeHtml(state.draftDivision)} &rsaquo; ${escapeHtml(state.draftHq)} &rsaquo; <strong style="color:var(--ink);">${escapeHtml(state.draftTeam)}</strong>
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:14px; font-size:12.5px; color:var(--ink);">
+                <span><span style="color:var(--muted); font-weight:700;">부문장</span> &nbsp;${escapeHtml(divLeader)}</span>
+                <span><span style="color:var(--muted); font-weight:700;">본부장</span> &nbsp;${escapeHtml(hqLeader)}</span>
+                <span><span style="color:var(--muted); font-weight:700;">팀장</span> &nbsp;${escapeHtml(state.draftLeader || '미지정')} ${state.draftLeaderTitle ? `(${escapeHtml(state.draftLeaderTitle)})` : ''}</span>
+                <span><span style="color:var(--muted); font-weight:700;">팀원</span> &nbsp;${state.draftMembers.length}명</span>
+              </div>
             </div>
+            <button type="button" id="open-org-picker" style="flex-shrink:0; padding:5px 11px; border:1px solid var(--line-strong); border-radius:7px; background:rgba(255,255,255,0.7); color:var(--muted); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all 0.15s;" onmouseover="this.style.color='var(--blue)';this.style.borderColor='var(--blue)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--line-strong)'">
+              팀 변경
+            </button>
           </div>
-        </div>
-      ` : `
+        </div>`;
+        })() : `
         <div class="selected-team-wrap">
           <button type="button" class="primary" id="open-org-picker">조직도에서 팀 선택</button>
         </div>
@@ -1822,7 +1836,10 @@ function renderAnalytics() {
       <div class="form-grid compact" style="grid-template-columns: repeat(2, 1fr); gap:16px;">
         <label>대상 기수 선택
           <select id="analytics-cohort-select" onchange="updateAnalyticsFilter('selectedAnalyticsCohort', this.value)">
-            ${cohorts.length ? cohorts.map(c => `<option value="${c}" ${cohort === c ? "selected" : ""}>${c}기</option>`).join("") : `<option value="">응답 없음</option>`}
+            ${cohorts.length ? cohorts.map(c => {
+              const teamNames = [...new Set((state.sessions || []).filter(s => s.cohort === c).map(s => s.team || s.participatingTeams || '').filter(Boolean))].slice(0, 2).join(', ');
+              return `<option value="${c}" ${cohort === c ? "selected" : ""}>${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
+            }).join("") : `<option value="">응답 없음</option>`}
           </select>
         </label>
         <label>세션 유형 선택
@@ -1932,7 +1949,10 @@ function renderReport() {
       <div class="form-grid compact" style="grid-template-columns: repeat(2, 1fr); gap:16px;">
         <label>대상 기수
           <select id="report-cohort-select" onchange="updateReportFilter('selectedReportCohort', this.value)">
-            ${cohorts.length ? cohorts.map(c=>`<option value="${c}" ${cohort===c?"selected":""}>${c}기</option>`).join("") : `<option value="">세션 없음</option>`}
+            ${cohorts.length ? cohorts.map(c => {
+              const teamNames = [...new Set((state.sessions || []).filter(s => s.cohort === c).map(s => s.team || s.participatingTeams || '').filter(Boolean))].slice(0, 2).join(', ');
+              return `<option value="${c}" ${cohort===c?"selected":""}>${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
+            }).join("") : `<option value="">세션 없음</option>`}
           </select>
         </label>
         <label>세션 유형
@@ -2314,10 +2334,29 @@ function renderStatsTable(stats, masked, cohort, type) {
 }
 
 function renderQualitative(cohort, type) {
-  const sessionIds = new Set(state.sessions.filter((s) => s.type === type).map((s) => s.id));
-  const rows = state.responses.filter((row) => row.cohort === Number(cohort) && sessionIds.has(row.sessionId) && (row.q9 || row.q10 || row.q11));
+  const cohortNum = Number(cohort);
+  const sessionIds = new Set((state.sessions || []).filter((s) => s.type === type).map((s) => s.id));
+  // Collect all qual question IDs from relevant surveys
+  const qualIds = [...new Set([
+    'q9', 'q10', 'q11',
+    ...(state.surveys || [])
+      .filter(s => sessionIds.has(s.sessionId) || Number(s.sessionCohort) === cohortNum)
+      .flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id))
+  ])];
+  // Match by sessionId first, fall back to cohort-only
+  let rows = (state.responses || []).filter(r =>
+    r.cohort === cohortNum && sessionIds.has(r.sessionId) && qualIds.some(id => r[id])
+  );
+  if (!rows.length) {
+    rows = (state.responses || []).filter(r =>
+      r.cohort === cohortNum && qualIds.some(id => r[id])
+    );
+  }
   if (!rows.length) return emptyCard("정성 응답이 없습니다.");
-  return `<div class="quote-grid">${rows.map((row) => `<article><span>${row.phase}</span><p>${escapeHtml(row.q9 || row.q10 || row.q11)}</p></article>`).join("")}</div>`;
+  return `<div class="quote-grid">${rows.slice(0, 8).map((row) => {
+    const answer = qualIds.map(id => row[id]).filter(Boolean)[0] || '';
+    return `<article><span>${row.phase || ''}</span><p>${escapeHtml(answer)}</p></article>`;
+  }).join("")}</div>`;
 }
 
 function fmt(value) {
@@ -3590,32 +3629,53 @@ async function initApp() {
 function renderQualModal(qualKey, cohort, type) {
   const saved = (state.qualAnalysis || {})[qualKey] || '';
   const prompt = buildQualPrompt(cohort, type);
-  const hasQual = prompt.includes('응답 1.');
+  // hasQual = prompt has at least one "응답" line with actual content
+  const hasQual = /응답 \d+\./.test(prompt);
+
+  // Count total responses for this cohort (any qual field)
+  const cohortNum = Number(cohort);
+  const totalResponses = (state.responses || []).filter(r => r.cohort === cohortNum).length;
+
   return `
     <div class="modal-overlay" id="qual-modal-overlay">
-      <div class="modal-card" style="max-width:640px; width:96%;">
+      <div class="modal-card" style="max-width:660px; width:96%;">
         <div class="modal-header">
-          <h2>정성 응답 AI 분석 — ${cohort}기 ${type}</h2>
+          <h2>주관식 AI 분석 — ${cohort}기 ${type}</h2>
           <button type="button" class="close-btn" onclick="closeQualModal()">&times;</button>
         </div>
-        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px; max-height:70vh; overflow-y:auto;">
-          ${!hasQual ? `<p style="color:var(--muted); font-size:13px;">주관식 응답 데이터가 없습니다. 설문 응답이 적재된 후 사용 가능합니다.</p>` : `
-          <div style="background:#f8fafc; border:1px solid var(--line); border-radius:10px; padding:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <span style="font-size:11.5px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.06em;">Step 1 — 프롬프트 복사 후 Claude / ChatGPT에 붙여넣기</span>
-              <button class="secondary compact" onclick="copyQualPrompt('${qualKey}')">복사</button>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px; max-height:72vh; overflow-y:auto;">
+          ${!hasQual ? `
+            <div style="padding:16px; background:#fff8f0; border:1.5px solid #fed7aa; border-radius:10px;">
+              <p style="margin:0 0 8px; font-weight:700; color:#c2410c; font-size:13.5px;">주관식 응답 데이터를 찾지 못했습니다.</p>
+              <p style="margin:0; color:#92400e; font-size:12.5px; line-height:1.6;">
+                • 현재 ${cohort}기 응답 총 ${totalResponses}건 적재됨<br>
+                • 리포트의 "세션 유형" 선택이 업로드한 세션 유형과 일치하는지 확인하세요<br>
+                • 주관식 질문이 포함된 설문의 CSV를 설문 카드에서 업로드하면 자동으로 감지됩니다
+              </p>
             </div>
-            <textarea id="qual-prompt-${qualKey}" readonly style="width:100%; height:160px; font-size:11.5px; font-family:monospace; resize:vertical; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; background:#ffffff; color:#334155; box-sizing:border-box;">${escapeHtml(prompt)}</textarea>
+          ` : `
+          <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:12px; flex-wrap:wrap;">
+              <div>
+                <span style="font-size:12px; font-weight:800; color:var(--blue-mid); text-transform:uppercase; letter-spacing:0.06em;">Step 1</span>
+                <span style="font-size:12px; font-weight:600; color:var(--muted); margin-left:6px;">아래 프롬프트를 Claude / ChatGPT에 붙여넣으세요</span>
+              </div>
+              <button class="primary compact" onclick="copyQualPrompt('${qualKey}')">프롬프트 복사</button>
+            </div>
+            <textarea id="qual-prompt-${qualKey}" readonly style="width:100%; height:200px; font-size:11px; font-family:monospace; resize:vertical; border:1px solid #bae6fd; border-radius:8px; padding:10px 12px; background:#ffffff; color:#0c2340; box-sizing:border-box; line-height:1.6;">${escapeHtml(prompt)}</textarea>
           </div>
-          <div style="border:1.5px solid var(--line); border-radius:10px; padding:16px;">
-            <span style="font-size:11.5px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; display:block; margin-bottom:10px;">Step 2 — AI 분석 결과 붙여넣기</span>
-            <textarea id="qual-result-input" style="width:100%; height:160px; font-size:13px; resize:vertical; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 12px; box-sizing:border-box;" placeholder="AI 분석 결과를 여기에 붙여넣으세요...">${escapeHtml(saved)}</textarea>
+          <div style="border:2px solid #bae6fd; border-radius:10px; padding:16px; background:#ffffff;">
+            <div style="margin-bottom:10px;">
+              <span style="font-size:12px; font-weight:800; color:var(--blue-mid); text-transform:uppercase; letter-spacing:0.06em;">Step 2</span>
+              <span style="font-size:12px; font-weight:600; color:var(--muted); margin-left:6px;">AI 분석 결과를 아래에 붙여넣고 저장하세요</span>
+            </div>
+            <textarea id="qual-result-input" style="width:100%; height:180px; font-size:13px; resize:vertical; border:1.5px solid #bae6fd; border-radius:8px; padding:10px 12px; box-sizing:border-box; line-height:1.7;" placeholder="AI가 돌려준 분석 결과를 여기에 붙여넣으세요. 저장하면 리포트 ④번 항목에 표시됩니다.">${escapeHtml(saved)}</textarea>
           </div>
           `}
         </div>
         <div class="modal-footer">
-          <button class="secondary" type="button" onclick="closeQualModal()">취소</button>
-          ${hasQual ? `<button class="primary" type="button" onclick="saveQualAnalysisFromModal('${qualKey}')">저장</button>` : ''}
+          <button class="secondary" type="button" onclick="closeQualModal()">닫기</button>
+          ${hasQual ? `<button class="primary" type="button" onclick="saveQualAnalysisFromModal('${qualKey}')">결과 저장 → 리포트 반영</button>` : ''}
         </div>
       </div>
     </div>
@@ -3624,37 +3684,70 @@ function renderQualModal(qualKey, cohort, type) {
 
 // ── Qualitative Analysis Helpers ─────────────────────────────────
 function buildQualPrompt(cohort, type) {
+  const cohortNum = Number(cohort);
   const sessionIds = new Set(
-    state.sessions.filter(s => s.type === type && s.cohort === Number(cohort)).map(s => s.id)
+    (state.sessions || []).filter(s => s.type === type && s.cohort === cohortNum).map(s => s.id)
   );
-  const qualIds = ['q9', 'q10', 'q11'];
+
+  // Collect all surveys relevant to this cohort (by sessionId or sessionCohort)
+  const relevantSurveys = (state.surveys || []).filter(s =>
+    sessionIds.has(s.sessionId) ||
+    Number(s.sessionCohort) === cohortNum
+  );
+
+  // Build qual question ID set from actual surveys — fall back to q9/q10/q11
+  const qualIdSet = new Set(['q9', 'q10', 'q11']);
+  relevantSurveys.forEach(survey => {
+    (survey.questions || []).filter(q => q.type === 'qual').forEach(q => qualIdSet.add(q.id));
+  });
+  const qualIds = [...qualIdSet];
+
+  // Question text lookup helper
+  const getQText = (qid, phase) => {
+    const survey = relevantSurveys.find(s => s.phase === phase) || relevantSurveys[0];
+    const q = survey?.questions?.find(q => q.id === qid);
+    if (q?.text) return q.text;
+    if (qid === 'q9')  return '세션 참여 전 기대하는 점';
+    if (qid === 'q10') return '세션 중 도움이 된 점';
+    if (qid === 'q11') return '운영진에게 전달하고 싶은 메시지';
+    return qid;
+  };
+
   let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션 유형: ${type} / 기수: ${cohort}기\n\n`;
+  let totalQualRows = 0;
 
   PHASES.forEach(phase => {
-    const rows = state.responses.filter(r =>
-      r.cohort === Number(cohort) && r.phase === phase && sessionIds.has(r.sessionId)
+    // Primary: match by cohort + phase + sessionId
+    let rows = (state.responses || []).filter(r =>
+      r.cohort === cohortNum && r.phase === phase && sessionIds.has(r.sessionId)
     );
+    // Fallback: match by cohort + phase only (handles manually-uploaded CSVs with no sessionId match)
+    if (!rows.length) {
+      rows = (state.responses || []).filter(r => r.cohort === cohortNum && r.phase === phase);
+    }
+
     const qualRows = rows.filter(r => qualIds.some(id => r[id] && String(r[id]).trim()));
     if (!qualRows.length) return;
+    totalQualRows += qualRows.length;
 
     prompt += `【${phase} 설문 — ${qualRows.length}명 응답】\n`;
     qualIds.forEach(qid => {
-      const survey = state.surveys.find(s => sessionIds.has(s.sessionId) && s.phase === phase);
-      const q = survey?.questions?.find(q => q.id === qid);
-      const qText = q?.text || (qid === 'q9' ? '기대하는 점' : qid === 'q10' ? '도움이 된 점' : '전달하고 싶은 메시지');
       const answers = qualRows.map(r => String(r[qid] || '')).filter(v => v.trim());
       if (!answers.length) return;
-      prompt += `\n질문: ${qText}\n`;
+      prompt += `\n질문: ${getQText(qid, phase)}\n`;
       answers.forEach((a, i) => { prompt += `  응답 ${i + 1}. ${a}\n`; });
     });
     prompt += '\n';
   });
 
-  prompt += `---\n위 응답을 바탕으로 다음 형식으로 분석해 주세요 (한국어).\n\n`;
+  if (!totalQualRows) return prompt; // hasQual will be false
+
+  prompt += `---\n위 응답을 바탕으로 다음 형식으로 분석해 주세요 (한국어로 작성).\n\n`;
   prompt += `1. 주요 기대/우려 — 사전 응답 기반 (3가지 이내)\n`;
-  prompt += `2. 주요 성과/피드백 — 사후 응답 기반 (3가지 이내)\n`;
+  prompt += `2. 주요 성과/피드백 — 중간·사후 응답 기반 (3가지 이내)\n`;
   prompt += `3. 사전→사후 변화 요약 (2~3문장)\n`;
-  prompt += `4. 운영자를 위한 다음 세션 제안 (1~2가지)\n`;
+  prompt += `4. 운영자를 위한 다음 세션 제안 (1~2가지)\n\n`;
+  prompt += `형식: 각 항목은 번호와 굵은 제목으로 시작하고, 핵심 내용을 간결하게 bullet로 정리해 주세요.\n`;
   return prompt;
 }
 

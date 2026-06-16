@@ -195,6 +195,7 @@ const blankState = () => ({
   showQualModal: false,
   activeQualKey: null,
   sidebarCollapsed: false,
+  collapsedSurveyIds: [],
 });
 
 let state = loadState();
@@ -221,7 +222,7 @@ function saveState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed
+    qualAnalysis, sidebarCollapsed, collapsedSurveyIds
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, responses, draftType, draftSchedule,
@@ -232,7 +233,7 @@ function saveState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed
+    qualAnalysis, sidebarCollapsed, collapsedSurveyIds
   }));
 }
 
@@ -1692,7 +1693,7 @@ function renderSurveyCreator() {
               <button class="secondary small compact" onclick="addSurveyDraftQuestion()">+ 질문 추가</button>
             </div>
 
-            <div class="draft-questions-list" style="display:flex; flex-direction:column; gap:10px; max-height:360px; overflow-y:auto; padding-right:4px;">
+            <div class="draft-questions-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:10px;">
               ${draftQuestions.map((q, idx) => `
                 <div class="draft-q-row">
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -1720,21 +1721,26 @@ function renderSurveyCreator() {
       <!-- Right: Generated Surveys -->
       <div>
         ${sectionTitle("배포 중인 설문지 및 QR", `${(state.surveys || []).length}건`)}
+        ${(state.surveys || []).length > 1 ? `
+        <div style="display:flex; gap:8px; margin-bottom:12px; justify-content:flex-end;">
+          <button class="ghost compact" style="font-size:11.5px;" onclick="collapseAllSurveys(true)">전체 접기</button>
+          <button class="ghost compact" style="font-size:11.5px;" onclick="collapseAllSurveys(false)">전체 펼치기</button>
+        </div>` : ''}
         <div class="surveys-grid">
           ${(state.surveys || []).length ? state.surveys.map(s => {
             const sess = state.sessions.find(session => session.id === s.sessionId);
             const sessLabel = sess ? `${sess.type} · ${sessionLabel(sess)}` : "만료된 세션";
-            
+            const isCollapsed = (state.collapsedSurveyIds || []).includes(s.id);
+
             // If Google Form URL is set, use it directly for QR
             let surveyLink;
             if (s.googleFormUrl) {
               surveyLink = s.googleFormUrl;
             } else {
-              // Firestore-backed: URL only needs the doc ID; survey.html loads from Firestore
               const qrHost = (state.qrBaseUrl || new URL('.', window.location.href).href).replace(/\/$/, '');
               surveyLink = `${qrHost}/survey.html?surveyId=${s.id}`;
             }
-            
+
             // Generate QR Code locally using qrcode.min.js
             let qrUrl = "";
             try {
@@ -1743,30 +1749,51 @@ function renderSurveyCreator() {
               qr.make();
               qrUrl = qr.createDataURL(4);
             } catch (err) {
-              console.error("Local QR generation failed, fallback to online server", err);
               qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(surveyLink)}`;
+            }
+
+            if (isCollapsed) {
+              return `
+                <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
+                  <div style="flex:1; min-width:0;">
+                    <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.title)}</strong>
+                    <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${escapeHtml(sessLabel)} · ${escapeHtml(s.phase)}${s.googleFormUrl ? ' · 구글 폼' : ''}</span>
+                  </div>
+                  <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; flex-shrink:0;">펼치기 ▾</button>
+                  <button class="delete-survey-btn" onclick="deleteSurvey('${s.id}')" style="position:static; margin-left:0;">&times;</button>
+                </div>
+              `;
             }
 
             return `
               <div class="survey-deploy-card">
-                <div class="survey-deploy-info">
-                  <strong>${escapeHtml(s.title)}</strong>
-                  <span>${escapeHtml(sessLabel)} [${escapeHtml(s.phase)}]${s.googleFormUrl ? ' · <span style="color:#0ea5e9;font-weight:800;">구글 폼</span>' : ''}</span>
-                  <input class="input-text compact-url" readonly value="${surveyLink}" onclick="this.select(); document.execCommand('copy'); alert('링크가 복사되었습니다!');" title="클릭 시 주소 복사" />
-                  <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
-                    <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
-                    <button class="ghost compact" onclick="copySurveyLink('${surveyLink}')">링크 복사</button>
-                    ${!s.googleFormUrl ? `<button class="ghost compact" style="font-size:11px;" onclick="downloadSurveyTemplate('${s.id}')">CSV 템플릿 ↓</button>` : ''}
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                  <div class="survey-deploy-info" style="flex:1; min-width:0;">
+                    <strong>${escapeHtml(s.title)}</strong>
+                    <span>${escapeHtml(sessLabel)} [${escapeHtml(s.phase)}]${s.googleFormUrl ? ' · <span style="color:#0ea5e9;font-weight:800;">구글 폼</span>' : ''}</span>
                   </div>
-                  <button onclick="uploadSurveyResults('${s.id}')" style="margin-top:10px; width:100%; padding:9px; background:#eff6ff; border:1.5px dashed #93c5fd; border-radius:8px; color:#1d4ed8; font-size:12px; font-weight:700; cursor:pointer; text-align:center; transition:all 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
-                    ↑ 결과 CSV 업로드 (과거 응답 수동 적재)
-                  </button>
+                  <div style="display:flex; gap:6px; flex-shrink:0;">
+                    <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--muted); cursor:pointer;">접기 ▴</button>
+                    <button class="delete-survey-btn" onclick="deleteSurvey('${s.id}')" style="position:static; margin-left:0;">&times;</button>
+                  </div>
                 </div>
-                <div class="survey-deploy-qr">
-                  <img src="${qrUrl}" alt="QR Code" />
-                  <button onclick="downloadQrCode('${s.id}')" class="secondary compact" style="display:block; width:100%; text-align:center; margin-top:6px; font-size:11px;">QR 다운로드</button>
+                <input class="input-text compact-url" readonly value="${surveyLink}" onclick="this.select(); document.execCommand('copy'); alert('링크가 복사되었습니다!');" title="클릭 시 주소 복사" />
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
+                  <button class="ghost compact" onclick="copySurveyLink('${surveyLink}')">링크 복사</button>
+                  ${!s.googleFormUrl ? `<button class="ghost compact" style="font-size:11px;" onclick="downloadSurveyTemplate('${s.id}')">CSV 템플릿 ↓</button>` : ''}
                 </div>
-                <button class="delete-survey-btn" onclick="deleteSurvey('${s.id}')">&times;</button>
+                <div style="display:flex; gap:14px; align-items:flex-start;">
+                  <div style="flex:1;">
+                    <button onclick="uploadSurveyResults('${s.id}')" style="width:100%; padding:9px; background:#eff6ff; border:1.5px dashed #93c5fd; border-radius:8px; color:#1d4ed8; font-size:12px; font-weight:700; cursor:pointer; text-align:center; transition:all 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                      ↑ 결과 CSV 업로드
+                    </button>
+                  </div>
+                  <div class="survey-deploy-qr" style="padding:10px;">
+                    <img src="${qrUrl}" alt="QR Code" style="width:100px; height:100px;" />
+                    <button onclick="downloadQrCode('${s.id}')" class="secondary compact" style="display:block; width:100%; text-align:center; margin-top:4px; font-size:10px;">QR 다운로드</button>
+                  </div>
+                </div>
               </div>
             `;
           }).join("") : emptyCard("생성된 설문지가 없습니다.")}
@@ -1850,20 +1877,164 @@ function renderAnalytics() {
       </div>
     </section>
 
-    ${cohort ? `
-      <section class="metric-grid slim">
-        ${PHASES.map((phase, index) => metricCard(`${phase} N`, stats[index] ? stats[index].n : 0, `${cohort}기 · ${type}`)).join("")}
+    ${cohort ? (() => {
+      const pre  = stats[0] || null;
+      const mid  = stats[1] || null;
+      const post = stats[2] || null;
+      const compositeOf = (ps) => {
+        if (!ps || ps.n < 1) return null;
+        const qs = REPORT_DIMS.flatMap(d => d.qs);
+        const vals = qs.map(q => ps[`${q}_avg`]).filter(v => typeof v === 'number');
+        return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+      };
+      const preC = compositeOf(pre), midC = compositeOf(mid), postC = compositeOf(post);
+      const overallDelta = preC !== null && postC !== null ? postC - preC : null;
+
+      // Dimension-level deltas for summary strip
+      const dimDeltas = REPORT_DIMS.map(dim => {
+        const ps = pre && pre.n >= 3 ? dimAvg(pre, dim.qs) : null;
+        const qs = post && post.n >= 3 ? dimAvg(post, dim.qs) : null;
+        const d = ps !== null && qs !== null ? qs - ps : null;
+        return { ...dim, preScore: ps, postScore: qs, delta: d };
+      });
+
+      return `
+      <!-- Pulse Overview -->
+      <section style="margin-bottom:20px;">
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; margin-bottom:14px;">
+          ${[['사전', pre, preC, null], ['중간', mid, midC, preC !== null && midC !== null ? midC - preC : null], ['사후', post, postC, overallDelta]].map(([phase, ps, sc, delta], idx) => {
+            const n = ps ? ps.n : 0;
+            const rag = ragInfo(sc);
+            const deltaColor = delta === null ? '#94a3b8' : delta > 0.1 ? '#059669' : delta < -0.1 ? '#dc2626' : '#d97706';
+            return `
+              <div style="background:#ffffff; border:1.5px solid ${sc !== null ? rag.bar+'40' : '#e2e8f0'}; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
+                <div style="position:absolute; top:0; left:0; right:0; height:3px; background:${sc !== null ? rag.bar : '#e2e8f0'};"></div>
+                <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px;">${phase} 종합</div>
+                <div style="font-size:32px; font-weight:800; color:${sc !== null ? rag.color : '#cbd5e1'}; line-height:1; margin-bottom:4px;">${sc !== null ? sc.toFixed(2) : '—'}<span style="font-size:14px; color:#94a3b8; font-weight:500;"> / 5</span></div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px;">
+                  <span style="font-size:11.5px; color:#94a3b8; font-weight:600;">N = ${n}</span>
+                  ${delta !== null ? `<span style="font-size:12px; font-weight:800; color:${deltaColor};">${delta > 0 ? '+' : ''}${delta.toFixed(2)} ${delta > 0.1 ? '↑' : delta < -0.1 ? '↓' : '→'}</span>` : idx === 0 ? `<span style="font-size:11px; color:#cbd5e1;">기준선</span>` : `<span style="font-size:11px; color:#cbd5e1;">—</span>`}
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+
+        <!-- 4 Dimension Summary Strip -->
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">
+          ${dimDeltas.map(d => {
+            const rag = ragInfo(d.postScore ?? d.preScore);
+            const deltaColor = d.delta === null ? '#94a3b8' : d.delta > 0.1 ? '#059669' : d.delta < -0.1 ? '#dc2626' : '#d97706';
+            return `
+              <div style="background:#ffffff; border:1.5px solid #f1f5f9; border-radius:10px; padding:12px 14px;">
+                <div style="font-size:11px; font-weight:700; color:${d.color}; margin-bottom:6px;">${d.label}</div>
+                <div style="display:flex; align-items:baseline; gap:6px;">
+                  ${d.preScore !== null ? `<span style="font-size:13px; color:#94a3b8; font-weight:600;">${d.preScore.toFixed(1)}</span><span style="color:#e2e8f0; font-size:11px;">→</span>` : ''}
+                  <span style="font-size:16px; font-weight:800; color:${d.postScore !== null ? rag.color : '#cbd5e1'};">${d.postScore !== null ? d.postScore.toFixed(1) : '—'}</span>
+                </div>
+                ${d.delta !== null ? `<div style="font-size:11px; font-weight:800; color:${deltaColor}; margin-top:4px;">${d.delta > 0 ? '+' : ''}${d.delta.toFixed(2)} ${d.delta > 0.1 ? '개선' : d.delta < -0.1 ? '하락' : '유지'}</div>` : ''}
+              </div>`;
+          }).join('')}
+        </div>
       </section>
-      <section class="panel">
+
+      <!-- Detailed Chart -->
+      <section class="panel" style="margin-bottom:20px;">
+        <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:14px;">문항별 상세 변화</div>
         ${renderChart(stats, cohort, type)}
         ${renderStatsTable(stats, false, cohort, type)}
       </section>
+
       <section>
         ${sectionTitle("정성 응답", `${cohort}기 · ${type}`)}
         ${renderQualitative(cohort, type)}
-      </section>
-    ` : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
+      </section>`;
+    })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
   `;
+}
+
+// ── Radar Chart (4-axis SVG diamond) ────────────────────────────
+function renderRadarChart(dimScores) {
+  const cx = 110, cy = 110, r = 76;
+  const angles = [-Math.PI / 2, 0, Math.PI / 2, Math.PI]; // top, right, bottom, left
+  const ptAt = (angle, factor) => [cx + r * factor * Math.cos(angle), cy + r * factor * Math.sin(angle)];
+  const pathOf = pts => `M${pts.map(p => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' L')} Z`;
+  const gridLevels = [0.2, 0.4, 0.6, 0.8, 1.0];
+  const labelOffset = [
+    [cx, cy - r - 22, 'middle'],
+    [cx + r + 10, cy, 'start'],
+    [cx, cy + r + 22, 'middle'],
+    [cx - r - 10, cy, 'end'],
+  ];
+  const scorePts = dimScores.map((d, i) => ptAt(angles[i], d.score !== null ? d.score / 5 : 0));
+  return `
+    <svg viewBox="0 0 220 220" width="220" height="220" style="overflow:visible; display:block;">
+      ${gridLevels.map(f => `<path d="${pathOf(angles.map(a => ptAt(a, f)))}" fill="none" stroke="#e2e8f0" stroke-width="${f === 1 ? 1.5 : 1}" stroke-dasharray="${f < 1 ? '3 3' : ''}"/>`).join('')}
+      ${angles.map(a => { const p = ptAt(a, 1); return `<line x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="#cbd5e1" stroke-width="1.2"/>`; }).join('')}
+      <path d="${pathOf(scorePts)}" fill="rgba(14,165,233,0.15)" stroke="#0ea5e9" stroke-width="2.5" stroke-linejoin="round"/>
+      ${scorePts.map((p, i) => dimScores[i].score !== null ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5" fill="${dimScores[i].color}" stroke="#fff" stroke-width="2"/>` : '').join('')}
+      ${dimScores.map((d, i) => `
+        <text x="${labelOffset[i][0]}" y="${labelOffset[i][1]}" text-anchor="${labelOffset[i][2]}" font-size="11" font-weight="700" fill="#334155" font-family="'Plus Jakarta Sans',sans-serif">${d.label}</text>
+        ${d.score !== null ? `<text x="${labelOffset[i][0]}" y="${Number(labelOffset[i][1]) + 14}" text-anchor="${labelOffset[i][2]}" font-size="11.5" font-weight="800" fill="${d.color}" font-family="'Plus Jakarta Sans',sans-serif">${d.score.toFixed(2)}</text>` : ''}
+      `).join('')}
+      ${[1,2,3,4,5].map(n => `<text x="${(cx + 3).toFixed(1)}" y="${(cy - (r * n / 5) + 4).toFixed(1)}" font-size="9" fill="#b0bec5" font-family="sans-serif">${n}</text>`).join('')}
+    </svg>
+  `;
+}
+
+// ── Qualitative Result Parser ────────────────────────────────────
+function parseQualResult(text) {
+  if (!text || text.trim().length < 20) return null;
+  const sections = {};
+  const lines = text.split('\n');
+  let key = null, buf = [];
+  for (const line of lines) {
+    const hm = line.match(/^#{1,3}\s+(.+)/);
+    if (hm) {
+      if (key !== null) sections[key] = buf.join('\n').trim();
+      key = hm[1].trim();
+      buf = [];
+    } else {
+      buf.push(line);
+    }
+  }
+  if (key !== null) sections[key] = buf.join('\n').trim();
+  return Object.keys(sections).length >= 2 ? sections : null;
+}
+
+function renderQualSections(sections) {
+  const ICONS = { '핵심 키워드': '🏷', '주요 테마': '🔍', '대표 발언': '💬', '조직문화 진단': '🧠', '세션 운영 제언': '📋' };
+  const COLOR = { '핵심 키워드': '#0ea5e9', '주요 테마': '#8b5cf6', '대표 발언': '#14b8a6', '조직문화 진단': '#f59e0b', '세션 운영 제언': '#10b981' };
+
+  return Object.entries(sections).map(([k, v]) => {
+    const icon = ICONS[k] || '📄';
+    const accent = COLOR[k] || '#64748b';
+    // For 핵심 키워드, render as pill tags
+    if (k === '핵심 키워드') {
+      const tags = v.split(/[·,\n]/).map(t => t.trim()).filter(Boolean);
+      return `
+        <div style="background:#f8fafc; border:1.5px solid ${accent}33; border-radius:12px; padding:16px 20px;">
+          <div style="font-size:11px; font-weight:800; color:${accent}; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">${icon} ${k}</div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            ${tags.map(t => `<span style="background:${accent}14; color:${accent}; border:1px solid ${accent}33; border-radius:99px; padding:4px 14px; font-size:12.5px; font-weight:700;">${escapeHtml(t)}</span>`).join('')}
+          </div>
+        </div>`;
+    }
+    // For 대표 발언, render each "..." as a blockquote
+    if (k === '대표 발언') {
+      const quotes = v.split('\n').map(l => l.trim()).filter(l => l.startsWith('"') || l.startsWith('"') || l.startsWith('•') || l.startsWith('-'));
+      return `
+        <div style="background:#f8fafc; border:1.5px solid ${accent}33; border-radius:12px; padding:16px 20px;">
+          <div style="font-size:11px; font-weight:800; color:${accent}; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px;">${icon} ${k}</div>
+          ${quotes.length ? quotes.map(q => `<div style="border-left:3px solid ${accent}; padding:8px 12px; margin-bottom:8px; font-size:13px; color:#0c2340; line-height:1.7; background:${accent}08; border-radius:0 8px 8px 0;">${escapeHtml(q.replace(/^[-•""]/, '').trim())}</div>`).join('') : `<p style="font-size:13px; line-height:1.7; color:#334155; margin:0; white-space:pre-wrap;">${escapeHtml(v)}</p>`}
+        </div>`;
+    }
+    // Default: text block
+    return `
+      <div style="background:#f8fafc; border:1.5px solid ${accent}33; border-radius:12px; padding:16px 20px;">
+        <div style="font-size:11px; font-weight:800; color:${accent}; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">${icon} ${k}</div>
+        <div style="font-size:13.5px; line-height:1.85; color:#0c2340; white-space:pre-wrap;">${escapeHtml(v)}</div>
+      </div>`;
+  }).join('');
 }
 
 // ── Report Analysis Helpers ──────────────────────────────────────
@@ -1972,42 +2143,51 @@ function renderReport() {
         <span>사전 설문 기준 · ${cohort}기 ${type} · N=${pre ? pre.n : 0}</span>
       </div>
       ${!hasPreData ? `<div class="empty">사전 설문 응답이 없습니다. 사전 설문을 진행한 후 진단이 가능합니다.</div>` : `
-      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:14px;">
-        ${REPORT_DIMS.map(dim => {
-          const score = dimAvg(pre, dim.qs);
-          const rag = ragInfo(score);
-          const pct = score ? Math.round((score/5)*100) : 0;
-          return `
-            <div style="background:${rag.bg}; border:1.5px solid ${rag.bar}33; border-radius:12px; padding:18px 20px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
-                <span style="font-size:11px; font-weight:800; color:${rag.color}; background:${rag.color}18; padding:3px 10px; border-radius:99px;">${rag.label}</span>
-              </div>
-              <div style="font-size:28px; font-weight:800; color:${rag.color}; margin-bottom:8px;">${score !== null ? score.toFixed(2) : '—'}<span style="font-size:13px; color:#94a3b8; font-weight:500;"> / 5.00</span></div>
-              <div style="background:#e2e8f0; border-radius:99px; height:6px; overflow:hidden;">
-                <div style="width:${pct}%; height:100%; background:${rag.bar}; border-radius:99px; transition:width 0.6s;"></div>
-              </div>
-            </div>
-          `;
-        }).join("")}
-      </div>
-      <div class="panel" style="margin-top:16px; padding:18px 22px;">
-        <p style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin:0 0 10px 0;">종합 진단 요약</p>
-        <p style="font-size:13.5px; line-height:1.8; color:#0c2340; margin:0;">
-          ${cohort}기 ${type} 세션 대상 사전 설문(N=${pre.n}) 결과,
+      <div style="display:grid; grid-template-columns: 220px 1fr; gap:20px; align-items:start;">
+        <!-- Radar Chart -->
+        <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:20px; display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em;">영역별 현황</div>
+          ${renderRadarChart(REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(pre, d.qs), color: d.color })))}
+          <div style="font-size:11px; color:#94a3b8; text-align:center; line-height:1.5;">사전 설문 · N=${pre.n}</div>
+        </div>
+        <!-- Dimension Score Cards -->
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
           ${REPORT_DIMS.map(dim => {
             const score = dimAvg(pre, dim.qs);
             const rag = ragInfo(score);
-            return score !== null ? `<strong>${dim.label}</strong>(${score.toFixed(1)}: ${rag.label})` : null;
-          }).filter(Boolean).join(' · ')}.
-          ${(() => {
-            const scores = REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(pre, d.qs) })).filter(d => d.score !== null);
-            const lowest = scores.sort((a,b) => a.score - b.score)[0];
-            const highest = scores.sort((a,b) => b.score - a.score)[0];
-            if (!lowest) return '';
-            return `가장 집중이 필요한 영역은 <strong>${lowest.label}(${lowest.score.toFixed(1)})</strong>이며, 상대적 강점은 <strong>${highest.label}(${highest.score.toFixed(1)})</strong>입니다.`;
-          })()}
-        </p>
+            const pct = score ? Math.round((score/5)*100) : 0;
+            const subLabel = { psych: 'Psychological Safety', silo: 'Silo Reduction', resilience: 'Resilience', mood: 'Team Climate' }[dim.key] || '';
+            return `
+              <div style="background:${rag.bg}; border:1.5px solid ${rag.bar}33; border-radius:12px; padding:16px 18px; position:relative; overflow:hidden;">
+                <div style="position:absolute; left:0; top:0; bottom:0; width:3px; background:${dim.color};"></div>
+                <div style="padding-left:8px;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+                    <div>
+                      <div style="font-size:13px; font-weight:800; color:#0c2340;">${dim.label}</div>
+                      <div style="font-size:10.5px; color:#94a3b8; font-weight:600; margin-top:1px;">${subLabel}</div>
+                    </div>
+                    <span style="font-size:10.5px; font-weight:800; color:${rag.color}; background:${rag.color}18; padding:2px 9px; border-radius:99px; white-space:nowrap; margin-left:6px; flex-shrink:0;">${rag.label}</span>
+                  </div>
+                  <div style="font-size:26px; font-weight:800; color:${rag.color}; margin-bottom:8px;">${score !== null ? score.toFixed(2) : '—'}<span style="font-size:12px; color:#94a3b8; font-weight:500;"> / 5</span></div>
+                  <div style="background:#e2e8f0; border-radius:99px; height:5px; overflow:hidden;">
+                    <div style="width:${pct}%; height:100%; background:${rag.bar}; border-radius:99px;"></div>
+                  </div>
+                </div>
+              </div>`;
+          }).join("")}
+          <!-- Summary callout -->
+          <div style="grid-column: 1 / -1; background:#f0f9ff; border:1.5px solid #bae6fd; border-radius:12px; padding:14px 18px;">
+            <p style="font-size:12.5px; line-height:1.8; color:#0c2340; margin:0;">
+              ${(() => {
+                const scores = REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(pre, d.qs) })).filter(d => d.score !== null).sort((a,b) => a.score - b.score);
+                if (!scores.length) return '데이터가 충분하지 않습니다.';
+                const low = scores[0], high = scores[scores.length - 1];
+                const allRag = REPORT_DIMS.map(d => { const s = dimAvg(pre, d.qs); return { ...d, s, rag: ragInfo(s) }; }).filter(d => d.s !== null);
+                return `<strong>집중 개입 필요</strong>: ${low.label} (${low.score.toFixed(1)}) · <strong>강점 활용 가능</strong>: ${high.label} (${high.score.toFixed(1)}). ${allRag.some(d => d.s < 3.0) ? '심리적 안전 수준이 위험 구간에 있어 세션 초반 안전 계약 수립이 최우선입니다.' : allRag.every(d => d.s >= 4.0) ? '전 영역이 양호 이상으로 심화 세션 및 확산 활동으로 진입할 수 있습니다.' : '전반적으로 관리 가능한 수준이며 집중 영역 중심으로 세션을 설계하세요.'}`;
+              })()}
+            </p>
+          </div>
+        </div>
       </div>
       `}
     </section>
@@ -2047,49 +2227,58 @@ function renderReport() {
     <section style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>③ 변화 분석</h2>
-        <span>사전 → 사후 비교 · N<3 마스킹 적용</span>
+        <span>사전 → 중간 → 사후 · N<3 마스킹 적용</span>
       </div>
       ${!hasPreData && !hasPostData ? `<div class="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>` : `
-      <div class="panel" style="overflow-x:auto;">
-        <table style="width:100%; border-collapse:collapse; font-size:13px;">
-          <thead>
-            <tr style="border-bottom:2px solid #e2e8f0;">
-              <th style="text-align:left; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px; text-transform:uppercase;">영역</th>
-              <th style="text-align:center; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">사전 (N=${pre ? pre.n : 0})</th>
-              <th style="text-align:center; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">중간 (N=${mid ? mid.n : 0})</th>
-              <th style="text-align:center; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">사후 (N=${post ? post.n : 0})</th>
-              <th style="text-align:center; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">변화량</th>
-              <th style="text-align:left; padding:10px 14px; color:#64748b; font-weight:700; font-size:11px;">해석</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${REPORT_DIMS.map(dim => {
-              const preScore  = pre  && pre.n  >= 3 ? dimAvg(pre,  dim.qs) : null;
-              const midScore  = mid  && mid.n  >= 3 ? dimAvg(mid,  dim.qs) : null;
-              const postScore = post && post.n >= 3 ? dimAvg(post, dim.qs) : null;
-              const delta = (preScore !== null && postScore !== null) ? postScore - preScore : null;
-              const arrow = delta === null ? '—' : delta > 0.2 ? '↑ 개선' : delta < -0.2 ? '↓ 하락' : '→ 유지';
-              const arrowColor = delta === null ? '#94a3b8' : delta > 0.2 ? '#059669' : delta < -0.2 ? '#dc2626' : '#d97706';
-              const interpretation = delta === null ? (hasPreData || hasPostData ? 'N<3 마스킹' : '데이터 없음')
-                : delta > 0.5 ? '뚜렷한 긍정 변화 — 세션 효과가 확인됩니다.'
-                : delta > 0.2 ? '긍정적 변화 — 세션 방향성이 적절합니다.'
-                : delta > -0.2 ? '변화 미미 — 추가 개입 또는 측정 시기 검토가 필요합니다.'
-                : '점수 하락 — 세션 내용 또는 환경 요인을 점검하세요.';
-              return `
-                <tr style="border-bottom:1px solid #f1f5f9;">
-                  <td style="padding:12px 14px; font-weight:700; color:#0c2340;">${dim.label}</td>
-                  <td style="text-align:center; padding:12px 14px; color:${ragInfo(preScore).color}; font-weight:700;">${preScore !== null ? preScore.toFixed(2) : '<span style="color:#94a3b8">N<3</span>'}</td>
-                  <td style="text-align:center; padding:12px 14px; color:${ragInfo(midScore).color}; font-weight:700;">${midScore !== null ? midScore.toFixed(2) : '<span style="color:#94a3b8">N<3</span>'}</td>
-                  <td style="text-align:center; padding:12px 14px; color:${ragInfo(postScore).color}; font-weight:700;">${postScore !== null ? postScore.toFixed(2) : '<span style="color:#94a3b8">N<3</span>'}</td>
-                  <td style="text-align:center; padding:12px 14px; font-weight:800; color:${arrowColor};">${delta !== null ? (delta > 0 ? '+' : '') + delta.toFixed(2) + ' ' + arrow : arrow}</td>
-                  <td style="padding:12px 14px; font-size:12px; color:#64748b;">${interpretation}</td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
-        <p style="font-size:11.5px; color:#94a3b8; margin:12px 14px 4px; line-height:1.6;">N이 3 미만인 셀은 익명 보장을 위해 마스킹 처리됩니다. 수치는 통계적 유의성이 아닌 운영 방향 지표입니다.</p>
+      <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px;">
+        ${REPORT_DIMS.map(dim => {
+          const preScore  = pre  && pre.n  >= 3 ? dimAvg(pre,  dim.qs) : null;
+          const midScore  = mid  && mid.n  >= 3 ? dimAvg(mid,  dim.qs) : null;
+          const postScore = post && post.n >= 3 ? dimAvg(post, dim.qs) : null;
+          const delta = preScore !== null && postScore !== null ? postScore - preScore : null;
+          const midDelta = preScore !== null && midScore !== null ? midScore - preScore : null;
+          const deltaColor = delta === null ? '#94a3b8' : delta > 0.2 ? '#059669' : delta < -0.2 ? '#dc2626' : '#d97706';
+          const interpretation = delta === null ? ''
+            : delta > 0.5 ? '뚜렷한 긍정 변화 — 세션 효과 확인'
+            : delta > 0.2 ? '긍정적 변화 — 방향성 적절'
+            : delta > -0.2 ? '변화 미미 — 추가 개입 필요'
+            : '점수 하락 — 환경 요인 점검 필요';
+          const bar = (score, color) => score !== null ? `<div style="height:8px; border-radius:99px; width:${Math.round((score/5)*100)}%; background:${color}; transition:width 0.5s;"></div>` : `<div style="height:8px; border-radius:99px; width:30%; background:#e2e8f0;"></div>`;
+          return `
+            <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
+              <div style="position:absolute; top:0; left:0; right:0; height:3px; background:${dim.color};"></div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
+                ${delta !== null ? `<span style="font-size:12px; font-weight:800; color:${deltaColor}; background:${deltaColor}14; padding:3px 10px; border-radius:99px;">${delta > 0 ? '+' : ''}${delta.toFixed(2)} ${delta > 0.2 ? '↑' : delta < -0.2 ? '↓' : '→'}</span>` : `<span style="font-size:11px; color:#94a3b8;">N<3 마스킹</span>`}
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-size:11px; font-weight:700; color:#94a3b8;">사전</span>
+                    <span style="font-size:11.5px; font-weight:800; color:${ragInfo(preScore).color};">${preScore !== null ? preScore.toFixed(2) : 'N<3'}</span>
+                  </div>
+                  <div style="background:#f1f5f9; border-radius:99px; overflow:hidden;">${bar(preScore, '#cbd5e1')}</div>
+                </div>
+                ${midScore !== null ? `<div>
+                  <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-size:11px; font-weight:700; color:#94a3b8;">중간</span>
+                    <span style="font-size:11.5px; font-weight:800; color:${ragInfo(midScore).color};">${midScore.toFixed(2)}${midDelta !== null ? ` <span style="color:${midDelta > 0 ? '#059669' : '#dc2626'}; font-size:10px;">(${midDelta > 0 ? '+' : ''}${midDelta.toFixed(2)})</span>` : ''}</span>
+                  </div>
+                  <div style="background:#f1f5f9; border-radius:99px; overflow:hidden;">${bar(midScore, '#fbbf24')}</div>
+                </div>` : ''}
+                <div>
+                  <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-size:11px; font-weight:700; color:#94a3b8;">사후</span>
+                    <span style="font-size:11.5px; font-weight:800; color:${ragInfo(postScore).color};">${postScore !== null ? postScore.toFixed(2) : 'N<3'}</span>
+                  </div>
+                  <div style="background:#f1f5f9; border-radius:99px; overflow:hidden;">${bar(postScore, dim.color)}</div>
+                </div>
+              </div>
+              ${interpretation ? `<p style="font-size:11.5px; color:#64748b; margin:10px 0 0; line-height:1.5;">${interpretation}</p>` : ''}
+            </div>`;
+        }).join("")}
       </div>
+      <p style="font-size:11.5px; color:#94a3b8; margin:10px 0 0; line-height:1.6;">N이 3 미만인 데이터는 익명 보장을 위해 마스킹 처리됩니다. 수치는 통계적 유의성이 아닌 운영 방향 지표입니다.</p>
       `}
     </section>
 
@@ -2097,18 +2286,19 @@ function renderReport() {
     ${(() => {
       const qualKey = `${cohort}-${type}`;
       const saved = (state.qualAnalysis || {})[qualKey] || '';
+      const parsed = parseQualResult(saved);
       return `
     <section style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
-        <h2>④ 정성 응답 AI 분석</h2>
+        <h2>④ 주관식 응답 AI 분석</h2>
         <button class="secondary compact" onclick="openQualModal('${qualKey}')">
-          ${saved ? '✏️ 분석 수정' : '🤖 AI 분석 시작'}
+          ${saved ? '분석 수정' : 'AI 분석 시작'}
         </button>
       </div>
       ${saved
-        ? `<div class="panel" style="padding:22px 26px;">
-            <div style="font-size:13.5px; line-height:2; color:#0c2340; white-space:pre-wrap;">${escapeHtml(saved)}</div>
-           </div>`
+        ? parsed
+          ? `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">${renderQualSections(parsed)}</div>`
+          : `<div class="panel" style="padding:22px 26px;"><div style="font-size:13.5px; line-height:2; color:#0c2340; white-space:pre-wrap;">${escapeHtml(saved)}</div></div>`
         : `<div class="empty">아직 AI 분석 결과가 없습니다. <button class="ghost compact" style="margin-left:6px;" onclick="openQualModal('${qualKey}')">분석 시작</button></div>`
       }
     </section>
@@ -3413,6 +3603,22 @@ window.deleteSurvey = function(id) {
   deleteSurveyFromFirestore(id).catch(e => console.error('Firestore 삭제 실패:', e));
 };
 
+window.toggleSurveyCard = function(id) {
+  state.collapsedSurveyIds = state.collapsedSurveyIds || [];
+  const idx = state.collapsedSurveyIds.indexOf(id);
+  if (idx >= 0) state.collapsedSurveyIds.splice(idx, 1);
+  else state.collapsedSurveyIds.push(id);
+  saveState();
+  render();
+};
+
+window.collapseAllSurveys = function(collapse) {
+  const ids = (state.surveys || []).map(s => s.id);
+  state.collapsedSurveyIds = collapse ? ids : [];
+  saveState();
+  render();
+};
+
 // ── Firestore Survey Helpers ─────────────────────────────────────
 async function loadSurveysFromFirestore() {
   try {
@@ -3742,12 +3948,12 @@ function buildQualPrompt(cohort, type) {
 
   if (!totalQualRows) return prompt; // hasQual will be false
 
-  prompt += `---\n위 응답을 바탕으로 다음 형식으로 분석해 주세요 (한국어로 작성).\n\n`;
-  prompt += `1. 주요 기대/우려 — 사전 응답 기반 (3가지 이내)\n`;
-  prompt += `2. 주요 성과/피드백 — 중간·사후 응답 기반 (3가지 이내)\n`;
-  prompt += `3. 사전→사후 변화 요약 (2~3문장)\n`;
-  prompt += `4. 운영자를 위한 다음 세션 제안 (1~2가지)\n\n`;
-  prompt += `형식: 각 항목은 번호와 굵은 제목으로 시작하고, 핵심 내용을 간결하게 bullet로 정리해 주세요.\n`;
+  prompt += `---\n위 응답을 바탕으로 아래 형식에 정확히 맞춰 한국어로 분석해 주세요.\n각 섹션은 반드시 ## 제목으로 시작하세요.\n\n`;
+  prompt += `## 핵심 키워드\n(응답 전반에서 가장 자주 등장하는 감정·주제 키워드 5개를 · 로 구분하여 한 줄에)\n\n`;
+  prompt += `## 주요 테마\n(사전~사후에 걸쳐 반복되는 핵심 주제 3가지를 **굵은 제목**: 1~2문장 설명 형식으로)\n\n`;
+  prompt += `## 대표 발언\n(가장 인상적인 참가자 발언 2~3개를 각 줄에 "..." 형식으로 인용, 끝에 [사전/중간/사후] 표기)\n\n`;
+  prompt += `## 조직문화 진단\n(Amy Edmondson 심리적 안전감, 팀 회복탄력성, 사일로 현상 등 조직심리 관점에서 이 집단의 특성과 주요 패턴을 3~4문장으로 서술)\n\n`;
+  prompt += `## 세션 운영 제언\n(다음 세션을 위한 구체적·실행 가능한 제언 2~3가지를 번호 목록으로)\n`;
   return prompt;
 }
 

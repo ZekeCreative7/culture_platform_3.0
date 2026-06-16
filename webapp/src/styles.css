@@ -306,6 +306,11 @@ main {
   z-index: 50;
 }
 
+.menu-toggle,
+.mobile-nav-backdrop {
+  display: none;
+}
+
 .searchbox {
   color: var(--faint);
   font-size: 13.5px;
@@ -1579,6 +1584,7 @@ td.minus {
   justify-content: space-between;
   position: relative;
   box-shadow: var(--shadow-low);
+  gap: 10px;
 }
 .org-card:hover {
   border-color: rgba(0, 114, 255, 0.4);
@@ -1617,6 +1623,25 @@ td.minus {
   text-overflow: ellipsis;
   flex: 1;
   padding-right: 8px;
+}
+.org-card-main {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 5px;
+}
+.org-card-meta {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.org-card-meta small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
 }
 .org-card-title small {
   color: var(--faint);
@@ -1681,6 +1706,43 @@ td.minus {
   border-radius: 5px;
   line-height: 1;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+
+.org-editor-modal {
+  max-width: 520px;
+}
+.org-editor-body {
+  display: grid;
+  gap: 18px;
+}
+.org-editor-body label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.org-editor-body input,
+.org-editor-body select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  padding: 0 12px;
+  outline: none;
+}
+.org-editor-body input:focus,
+.org-editor-body select:focus {
+  border-color: var(--neon-blue);
+  box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.14);
+}
+.org-editor-note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 /* 4. 조직도 선택 팝업 */
@@ -1881,6 +1943,7 @@ td.minus {
   grid-template-columns: 160px minmax(0, 1fr);
   border-bottom: 1px solid var(--line);
 }
+
 .week-day-row:last-child {
   border-bottom: none;
 }
@@ -2454,7 +2517,7 @@ td.minus {
   }
 }
 
-/* ── 767px 이하: 모바일 (하단 탭 네비게이션) ── */
+/* ── 767px 이하: 모바일 (햄버거 오프캔버스 네비게이션) ── */
 @media (max-width: 767px) {
   #app {
     grid-template-columns: 1fr;
@@ -2462,79 +2525,99 @@ td.minus {
 
   .sidebar {
     position: fixed;
-    bottom: 0;
     left: 0;
-    right: 0;
-    top: auto;
-    height: auto;
-    min-height: calc(60px + env(safe-area-inset-bottom));
-    padding: 6px 8px;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom));
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-around;
-    border-top: 1px solid var(--line);
+    top: 0;
+    bottom: 0;
+    width: min(82vw, 320px);
+    height: 100vh;
+    min-height: 100vh;
+    padding: 28px 20px;
+    padding-top: calc(28px + env(safe-area-inset-top));
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    border-right: 1px solid var(--line);
     border-bottom: none;
-    border-right: none;
-    z-index: 100;
-    gap: 0;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    background: rgba(8, 12, 28, 0.95);
-    overflow-x: visible;
+    z-index: 120;
+    gap: 28px;
+    background: rgba(8, 12, 28, 0.98);
+    overflow-y: auto;
+    transform: translateX(-104%);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 24px 0 70px rgba(0, 0, 0, 0.4);
   }
 
   .brand {
-    display: none;
+    display: flex;
   }
 
   .sidebar-note {
-    display: none;
+    display: block;
   }
 
   nav {
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    flex-direction: column;
     width: 100%;
-    justify-content: space-around;
-    gap: 0;
-    overflow-x: visible;
+    justify-content: stretch;
+    gap: 8px;
+    overflow-x: hidden;
   }
 
   .nav-label {
-    display: none;
+    display: block;
   }
 
   nav button {
-    flex-direction: column;
-    min-height: 48px;
-    padding: 5px 4px;
-    font-size: 9.5px;
-    gap: 3px;
+    flex-direction: row;
+    min-height: 42px;
+    padding: 10px 12px;
+    font-size: 14px;
+    gap: 10px;
     border-radius: var(--radius-sm);
-    flex: 1;
-    text-align: center;
+    text-align: left;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     white-space: nowrap;
   }
 
   nav button i {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
   }
 
   nav button.active {
     border-left: none;
     border-bottom: none;
-    border-top: 2px solid var(--neon-blue);
-    border-radius: 0;
-    background: rgba(0, 114, 255, 0.08);
+    border-top: none;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 114, 255, 0.16);
     color: #fff;
   }
 
+  .mobile-nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .mobile-nav-backdrop {
+    position: fixed;
+    inset: 0;
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+    border: 0;
+    padding: 0;
+    background: rgba(1, 6, 18, 0.62);
+    z-index: 110;
+    transition: opacity 0.22s ease;
+  }
+
+  .mobile-nav-open .mobile-nav-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   main {
-    padding-bottom: calc(68px + env(safe-area-inset-bottom));
     min-height: 100vh;
   }
 
@@ -2545,6 +2628,43 @@ td.minus {
     position: sticky;
     top: 0;
     z-index: 50;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .menu-toggle {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--ink);
+  }
+
+  .menu-toggle span {
+    width: 17px;
+    height: 2px;
+    border-radius: 99px;
+    background: currentColor;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .mobile-nav-open .menu-toggle span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+  }
+
+  .mobile-nav-open .menu-toggle span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .mobile-nav-open .menu-toggle span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
   }
 
   .searchbox {
@@ -2740,8 +2860,8 @@ td.minus {
   }
 
   nav button {
-    font-size: 9px;
-    padding: 5px 2px;
+    font-size: 14px;
+    padding: 10px 12px;
   }
 
   .canvas {
@@ -2822,4 +2942,3 @@ td.minus {
   background: rgba(255, 255, 255, 0.09);
   border-color: var(--line-strong);
 }
-

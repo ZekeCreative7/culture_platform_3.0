@@ -32,6 +32,28 @@ const SESSION_TYPES = {
     duration: 120,
   },
 };
+const POSITION_OPTIONS = ["사장", "부사장", "부문장", "본부장", "이사", "부장", "차장", "과장", "대리", "사원"];
+const POSITION_ALIASES = {
+  CEO: "사장",
+  대표: "사장",
+  대표이사: "사장",
+  전무: "부사장",
+  상무: "이사",
+  구성원: "사원",
+  팀원: "사원",
+};
+const UNIT_LABELS = {
+  company: "전사",
+  division: "부문",
+  hq: "본부",
+  team: "팀",
+};
+const UNIT_LEADER_LABELS = {
+  company: "대표",
+  division: "부문장",
+  hq: "본부장",
+  team: "팀장",
+};
 const SCORE_MAP = {
   "매우 그렇다": 5,
   그렇다: 4,
@@ -69,6 +91,17 @@ const addWeeks = (date, weeks) => {
 const uid = () => Math.floor(Date.now() + Math.random() * 100000).toString(36);
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const normalizePosition = (value, fallback = "사원") => {
+  const clean = String(value || "").trim();
+  if (!clean) return fallback;
+  if (POSITION_OPTIONS.includes(clean)) return clean;
+  return POSITION_ALIASES[clean] || clean;
+};
+const rankOptions = (selected = "사원") => {
+  const current = normalizePosition(selected);
+  const options = POSITION_OPTIONS.includes(current) ? POSITION_OPTIONS : [current, ...POSITION_OPTIONS];
+  return options.map((position) => `<option value="${escapeHtml(position)}" ${position === current ? "selected" : ""}>${escapeHtml(position)}</option>`).join("");
+};
 
 function defaultQuestions(phase) {
   const list = [
@@ -121,6 +154,11 @@ const blankState = () => ({
   selectedAnalyticsType: "팀장",
   selectedReportCohort: "",
   selectedReportType: "팀장",
+  mobileNavOpen: false,
+  draftDivisionId: "",
+  draftHqId: "",
+  draftTeamId: "",
+  orgEditor: null,
 });
 
 let state = loadState();
@@ -144,7 +182,8 @@ function saveState() {
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
-    selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType
+    selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
+    draftDivisionId, draftHqId, draftTeamId
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({ 
     activeView, sessions, responses, draftType, draftSchedule, 
@@ -152,7 +191,8 @@ function saveState() {
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
-    selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType
+    selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
+    draftDivisionId, draftHqId, draftTeamId
   }));
 }
 
@@ -235,6 +275,143 @@ function validateAndRepairSelectedOrg() {
     const teams = state.orgUnits.filter(u => u.level === "team" && u.parentId === state.selectedHq);
     state.selectedTeam = teams.length > 0 ? teams[0].id : "";
   }
+}
+
+function childUnits(parentId, level) {
+  return state.orgUnits.filter((unit) => unit.parentId === parentId && (!level || unit.level === level));
+}
+
+function descendantTeamIds(unitId) {
+  const unit = state.orgUnits.find((item) => item.id === unitId);
+  if (!unit) return [];
+  if (unit.level === "team") return [unit.id];
+  return childUnits(unit.id).flatMap((child) => descendantTeamIds(child.id));
+}
+
+function orgMemberOptionsForUnit(unitId) {
+  const unit = state.orgUnits.find((item) => item.id === unitId);
+  if (!unit) return [];
+  const teamIds = descendantTeamIds(unit.id);
+  const options = [];
+  const seen = new Set();
+
+  const addOption = (value, name, position) => {
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    options.push({ value, name, position: normalizePosition(position) });
+  };
+
+  teamIds.forEach((teamId) => {
+    const team = state.orgUnits.find((item) => item.id === teamId);
+    if (team && team.leader) {
+      addOption(`unit:${team.id}`, team.leader, team.leaderTitle || "부장");
+    }
+    state.orgMembers
+      .filter((member) => member.parentId === teamId)
+      .forEach((member) => addOption(`member:${member.id}`, member.name, member.position));
+  });
+
+  if (unit.leader) {
+    addOption(`current:${unit.id}`, unit.leader, unit.leaderTitle || UNIT_LEADER_LABELS[unit.level]);
+  }
+
+  return options.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
+
+function optionHtml(items, selectedId, emptyLabel) {
+  const empty = `<option value="">${escapeHtml(emptyLabel)}</option>`;
+  return empty + items.map((item) => `<option value="${escapeHtml(item.id)}" ${selectedId === item.id ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("");
+}
+
+function syncDraftOrgFromTeam(teamId = state.draftTeamId) {
+  const team = state.orgUnits.find((unit) => unit.id === teamId && unit.level === "team");
+  if (!team) {
+    state.draftDivision = "";
+    state.draftHq = "";
+    state.draftTeam = "";
+    state.draftTeamId = "";
+    state.draftLeader = "";
+    state.draftLeaderTitle = "";
+    state.draftMembers = [];
+    return;
+  }
+
+  const hq = state.orgUnits.find((unit) => unit.id === team.parentId);
+  const division = hq ? state.orgUnits.find((unit) => unit.id === hq.parentId) : null;
+  state.draftTeamId = team.id;
+  state.draftHqId = hq ? hq.id : "";
+  state.draftDivisionId = division ? division.id : "";
+  state.draftTeam = team.name;
+  state.draftHq = hq ? hq.name : "";
+  state.draftDivision = division ? division.name : "";
+  state.draftLeader = team.leader || "";
+  state.draftLeaderTitle = normalizePosition(team.leaderTitle || "부장");
+  state.draftMembers = state.orgMembers
+    .filter((member) => member.parentId === team.id)
+    .map((member) => ({ id: member.id, name: member.name, position: normalizePosition(member.position) }));
+}
+
+function ensureDraftOrgSelection() {
+  if (!state.orgUnits || !state.orgUnits.length) return { divisionList: [], hqList: [], teamList: [] };
+  const company = state.orgUnits.find((unit) => unit.id === state.selectedCompany && unit.level === "company") || state.orgUnits.find((unit) => unit.level === "company");
+  const divisionList = company ? childUnits(company.id, "division") : state.orgUnits.filter((unit) => unit.level === "division");
+  if (!divisionList.some((unit) => unit.id === state.draftDivisionId)) {
+    state.draftDivisionId = state.selectedDivision && divisionList.some((unit) => unit.id === state.selectedDivision)
+      ? state.selectedDivision
+      : (divisionList[0]?.id || "");
+  }
+
+  const hqList = childUnits(state.draftDivisionId, "hq");
+  if (!hqList.some((unit) => unit.id === state.draftHqId)) {
+    state.draftHqId = state.selectedHq && hqList.some((unit) => unit.id === state.selectedHq)
+      ? state.selectedHq
+      : (hqList[0]?.id || "");
+  }
+
+  const teamList = childUnits(state.draftHqId, "team");
+  if (!teamList.some((unit) => unit.id === state.draftTeamId)) {
+    state.draftTeamId = state.selectedTeam && teamList.some((unit) => unit.id === state.selectedTeam)
+      ? state.selectedTeam
+      : (teamList[0]?.id || "");
+  }
+
+  syncDraftOrgFromTeam(state.draftTeamId);
+  return { divisionList, hqList, teamList };
+}
+
+function leaderMeta(unit) {
+  if (!unit || !unit.leader) return "";
+  return `<span class="org-card-meta">${escapeHtml(UNIT_LEADER_LABELS[unit.level] || "리더")} · ${escapeHtml(unit.leader)} <small>${escapeHtml(normalizePosition(unit.leaderTitle || UNIT_LEADER_LABELS[unit.level]))}</small></span>`;
+}
+
+function applyLeaderSelection(unit, selectValue) {
+  if (!unit) return;
+  if (!selectValue) {
+    unit.leader = "";
+    unit.leaderTitle = "";
+    unit.leaderRole = "";
+    unit.leaderMemberId = "";
+    return;
+  }
+
+  const [source, id] = selectValue.split(":");
+  let name = "";
+  let position = "";
+  if (source === "member") {
+    const member = state.orgMembers.find((item) => item.id === id);
+    name = member?.name || "";
+    position = member?.position || "";
+    unit.leaderMemberId = id;
+  } else if (source === "unit" || source === "current") {
+    const leaderUnit = state.orgUnits.find((item) => item.id === id);
+    name = leaderUnit?.leader || "";
+    position = leaderUnit?.leaderTitle || "";
+    unit.leaderMemberId = "";
+  }
+
+  unit.leader = name;
+  unit.leaderTitle = normalizePosition(position || UNIT_LEADER_LABELS[unit.level]);
+  unit.leaderRole = UNIT_LEADER_LABELS[unit.level] || "리더";
 }
 
 function statsForCohort(cohort, type = "팀장") {
@@ -335,6 +512,7 @@ function parseCSVLine(line) {
 
 function render() {
   const app = document.querySelector("#app");
+  app.className = state.mobileNavOpen ? "mobile-nav-open" : "";
   app.innerHTML = `
     <aside class="sidebar">
       <div class="brand">
@@ -354,8 +532,14 @@ function render() {
         <small>${new Date().toLocaleDateString("ko-KR")}</small>
       </div>
     </aside>
+    <button type="button" class="mobile-nav-backdrop" aria-label="메뉴 닫기"></button>
     <main>
       <header class="topbar">
+        <button type="button" class="menu-toggle" aria-label="${state.mobileNavOpen ? "메뉴 닫기" : "메뉴 열기"}" aria-expanded="${state.mobileNavOpen}">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
         <div class="searchbox">Search sessions, cohorts, uploads</div>
         <div class="topbar-actions">
           <span>${state.sessions.length} sessions</span>
@@ -450,6 +634,7 @@ function renderDashboard() {
 function renderSessions() {
   const orgPopupHtml = state.showOrgPopup ? renderOrgPopup() : "";
   const attendanceModalHtml = state.showAttendanceModal ? renderAttendanceModal() : "";
+  const { divisionList, hqList, teamList } = ensureDraftOrgSelection();
   
   let mainContentHtml = "";
   if (state.activeSessionTab === "calendar") {
@@ -464,25 +649,36 @@ function renderSessions() {
             </select>
           </label>
           <label>기수<input id="cohort" type="number" min="1" value="1" /></label>
+          <label>부문명
+            <select id="session-division">
+              ${optionHtml(divisionList, state.draftDivisionId, "부문 선택")}
+            </select>
+          </label>
+          <label>본부명
+            <select id="session-hq" ${state.draftDivisionId ? "" : "disabled"}>
+              ${optionHtml(hqList, state.draftHqId, "본부 선택")}
+            </select>
+          </label>
+          <label>팀명
+            <select id="session-team" ${state.draftHqId ? "" : "disabled"}>
+              ${optionHtml(teamList, state.draftTeamId, "팀 선택")}
+            </select>
+          </label>
           
-          ${state.draftType === "팀빌딩" ? `
+          ${state.draftTeamId ? `
             <div style="grid-column: span 3; margin: 10px 0;">
-              ${state.draftTeamId ? `
-                <div class="selected-team-badge">
-                  <strong>선택된 부서:</strong> ${escapeHtml(state.draftDivision)} &gt; ${escapeHtml(state.draftHq)} &gt; ${escapeHtml(state.draftTeam)} 
-                  <button type="button" class="ghost compact" id="open-org-picker" style="margin-left:12px;">조직 변경</button>
-                  <div style="margin-top: 6px; font-size:12px; color:var(--muted);">
-                    팀장: ${escapeHtml(state.draftLeader || "미지정")} (${escapeHtml(state.draftLeaderTitle || "")}) | 팀원: ${state.draftMembers.length}명
-                  </div>
+              <div class="selected-team-badge">
+                <strong>선택된 조직:</strong> ${escapeHtml(state.draftDivision)} &gt; ${escapeHtml(state.draftHq)} &gt; ${escapeHtml(state.draftTeam)}
+                <button type="button" class="ghost compact" id="open-org-picker" style="margin-left:12px;">조직도에서 보기</button>
+                <div style="margin-top: 6px; font-size:12px; color:var(--muted);">
+                  팀장: ${escapeHtml(state.draftLeader || "미지정")} ${state.draftLeaderTitle ? `(${escapeHtml(state.draftLeaderTitle)})` : ""} | 팀원: ${state.draftMembers.length}명
                 </div>
-              ` : `
-                <button type="button" class="primary" id="open-org-picker">조직도에서 팀 선택</button>
-              `}
+              </div>
             </div>
           ` : `
-            <label>부문<input id="division" value="${state.draftDivision || ''}" placeholder="예: Customer Division" /></label>
-            <label>본부<input id="hq" value="${state.draftHq || ''}" placeholder="예: CX 본부" /></label>
-            <label>참여 팀<input id="participating" placeholder="팀장 세션: A팀, B팀" /></label>
+            <div style="grid-column: span 3; margin: 10px 0;">
+              <button type="button" class="primary" id="open-org-picker">조직도에서 팀 선택</button>
+            </div>
           `}
         </div>
         <div class="schedule-head">
@@ -496,7 +692,7 @@ function renderSessions() {
           ${state.draftSchedule.map(scheduleRow).join("")}
         </div>
         <div class="panel-actions">
-          <button class="primary" id="create-session" ${state.draftType === '팀빌딩' && !state.draftTeamId ? 'disabled' : ''}>세션 등록</button>
+          <button class="primary" id="create-session" ${!state.draftTeamId ? 'disabled' : ''}>세션 등록</button>
         </div>
       </section>
       <section>
@@ -568,6 +764,114 @@ function renderOrgPopup() {
   `;
 }
 
+function renderOrgUnitCard(unit, activeId, matches) {
+  return `
+    <div class="org-card ${activeId === unit.id ? "active" : ""} ${matches(unit.name) ? "searched-match" : ""}" onclick="selectOrgNode('${unit.level}', '${unit.id}')"
+         ${unit.level === "hq" || unit.level === "team" ? `draggable="true" ondragstart="handleDragStart(event, '${unit.id}', '${unit.level}')" ondragend="handleDragEnd(event)"` : ""}
+         ${unit.level !== "company" ? `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${unit.id}', '${unit.level}')"` : ""}>
+      <div class="org-card-main">
+        <span class="org-card-title">${escapeHtml(unit.name)}</span>
+        ${leaderMeta(unit)}
+      </div>
+      <div class="org-card-actions">
+        <button onclick="event.stopPropagation(); renameOrgNode('${unit.id}')" title="설정">설정</button>
+        <button class="delete-btn-red" onclick="event.stopPropagation(); deleteOrgNode('${unit.id}')" title="삭제">삭제</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderMemberCard(member, matches) {
+  const position = normalizePosition(member.position);
+  return `
+    <div class="org-card member-card ${matches(member.name) ? "searched-match" : ""}" draggable="true" ondragstart="handleDragStart(event, '${member.id}', 'member')" ondragend="handleDragEnd(event)">
+      <div class="org-card-main">
+        <span class="org-card-title">${escapeHtml(member.name)}</span>
+        <span class="org-card-meta">직급 · <small>${escapeHtml(position)}</small></span>
+      </div>
+      <div class="org-card-actions">
+        <button onclick="renameMember('${member.id}')" title="수정">수정</button>
+        <button class="delete-btn-red" onclick="deleteMember('${member.id}')" title="삭제">삭제</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderOrgEditorModal() {
+  const editor = state.orgEditor;
+  if (!editor) return "";
+
+  if (editor.kind === "member") {
+    const member = editor.mode === "edit" ? state.orgMembers.find((item) => item.id === editor.id) : null;
+    return `
+      <div class="modal-overlay">
+        <div class="modal-card org-editor-modal">
+          <div class="modal-header">
+            <h2>${editor.mode === "add" ? "구성원 추가" : "구성원 수정"}</h2>
+            <button type="button" class="close-btn" id="close-org-editor">&times;</button>
+          </div>
+          <div class="modal-body org-editor-body">
+            <label>이름
+              <input id="org-member-name" value="${escapeHtml(member?.name || "")}" placeholder="구성원 이름" />
+            </label>
+            <label>직급
+              <select id="org-member-position">
+                ${rankOptions(member?.position || "사원")}
+              </select>
+            </label>
+          </div>
+          <div class="modal-footer">
+            <button class="secondary" type="button" id="cancel-org-editor">취소</button>
+            <button class="primary" type="button" id="save-org-editor">저장</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const unit = editor.mode === "edit" ? state.orgUnits.find((item) => item.id === editor.id) : null;
+  const levelLabel = UNIT_LABELS[editor.level] || "조직";
+  const leaderOptions = unit ? orgMemberOptionsForUnit(unit.id) : orgMemberOptionsForUnit(editor.parentId);
+  const selectedLeaderValue = unit?.leaderMemberId
+    ? `member:${unit.leaderMemberId}`
+    : (unit?.leader ? `current:${unit.id}` : "");
+
+  return `
+    <div class="modal-overlay">
+      <div class="modal-card org-editor-modal">
+        <div class="modal-header">
+          <h2>${editor.mode === "add" ? `${levelLabel} 추가` : `${levelLabel} 설정`}</h2>
+          <button type="button" class="close-btn" id="close-org-editor">&times;</button>
+        </div>
+        <div class="modal-body org-editor-body">
+          <label>${levelLabel} 이름
+            <input id="org-unit-name" value="${escapeHtml(unit?.name || "")}" placeholder="${levelLabel} 이름" />
+          </label>
+          ${editor.level === "hq" || editor.level === "team" ? `
+            <label>${UNIT_LEADER_LABELS[editor.level]} 설정
+              <select id="org-unit-leader">
+                <option value="">미지정</option>
+                ${leaderOptions.map((option) => `<option value="${escapeHtml(option.value)}" ${selectedLeaderValue === option.value ? "selected" : ""}>${escapeHtml(option.name)} · ${escapeHtml(option.position)}</option>`).join("")}
+              </select>
+            </label>
+          ` : `
+            <label>${UNIT_LEADER_LABELS[editor.level] || "리더"} 직급
+              <select id="org-unit-leader-title">
+                ${rankOptions(unit?.leaderTitle || (editor.level === "company" ? "사장" : "부문장"))}
+              </select>
+            </label>
+          `}
+          ${editor.level === "hq" || editor.level === "team" ? `<p class="org-editor-note">리더 후보는 이 조직 아래의 구성원과 현재 등록된 리더에서 불러옵니다.</p>` : ""}
+        </div>
+        <div class="modal-footer">
+          <button class="secondary" type="button" id="cancel-org-editor">취소</button>
+          <button class="primary" type="button" id="save-org-editor">저장</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderOrg() {
   validateAndRepairSelectedOrg();
 
@@ -610,15 +914,7 @@ function renderOrg() {
           <button class="column-add-btn" onclick="addOrgNode('company', null)" title="회사 추가">+</button>
         </div>
         <div class="org-column-body">
-          ${companyList.map(c => `
-            <div class="org-card ${state.selectedCompany === c.id ? "active" : ""} ${matches(c.name) ? "searched-match" : ""}" onclick="selectOrgNode('company', '${c.id}')">
-              <span class="org-card-title">${escapeHtml(c.name)}</span>
-              <div class="org-card-actions">
-                <button onclick="event.stopPropagation(); renameOrgNode('${c.id}')" title="이름 수정">수정</button>
-                <button class="delete-btn-red" onclick="event.stopPropagation(); deleteOrgNode('${c.id}')" title="삭제">삭제</button>
-              </div>
-            </div>
-          `).join("")}
+          ${companyList.map(c => renderOrgUnitCard(c, state.selectedCompany, matches)).join("")}
         </div>
       </div>
 
@@ -630,16 +926,7 @@ function renderOrg() {
           <button class="column-add-btn" onclick="addOrgNode('division', '${state.selectedCompany}')" title="부문 추가">+</button>
         </div>
         <div class="org-column-body">
-          ${divisionList.map(d => `
-            <div class="org-card ${state.selectedDivision === d.id ? "active" : ""} ${matches(d.name) ? "searched-match" : ""}" onclick="selectOrgNode('division', '${d.id}')"
-                 ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${d.id}', 'division')">
-              <span class="org-card-title">${escapeHtml(d.name)}</span>
-              <div class="org-card-actions">
-                <button onclick="event.stopPropagation(); renameOrgNode('${d.id}')" title="수정">수정</button>
-                <button class="delete-btn-red" onclick="event.stopPropagation(); deleteOrgNode('${d.id}')" title="삭제">삭제</button>
-              </div>
-            </div>
-          `).join("")}
+          ${divisionList.map(d => renderOrgUnitCard(d, state.selectedDivision, matches)).join("")}
         </div>
       </div>
 
@@ -651,17 +938,7 @@ function renderOrg() {
           <button class="column-add-btn" onclick="addOrgNode('hq', '${state.selectedDivision}')" title="본부 추가">+</button>
         </div>
         <div class="org-column-body">
-          ${hqList.map(h => `
-            <div class="org-card ${state.selectedHq === h.id ? "active" : ""} ${matches(h.name) ? "searched-match" : ""}" onclick="selectOrgNode('hq', '${h.id}')"
-                 draggable="true" ondragstart="handleDragStart(event, '${h.id}', 'hq')" ondragend="handleDragEnd(event)"
-                 ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${h.id}', 'hq')">
-              <span class="org-card-title">${escapeHtml(h.name)}</span>
-              <div class="org-card-actions">
-                <button onclick="event.stopPropagation(); renameOrgNode('${h.id}')" title="수정">수정</button>
-                <button class="delete-btn-red" onclick="event.stopPropagation(); deleteOrgNode('${h.id}')" title="삭제">삭제</button>
-              </div>
-            </div>
-          `).join("")}
+          ${hqList.map(h => renderOrgUnitCard(h, state.selectedHq, matches)).join("")}
         </div>
       </div>
 
@@ -673,17 +950,7 @@ function renderOrg() {
           <button class="column-add-btn" onclick="addOrgNode('team', '${state.selectedHq}')" title="팀 추가">+</button>
         </div>
         <div class="org-column-body">
-          ${teamList.map(t => `
-            <div class="org-card ${state.selectedTeam === t.id ? "active" : ""} ${matches(t.name) ? "searched-match" : ""}" onclick="selectOrgNode('team', '${t.id}')"
-                 draggable="true" ondragstart="handleDragStart(event, '${t.id}', 'team')" ondragend="handleDragEnd(event)"
-                 ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${t.id}', 'team')">
-              <span class="org-card-title">${escapeHtml(t.name)}</span>
-              <div class="org-card-actions">
-                <button onclick="event.stopPropagation(); renameOrgNode('${t.id}')" title="수정">수정</button>
-                <button class="delete-btn-red" onclick="event.stopPropagation(); deleteOrgNode('${t.id}')" title="삭제">삭제</button>
-              </div>
-            </div>
-          `).join("")}
+          ${teamList.map(t => renderOrgUnitCard(t, state.selectedTeam, matches)).join("")}
         </div>
       </div>
 
@@ -699,27 +966,23 @@ function renderOrg() {
           ${activeTeam && activeTeam.leader ? `
             <div class="org-card leader-card ${matches(activeTeam.leader) ? "searched-match" : ""}">
               <div class="org-card-badge">팀장</div>
-              <span class="org-card-title"><strong>${escapeHtml(activeTeam.leader)}</strong> ${escapeHtml(activeTeam.leaderTitle || "")}</span>
+              <div class="org-card-main">
+                <span class="org-card-title"><strong>${escapeHtml(activeTeam.leader)}</strong></span>
+                <span class="org-card-meta">직급 · <small>${escapeHtml(normalizePosition(activeTeam.leaderTitle || "부장"))}</small></span>
+              </div>
               <div class="org-card-actions">
-                <button onclick="renameTeamLeader('${activeTeam.id}')" title="수정">수정</button>
-                <button class="delete-btn-red" onclick="deleteTeamLeader('${activeTeam.id}')" title="삭제">삭제</button>
+                <button onclick="event.stopPropagation(); renameTeamLeader('${activeTeam.id}')" title="수정">수정</button>
+                <button class="delete-btn-red" onclick="event.stopPropagation(); deleteTeamLeader('${activeTeam.id}')" title="삭제">삭제</button>
               </div>
             </div>
           ` : ""}
           
           <!-- Members -->
-          ${memberList.map(m => `
-            <div class="org-card member-card ${matches(m.name) ? "searched-match" : ""}" draggable="true" ondragstart="handleDragStart(event, '${m.id}', 'member')" ondragend="handleDragEnd(event)">
-              <span class="org-card-title">${escapeHtml(m.name)} <small>${escapeHtml(m.position || "팀원")}</small></span>
-              <div class="org-card-actions">
-                <button onclick="renameMember('${m.id}')" title="수정">수정</button>
-                <button class="delete-btn-red" onclick="deleteMember('${m.id}')" title="삭제">삭제</button>
-              </div>
-            </div>
-          `).join("")}
+          ${memberList.map(m => renderMemberCard(m, matches)).join("")}
         </div>
       </div>
     </div>
+    ${renderOrgEditorModal()}
   `;
 }
 
@@ -1442,9 +1705,18 @@ function bindGlobal() {
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeView = button.dataset.view;
+      state.mobileNavOpen = false;
       saveState();
       render();
     });
+  });
+  document.querySelector(".menu-toggle")?.addEventListener("click", () => {
+    state.mobileNavOpen = !state.mobileNavOpen;
+    render();
+  });
+  document.querySelector(".mobile-nav-backdrop")?.addEventListener("click", () => {
+    state.mobileNavOpen = false;
+    render();
   });
   bindSessions();
   bindOrg();
@@ -1503,6 +1775,88 @@ function bindOrg() {
     saveState();
     render();
   });
+
+  document.querySelector("#close-org-editor")?.addEventListener("click", () => {
+    state.orgEditor = null;
+    render();
+  });
+  document.querySelector("#cancel-org-editor")?.addEventListener("click", () => {
+    state.orgEditor = null;
+    render();
+  });
+  document.querySelector("#save-org-editor")?.addEventListener("click", () => {
+    const editor = state.orgEditor;
+    if (!editor) return;
+
+    if (editor.kind === "member") {
+      const name = document.querySelector("#org-member-name")?.value.trim();
+      const position = document.querySelector("#org-member-position")?.value || "사원";
+      if (!name) {
+        alert("구성원 이름을 입력해 주세요.");
+        return;
+      }
+
+      if (editor.mode === "add") {
+        state.orgMembers.push({
+          recordType: "person",
+          id: `person-${editor.parentId}-${Math.floor(Math.random() * 100000)}`,
+          name,
+          parentId: editor.parentId,
+          level: "member",
+          position,
+          role: `${name} ${position}`,
+          tags: "팀원",
+          generation: "30대"
+        });
+      } else {
+        const member = state.orgMembers.find((item) => item.id === editor.id);
+        if (member) {
+          member.name = name;
+          member.position = position;
+          member.role = `${name} ${position}`;
+        }
+      }
+    } else if (editor.kind === "unit") {
+      const name = document.querySelector("#org-unit-name")?.value.trim();
+      if (!name) {
+        alert(`${UNIT_LABELS[editor.level] || "조직"} 이름을 입력해 주세요.`);
+        return;
+      }
+
+      let unit = editor.mode === "edit" ? state.orgUnits.find((item) => item.id === editor.id) : null;
+      if (!unit) {
+        unit = {
+          recordType: "unit",
+          id: `${editor.level.toUpperCase()}_${Math.floor(Math.random() * 100000)}`,
+          level: editor.level,
+          parentId: editor.parentId,
+          name,
+          leader: "",
+          leaderTitle: "",
+          leaderRole: "",
+          leaderMemberId: ""
+        };
+        state.orgUnits.push(unit);
+        if (editor.level === "company") state.selectedCompany = unit.id;
+        if (editor.level === "division") state.selectedDivision = unit.id;
+        if (editor.level === "hq") state.selectedHq = unit.id;
+        if (editor.level === "team") state.selectedTeam = unit.id;
+      }
+
+      unit.name = name;
+      if (editor.level === "hq" || editor.level === "team") {
+        applyLeaderSelection(unit, document.querySelector("#org-unit-leader")?.value || "");
+      } else {
+        unit.leaderTitle = document.querySelector("#org-unit-leader-title")?.value || unit.leaderTitle;
+        unit.leaderRole = UNIT_LEADER_LABELS[editor.level] || unit.leaderRole;
+      }
+    }
+
+    state.orgEditor = null;
+    syncDraftOrgFromTeam(state.draftTeamId);
+    saveState();
+    render();
+  });
 }
 
 function bindSessions() {
@@ -1533,22 +1887,7 @@ function bindSessions() {
     const team = state.orgUnits.find(u => u.id === state.selectedTeam);
     if (team) {
       state.draftTeamId = team.id;
-      state.draftTeam = team.name;
-      state.draftLeader = team.leader || "";
-      state.draftLeaderTitle = team.leaderTitle || "";
-      
-      const hq = state.orgUnits.find(u => u.id === team.parentId);
-      if (hq) {
-        state.draftHq = hq.name;
-        const div = state.orgUnits.find(u => u.id === hq.parentId);
-        if (div) {
-          state.draftDivision = div.name;
-        }
-      }
-      
-      state.draftMembers = state.orgMembers
-        .filter(m => m.parentId === team.id)
-        .map(m => ({ id: m.id, name: m.name, position: m.position }));
+      syncDraftOrgFromTeam(team.id);
     }
     state.showOrgPopup = false;
     saveState();
@@ -1655,6 +1994,27 @@ function bindSessions() {
     saveState();
     render();
   });
+  document.querySelector("#session-division")?.addEventListener("change", (event) => {
+    state.draftDivisionId = event.target.value;
+    state.draftHqId = "";
+    state.draftTeamId = "";
+    ensureDraftOrgSelection();
+    saveState();
+    render();
+  });
+  document.querySelector("#session-hq")?.addEventListener("change", (event) => {
+    state.draftHqId = event.target.value;
+    state.draftTeamId = "";
+    ensureDraftOrgSelection();
+    saveState();
+    render();
+  });
+  document.querySelector("#session-team")?.addEventListener("change", (event) => {
+    state.draftTeamId = event.target.value;
+    syncDraftOrgFromTeam(state.draftTeamId);
+    saveState();
+    render();
+  });
   document.querySelectorAll(".schedule-row").forEach((rowEl) => {
     rowEl.querySelectorAll("input").forEach((input) => {
       input.addEventListener("input", () => {
@@ -1671,31 +2031,27 @@ function bindSessions() {
     render();
   });
   document.querySelector("#create-session")?.addEventListener("click", () => {
-    const isTeamBuilding = state.draftType === "팀빌딩";
+    syncDraftOrgFromTeam(state.draftTeamId);
     const session = {
       id: uid(),
       type: state.draftType,
       cohort: Number(document.querySelector("#cohort").value || 1),
-      division: isTeamBuilding ? state.draftDivision : document.querySelector("#division").value.trim(),
-      hq: isTeamBuilding ? state.draftHq : document.querySelector("#hq").value.trim(),
-      team: isTeamBuilding ? state.draftTeam : document.querySelector("#team").value.trim(),
-      participatingTeams: isTeamBuilding ? "" : document.querySelector("#participating").value.trim(),
+      divisionId: state.draftDivisionId,
+      hqId: state.draftHqId,
+      teamId: state.draftTeamId,
+      division: state.draftDivision,
+      hq: state.draftHq,
+      team: state.draftTeam,
+      participatingTeams: state.draftType === "팀빌딩" ? "" : state.draftTeam,
       targetWeeks: SESSION_TYPES[state.draftType].weeks,
       createdAt: new Date().toISOString(),
       schedule: state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? "confirmed" : "planned", absences: [] })),
-      leader: isTeamBuilding ? state.draftLeader : "",
-      leaderTitle: isTeamBuilding ? state.draftLeaderTitle : "",
-      members: isTeamBuilding ? state.draftMembers : [],
+      leader: state.draftLeader,
+      leaderTitle: state.draftLeaderTitle,
+      members: state.draftMembers,
     };
     state.sessions.unshift(session);
     state.draftSchedule = makeSchedule(state.draftType);
-    state.draftDivision = "";
-    state.draftHq = "";
-    state.draftTeam = "";
-    state.draftTeamId = "";
-    state.draftLeader = "";
-    state.draftLeaderTitle = "";
-    state.draftMembers = [];
     saveState();
     render();
   });
@@ -1922,34 +2278,14 @@ window.selectOrgNode = function(level, id) {
 };
 
 window.addOrgNode = function(level, parentId) {
-  const name = prompt(`${level}의 이름을 입력하세요:`);
-  if (!name || !name.trim()) return;
-  const newId = level.toUpperCase() + "_" + Math.floor(Math.random() * 10000);
-  state.orgUnits.push({
-    recordType: "unit",
-    id: newId,
-    level: level,
-    parentId: parentId,
-    name: name.trim(),
-    leader: "",
-    leaderTitle: "",
-    leaderRole: ""
-  });
-  if (level === "company") state.selectedCompany = newId;
-  else if (level === "division") state.selectedDivision = newId;
-  else if (level === "hq") state.selectedHq = newId;
-  else if (level === "team") state.selectedTeam = newId;
-  saveState();
+  state.orgEditor = { kind: "unit", mode: "add", level, parentId };
   render();
 };
 
 window.renameOrgNode = function(id) {
   const unit = state.orgUnits.find(u => u.id === id);
   if (!unit) return;
-  const newName = prompt("새 이름을 입력하세요:", unit.name);
-  if (!newName || !newName.trim()) return;
-  unit.name = newName.trim();
-  saveState();
+  state.orgEditor = { kind: "unit", mode: "edit", id, level: unit.level, parentId: unit.parentId };
   render();
 };
 
@@ -1983,34 +2319,14 @@ window.addOrgMember = function(teamId) {
     alert("먼저 팀을 선택해 주세요.");
     return;
   }
-  const name = prompt("팀원의 이름을 입력하세요:");
-  if (!name || !name.trim()) return;
-  const pos = prompt("직급을 입력하세요 (예: 사원, 대리, 차장):", "팀원");
-  const newId = "person-" + teamId + "-" + Math.floor(Math.random() * 1000);
-  state.orgMembers.push({
-    recordType: "person",
-    id: newId,
-    name: name.trim(),
-    parentId: teamId,
-    level: "member",
-    position: pos ? pos.trim() : "팀원",
-    role: `${name.trim()} 구성원`,
-    tags: "팀원",
-    generation: "30대"
-  });
-  saveState();
+  state.orgEditor = { kind: "member", mode: "add", parentId: teamId };
   render();
 };
 
 window.renameMember = function(id) {
   const member = state.orgMembers.find(m => m.id === id);
   if (!member) return;
-  const newName = prompt("이름을 입력하세요:", member.name);
-  if (!newName || !newName.trim()) return;
-  const newPos = prompt("직급을 입력하세요:", member.position);
-  member.name = newName.trim();
-  if (newPos) member.position = newPos.trim();
-  saveState();
+  state.orgEditor = { kind: "member", mode: "edit", id, parentId: member.parentId };
   render();
 };
 
@@ -2024,13 +2340,7 @@ window.deleteMember = function(id) {
 window.renameTeamLeader = function(teamId) {
   const team = state.orgUnits.find(u => u.id === teamId);
   if (!team) return;
-  const newName = prompt("팀장의 이름을 입력하세요:", team.leader || "");
-  if (!newName || !newName.trim()) return;
-  const title = prompt("직급을 입력하세요 (예: 팀장, 부장, 이사):", team.leaderTitle || "팀장");
-  team.leader = newName.trim();
-  team.leaderTitle = title ? title.trim() : "팀장";
-  team.leaderRole = "팀장";
-  saveState();
+  state.orgEditor = { kind: "unit", mode: "edit", id: teamId, level: "team", parentId: team.parentId };
   render();
 };
 
@@ -2041,6 +2351,7 @@ window.deleteTeamLeader = function(teamId) {
     team.leader = "";
     team.leaderTitle = "";
     team.leaderRole = "";
+    team.leaderMemberId = "";
   }
   saveState();
   render();
@@ -2108,6 +2419,7 @@ async function initApp() {
       state.selectedTeam = teams[0].id;
     }
   }
+  ensureDraftOrgSelection();
   
   render();
 }

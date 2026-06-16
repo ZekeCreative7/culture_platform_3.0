@@ -158,6 +158,12 @@ const blankState = () => ({
   draftDivisionId: "",
   draftHqId: "",
   draftTeamId: "",
+  draftLeaderGroup: [],
+  draftCrossMode: "leader-session",
+  draftCrossParentSessionId: "",
+  draftCrossTeamIds: [],
+  draftCrossMemberIds: [],
+  draftCrossRandomCount: 6,
   orgEditor: null,
 });
 
@@ -183,7 +189,8 @@ function saveState() {
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
-    draftDivisionId, draftHqId, draftTeamId
+    draftDivisionId, draftHqId, draftTeamId,
+    draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({ 
     activeView, sessions, responses, draftType, draftSchedule, 
@@ -192,7 +199,8 @@ function saveState() {
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
-    draftDivisionId, draftHqId, draftTeamId
+    draftDivisionId, draftHqId, draftTeamId,
+    draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount
   }));
 }
 
@@ -216,6 +224,7 @@ function sessionLabel(session) {
   if (!session) return "";
   if (session.type === "팀빌딩") return `${session.cohort}기 · ${session.team || "팀 미지정"}`;
   if (session.type === "팀장") return `${session.cohort}기 · ${session.participatingTeams || session.hq || "팀장 그룹"}`;
+  if (session.type === "크로스펑셔널" && session.sourceMode === "random") return `${session.cohort}기 · 무작위 크로스펑셔널`;
   return `${session.cohort}기 · 크로스펑셔널`;
 }
 
@@ -256,29 +265,42 @@ function validateAndRepairSelectedOrg() {
   }
   
   // 2. Division
-  let div = state.orgUnits.find(u => u.id === state.selectedDivision && u.level === "division" && u.parentId === state.selectedCompany);
+  let div = state.orgUnits.find(u => u.id === state.selectedDivision && u.parentId === state.selectedCompany);
   if (!div) {
-    const divs = state.orgUnits.filter(u => u.level === "division" && u.parentId === state.selectedCompany);
+    const divs = topLevelOrgUnits(state.selectedCompany);
     state.selectedDivision = divs.length > 0 ? divs[0].id : "";
   }
   
   // 3. HQ
   let hq = state.orgUnits.find(u => u.id === state.selectedHq && u.level === "hq" && u.parentId === state.selectedDivision);
   if (!hq) {
-    const hqs = state.orgUnits.filter(u => u.level === "hq" && u.parentId === state.selectedDivision);
+    const hqs = hqUnitsForDivision(state.selectedDivision);
     state.selectedHq = hqs.length > 0 ? hqs[0].id : "";
   }
   
   // 4. Team
-  let team = state.orgUnits.find(u => u.id === state.selectedTeam && u.level === "team" && u.parentId === state.selectedHq);
+  let team = teamUnitsForSelection(state.selectedDivision, state.selectedHq).find(u => u.id === state.selectedTeam);
   if (!team) {
-    const teams = state.orgUnits.filter(u => u.level === "team" && u.parentId === state.selectedHq);
+    const teams = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
     state.selectedTeam = teams.length > 0 ? teams[0].id : "";
   }
 }
 
 function childUnits(parentId, level) {
   return state.orgUnits.filter((unit) => unit.parentId === parentId && (!level || unit.level === level));
+}
+
+function topLevelOrgUnits(companyId = state.selectedCompany) {
+  return state.orgUnits.filter((unit) => unit.parentId === companyId);
+}
+
+function hqUnitsForDivision(divisionId) {
+  return childUnits(divisionId, "hq");
+}
+
+function teamUnitsForSelection(divisionId, hqId) {
+  if (hqId) return childUnits(hqId, "team");
+  return childUnits(divisionId, "team");
 }
 
 function descendantTeamIds(unitId) {
@@ -336,14 +358,17 @@ function syncDraftOrgFromTeam(teamId = state.draftTeamId) {
     return;
   }
 
-  const hq = state.orgUnits.find((unit) => unit.id === team.parentId);
-  const division = hq ? state.orgUnits.find((unit) => unit.id === hq.parentId) : null;
+  const parent = state.orgUnits.find((unit) => unit.id === team.parentId);
+  const grandParent = parent ? state.orgUnits.find((unit) => unit.id === parent.parentId) : null;
+  const isDirectTopLevel = parent && grandParent?.level === "company";
+  const hq = parent?.level === "hq" && !isDirectTopLevel ? parent : null;
+  const division = isDirectTopLevel ? parent : (parent?.level === "division" ? parent : grandParent);
   state.draftTeamId = team.id;
-  state.draftHqId = hq ? hq.id : "";
-  state.draftDivisionId = division ? division.id : "";
+  state.draftHqId = hq?.id || "";
+  state.draftDivisionId = division?.id || "";
   state.draftTeam = team.name;
-  state.draftHq = hq ? hq.name : "";
-  state.draftDivision = division ? division.name : "";
+  state.draftHq = hq?.name || "";
+  state.draftDivision = division?.name || "";
   state.draftLeader = team.leader || "";
   state.draftLeaderTitle = normalizePosition(team.leaderTitle || "부장");
   state.draftMembers = state.orgMembers
@@ -354,21 +379,21 @@ function syncDraftOrgFromTeam(teamId = state.draftTeamId) {
 function ensureDraftOrgSelection() {
   if (!state.orgUnits || !state.orgUnits.length) return { divisionList: [], hqList: [], teamList: [] };
   const company = state.orgUnits.find((unit) => unit.id === state.selectedCompany && unit.level === "company") || state.orgUnits.find((unit) => unit.level === "company");
-  const divisionList = company ? childUnits(company.id, "division") : state.orgUnits.filter((unit) => unit.level === "division");
+  const divisionList = company ? topLevelOrgUnits(company.id) : state.orgUnits.filter((unit) => unit.parentId === "CEO");
   if (!divisionList.some((unit) => unit.id === state.draftDivisionId)) {
     state.draftDivisionId = state.selectedDivision && divisionList.some((unit) => unit.id === state.selectedDivision)
       ? state.selectedDivision
       : (divisionList[0]?.id || "");
   }
 
-  const hqList = childUnits(state.draftDivisionId, "hq");
+  const hqList = hqUnitsForDivision(state.draftDivisionId);
   if (!hqList.some((unit) => unit.id === state.draftHqId)) {
     state.draftHqId = state.selectedHq && hqList.some((unit) => unit.id === state.selectedHq)
       ? state.selectedHq
       : (hqList[0]?.id || "");
   }
 
-  const teamList = childUnits(state.draftHqId, "team");
+  const teamList = teamUnitsForSelection(state.draftDivisionId, state.draftHqId);
   if (!teamList.some((unit) => unit.id === state.draftTeamId)) {
     state.draftTeamId = state.selectedTeam && teamList.some((unit) => unit.id === state.selectedTeam)
       ? state.selectedTeam
@@ -377,6 +402,115 @@ function ensureDraftOrgSelection() {
 
   syncDraftOrgFromTeam(state.draftTeamId);
   return { divisionList, hqList, teamList };
+}
+
+function teamPath(teamId) {
+  const team = state.orgUnits.find((unit) => unit.id === teamId && unit.level === "team");
+  if (!team) return null;
+  const parent = state.orgUnits.find((unit) => unit.id === team.parentId);
+  const grandParent = parent ? state.orgUnits.find((unit) => unit.id === parent.parentId) : null;
+  const isDirectTopLevel = parent && grandParent?.level === "company";
+  const hq = parent?.level === "hq" && !isDirectTopLevel ? parent : null;
+  const division = isDirectTopLevel ? parent : (parent?.level === "division" ? parent : grandParent);
+  return {
+    divisionId: division?.id || "",
+    divisionName: division?.name || "",
+    hqId: hq?.id || "",
+    hqName: hq?.name || "",
+    teamId: team.id,
+    teamName: team.name,
+  };
+}
+
+function leaderCandidateForTeam(teamId) {
+  const team = state.orgUnits.find((unit) => unit.id === teamId && unit.level === "team");
+  const path = teamPath(teamId);
+  if (!team || !path || !team.leader) return null;
+  return {
+    id: `leader:${team.id}`,
+    teamId: team.id,
+    name: team.leader,
+    position: normalizePosition(team.leaderTitle || "팀장", "팀장"),
+    role: "팀장",
+    ...path,
+  };
+}
+
+function orgMemberCandidate(member) {
+  const path = teamPath(member.parentId);
+  if (!path) return null;
+  return {
+    id: member.id,
+    memberId: member.id,
+    teamId: member.parentId,
+    name: member.name,
+    position: normalizePosition(member.position || "사원"),
+    role: member.role || "",
+    ...path,
+  };
+}
+
+function teamMemberCandidates(teamId, includeLeaders = false) {
+  return state.orgMembers
+    .filter((member) => member.parentId === teamId)
+    .map(orgMemberCandidate)
+    .filter(Boolean)
+    .filter((member) => includeLeaders || normalizePosition(member.position) !== "팀장");
+}
+
+function allMemberCandidates(includeLeaders = false) {
+  const seen = new Set();
+  return state.orgMembers
+    .map(orgMemberCandidate)
+    .filter(Boolean)
+    .filter((member) => includeLeaders || normalizePosition(member.position) !== "팀장")
+    .filter((member) => {
+      if (seen.has(member.id)) return false;
+      seen.add(member.id);
+      return true;
+    })
+    .sort((a, b) => `${a.teamName}${a.name}`.localeCompare(`${b.teamName}${b.name}`, "ko"));
+}
+
+function leaderSessions() {
+  return state.sessions.filter((session) => session.type === "팀장" && Array.isArray(session.leaderGroup) && session.leaderGroup.length);
+}
+
+function selectedLeaderSession() {
+  const sessions = leaderSessions();
+  if (!sessions.length) return null;
+  if (!sessions.some((session) => session.id === state.draftCrossParentSessionId)) {
+    state.draftCrossParentSessionId = sessions[0].id;
+  }
+  return sessions.find((session) => session.id === state.draftCrossParentSessionId) || sessions[0];
+}
+
+function crossSourceTeams() {
+  const session = selectedLeaderSession();
+  if (!session) return [];
+  return (session.leaderGroup || [])
+    .map((leader) => teamPath(leader.teamId))
+    .filter(Boolean)
+    .filter((team, index, list) => list.findIndex((item) => item.teamId === team.teamId) === index);
+}
+
+function crossMemberPool() {
+  const teamIds = state.draftCrossMode === "leader-session"
+    ? state.draftCrossTeamIds
+    : [];
+  if (state.draftCrossMode === "random") return allMemberCandidates(false);
+  return teamIds.flatMap((teamId) => teamMemberCandidates(teamId, false));
+}
+
+function selectedCrossMembers() {
+  const poolById = new Map(crossMemberPool().map((member) => [member.id, member]));
+  return (state.draftCrossMemberIds || []).map((id) => poolById.get(id)).filter(Boolean);
+}
+
+function resetCrossDraft() {
+  state.draftCrossTeamIds = [];
+  state.draftCrossMemberIds = [];
+  state.draftCrossParentSessionId = "";
 }
 
 function leaderMeta(unit) {
@@ -631,6 +765,203 @@ function renderDashboard() {
   `;
 }
 
+function renderOrgSelectRow(divisionList, hqList, teamList) {
+  return `
+    <div class="session-org-row">
+      <label>부문명
+        <select id="session-division">
+          ${optionHtml(divisionList, state.draftDivisionId, "부문 선택")}
+        </select>
+      </label>
+      <label>본부명
+        <select id="session-hq" ${hqList.length ? "" : "disabled"}>
+          ${optionHtml(hqList, state.draftHqId, hqList.length ? "본부 선택" : "본부 없음/직속")}
+        </select>
+      </label>
+      <label>팀명
+        <select id="session-team" ${state.draftDivisionId ? "" : "disabled"}>
+          ${optionHtml(teamList, state.draftTeamId, "팀 선택")}
+        </select>
+      </label>
+    </div>
+  `;
+}
+
+function renderTeamBuildingPanel(divisionList, hqList, teamList) {
+  return `
+    <div class="session-config-panel">
+      <div class="session-config-head">
+        <strong>팀 전체 참여</strong>
+        <span>한 팀을 선택하면 팀장과 팀원 데이터를 불러옵니다.</span>
+      </div>
+      ${renderOrgSelectRow(divisionList, hqList, teamList)}
+      ${state.draftTeamId ? `
+        <div class="selected-team-wrap">
+          <div class="selected-team-badge">
+            <strong>선택된 조직:</strong> ${escapeHtml(state.draftDivision)} &gt; ${escapeHtml(state.draftHq)} &gt; ${escapeHtml(state.draftTeam)}
+            <button type="button" class="ghost compact" id="open-org-picker" style="margin-left:12px;">조직도에서 보기</button>
+            <div style="margin-top: 6px; font-size:12px; color:var(--muted);">
+              팀장: ${escapeHtml(state.draftLeader || "미지정")} ${state.draftLeaderTitle ? `(${escapeHtml(state.draftLeaderTitle)})` : ""} | 팀원: ${state.draftMembers.length}명
+            </div>
+          </div>
+        </div>
+      ` : `
+        <div class="selected-team-wrap">
+          <button type="button" class="primary" id="open-org-picker">조직도에서 팀 선택</button>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderLeaderSessionPanel(divisionList, hqList, teamList) {
+  const leader = leaderCandidateForTeam(state.draftTeamId);
+  const group = state.draftLeaderGroup || [];
+  const alreadyAdded = leader && group.some((item) => item.teamId === leader.teamId);
+  return `
+    <div class="session-config-panel">
+      <div class="session-config-head">
+        <strong>팀장 그룹 구성</strong>
+        <span>부문/본부/팀을 선택하고 팀장을 추가합니다. 권장 인원은 6명입니다.</span>
+      </div>
+      ${renderOrgSelectRow(divisionList, hqList, teamList)}
+      <div class="session-picker-actions">
+        <div>
+          <strong>${leader ? `${escapeHtml(leader.name)} · ${escapeHtml(leader.teamName)}` : "팀장을 선택해 주세요"}</strong>
+          <span>${leader ? `${escapeHtml(leader.divisionName)} > ${escapeHtml(leader.hqName)}` : "팀에 등록된 팀장 정보가 있어야 추가할 수 있습니다."}</span>
+        </div>
+        <button type="button" class="primary compact" id="add-team-leader" ${!leader || alreadyAdded ? "disabled" : ""}>팀장 추가</button>
+      </div>
+      <div class="selection-summary">
+        <strong>선택된 팀장 ${group.length}명</strong>
+        <span>${group.length < 6 ? `권장 인원까지 ${6 - group.length}명 남음` : "권장 인원 충족"}</span>
+      </div>
+      ${group.length ? `
+        <div class="selection-chip-grid">
+          ${group.map((item) => `
+            <div class="selection-chip">
+              <div>
+                <strong>${escapeHtml(item.name)}</strong>
+                <span>${escapeHtml(item.teamName)} · ${escapeHtml(item.position || "팀장")}</span>
+              </div>
+              <button type="button" data-remove-leader="${escapeHtml(item.teamId)}" aria-label="팀장 제거">삭제</button>
+            </div>
+          `).join("")}
+        </div>
+      ` : `<div class="empty compact">아직 추가된 팀장이 없습니다.</div>`}
+    </div>
+  `;
+}
+
+function renderCrossFunctionalPanel() {
+  const mode = state.draftCrossMode || "leader-session";
+  const sessions = leaderSessions();
+  const parentSession = selectedLeaderSession();
+  const sourceTeams = crossSourceTeams();
+  const memberPool = crossMemberPool();
+  const selectedMembers = selectedCrossMembers();
+  return `
+    <div class="session-config-panel">
+      <div class="session-config-head">
+        <strong>크로스펑셔널 그룹 구성</strong>
+        <span>팀장 세션의 추천 흐름을 쓰거나, 팀장 세션 없이 전체 조직에서 무작위로 구성합니다.</span>
+      </div>
+      <div class="mode-switch">
+        <label class="${mode === "leader-session" ? "active" : ""}">
+          <input type="radio" name="cross-mode" value="leader-session" ${mode === "leader-session" ? "checked" : ""} />
+          팀장 세션 기반
+        </label>
+        <label class="${mode === "random" ? "active" : ""}">
+          <input type="radio" name="cross-mode" value="random" ${mode === "random" ? "checked" : ""} />
+          전체 조직 무작위
+        </label>
+      </div>
+
+      ${mode === "leader-session" ? `
+        <label>기준 팀장 세션
+          <select id="cross-parent-session" ${sessions.length ? "" : "disabled"}>
+            ${sessions.length ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${parentSession?.id === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))} · ${session.leaderGroup.length}명</option>`).join("") : `<option value="">등록된 팀장 세션 없음</option>`}
+          </select>
+        </label>
+        ${sourceTeams.length ? `
+          <div class="selection-summary">
+            <strong>참여 팀 선택</strong>
+            <span>${state.draftCrossTeamIds.length}개 팀 선택</span>
+          </div>
+          <div class="checkbox-grid team-source-grid">
+            ${sourceTeams.map((team) => `
+              <label class="check-card ${state.draftCrossTeamIds.includes(team.teamId) ? "active" : ""}">
+                <input type="checkbox" data-cross-team="${escapeHtml(team.teamId)}" ${state.draftCrossTeamIds.includes(team.teamId) ? "checked" : ""} />
+                <span><strong>${escapeHtml(team.teamName)}</strong><small>${escapeHtml(team.divisionName)} > ${escapeHtml(team.hqName)}</small></span>
+              </label>
+            `).join("")}
+          </div>
+        ` : `<div class="empty compact">먼저 팀장 세션을 등록해야 추천 팀을 불러올 수 있습니다.</div>`}
+        ${state.draftCrossTeamIds.length ? renderCrossMemberSelector(memberPool, selectedMembers) : ""}
+      ` : `
+        <div class="random-config-row">
+          <label>무작위 인원 수
+            <input id="cross-random-count" type="number" min="1" max="30" value="${Number(state.draftCrossRandomCount || 6)}" />
+          </label>
+          <button type="button" class="primary" id="generate-random-cross">무작위 구성</button>
+        </div>
+        <p class="config-note">팀장 직급은 제외하고 전체 조직 구성원 풀에서 중복 없이 뽑습니다.</p>
+        ${renderSelectedCrossMembers(selectedMembers)}
+      `}
+    </div>
+  `;
+}
+
+function renderCrossMemberSelector(memberPool, selectedMembers) {
+  return `
+    <div class="selection-summary">
+      <strong>추천 구성원 선택</strong>
+      <span>${selectedMembers.length}명 선택</span>
+    </div>
+    <div class="checkbox-grid member-pool-grid">
+      ${memberPool.length ? memberPool.map((member) => `
+        <label class="check-card ${state.draftCrossMemberIds.includes(member.id) ? "active" : ""}">
+          <input type="checkbox" data-cross-member="${escapeHtml(member.id)}" ${state.draftCrossMemberIds.includes(member.id) ? "checked" : ""} />
+          <span><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(member.teamName)} · ${escapeHtml(member.position)}</small></span>
+        </label>
+      `).join("") : `<div class="empty compact">선택한 팀에서 불러올 구성원이 없습니다.</div>`}
+    </div>
+  `;
+}
+
+function renderSelectedCrossMembers(selectedMembers) {
+  return selectedMembers.length ? `
+    <div class="selection-summary">
+      <strong>선택된 구성원 ${selectedMembers.length}명</strong>
+      <span>세션 등록 시 참여자로 저장됩니다.</span>
+    </div>
+    <div class="selection-chip-grid">
+      ${selectedMembers.map((member) => `
+        <div class="selection-chip">
+          <div>
+            <strong>${escapeHtml(member.name)}</strong>
+            <span>${escapeHtml(member.teamName)} · ${escapeHtml(member.position)}</span>
+          </div>
+          <button type="button" data-remove-cross-member="${escapeHtml(member.id)}" aria-label="구성원 제거">삭제</button>
+        </div>
+      `).join("")}
+    </div>
+  ` : `<div class="empty compact">아직 구성원이 선택되지 않았습니다.</div>`;
+}
+
+function renderSessionConfigPanel(divisionList, hqList, teamList) {
+  if (state.draftType === "팀빌딩") return renderTeamBuildingPanel(divisionList, hqList, teamList);
+  if (state.draftType === "팀장") return renderLeaderSessionPanel(divisionList, hqList, teamList);
+  return renderCrossFunctionalPanel();
+}
+
+function canCreateDraftSession() {
+  if (state.draftType === "팀빌딩") return Boolean(state.draftTeamId);
+  if (state.draftType === "팀장") return Boolean((state.draftLeaderGroup || []).length);
+  if (state.draftType === "크로스펑셔널") return Boolean((state.draftCrossMemberIds || []).length);
+  return false;
+}
+
 function renderSessions() {
   const orgPopupHtml = state.showOrgPopup ? renderOrgPopup() : "";
   const attendanceModalHtml = state.showAttendanceModal ? renderAttendanceModal() : "";
@@ -642,44 +973,16 @@ function renderSessions() {
   } else {
     mainContentHtml = `
       <section class="panel">
-        <div class="form-grid">
-          <label>세션 유형
-            <select id="session-type">
-              ${Object.keys(SESSION_TYPES).map((type) => `<option ${state.draftType === type ? "selected" : ""}>${type}</option>`).join("")}
-            </select>
-          </label>
-          <label>기수<input id="cohort" type="number" min="1" value="1" /></label>
-          <label>부문명
-            <select id="session-division">
-              ${optionHtml(divisionList, state.draftDivisionId, "부문 선택")}
-            </select>
-          </label>
-          <label>본부명
-            <select id="session-hq" ${state.draftDivisionId ? "" : "disabled"}>
-              ${optionHtml(hqList, state.draftHqId, "본부 선택")}
-            </select>
-          </label>
-          <label>팀명
-            <select id="session-team" ${state.draftHqId ? "" : "disabled"}>
-              ${optionHtml(teamList, state.draftTeamId, "팀 선택")}
-            </select>
-          </label>
-          
-          ${state.draftTeamId ? `
-            <div style="grid-column: span 3; margin: 10px 0;">
-              <div class="selected-team-badge">
-                <strong>선택된 조직:</strong> ${escapeHtml(state.draftDivision)} &gt; ${escapeHtml(state.draftHq)} &gt; ${escapeHtml(state.draftTeam)}
-                <button type="button" class="ghost compact" id="open-org-picker" style="margin-left:12px;">조직도에서 보기</button>
-                <div style="margin-top: 6px; font-size:12px; color:var(--muted);">
-                  팀장: ${escapeHtml(state.draftLeader || "미지정")} ${state.draftLeaderTitle ? `(${escapeHtml(state.draftLeaderTitle)})` : ""} | 팀원: ${state.draftMembers.length}명
-                </div>
-              </div>
-            </div>
-          ` : `
-            <div style="grid-column: span 3; margin: 10px 0;">
-              <button type="button" class="primary" id="open-org-picker">조직도에서 팀 선택</button>
-            </div>
-          `}
+        <div class="session-form">
+          <div class="session-meta-row">
+            <label>세션 유형
+              <select id="session-type">
+                ${Object.keys(SESSION_TYPES).map((type) => `<option ${state.draftType === type ? "selected" : ""}>${type}</option>`).join("")}
+              </select>
+            </label>
+            <label>기수<input id="cohort" type="number" min="1" value="1" /></label>
+          </div>
+          ${renderSessionConfigPanel(divisionList, hqList, teamList)}
         </div>
         <div class="schedule-head">
           <div>
@@ -692,7 +995,7 @@ function renderSessions() {
           ${state.draftSchedule.map(scheduleRow).join("")}
         </div>
         <div class="panel-actions">
-          <button class="primary" id="create-session" ${!state.draftTeamId ? 'disabled' : ''}>세션 등록</button>
+          <button class="primary" id="create-session" ${canCreateDraftSession() ? "" : "disabled"}>세션 등록</button>
         </div>
       </section>
       <section>
@@ -726,9 +1029,9 @@ function renderSessions() {
 
 function renderOrgPopup() {
   const companyList = state.orgUnits.filter(u => u.level === "company");
-  const divisionList = state.orgUnits.filter(u => u.level === "division" && u.parentId === state.selectedCompany);
-  const hqList = state.orgUnits.filter(u => u.level === "hq" && u.parentId === state.selectedDivision);
-  const teamList = state.orgUnits.filter(u => u.level === "team" && u.parentId === state.selectedHq);
+  const divisionList = topLevelOrgUnits(state.selectedCompany);
+  const hqList = hqUnitsForDivision(state.selectedDivision);
+  const teamList = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
 
   return `
     <div class="modal-overlay">
@@ -764,11 +1067,11 @@ function renderOrgPopup() {
   `;
 }
 
-function renderOrgUnitCard(unit, activeId, matches) {
+function renderOrgUnitCard(unit, activeId, matches, displayLevel = unit.level) {
   return `
-    <div class="org-card ${activeId === unit.id ? "active" : ""} ${matches(unit.name) ? "searched-match" : ""}" onclick="selectOrgNode('${unit.level}', '${unit.id}')"
-         ${unit.level === "hq" || unit.level === "team" ? `draggable="true" ondragstart="handleDragStart(event, '${unit.id}', '${unit.level}')" ondragend="handleDragEnd(event)"` : ""}
-         ${unit.level !== "company" ? `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${unit.id}', '${unit.level}')"` : ""}>
+    <div class="org-card ${activeId === unit.id ? "active" : ""} ${matches(unit.name) ? "searched-match" : ""}" onclick="selectOrgNode('${displayLevel}', '${unit.id}')"
+         ${displayLevel === "hq" || displayLevel === "team" ? `draggable="true" ondragstart="handleDragStart(event, '${unit.id}', '${displayLevel}')" ondragend="handleDragEnd(event)"` : ""}
+         ${displayLevel !== "company" ? `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${unit.id}', '${displayLevel}')"` : ""}>
       <div class="org-card-main">
         <span class="org-card-title">${escapeHtml(unit.name)}</span>
         ${leaderMeta(unit)}
@@ -876,9 +1179,9 @@ function renderOrg() {
   validateAndRepairSelectedOrg();
 
   const companyList = state.orgUnits.filter(u => u.level === "company");
-  const divisionList = state.orgUnits.filter(u => u.level === "division" && u.parentId === state.selectedCompany);
-  const hqList = state.orgUnits.filter(u => u.level === "hq" && u.parentId === state.selectedDivision);
-  const teamList = state.orgUnits.filter(u => u.level === "team" && u.parentId === state.selectedHq);
+  const divisionList = topLevelOrgUnits(state.selectedCompany);
+  const hqList = hqUnitsForDivision(state.selectedDivision);
+  const teamList = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
   const memberList = state.orgMembers.filter(m => m.parentId === state.selectedTeam);
   const activeTeam = state.orgUnits.find(u => u.id === state.selectedTeam);
 
@@ -926,7 +1229,7 @@ function renderOrg() {
           <button class="column-add-btn" onclick="addOrgNode('division', '${state.selectedCompany}')" title="부문 추가">+</button>
         </div>
         <div class="org-column-body">
-          ${divisionList.map(d => renderOrgUnitCard(d, state.selectedDivision, matches)).join("")}
+          ${divisionList.map(d => renderOrgUnitCard(d, state.selectedDivision, matches, "division")).join("")}
         </div>
       </div>
 
@@ -944,7 +1247,7 @@ function renderOrg() {
 
       <!-- 4. Team Column -->
       <div class="org-column" id="col-team"
-           ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${state.selectedHq}', 'hq')">
+           ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${state.selectedHq || state.selectedDivision}', '${state.selectedHq ? "hq" : "division"}')">
         <div class="org-column-header">
           <h3>팀 (${teamList.length})</h3>
           <button class="column-add-btn" onclick="addOrgNode('team', '${state.selectedHq}')" title="팀 추가">+</button>
@@ -1213,7 +1516,7 @@ function renderAttendanceModal() {
                 }).join("")}
               </div>
             ` : `
-              <p class="muted">세션에 등록된 구성원이 없습니다. 팀장 세션이나 직접 입력된 세션은 개별 구성원 출석 체크가 불가능합니다. (팀빌딩 세션 한정 지원)</p>
+              <p class="muted">세션에 등록된 참여자가 없습니다. 세션 등록 화면에서 참여자 구성을 먼저 완료해 주세요.</p>
             `}
           </div>
           
@@ -1286,8 +1589,8 @@ function renderSurveyCreator() {
                     <span style="font-size:11px; font-weight:800; color:var(--cyan); text-transform:uppercase; letter-spacing:0.04em;">${q.id.toUpperCase()} · ${q.type === 'quant' ? '5점 척도' : '주관식 텍스트'}</span>
                     <button onclick="deleteSurveyDraftQuestion('${q.id}')" style="background:transparent; border:none; padding:3px 8px; font-size:12px; color:var(--muted); cursor:pointer; border-radius:4px; transition:all 0.15s; font-weight:700;">&times; 삭제</button>
                   </div>
-                  <input style="min-height:38px; font-size:13px; width:100%; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:rgba(255,255,255,0.03); color:#fff; padding:8px 12px; outline:none;" value="${escapeHtml(q.text)}" placeholder="질문 내용을 입력하세요." oninput="updateSurveyDraftQuestionText('${q.id}', this.value)" />
-                  <div style="display:inline-flex; gap:4px; background:rgba(3,7,18,0.5); padding:3px; border-radius:8px; border:1px solid var(--line); margin-top:2px;">
+                  <input style="min-height:38px; font-size:13px; width:100%; border:1.5px solid #e5e7eb; border-radius:var(--radius-sm); background:#ffffff; color:var(--ink); padding:8px 12px; outline:none; box-sizing:border-box;" value="${escapeHtml(q.text)}" placeholder="질문 내용을 입력하세요." oninput="updateSurveyDraftQuestionText('${q.id}', this.value)" />
+                  <div style="display:inline-flex; gap:4px; background:#f3f4f6; padding:3px; border-radius:8px; border:1px solid #e5e7eb; margin-top:2px;">
                     <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'quant' ? '#fff' : 'var(--muted)'}; background:${q.type === 'quant' ? 'var(--neon-blue)' : 'transparent'};">
                       <input type="radio" name="qtype-${q.id}" value="quant" ${q.type === 'quant' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'quant')" style="display:none;" /> 5점 척도
                     </label>
@@ -1733,26 +2036,31 @@ function bindOrg() {
       // Find matching member or unit and reveal parents
       const matchMember = state.orgMembers.find(m => m.name.toLowerCase().includes(query.toLowerCase()));
       if (matchMember) {
-        state.selectedTeam = matchMember.parentId;
-        const teamUnit = state.orgUnits.find(u => u.id === matchMember.parentId);
-        if (teamUnit) {
-          state.selectedHq = teamUnit.parentId;
-          const hqUnit = state.orgUnits.find(u => u.id === teamUnit.parentId);
-          if (hqUnit) {
-            state.selectedDivision = hqUnit.parentId;
-          }
+        const path = teamPath(matchMember.parentId);
+        if (path) {
+          state.selectedDivision = path.divisionId;
+          state.selectedHq = path.hqId;
+          state.selectedTeam = path.teamId;
         }
       } else {
         const matchUnit = state.orgUnits.find(u => u.name.toLowerCase().includes(query.toLowerCase()));
         if (matchUnit) {
           if (matchUnit.level === "team") {
-            state.selectedTeam = matchUnit.id;
-            state.selectedHq = matchUnit.parentId;
-            const hqUnit = state.orgUnits.find(u => u.id === matchUnit.parentId);
-            if (hqUnit) state.selectedDivision = hqUnit.parentId;
+            const path = teamPath(matchUnit.id);
+            if (path) {
+              state.selectedDivision = path.divisionId;
+              state.selectedHq = path.hqId;
+              state.selectedTeam = path.teamId;
+            }
           } else if (matchUnit.level === "hq") {
-            state.selectedHq = matchUnit.id;
-            state.selectedDivision = matchUnit.parentId;
+            const parent = state.orgUnits.find(u => u.id === matchUnit.parentId);
+            if (parent?.level === "company") {
+              state.selectedDivision = matchUnit.id;
+              state.selectedHq = "";
+            } else {
+              state.selectedHq = matchUnit.id;
+              state.selectedDivision = matchUnit.parentId;
+            }
           } else if (matchUnit.level === "division") {
             state.selectedDivision = matchUnit.id;
           }
@@ -1991,6 +2299,9 @@ function bindSessions() {
   typeSelect.addEventListener("change", () => {
     state.draftType = typeSelect.value;
     state.draftSchedule = makeSchedule(typeSelect.value);
+    if (state.draftType !== "크로스펑셔널") {
+      resetCrossDraft();
+    }
     saveState();
     render();
   });
@@ -2015,6 +2326,89 @@ function bindSessions() {
     saveState();
     render();
   });
+  document.querySelector("#add-team-leader")?.addEventListener("click", () => {
+    const leader = leaderCandidateForTeam(state.draftTeamId);
+    if (!leader) {
+      alert("선택한 팀에 등록된 팀장이 없습니다.");
+      return;
+    }
+    if (!state.draftLeaderGroup.some((item) => item.teamId === leader.teamId)) {
+      state.draftLeaderGroup.push(leader);
+    }
+    saveState();
+    render();
+  });
+  document.querySelectorAll("[data-remove-leader]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.draftLeaderGroup = state.draftLeaderGroup.filter((item) => item.teamId !== button.dataset.removeLeader);
+      saveState();
+      render();
+    });
+  });
+  document.querySelectorAll("input[name='cross-mode']").forEach((input) => {
+    input.addEventListener("change", () => {
+      state.draftCrossMode = input.value;
+      state.draftCrossTeamIds = [];
+      state.draftCrossMemberIds = [];
+      saveState();
+      render();
+    });
+  });
+  document.querySelector("#cross-parent-session")?.addEventListener("change", (event) => {
+    state.draftCrossParentSessionId = event.target.value;
+    state.draftCrossTeamIds = [];
+    state.draftCrossMemberIds = [];
+    saveState();
+    render();
+  });
+  document.querySelectorAll("[data-cross-team]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const teamId = input.dataset.crossTeam;
+      if (input.checked && !state.draftCrossTeamIds.includes(teamId)) {
+        state.draftCrossTeamIds.push(teamId);
+      } else if (!input.checked) {
+        state.draftCrossTeamIds = state.draftCrossTeamIds.filter((id) => id !== teamId);
+        const validMemberIds = new Set(crossMemberPool().map((member) => member.id));
+        state.draftCrossMemberIds = state.draftCrossMemberIds.filter((id) => validMemberIds.has(id));
+      }
+      saveState();
+      render();
+    });
+  });
+  document.querySelectorAll("[data-cross-member]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const memberId = input.dataset.crossMember;
+      if (input.checked && !state.draftCrossMemberIds.includes(memberId)) {
+        state.draftCrossMemberIds.push(memberId);
+      } else if (!input.checked) {
+        state.draftCrossMemberIds = state.draftCrossMemberIds.filter((id) => id !== memberId);
+      }
+      saveState();
+      render();
+    });
+  });
+  document.querySelector("#cross-random-count")?.addEventListener("input", (event) => {
+    state.draftCrossRandomCount = Math.max(1, Math.min(30, Number(event.target.value || 6)));
+    saveState();
+  });
+  document.querySelector("#generate-random-cross")?.addEventListener("click", () => {
+    const pool = allMemberCandidates(false);
+    const count = Math.max(1, Math.min(pool.length, Number(state.draftCrossRandomCount || 6)));
+    state.draftCrossMemberIds = pool
+      .map((member) => ({ member, sort: Math.random() }))
+      .sort((a, b) => a.sort - b.sort)
+      .slice(0, count)
+      .map((item) => item.member.id);
+    saveState();
+    render();
+  });
+  document.querySelectorAll("[data-remove-cross-member]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.draftCrossMemberIds = state.draftCrossMemberIds.filter((id) => id !== button.dataset.removeCrossMember);
+      saveState();
+      render();
+    });
+  });
   document.querySelectorAll(".schedule-row").forEach((rowEl) => {
     rowEl.querySelectorAll("input").forEach((input) => {
       input.addEventListener("input", () => {
@@ -2031,27 +2425,77 @@ function bindSessions() {
     render();
   });
   document.querySelector("#create-session")?.addEventListener("click", () => {
-    syncDraftOrgFromTeam(state.draftTeamId);
+    if (!canCreateDraftSession()) return;
+    const type = state.draftType;
+    const cohort = Number(document.querySelector("#cohort").value || 1);
     const session = {
       id: uid(),
-      type: state.draftType,
-      cohort: Number(document.querySelector("#cohort").value || 1),
-      divisionId: state.draftDivisionId,
-      hqId: state.draftHqId,
-      teamId: state.draftTeamId,
-      division: state.draftDivision,
-      hq: state.draftHq,
-      team: state.draftTeam,
-      participatingTeams: state.draftType === "팀빌딩" ? "" : state.draftTeam,
-      targetWeeks: SESSION_TYPES[state.draftType].weeks,
+      type,
+      cohort,
+      targetWeeks: SESSION_TYPES[type].weeks,
       createdAt: new Date().toISOString(),
       schedule: state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? "confirmed" : "planned", absences: [] })),
-      leader: state.draftLeader,
-      leaderTitle: state.draftLeaderTitle,
-      members: state.draftMembers,
     };
+
+    if (type === "팀빌딩") {
+      syncDraftOrgFromTeam(state.draftTeamId);
+      Object.assign(session, {
+        divisionId: state.draftDivisionId,
+        hqId: state.draftHqId,
+        teamId: state.draftTeamId,
+        division: state.draftDivision,
+        hq: state.draftHq,
+        team: state.draftTeam,
+        participatingTeams: "",
+        leader: state.draftLeader,
+        leaderTitle: state.draftLeaderTitle,
+        members: state.draftMembers,
+      });
+    } else if (type === "팀장") {
+      const leaderGroup = [...(state.draftLeaderGroup || [])];
+      Object.assign(session, {
+        participatingTeams: leaderGroup.map((leader) => leader.teamName).join(", "),
+        leaderGroup,
+        leader: `${leaderGroup.length}명 팀장 그룹`,
+        leaderTitle: "팀장",
+        members: leaderGroup.map((leader) => ({
+          id: leader.id,
+          name: leader.name,
+          position: leader.position || "팀장",
+          teamId: leader.teamId,
+          teamName: leader.teamName,
+          divisionName: leader.divisionName,
+          hqName: leader.hqName,
+        })),
+      });
+      state.draftLeaderGroup = [];
+    } else if (type === "크로스펑셔널") {
+      const members = selectedCrossMembers();
+      const sourceTeamIds = state.draftCrossMode === "leader-session"
+        ? [...state.draftCrossTeamIds]
+        : [...new Set(members.map((member) => member.teamId))];
+      Object.assign(session, {
+        sourceMode: state.draftCrossMode,
+        parentSessionId: state.draftCrossMode === "leader-session" ? state.draftCrossParentSessionId : "",
+        sourceTeamIds,
+        participatingTeams: [...new Set(members.map((member) => member.teamName))].join(", "),
+        members: members.map((member) => ({
+          id: member.id,
+          memberId: member.memberId,
+          name: member.name,
+          position: member.position,
+          teamId: member.teamId,
+          teamName: member.teamName,
+          divisionName: member.divisionName,
+          hqName: member.hqName,
+        })),
+      });
+      state.draftCrossMemberIds = [];
+      state.draftCrossTeamIds = [];
+    }
+
     state.sessions.unshift(session);
-    state.draftSchedule = makeSchedule(state.draftType);
+    state.draftSchedule = makeSchedule(type);
     saveState();
     render();
   });
@@ -2240,6 +2684,16 @@ window.handleDrop = function(event, targetId, targetLevel) {
       saveState();
       render();
     }
+  } else if (type === "team" && targetLevel === "division") {
+    const unit = state.orgUnits.find(u => u.id === id);
+    if (unit) {
+      unit.parentId = targetId;
+      state.selectedDivision = targetId;
+      state.selectedHq = "";
+      state.selectedTeam = id;
+      saveState();
+      render();
+    }
   } else if (type === "member" && targetLevel === "team") {
     const member = state.orgMembers.find(m => m.id === id);
     if (member) {
@@ -2257,14 +2711,19 @@ window.selectOrgNode = function(level, id) {
     state.selectedDivision = "";
     state.selectedHq = "";
     state.selectedTeam = "";
-    const divs = state.orgUnits.filter(u => u.parentId === id);
+    const divs = topLevelOrgUnits(id);
     if (divs.length > 0) selectOrgNode("division", divs[0].id);
   } else if (level === "division") {
     state.selectedDivision = id;
     state.selectedHq = "";
     state.selectedTeam = "";
-    const hqs = state.orgUnits.filter(u => u.parentId === id);
-    if (hqs.length > 0) selectOrgNode("hq", hqs[0].id);
+    const hqs = hqUnitsForDivision(id);
+    if (hqs.length > 0) {
+      selectOrgNode("hq", hqs[0].id);
+    } else {
+      const teams = teamUnitsForSelection(id, "");
+      if (teams.length > 0) selectOrgNode("team", teams[0].id);
+    }
   } else if (level === "hq") {
     state.selectedHq = id;
     state.selectedTeam = "";
@@ -2406,15 +2865,15 @@ async function initApp() {
       const ceo = state.orgUnits.find(u => u.level === 'company');
       if (ceo) state.selectedCompany = ceo.id;
     }
-    const divisions = state.orgUnits.filter(u => u.level === 'division' && u.parentId === state.selectedCompany);
+    const divisions = topLevelOrgUnits(state.selectedCompany);
     if (divisions.length > 0 && !state.selectedDivision) {
       state.selectedDivision = divisions[0].id;
     }
-    const hqs = state.orgUnits.filter(u => u.level === 'hq' && u.parentId === state.selectedDivision);
+    const hqs = hqUnitsForDivision(state.selectedDivision);
     if (hqs.length > 0 && !state.selectedHq) {
       state.selectedHq = hqs[0].id;
     }
-    const teams = state.orgUnits.filter(u => u.level === 'team' && u.parentId === state.selectedHq);
+    const teams = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
     if (teams.length > 0 && !state.selectedTeam) {
       state.selectedTeam = teams[0].id;
     }

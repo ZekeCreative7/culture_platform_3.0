@@ -171,6 +171,7 @@ const blankState = () => ({
   draftCrossMemberIds: [],
   draftCrossRandomCount: 6,
   orgEditor: null,
+  qualAnalysis: {},
 });
 
 let state = loadState();
@@ -196,17 +197,19 @@ function saveState() {
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
     draftDivisionId, draftHqId, draftTeamId,
-    draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount
+    draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
+    qualAnalysis
   } = state;
-  localStorage.setItem(STORE_KEY, JSON.stringify({ 
-    activeView, sessions, responses, draftType, draftSchedule, 
+  localStorage.setItem(STORE_KEY, JSON.stringify({
+    activeView, sessions, responses, draftType, draftSchedule,
     orgUnits, orgMembers, surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
     draftDivisionId, draftHqId, draftTeamId,
-    draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount
+    draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
+    qualAnalysis
   }));
 }
 
@@ -2024,6 +2027,41 @@ function renderReport() {
       `}
     </section>
 
+    <!-- ④ 정성 분석 -->
+    ${(() => {
+      const qualKey = `${cohort}-${type}`;
+      const saved = (state.qualAnalysis || {})[qualKey] || '';
+      const prompt = buildQualPrompt(cohort, type);
+      const hasQual = prompt.includes('응답 1.');
+      return `
+    <section style="margin-bottom:28px;">
+      <div class="section-title" style="margin-bottom:16px;">
+        <h2>④ 정성 응답 AI 분석</h2>
+        <span>프롬프트 자동 생성 → Claude / ChatGPT 붙여넣기 → 결과 저장</span>
+      </div>
+      ${!hasQual ? `<div class="empty">주관식 응답이 없습니다. 설문 응답이 적재된 후 분석이 가능합니다.</div>` : `
+      <div class="panel" style="padding:18px 22px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <p style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin:0;">Step 1 — 프롬프트 복사 후 AI에 붙여넣기</p>
+          <button class="secondary compact" onclick="copyQualPrompt('${qualKey}')">프롬프트 복사</button>
+        </div>
+        <textarea id="qual-prompt-${qualKey}" readonly style="width:100%; height:180px; font-size:11.5px; font-family:monospace; resize:vertical; border:1px solid var(--line); border-radius:8px; padding:12px; background:#f8fafc; color:#334155; box-sizing:border-box;">${escapeHtml(prompt)}</textarea>
+      </div>
+      <div class="panel" style="padding:18px 22px;">
+        <p style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin:0 0 10px 0;">Step 2 — AI 분석 결과 붙여넣고 저장</p>
+        <textarea id="qual-result-${qualKey}" style="width:100%; height:160px; font-size:13px; resize:vertical; border:1.5px solid var(--line); border-radius:8px; padding:12px; box-sizing:border-box;" placeholder="AI 분석 결과를 여기에 붙여넣으세요...">${escapeHtml(saved)}</textarea>
+        <button class="primary compact" style="margin-top:10px;" onclick="saveQualAnalysis('${qualKey}')">결과 저장</button>
+      </div>
+      ${saved ? `
+      <div class="panel" style="margin-top:14px; padding:20px 24px;">
+        <p style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; margin:0 0 12px 0;">저장된 분석 결과</p>
+        <div style="font-size:13.5px; line-height:1.9; color:#0c2340; white-space:pre-wrap;">${escapeHtml(saved)}</div>
+      </div>` : ''}
+      `}
+    </section>
+      `;
+    })()}
+
     `}
   `;
 }
@@ -3430,6 +3468,59 @@ async function initApp() {
     console.error('Firestore 응답 실시간 리스너 오류:', err);
   });
 }
+
+// ── Qualitative Analysis Helpers ─────────────────────────────────
+function buildQualPrompt(cohort, type) {
+  const sessionIds = new Set(
+    state.sessions.filter(s => s.type === type && s.cohort === Number(cohort)).map(s => s.id)
+  );
+  const qualIds = ['q9', 'q10', 'q11'];
+  let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션 유형: ${type} / 기수: ${cohort}기\n\n`;
+
+  PHASES.forEach(phase => {
+    const rows = state.responses.filter(r =>
+      r.cohort === Number(cohort) && r.phase === phase && sessionIds.has(r.sessionId)
+    );
+    const qualRows = rows.filter(r => qualIds.some(id => r[id] && String(r[id]).trim()));
+    if (!qualRows.length) return;
+
+    prompt += `【${phase} 설문 — ${qualRows.length}명 응답】\n`;
+    qualIds.forEach(qid => {
+      const survey = state.surveys.find(s => sessionIds.has(s.sessionId) && s.phase === phase);
+      const q = survey?.questions?.find(q => q.id === qid);
+      const qText = q?.text || (qid === 'q9' ? '기대하는 점' : qid === 'q10' ? '도움이 된 점' : '전달하고 싶은 메시지');
+      const answers = qualRows.map(r => String(r[qid] || '')).filter(v => v.trim());
+      if (!answers.length) return;
+      prompt += `\n질문: ${qText}\n`;
+      answers.forEach((a, i) => { prompt += `  응답 ${i + 1}. ${a}\n`; });
+    });
+    prompt += '\n';
+  });
+
+  prompt += `---\n위 응답을 바탕으로 다음 형식으로 분석해 주세요 (한국어).\n\n`;
+  prompt += `1. 주요 기대/우려 — 사전 응답 기반 (3가지 이내)\n`;
+  prompt += `2. 주요 성과/피드백 — 사후 응답 기반 (3가지 이내)\n`;
+  prompt += `3. 사전→사후 변화 요약 (2~3문장)\n`;
+  prompt += `4. 운영자를 위한 다음 세션 제안 (1~2가지)\n`;
+  return prompt;
+}
+
+window.copyQualPrompt = function(qualKey) {
+  const el = document.getElementById(`qual-prompt-${qualKey}`);
+  if (!el) return;
+  el.select();
+  document.execCommand('copy');
+  alert('프롬프트가 복사되었습니다. Claude 또는 ChatGPT에 붙여넣으세요.');
+};
+
+window.saveQualAnalysis = function(qualKey) {
+  const el = document.getElementById(`qual-result-${qualKey}`);
+  if (!el) return;
+  if (!state.qualAnalysis) state.qualAnalysis = {};
+  state.qualAnalysis[qualKey] = el.value.trim();
+  saveState();
+  render();
+};
 
 window.updateAnalyticsFilter = function(field, val) {
   state[field] = val;

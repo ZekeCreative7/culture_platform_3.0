@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDocs, deleteDoc, serverTimestamp } from './firebase.js';
+import { db, collection, doc, addDoc, getDocs, deleteDoc, onSnapshot, serverTimestamp } from './firebase.js';
 
 const PHASES = ["사전", "중간", "사후"];
 const QUANT_LABELS = {
@@ -152,7 +152,9 @@ const blankState = () => ({
   draftSurveySessionId: "",
   draftSurveyQuestions: defaultQuestions("사전"),
   draftGoogleFormUrl: "",
-  qrBaseUrl: window.location.origin.startsWith("file") ? "http://localhost:4173" : new URL('.', window.location.href).href.replace(/\/$/, ''),
+  qrBaseUrl: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.origin.startsWith('file'))
+    ? 'https://zekecreative7.github.io/culture_platform_3.0/webapp'
+    : new URL('.', window.location.href).href.replace(/\/$/, ''),
   selectedAnalyticsCohort: "",
   selectedAnalyticsType: "팀장",
   selectedReportCohort: "",
@@ -1573,6 +1575,14 @@ function renderSurveyCreator() {
             </select>
           </label>
 
+          ${(state.qrBaseUrl || '').includes('localhost') || (state.qrBaseUrl || '').includes('127.0.0.1') ? `
+          <div style="background:#fef3c7; border:1.5px solid #fbbf24; border-radius:8px; padding:12px 14px; font-size:12px; color:#92400e; line-height:1.6;">
+            ⚠️ QR 베이스 주소가 <strong>localhost</strong>로 설정되어 있어 모바일에서 열리지 않습니다.<br/>
+            배포 설문은 <strong>GitHub Pages URL</strong>을 사용하세요:<br/>
+            <code style="font-size:11px; word-break:break-all;">https://zekecreative7.github.io/culture_platform_3.0/webapp</code>
+          </div>
+          ` : ''}
+
           <!-- Google Form URL (primary method) -->
           <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #bae6fd; border-radius:10px; padding:16px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
@@ -2975,9 +2985,25 @@ async function initApp() {
   }
   ensureDraftOrgSelection();
 
-  // Load surveys + responses from Firestore (non-blocking: render first, then update)
   render();
-  Promise.all([loadSurveysFromFirestore(), loadResponsesFromFirestore()]).then(() => render());
+
+  // Load surveys once on startup
+  loadSurveysFromFirestore().then(() => render());
+
+  // Real-time listener for responses — updates dashboard whenever a phone submits
+  onSnapshot(collection(db, 'responses'), (snap) => {
+    const firestoreResponses = snap.docs.map(d => {
+      const data = d.data();
+      return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString() };
+    });
+    const firestoreIds = new Set(firestoreResponses.map(r => r.id));
+    const localOnly = (state.responses || []).filter(r => !firestoreIds.has(r.id));
+    state.responses = [...firestoreResponses, ...localOnly];
+    saveState();
+    render();
+  }, (err) => {
+    console.error('Firestore 응답 실시간 리스너 오류:', err);
+  });
 }
 
 window.updateAnalyticsFilter = function(field, val) {

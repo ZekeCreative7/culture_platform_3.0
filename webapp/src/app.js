@@ -1609,6 +1609,19 @@ function renderSurveyCreator() {
             <div style="flex:1; height:1px; background:var(--line);"></div>
           </div>
 
+          <!-- Template loader -->
+          ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length > 0 ? `
+          <div style="display:flex; gap:8px; align-items:flex-end;">
+            <label style="flex:1; font-size:12px; font-weight:700; color:var(--ink-2);">기존 설문에서 질문 불러오기
+              <select id="survey-template-select" style="margin-top:4px;">
+                <option value="">-- 템플릿 선택 --</option>
+                ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).map(s => `<option value="${s.id}">${escapeHtml(s.title)} (${s.questions.length}문항 · ${s.phase})</option>`).join('')}
+              </select>
+            </label>
+            <button class="secondary compact" style="white-space:nowrap; flex-shrink:0;" onclick="loadSurveyTemplate()">불러오기</button>
+          </div>
+          ` : ''}
+
           <!-- Questions Editor -->
           <div class="survey-questions-preview" style="background:var(--surface-soft); border-radius:8px; padding:16px; border:1px solid var(--line); ${state.draftGoogleFormUrl ? 'opacity:0.45; pointer-events:none;' : ''}">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -2915,6 +2928,18 @@ window.addSurveyDraftQuestion = function() {
     return isNaN(n) ? max : Math.max(max, n);
   }, 0);
   current.push({ id: `q${maxNum + 1}`, type: "quant", text: "" });
+  saveState();
+  render();
+};
+
+window.loadSurveyTemplate = function() {
+  const select = document.querySelector('#survey-template-select');
+  const surveyId = select ? select.value : '';
+  if (!surveyId) { alert('불러올 템플릿을 선택해 주세요.'); return; }
+  const survey = (state.surveys || []).find(s => s.id === surveyId);
+  if (!survey || !survey.questions || !survey.questions.length) { alert('해당 설문에 질문이 없습니다.'); return; }
+  if (!confirm(`"${survey.title}"의 질문 ${survey.questions.length}개를 현재 초안에 덮어씌울까요?`)) return;
+  state.draftSurveyQuestions = JSON.parse(JSON.stringify(survey.questions));
   saveState();
   render();
 };

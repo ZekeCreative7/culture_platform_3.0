@@ -143,6 +143,7 @@ const blankState = () => ({
   selectedDivision: "",
   selectedHq: "",
   selectedTeam: "",
+  editingSessionId: null,
   activeSessionTab: "list",
   calendarView: "month",
   calendarDate: todayISO(),
@@ -1000,7 +1001,13 @@ function renderSessions() {
           ${state.draftSchedule.map(scheduleRow).join("")}
         </div>
         <div class="panel-actions">
-          <button class="primary" id="create-session" ${canCreateDraftSession() ? "" : "disabled"}>세션 등록</button>
+          ${state.editingSessionId ? `
+            <span style="font-size:12px;color:#0ea5e9;font-weight:700;margin-right:8px;">✏️ 세션 수정 중</span>
+            <button class="ghost" id="cancel-edit-session">취소</button>
+          ` : ''}
+          <button class="primary" id="create-session" ${canCreateDraftSession() ? "" : "disabled"}>
+            ${state.editingSessionId ? '수정 완료' : '세션 등록'}
+          </button>
         </div>
       </section>
       <section>
@@ -1670,9 +1677,10 @@ function renderSurveyCreator() {
                   <strong>${escapeHtml(s.title)}</strong>
                   <span>${escapeHtml(sessLabel)} [${escapeHtml(s.phase)}]${s.googleFormUrl ? ' · <span style="color:#0ea5e9;font-weight:800;">구글 폼</span>' : ''}</span>
                   <input class="input-text compact-url" readonly value="${surveyLink}" onclick="this.select(); document.execCommand('copy'); alert('링크가 복사되었습니다!');" title="클릭 시 주소 복사" />
-                  <div style="margin-top:6px; display:flex; gap:6px;">
+                  <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
                     <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
                     <button class="ghost compact" onclick="copySurveyLink('${surveyLink}')">링크 복사</button>
+                    ${!s.googleFormUrl ? `<button class="ghost compact" style="font-size:11px;" onclick="downloadSurveyTemplate('${s.id}')">CSV 템플릿 ↓</button>` : ''}
                   </div>
                 </div>
                 <div class="survey-deploy-qr">
@@ -2084,20 +2092,26 @@ function scheduleRow(item) {
 function sessionCard(session) {
   const [status, tone] = getStatus(session);
   const confirmed = session.schedule.filter((item) => item.confirmed && item.date).length;
-  const pending = session.schedule.length - confirmed;
+  const total     = session.schedule.length;
+  const uploadCount = phasesForSession(session.id).length;
+  const isEditing = state.editingSessionId === session.id;
   return `
-    <article class="session-card">
+    <article class="session-card compact${isEditing ? ' editing' : ''}">
       <div class="session-top">
         <div>
           <span>${escapeHtml(session.type)} · ${session.cohort}기</span>
           <h3>${escapeHtml(sessionLabel(session))}</h3>
         </div>
-        <b class="status ${tone}">${status}</b>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+          <b class="status ${tone}">${status}</b>
+          <button class="ghost compact" onclick="startEditSession('${session.id}')">${isEditing ? '편집 중' : '수정'}</button>
+          <button class="ghost compact" onclick="deleteSession('${session.id}')" style="color:#ef4444;">삭제</button>
+        </div>
       </div>
       <div class="session-meta">
-        <span>확정 ${confirmed}회</span>
-        <span>미정 ${pending}회</span>
-        <span>${phasesForSession(session.id).length}/3 업로드</span>
+        <span title="일정이 확정된 회차 수">📅 일정 확정 ${confirmed}/${total}회차</span>
+        <span title="날짜 미정 또는 미확정 회차">⏳ 미확정 ${total - confirmed}회차</span>
+        <span title="사전/중간/사후 설문 CSV 업로드 완료 단계">📊 설문 응답 업로드 ${uploadCount}/3단계</span>
       </div>
     </article>
   `;
@@ -2657,17 +2671,70 @@ function bindSessions() {
     saveState();
     render();
   });
+  document.querySelector("#cancel-edit-session")?.addEventListener("click", () => {
+    state.editingSessionId = null;
+    state.draftSchedule = makeSchedule(state.draftType);
+    state.draftLeaderGroup = [];
+    saveState();
+    render();
+  });
+
   document.querySelector("#create-session")?.addEventListener("click", () => {
     if (!canCreateDraftSession()) return;
     const type = state.draftType;
     const cohort = Number(document.querySelector("#cohort").value || 1);
+    const updatedSchedule = state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? "confirmed" : "planned", absences: item.absences || [] }));
+
+    if (state.editingSessionId) {
+      // Update existing session
+      const idx = state.sessions.findIndex(s => s.id === state.editingSessionId);
+      if (idx >= 0) {
+        const existing = state.sessions[idx];
+        const updatedSession = { ...existing, type, cohort, schedule: updatedSchedule };
+
+        if (type === "팀빌딩") {
+          syncDraftOrgFromTeam(state.draftTeamId);
+          Object.assign(updatedSession, {
+            divisionId: state.draftDivisionId, hqId: state.draftHqId, teamId: state.draftTeamId,
+            division: state.draftDivision, hq: state.draftHq, team: state.draftTeam,
+            participatingTeams: "", leader: state.draftLeader, leaderTitle: state.draftLeaderTitle, members: state.draftMembers,
+          });
+        } else if (type === "팀장") {
+          const leaderGroup = [...(state.draftLeaderGroup || [])];
+          Object.assign(updatedSession, {
+            participatingTeams: leaderGroup.map(l => l.teamName).join(", "),
+            leaderGroup, leader: `${leaderGroup.length}명 팀장 그룹`, leaderTitle: "팀장",
+            members: leaderGroup.map(l => ({ id: l.id, name: l.name, position: l.position || "팀장", teamId: l.teamId, teamName: l.teamName, divisionName: l.divisionName, hqName: l.hqName })),
+          });
+          state.draftLeaderGroup = [];
+        } else if (type === "크로스펑셔널") {
+          const members = selectedCrossMembers();
+          const sourceTeamIds = state.draftCrossMode === "leader-session" ? [...state.draftCrossTeamIds] : [...new Set(members.map(m => m.teamId))];
+          Object.assign(updatedSession, {
+            sourceMode: state.draftCrossMode, parentSessionId: state.draftCrossMode === "leader-session" ? state.draftCrossParentSessionId : "",
+            sourceTeamIds, participatingTeams: [...new Set(members.map(m => m.teamName))].join(", "),
+            members: members.map(m => ({ id: m.id, memberId: m.memberId, name: m.name, position: m.position, teamId: m.teamId, teamName: m.teamName, divisionName: m.divisionName, hqName: m.hqName })),
+          });
+          state.draftCrossMemberIds = []; state.draftCrossTeamIds = [];
+        }
+
+        state.sessions[idx] = updatedSession;
+      }
+      state.editingSessionId = null;
+      state.draftSchedule = makeSchedule(type);
+      saveState();
+      render();
+      return;
+    }
+
+    // Create new session
     const session = {
       id: uid(),
       type,
       cohort,
       targetWeeks: SESSION_TYPES[type].weeks,
       createdAt: new Date().toISOString(),
-      schedule: state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? "confirmed" : "planned", absences: [] })),
+      schedule: updatedSchedule,
     };
 
     if (type === "팀빌딩") {
@@ -2857,6 +2924,61 @@ window.deleteSurveyDraftQuestion = function(qid) {
   state.draftSurveyQuestions = (state.draftSurveyQuestions || []).filter(q => q.id !== qid);
   saveState();
   render();
+};
+
+// ── Session Edit / Delete ────────────────────────────────────────
+window.startEditSession = function(id) {
+  const session = state.sessions.find(s => s.id === id);
+  if (!session) return;
+  state.editingSessionId = id;
+  state.activeSessionTab = 'list';
+  state.draftType = session.type;
+  state.draftSchedule = JSON.parse(JSON.stringify(session.schedule));
+  state.draftDivisionId  = session.divisionId  || '';
+  state.draftHqId        = session.hqId        || '';
+  state.draftTeamId      = session.teamId      || '';
+  state.draftDivision    = session.division    || '';
+  state.draftHq          = session.hq          || '';
+  state.draftTeam        = session.team        || '';
+  state.draftLeader      = session.leader      || '';
+  state.draftLeaderTitle = session.leaderTitle || '';
+  state.draftMembers     = session.members     || [];
+  state.draftLeaderGroup = session.leaderGroup || [];
+  state.draftCrossTeams  = session.crossTeams  || [];
+  saveState();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => {
+    const cohortEl = document.querySelector('#cohort');
+    if (cohortEl) cohortEl.value = session.cohort;
+  }, 50);
+};
+
+window.deleteSession = function(id) {
+  if (!confirm('이 세션을 삭제하시겠습니까?\n세션에 연결된 설문 및 응답 데이터는 유지됩니다.')) return;
+  state.sessions = state.sessions.filter(s => s.id !== id);
+  if (state.editingSessionId === id) state.editingSessionId = null;
+  saveState();
+  render();
+};
+
+// ── Survey CSV Template Download ─────────────────────────────────
+window.downloadSurveyTemplate = function(surveyId) {
+  const survey = state.surveys.find(s => s.id === surveyId);
+  const session = state.sessions.find(s => s.id === survey?.sessionId);
+  if (!survey) { alert('설문 정보를 찾을 수 없습니다.'); return; }
+  const cohort = session ? session.cohort : 1;
+  const qCols  = (survey.questions || []).filter(q => q.type === 'quant').map(q => q.id);
+  if (qCols.length === 0) qCols.push(...['q1','q2','q3','q4','q5','q6','q7','q8']);
+  const headers  = ['[기수]', ...qCols.map(q => `[${q}]`)];
+  const sampleRow = [cohort, ...qCols.map(() => '')];
+  const csv = [headers.join(','), sampleRow.join(',')].join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `설문응답_템플릿_${cohort}기_${survey.phase}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
 };
 
 window.copySurveyLink = function(link) {

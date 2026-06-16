@@ -1,3 +1,5 @@
+import { db, collection, doc, addDoc, getDocs, deleteDoc, serverTimestamp } from './firebase.js';
+
 const PHASES = ["사전", "중간", "사후"];
 const QUANT_LABELS = {
   q1: "심리안전 1",
@@ -1635,19 +1637,9 @@ function renderSurveyCreator() {
             if (s.googleFormUrl) {
               surveyLink = s.googleFormUrl;
             } else {
+              // Firestore-backed: URL only needs the doc ID; survey.html loads from Firestore
               const qrHost = (state.qrBaseUrl || new URL('.', window.location.href).href).replace(/\/$/, '');
-              const surveyJson = JSON.stringify({
-                id: s.id,
-                title: s.title,
-                phase: s.phase,
-                sessionId: s.sessionId,
-                sessionType: sess ? sess.type : '',
-                sessionCohort: sess ? (sess.cohort || '') : '',
-                questions: (s.questions || []).map(q => ({ id: q.id, text: q.text, type: q.type }))
-              });
-              const surveyPayload = btoa(unescape(encodeURIComponent(surveyJson)))
-                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-              surveyLink = `${qrHost}/survey.html?d=${surveyPayload}`;
+              surveyLink = `${qrHost}/survey.html?surveyId=${s.id}`;
             }
             
             // Generate QR Code locally using qrcode.min.js
@@ -2317,20 +2309,28 @@ function bindSessions() {
 
     if (!state.surveys) state.surveys = [];
 
-    state.surveys.push({
-      id: uid(),
+    const sess = (state.sessions || []).find(s => s.id === sessionId);
+    const newSurvey = {
       title,
       sessionId,
       phase,
+      sessionType: sess ? (sess.type || '') : '',
+      sessionCohort: sess ? (sess.cohort || '') : '',
       googleFormUrl: googleFormUrl || null,
       questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
-    });
+    };
 
-    state.draftSurveyTitle = "";
-    state.draftGoogleFormUrl = "";
-    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
-    saveState();
-    render();
+    // Save to Firestore, use returned doc ID
+    saveSurveyToFirestore(newSurvey).then(firestoreId => {
+      state.surveys.push({ ...newSurvey, id: firestoreId });
+      state.draftSurveyTitle = "";
+      state.draftGoogleFormUrl = "";
+      state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+      saveState();
+      render();
+    }).catch(e => {
+      alert('설문 저장 실패: ' + e.message);
+    });
   });
 
   const typeSelect = document.querySelector("#session-type");
@@ -2878,7 +2878,32 @@ window.deleteSurvey = function(id) {
   state.surveys = (state.surveys || []).filter(s => s.id !== id);
   saveState();
   render();
+  deleteSurveyFromFirestore(id).catch(e => console.error('Firestore 삭제 실패:', e));
 };
+
+// ── Firestore Survey Helpers ─────────────────────────────────────
+async function loadSurveysFromFirestore() {
+  try {
+    const snap = await getDocs(collection(db, 'surveys'));
+    state.surveys = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    saveState();
+  } catch (e) {
+    console.error('Firestore 설문 로드 실패:', e);
+  }
+}
+
+async function saveSurveyToFirestore(survey) {
+  const { id, ...data } = survey;
+  const docRef = await addDoc(collection(db, 'surveys'), {
+    ...data,
+    createdAt: serverTimestamp()
+  });
+  return docRef.id;
+}
+
+async function deleteSurveyFromFirestore(id) {
+  await deleteDoc(doc(db, 'surveys', id));
+}
 
 // ── Async Startup Initializer ───────────────────────────────────
 async function initApp() {
@@ -2918,8 +2943,10 @@ async function initApp() {
     }
   }
   ensureDraftOrgSelection();
-  
+
+  // Load surveys from Firestore (non-blocking: render first, then update)
   render();
+  loadSurveysFromFirestore().then(() => render());
 }
 
 window.updateAnalyticsFilter = function(field, val) {

@@ -268,8 +268,22 @@
       <div id="loading" style="text-align:center; color:var(--text-muted); padding:20px;">설문 양식을 불러오는 중입니다...</div>
     </div>
 
-    <script>
-      const STORE_KEY = "culture-platform-webapp-v1";
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+      import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp }
+        from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAD1setZ-VrrB5do3wl6iHuVcqY91se0tk",
+        authDomain: "culture-platform-8cd24.firebaseapp.com",
+        projectId: "culture-platform-8cd24",
+        storageBucket: "culture-platform-8cd24.firebasestorage.app",
+        messagingSenderId: "391783796041",
+        appId: "1:391783796041:web:7bdd71d7fb4be533e81e98"
+      };
+      const firebaseApp = initializeApp(firebaseConfig);
+      const db = getFirestore(firebaseApp);
+
       const SCORE_VALUES = {
         "매우 그렇다": 5,
         "그렇다": 4,
@@ -279,41 +293,25 @@
         "모름/해당없음": null
       };
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const encodedData = urlParams.get('d');
-      const surveyId = urlParams.get('surveyId');
+      const surveyId = new URLSearchParams(window.location.search).get('surveyId');
 
-      window.addEventListener('DOMContentLoaded', () => {
-        // Primary: read survey data encoded in URL (works on any device)
-        if (encodedData) {
-          try {
-            // Restore standard base64 from URL-safe base64 (- → +, _ → /, re-pad)
-            const b64 = encodedData.replace(/-/g, '+').replace(/_/g, '/');
-            const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
-            const payload = JSON.parse(decodeURIComponent(escape(atob(padded))));
-            const session = { id: payload.sessionId, type: payload.sessionType || '', cohort: payload.sessionCohort || '' };
-            renderSurveyForm(payload, session);
-            return;
-          } catch (e) {
-            console.error('URL 데이터 파싱 실패, localStorage로 대체 시도', e);
-          }
-        }
-
-        // Fallback: read from localStorage (same device only)
+      window.addEventListener('DOMContentLoaded', async () => {
         if (!surveyId) {
           showError("설문 ID가 누락되었습니다. 정상적인 링크를 이용해 주세요.");
           return;
         }
-        const storeData = JSON.parse(localStorage.getItem(STORE_KEY)) || { sessions: [], responses: [], surveys: [] };
-        const survey = (storeData.surveys || []).find(s => s.id === surveyId);
-        const session = (storeData.sessions || []).find(s => s.id === (survey ? survey.sessionId : ""));
-
-        if (!survey || !session) {
-          showError("해당 설문조사를 찾을 수 없거나 만료되었습니다.<br/>설문지를 다시 배포하거나 운영자에게 문의해 주세요.");
-          return;
+        try {
+          const snap = await getDoc(doc(db, 'surveys', surveyId));
+          if (!snap.exists()) {
+            showError("해당 설문조사를 찾을 수 없거나 만료되었습니다.<br/>운영자에게 문의해 주세요.");
+            return;
+          }
+          const survey = { id: snap.id, ...snap.data() };
+          renderSurveyForm(survey, db, addDoc, collection, serverTimestamp);
+        } catch (e) {
+          console.error(e);
+          showError("설문을 불러오는 중 오류가 발생했습니다.<br/>" + e.message);
         }
-
-        renderSurveyForm(survey, session);
       });
 
       function showError(msg) {
@@ -326,108 +324,80 @@
         `;
       }
 
-      function renderSurveyForm(survey, session) {
+      function renderSurveyForm(survey, db, addDoc, collection, serverTimestamp) {
         const container = document.getElementById('survey-content');
-        
+
         let html = `
           <header>
             <h1>${escapeHtml(survey.title)}</h1>
-            <p>${escapeHtml(session.type)} · ${escapeHtml(session.cohort)}기 대상을 위한 익명 설문조사입니다.</p>
+            <p>${escapeHtml(survey.sessionType || '')}${survey.sessionCohort ? ' · ' + escapeHtml(String(survey.sessionCohort)) + '기' : ''} 대상 익명 설문조사입니다.</p>
           </header>
-          
           <div class="section-info">
             본 설문조사는 완전히 익명으로 진행되며, 답변 내용은 통계적으로 합산하여 분석에만 활용됩니다. 개인 식별 정보는 일절 수집하지 않습니다.
           </div>
-
           <form id="survey-form">
-            <div class="question-card">
-              <label class="q-title" for="cohort-select">본인의 참여 기수를 선택해 주세요. *</label>
-              <select id="cohort-select" required>
-                <option value="${session.cohort}">${session.cohort}기</option>
-              </select>
-            </div>
         `;
 
-        survey.questions.forEach((q, idx) => {
-          const qId = q.id;
-          const isQuant = q.type === 'quant';
-
+        (survey.questions || []).forEach((q, idx) => {
           html += `<div class="question-card">`;
           html += `<label class="q-title">${idx + 1}. ${escapeHtml(q.text)} *</label>`;
-
-          if (isQuant) {
+          if (q.type === 'quant') {
             html += `<div class="scale-container">`;
-            Object.keys(SCORE_VALUES).forEach((label) => {
-              html += `
-                <label class="scale-option" onclick="selectRadio(this)">
-                  <input type="radio" name="${qId}" value="${label}" required />
-                  <span>${label}</span>
-                </label>
-              `;
+            Object.keys(SCORE_VALUES).forEach(label => {
+              html += `<label class="scale-option"><input type="radio" name="${q.id}" value="${label}" required /><span>${label}</span></label>`;
             });
             html += `</div>`;
           } else {
-            html += `
-              <textarea class="input-text" name="${qId}" placeholder="답변을 입력해 주세요." required></textarea>
-            `;
+            html += `<textarea class="input-text" name="${q.id}" placeholder="답변을 입력해 주세요." required></textarea>`;
           }
           html += `</div>`;
         });
 
-        html += `
-            <button type="submit" class="submit-btn">설문 제출하기</button>
-          </form>
-        `;
-
+        html += `<button type="submit" class="submit-btn">설문 제출하기</button></form>`;
         container.innerHTML = html;
 
-        const form = document.getElementById('survey-form');
-        form.addEventListener('submit', (e) => {
-          e.preventDefault();
-          submitSurvey(survey, session);
+        // Radio click highlight
+        container.querySelectorAll('.scale-option').forEach(el => {
+          el.addEventListener('click', () => {
+            el.closest('.scale-container').querySelectorAll('.scale-option').forEach(s => s.classList.remove('active'));
+            el.classList.add('active');
+            el.querySelector('input').checked = true;
+          });
         });
-      }
 
-      function selectRadio(element) {
-        const siblings = element.parentNode.querySelectorAll('.scale-option');
-        siblings.forEach(s => s.classList.remove('active'));
-        element.classList.add('active');
-        element.querySelector('input').checked = true;
-      }
+        document.getElementById('survey-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = e.target.querySelector('.submit-btn');
+          btn.disabled = true;
+          btn.textContent = '제출 중...';
 
-      function submitSurvey(survey, session) {
-        const storeData = JSON.parse(localStorage.getItem(STORE_KEY)) || { sessions: [], responses: [], surveys: [] };
-        const form = document.getElementById('survey-form');
-        const formData = new FormData(form);
-        const cohort = parseInt(document.getElementById('cohort-select').value);
+          const formData = new FormData(e.target);
+          const responseData = {
+            surveyId: survey.id,
+            sessionId: survey.sessionId,
+            phase: survey.phase,
+            createdAt: serverTimestamp()
+          };
+          (survey.questions || []).forEach(q => {
+            const val = formData.get(q.id);
+            responseData[q.id] = q.type === 'quant' ? (val ? (SCORE_VALUES[val] ?? null) : null) : (val || '');
+          });
 
-        const response = {
-          id: Math.floor(Date.now() + Math.random() * 100000).toString(36),
-          sessionId: survey.sessionId,
-          phase: survey.phase,
-          cohort: cohort,
-          createdAt: new Date().toISOString()
-        };
-
-        survey.questions.forEach(q => {
-          const val = formData.get(q.id);
-          if (q.type === 'quant') {
-            response[q.id] = val ? SCORE_VALUES[val] : null;
-          } else {
-            response[q.id] = val || "";
+          try {
+            await addDoc(collection(db, 'responses'), responseData);
+            document.getElementById('survey-content').innerHTML = `
+              <div class="success-view">
+                <div class="success-icon">✓</div>
+                <h2>제출 완료</h2>
+                <p>설문조사에 응해주셔서 대단히 감사합니다.<br />입력하신 답변이 성공적으로 기록되었습니다.</p>
+              </div>
+            `;
+          } catch (err) {
+            btn.disabled = false;
+            btn.textContent = '설문 제출하기';
+            alert('제출 중 오류가 발생했습니다. 다시 시도해 주세요.\n' + err.message);
           }
         });
-
-        storeData.responses.push(response);
-        localStorage.setItem(STORE_KEY, JSON.stringify(storeData));
-
-        document.getElementById('survey-content').innerHTML = `
-          <div class="success-view">
-            <div class="success-icon">✓</div>
-            <h2>제출 완료</h2>
-            <p>설문조사에 응해주셔서 대단히 감사합니다.<br />입력하신 답변이 성공적으로 기록되었습니다.</p>
-          </div>
-        `;
       }
 
       function escapeHtml(value) {

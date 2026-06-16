@@ -376,6 +376,7 @@
             surveyId: survey.id,
             sessionId: survey.sessionId,
             phase: survey.phase,
+            cohort: Number(survey.sessionCohort) || 0,
             createdAt: serverTimestamp()
           };
           (survey.questions || []).forEach(q => {

@@ -1694,8 +1694,10 @@ function renderSurveyCreator() {
                     <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
                     <button class="ghost compact" onclick="copySurveyLink('${surveyLink}')">링크 복사</button>
                     ${!s.googleFormUrl ? `<button class="ghost compact" style="font-size:11px;" onclick="downloadSurveyTemplate('${s.id}')">CSV 템플릿 ↓</button>` : ''}
-                    <button class="ghost compact" style="font-size:11px; color:#0071e3; font-weight:700;" onclick="uploadSurveyResults('${s.id}')">결과 CSV 업로드 ↑</button>
                   </div>
+                  <button onclick="uploadSurveyResults('${s.id}')" style="margin-top:10px; width:100%; padding:9px; background:#eff6ff; border:1.5px dashed #93c5fd; border-radius:8px; color:#1d4ed8; font-size:12px; font-weight:700; cursor:pointer; text-align:center; transition:all 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                    ↑ 결과 CSV 업로드 (과거 응답 수동 적재)
+                  </button>
                 </div>
                 <div class="survey-deploy-qr">
                   <img src="${qrUrl}" alt="QR Code" />

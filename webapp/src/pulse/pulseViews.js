@@ -1,10 +1,22 @@
 import { PULSE_DIVISIONS } from "../config/pulseDivisions.js";
 import { companyEngagement, percentLabel, themeTrend, trendMatched } from "./pulseEngine.js";
+import { parsePulseWorkbook } from "./pulseUpload.js";
 
-const DEFAULT_YEARS = [2024, 2025, 2026];
+const DEFAULT_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
 
 function pct(value) {
   return percentLabel(value);
+}
+
+function pulseYears(cache, state) {
+  const years = new Set(DEFAULT_YEARS);
+  Object.keys(cache.years || {}).forEach((year) => years.add(Number(year)));
+  if (state.pulseYear) years.add(Number(state.pulseYear));
+  return [...years].filter(Boolean).sort((a, b) => a - b);
 }
 
 function scoreTile(title, value, note, tone = "") {
@@ -34,6 +46,42 @@ function renderPulseTabs(state) {
       <button class="${view === "overview" ? "active" : ""}" data-pulse-view="overview">전사 개요</button>
       <button class="${view === "priority" ? "active" : ""}" data-pulse-view="priority">우선순위</button>
     </div>
+  `;
+}
+
+function renderUploadPanel(state) {
+  const upload = state.pulseUpload || {};
+  const preview = upload.preview;
+  return `
+    <section class="panel pulse-upload-panel">
+      <div class="pulse-upload-main">
+        <div>
+          <span class="eyebrow">Pulse upload</span>
+          <h2>연도별 Pulse 템플릿 업로드</h2>
+          <p>다운로드한 템플릿을 채워 올리면 해당 연도의 전사·본부 집계가 DB에 저장되고 바로 분석에 반영됩니다.</p>
+        </div>
+        <div class="pulse-upload-actions">
+          <button class="secondary" data-pulse-action="download-template" data-year="${new Date().getFullYear() + 1}">템플릿 다운로드</button>
+          <label class="pulse-file-button">
+            <input id="pulse-upload-file" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
+            파일 선택
+          </label>
+        </div>
+      </div>
+      ${upload.loading ? `<div class="pulse-upload-status">파일을 읽는 중입니다.</div>` : ""}
+      ${upload.savedMessage ? `<div class="pulse-upload-success">${escapeHtml(upload.savedMessage)}</div>` : ""}
+      ${upload.errors?.length ? `<div class="error-list pulse-upload-errors">${upload.errors.map((err) => `<p>${escapeHtml(err)}</p>`).join("")}</div>` : ""}
+      ${preview ? `
+        <div class="pulse-upload-preview">
+          <strong>${preview.year}년 Pulse 데이터 확인</strong>
+          <span>전사 ${preview.companyItems}문항</span>
+          <span>본부 ${preview.divisionCount}개</span>
+          <span>N 입력 ${preview.nCount}개</span>
+          <span>전사 Engagement ${pct(preview.engagementCompany)}</span>
+          <button class="primary compact" data-pulse-action="save-upload">DB에 저장</button>
+        </div>
+      ` : `<div class="pulse-upload-status muted">아직 선택한 Pulse 파일이 없습니다.</div>`}
+    </section>
   `;
 }
 
@@ -162,6 +210,7 @@ function renderPriorityPlaceholder() {
 export function renderPulse({ state, pulseCache }) {
   const year = Number(state.pulseYear || 2026);
   const view = state.pulseView || "overview";
+  const years = pulseYears(pulseCache, state);
   return `
     <section class="page-head pulse-head">
       <div>
@@ -173,17 +222,18 @@ export function renderPulse({ state, pulseCache }) {
         ${renderLayerToggle(state)}
         <label class="pulse-year">연도
           <select id="pulse-year-select">
-            ${DEFAULT_YEARS.map((item) => `<option value="${item}" ${item === year ? "selected" : ""}>${item}</option>`).join("")}
+            ${years.map((item) => `<option value="${item}" ${item === year ? "selected" : ""}>${item}</option>`).join("")}
           </select>
         </label>
       </div>
     </section>
     ${renderPulseTabs(state)}
+    ${renderUploadPanel(state)}
     ${view === "priority" ? renderPriorityPlaceholder() : renderOverview({ state, cache: pulseCache })}
   `;
 }
 
-export function bindPulse({ state, saveState, render, loadPulseYears, downloadPulseTemplate }) {
+export function bindPulse({ state, saveState, render, loadPulseYears, savePulseResult, downloadPulseTemplate }) {
   document.querySelectorAll("[data-pulse-layer]").forEach((button) => {
     button.addEventListener("click", () => {
       state.pulseLayer = button.dataset.pulseLayer;
@@ -201,7 +251,7 @@ export function bindPulse({ state, saveState, render, loadPulseYears, downloadPu
   document.querySelector("#pulse-year-select")?.addEventListener("change", (event) => {
     state.pulseYear = Number(event.target.value);
     saveState();
-    loadPulseYears(DEFAULT_YEARS).then(render);
+    loadPulseYears(pulseYears({ years: {} }, state)).then(render);
   });
   document.querySelectorAll("[data-pulse-action='download-template']").forEach((button) => {
     button.addEventListener("click", () => downloadPulseTemplate(Number(button.dataset.year)));
@@ -209,7 +259,52 @@ export function bindPulse({ state, saveState, render, loadPulseYears, downloadPu
   document.querySelectorAll("[data-pulse-action='reload']").forEach((button) => {
     button.addEventListener("click", () => {
       button.disabled = true;
-      loadPulseYears(DEFAULT_YEARS).then(render);
+      loadPulseYears(pulseYears({ years: {} }, state)).then(render);
     });
+  });
+  document.querySelector("#pulse-upload-file")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    state.pulseUpload = { loading: true, fileName: file.name, errors: [], payload: null, preview: null };
+    render();
+    const result = await parsePulseWorkbook(file);
+    state.pulseUpload = {
+      loading: false,
+      fileName: file.name,
+      errors: result.errors || [],
+      payload: result.payload,
+      preview: result.preview,
+    };
+    render();
+  });
+  document.querySelector("[data-pulse-action='save-upload']")?.addEventListener("click", async (event) => {
+    const payload = state.pulseUpload?.payload;
+    if (!payload || state.pulseUpload?.errors?.length) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = "저장 중...";
+    try {
+      await savePulseResult(payload);
+      state.pulseYear = payload.year;
+      state.pulseView = "overview";
+      state.pulseUpload = {
+        loading: false,
+        errors: [],
+        preview: null,
+        payload: null,
+        fileName: "",
+        savedMessage: `${payload.year}년 Pulse 데이터가 저장되었습니다.`,
+      };
+      saveState();
+      await loadPulseYears(pulseYears({ years: { [payload.year]: payload } }, state));
+      render();
+    } catch (e) {
+      state.pulseUpload = {
+        ...(state.pulseUpload || {}),
+        loading: false,
+        errors: [`DB 저장 실패: ${e.message || e}`],
+      };
+      render();
+    }
   });
 }

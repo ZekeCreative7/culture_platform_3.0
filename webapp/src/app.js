@@ -92,6 +92,7 @@ const NAV_ICONS = {
   pulse: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm1 3a1 1 0 0 0-1 1v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1H4Zm3 7a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v4a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1v-1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Z"/></svg>`,
 };
 const STORE_KEY = "culture-platform-webapp-v1";
+const PULSE_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 const pulseCache = { years: {}, loading: false, loaded: false, error: "" };
 
 let dbStatus = 'connecting';
@@ -688,12 +689,26 @@ function parseCSVLine(line) {
   return cells;
 }
 
-function render() {
-  const app = document.querySelector("#app");
+function appShellClasses() {
   const classes = [];
   if (state.mobileNavOpen) classes.push("mobile-nav-open");
   if (state.sidebarCollapsed && window.innerWidth > 767) classes.push("sidebar-collapsed");
-  app.className = classes.join(" ");
+  return classes.join(" ");
+}
+
+function syncMobileNavShell() {
+  const app = document.querySelector("#app");
+  if (app) app.className = appShellClasses();
+  const button = document.querySelector(".menu-toggle");
+  if (button) {
+    button.setAttribute("aria-expanded", state.mobileNavOpen ? "true" : "false");
+    button.setAttribute("aria-label", state.mobileNavOpen ? "메뉴 닫기" : "메뉴 열기");
+  }
+}
+
+function render() {
+  const app = document.querySelector("#app");
+  app.className = appShellClasses();
 
   const toggleIcon = state.sidebarCollapsed
     ? `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 0 1 0-1.414L10.586 10 7.293 6.707a1 1 0 0 1 1.414-1.414l4 4a1 1 0 0 1 0 1.414l-4 4a1 1 0 0 1-1.414 0Z" clip-rule="evenodd"/></svg>`
@@ -2573,17 +2588,17 @@ function bindGlobal() {
       saveState();
       render();
       if (state.activeView === "pulse") {
-        loadPulseYears([2024, 2025, 2026]).then(render);
+        loadPulseYears(PULSE_YEARS).then(render);
       }
     });
   });
   document.querySelector(".menu-toggle")?.addEventListener("click", () => {
     state.mobileNavOpen = !state.mobileNavOpen;
-    render();
+    syncMobileNavShell();
   });
   document.querySelector(".mobile-nav-backdrop")?.addEventListener("click", () => {
     state.mobileNavOpen = false;
-    render();
+    syncMobileNavShell();
   });
   document.querySelector("#toggle-sidebar")?.addEventListener("click", () => {
     state.sidebarCollapsed = !state.sidebarCollapsed;
@@ -2594,7 +2609,7 @@ function bindGlobal() {
   bindOrg();
   bindUpload();
   bindReport();
-  bindPulse({ state, saveState, render, loadPulseYears, downloadPulseTemplate });
+  bindPulse({ state, saveState, render, loadPulseYears, savePulseResult: savePulseResultToFirestore, downloadPulseTemplate });
 }
 
 function bindOrg() {
@@ -3723,7 +3738,7 @@ async function deleteSurveyFromFirestore(id) {
   await deleteDoc(doc(db, 'surveys', id));
 }
 
-async function loadPulseYears(years = [2024, 2025, 2026]) {
+async function loadPulseYears(years = PULSE_YEARS) {
   if (pulseCache.loading) return pulseCache.years;
   pulseCache.loading = true;
   pulseCache.error = "";
@@ -3745,6 +3760,17 @@ async function loadPulseYears(years = [2024, 2025, 2026]) {
     pulseCache.loading = false;
   }
   return pulseCache.years;
+}
+
+async function savePulseResultToFirestore(payload) {
+  if (!payload?.year) throw new Error("저장할 Pulse 연도가 없습니다.");
+  await setDoc(doc(db, 'pulseResults', String(payload.year)), {
+    ...payload,
+    updatedAt: serverTimestamp(),
+  });
+  pulseCache.years[payload.year] = payload;
+  pulseCache.loaded = true;
+  setDbStatus('connected');
 }
 
 async function uploadStateToDb() {
@@ -3844,7 +3870,7 @@ async function initApp() {
   loadSessionsFromFirestore().then(() => render());
   loadSurveysFromFirestore().then(() => render());
   if (state.activeView === "pulse") {
-    loadPulseYears([2024, 2025, 2026]).then(() => render());
+    loadPulseYears(PULSE_YEARS).then(() => render());
   }
 
   // Real-time listener for responses — updates dashboard whenever a phone submits

@@ -163,6 +163,7 @@ const blankState = () => ({
   draftYear: new Date().getFullYear(),
   duplicateSessionWarning: null,
   showQualAnswersModal: null,
+  qualAnswersGroupBy: 'question',
   uploadRows: [],
   uploadErrors: [],
   uploadFileName: "",
@@ -2798,6 +2799,43 @@ function renderQualitative(cohort, type, sessionId = "") {
   }).join("")}</div>`;
 }
 
+function renderQualByQuestion(rows, qualIds, type, showPhase) {
+  return qualIds.map((id) => {
+    const answers = rows.filter((r) => r[id]).map((r) => ({ phase: r.phase || '', answer: r[id] }));
+    if (!answers.length) return '';
+    return `
+      <div class="qual-group">
+        <div class="qual-group-head"><strong>${escapeHtml(qualQuestionLabel(id, type))}</strong><span>${answers.length}건</span></div>
+        ${answers.map((a) => `
+          <article class="qual-answer-row">
+            ${showPhase ? `<div class="qual-answer-meta"><span>${escapeHtml(a.phase)}</span></div>` : ''}
+            <p>${escapeHtml(a.answer)}</p>
+          </article>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+}
+
+function renderQualByPerson(rows, qualIds, type, showPhase) {
+  const peopleRows = rows.filter((row) => qualIds.some((id) => row[id]));
+  return peopleRows.map((row, index) => {
+    const answers = qualIds.filter((id) => row[id]).map((id) => ({ label: qualQuestionLabel(id, type), answer: row[id] }));
+    if (!answers.length) return '';
+    return `
+      <div class="qual-group">
+        <div class="qual-group-head"><strong>응답자 ${index + 1}</strong>${showPhase ? `<span>${escapeHtml(row.phase || '')}</span>` : ''}</div>
+        ${answers.map((a) => `
+          <article class="qual-answer-row">
+            <div class="qual-answer-meta"><span>${escapeHtml(a.label)}</span></div>
+            <p>${escapeHtml(a.answer)}</p>
+          </article>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+}
+
 function renderQualAnswersModal() {
   const ctx = state.showQualAnswersModal;
   if (!ctx) return "";
@@ -2806,26 +2844,35 @@ function renderQualAnswersModal() {
   const { qualIds, rows } = qualResponseRows(cohort, type, sessionId);
   const yearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
   const title = session ? sessionLabel(session) : `${yearLabel}${cohort}기`;
-  const entries = rows.flatMap((row) =>
-    qualIds.filter((id) => row[id]).map((id) => ({ phase: row.phase || '', label: qualQuestionLabel(id, type), answer: row[id] }))
-  );
+  const phases = [...new Set(rows.map((r) => r.phase).filter(Boolean))];
+  const singlePhase = phases.length === 1 ? phases[0] : '';
+  const showPhase = !singlePhase;
+  const totalAnswers = rows.reduce((sum, row) => sum + qualIds.filter((id) => row[id]).length, 0);
+  const groupBy = state.qualAnswersGroupBy === 'person' ? 'person' : 'question';
+  const body = groupBy === 'person'
+    ? renderQualByPerson(rows, qualIds, type, showPhase)
+    : renderQualByQuestion(rows, qualIds, type, showPhase);
   return `
     <div class="modal-overlay">
       <div class="modal-card" style="max-width:680px; width:96%;">
         <div class="modal-header">
-          <h2>주관식 응답 전체보기 — ${escapeHtml(String(title))}</h2>
+          <div>
+            <h2>주관식 응답 전체보기 — ${escapeHtml(String(title))}</h2>
+            ${singlePhase ? `<span class="muted" style="font-size:12px;">${escapeHtml(singlePhase)} 설문</span>` : ''}
+          </div>
           <button type="button" class="close-btn" id="close-qual-answers">&times;</button>
         </div>
-        <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; max-height:72vh; overflow-y:auto;">
-          ${entries.length ? entries.map((entry) => `
-            <article class="qual-answer-row">
-              <div class="qual-answer-meta"><span>${escapeHtml(entry.phase)}</span><strong>${escapeHtml(entry.label)}</strong></div>
-              <p>${escapeHtml(entry.answer)}</p>
-            </article>
-          `).join("") : emptyCard("정성 응답이 없습니다.")}
+        <div class="qual-answers-toolbar">
+          <div class="pulse-segmented" aria-label="보기 방식">
+            <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question">문항별</button>
+            <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person">같은 사람별</button>
+          </div>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px; max-height:64vh; overflow-y:auto;">
+          ${totalAnswers ? body : emptyCard("정성 응답이 없습니다.")}
         </div>
         <div class="modal-footer" style="justify-content:space-between;">
-          <span class="muted" style="font-size:12px;">총 ${entries.length}건</span>
+          <span class="muted" style="font-size:12px;">총 ${totalAnswers}건</span>
           <button class="secondary" type="button" id="close-qual-answers-footer">닫기</button>
         </div>
       </div>
@@ -3550,6 +3597,12 @@ function bindReport() {
   document.querySelector("#close-qual-answers-footer")?.addEventListener("click", () => {
     state.showQualAnswersModal = null;
     render();
+  });
+  document.querySelectorAll("[data-qual-groupby]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.qualAnswersGroupBy = button.dataset.qualGroupby;
+      render();
+    });
   });
 
   document.querySelector("#apply-report-filter")?.addEventListener("click", () => {

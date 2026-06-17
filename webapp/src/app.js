@@ -4308,12 +4308,12 @@ function buildQualPrompt(cohort, type, sessionId = "") {
     Number(s.sessionCohort) === cohortNum
   );
 
-  // Build qual question ID set from actual surveys — fall back to q9/q10/q11
-  const qualIdSet = new Set(['q9', 'q10', 'q11']);
-  relevantSurveys.forEach(survey => {
-    (survey.questions || []).filter(q => q.type === 'qual').forEach(q => qualIdSet.add(q.id));
-  });
-  const qualIds = [...qualIdSet];
+  // Trust each survey's own question type — only fall back to the legacy q9~q11 guess when
+  // none of the matched surveys have any question config at all (see qualResponseRows()).
+  const hasExplicitConfig = relevantSurveys.some(s => (s.questions || []).length > 0);
+  const qualIds = hasExplicitConfig
+    ? [...new Set(relevantSurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))]
+    : ['q9', 'q10', 'q11'];
 
   // Question text lookup helper
   const getQText = (qid, phase) => {

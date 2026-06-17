@@ -145,10 +145,10 @@ function defaultQuestions(phase) {
   if (phase === "사전") {
     list.push({ id: "q9", type: "qual", text: "본 조직문화 세션 과정에 기대하는 점이나 바라는 점은 무엇입니까?" });
   } else if (phase === "중간") {
-    list.push({ id: "q10", type: "qual", text: "현재까지 진행된 세션에서 가장 도움이 되었던 내용이나 좋았던 점은 무엇입니까?" });
+    list.push({ id: "q9", type: "qual", text: "현재까지 진행된 세션에서 가장 도움이 되었던 내용이나 좋았던 점은 무엇입니까?" });
   } else {
-    list.push({ id: "q10", type: "qual", text: "세션을 마무리하며 가장 도움이 되었던 점은 무엇입니까?" });
-    list.push({ id: "q11", type: "qual", text: "운영진이나 회사에 전하고 싶은 메시지나 의견이 있으시면 적어주세요." });
+    list.push({ id: "q9", type: "qual", text: "세션을 마무리하며 가장 도움이 되었던 점은 무엇입니까?" });
+    list.push({ id: "q10", type: "qual", text: "운영진이나 회사에 전하고 싶은 메시지나 의견이 있으시면 적어주세요." });
   }
   return list;
 }
@@ -163,6 +163,8 @@ const blankState = () => ({
   draftYear: new Date().getFullYear(),
   duplicateSessionWarning: null,
   qualAnswersGroupBy: 'question',
+  collapsedSessionTypeGroups: [],
+  collapsedAnalyticsSections: [],
   editingSurveyId: null,
   uploadRows: [],
   uploadErrors: [],
@@ -239,7 +241,7 @@ function saveState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed, collapsedSurveyIds,
+    qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseDeptId, pulseLayer, pulseYear
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
@@ -251,7 +253,7 @@ function saveState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed, collapsedSurveyIds,
+    qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseDeptId, pulseLayer, pulseYear
   }));
 }
@@ -318,13 +320,15 @@ function sessionsByTypeGrouped() {
   return Object.keys(SESSION_TYPES).map((type) => {
     const group = sorted.filter((s) => s.type === type);
     if (!group.length) return "";
+    const collapsed = (state.collapsedSessionTypeGroups || []).includes(type);
     return `
       <div class="session-type-group">
-        <div class="session-type-group-head" style="--accent:${SESSION_TYPES[type].accent}">
+        <button type="button" class="session-type-group-head" style="--accent:${SESSION_TYPES[type].accent}" onclick="toggleSessionTypeGroup('${type}')">
+          <span class="session-type-group-chevron">${collapsed ? "▸" : "▾"}</span>
           <strong>${escapeHtml(type)}</strong>
           <span>${group.length}개</span>
-        </div>
-        ${group.map(sessionCard).join("")}
+        </button>
+        ${collapsed ? "" : `<div class="session-card-grid">${group.map(sessionCard).join("")}</div>`}
       </div>
     `;
   }).join("");
@@ -2195,8 +2199,13 @@ function renderAnalytics() {
       </section>
 
       <section>
-        ${sectionTitle("정성 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`)}
-        ${renderQualSection(cohort, type, sessionId)}
+        ${collapsibleSectionHeader("정량 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`, "quant")}
+        ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session)}
+      </section>
+
+      <section>
+        ${collapsibleSectionHeader("정성 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`, "qual")}
+        ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId)}
       </section>`;
     })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
   `;
@@ -2571,6 +2580,34 @@ function sectionTitle(title, meta = "") {
   return `<div class="section-title"><h2>${title}</h2><span>${meta}</span></div>`;
 }
 
+function isAnalyticsSectionCollapsed(key) {
+  return (state.collapsedAnalyticsSections || []).includes(key);
+}
+
+function collapsibleSectionHeader(title, meta, key) {
+  const collapsed = isAnalyticsSectionCollapsed(key);
+  return `
+    <button type="button" class="section-title section-title-toggle" onclick="toggleAnalyticsSection('${key}')">
+      <h2><span class="section-title-chevron">${collapsed ? "▸" : "▾"}</span>${title}</h2>
+      <span>${meta}</span>
+    </button>
+  `;
+}
+
+function renderQuantSection(sessionId, session) {
+  if (!session) return emptyCard("선택된 세션이 없습니다.");
+  const surveys = PHASES
+    .map((phase) => (state.surveys || []).find((s) => s.sessionId === sessionId && s.phase === phase))
+    .filter(Boolean);
+  if (!surveys.length) return emptyCard("배포된 설문이 없습니다.");
+  return `<div style="display:flex; flex-direction:column; gap:20px;">${surveys.map((survey) => `
+    <div>
+      <div class="qual-group-head" style="margin-bottom:8px;"><strong>${escapeHtml(survey.phase)}</strong><span>${escapeHtml(survey.title)}</span></div>
+      ${renderSurveyResponsePanel(survey, session)}
+    </div>
+  `).join("")}</div>`;
+}
+
 function emptyCard(text, tone = "") {
   return `<div class="empty ${tone}">${text}</div>`;
 }
@@ -2781,21 +2818,30 @@ function qualResponseRows(cohort, type, sessionId = "") {
   const sessionIds = new Set(sessionId
     ? [sessionId]
     : (state.sessions || []).filter((s) => s.type === type).map((s) => s.id));
-  const relevantSurveys = (state.surveys || []).filter(s => sessionIds.has(s.sessionId) || Number(s.sessionCohort) === cohortNum);
+  // Same cohort number can be shared by a 팀빌딩 session and a 팀장 session at once — always
+  // require the survey's own sessionType to match, so the two never get pooled together.
+  const relevantSurveys = (state.surveys || []).filter(s =>
+    sessionIds.has(s.sessionId) || (Number(s.sessionCohort) === cohortNum && s.sessionType === type)
+  );
   const configuredQualIds = [...new Set(relevantSurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
   // Trust each survey's own question type (so a 5점 척도 question placed at q9/q10/q11 never
   // leaks into 정성 응답). Only fall back to the legacy q9~q11 guess when none of the matched
   // surveys have any question config at all — e.g. orphaned CSV-only data with no survey doc.
   const hasExplicitConfig = relevantSurveys.some(s => (s.questions || []).length > 0);
   const qualIds = hasExplicitConfig ? configuredQualIds : ['q9', 'q10', 'q11'];
-  // Match by sessionId first, fall back to cohort-only
+  // Match by sessionId first.
   let rows = (state.responses || []).filter(r =>
     r.cohort === cohortNum && sessionIds.has(r.sessionId) && qualIds.some(id => r[id])
   );
+  // Fallback for orphaned rows whose sessionId no longer matches any session (e.g. CSV upload
+  // with a stale id) — only keep them if their linked survey confirms the same session type,
+  // so a 팀빌딩 1기 response never shows up under 팀장 1기 just because the cohort number matches.
   if (!rows.length && !sessionId) {
-    rows = (state.responses || []).filter(r =>
-      r.cohort === cohortNum && qualIds.some(id => r[id])
-    );
+    rows = (state.responses || []).filter(r => {
+      if (r.cohort !== cohortNum || !qualIds.some(id => r[id])) return false;
+      const survey = (state.surveys || []).find(s => s.id === r.surveyId);
+      return Boolean(survey && survey.sessionType === type);
+    });
   }
   return { qualIds, rows };
 }
@@ -4050,6 +4096,24 @@ window.resetSurveyResponses = function(id) {
   Promise.all(rows.map(r => deleteResponseFromFirestore(r.id))).catch(e => console.error('Firestore 응답 삭제 실패:', e));
 };
 
+window.toggleAnalyticsSection = function(key) {
+  state.collapsedAnalyticsSections = state.collapsedAnalyticsSections || [];
+  const idx = state.collapsedAnalyticsSections.indexOf(key);
+  if (idx >= 0) state.collapsedAnalyticsSections.splice(idx, 1);
+  else state.collapsedAnalyticsSections.push(key);
+  saveState();
+  render();
+};
+
+window.toggleSessionTypeGroup = function(type) {
+  state.collapsedSessionTypeGroups = state.collapsedSessionTypeGroups || [];
+  const idx = state.collapsedSessionTypeGroups.indexOf(type);
+  if (idx >= 0) state.collapsedSessionTypeGroups.splice(idx, 1);
+  else state.collapsedSessionTypeGroups.push(type);
+  saveState();
+  render();
+};
+
 window.toggleSurveyCard = function(id) {
   state.collapsedSurveyIds = state.collapsedSurveyIds || [];
   const idx = state.collapsedSurveyIds.indexOf(id);
@@ -4374,10 +4438,11 @@ function buildQualPrompt(cohort, type, sessionId = "") {
   );
   const selectedSession = (state.sessions || []).find((session) => session.id === sessionId);
 
-  // Collect all surveys relevant to this cohort (by sessionId or sessionCohort)
+  // Collect all surveys relevant to this cohort (by sessionId, or by sessionCohort + sessionType
+  // so a different session type sharing the same cohort number is never pulled in).
   const relevantSurveys = (state.surveys || []).filter(s =>
     sessionIds.has(s.sessionId) ||
-    Number(s.sessionCohort) === cohortNum
+    (Number(s.sessionCohort) === cohortNum && s.sessionType === type)
   );
 
   // Trust each survey's own question type — only fall back to the legacy q9~q11 guess when
@@ -4407,9 +4472,14 @@ function buildQualPrompt(cohort, type, sessionId = "") {
     let rows = (state.responses || []).filter(r =>
       r.cohort === cohortNum && r.phase === phase && sessionIds.has(r.sessionId)
     );
-    // Fallback: match by cohort + phase only (handles manually-uploaded CSVs with no sessionId match)
+    // Fallback for orphaned rows with a stale sessionId — only keep them if their linked survey
+    // confirms the same session type, so different types sharing a cohort number stay separate.
     if (!rows.length && !sessionId) {
-      rows = (state.responses || []).filter(r => r.cohort === cohortNum && r.phase === phase);
+      rows = (state.responses || []).filter(r => {
+        if (r.cohort !== cohortNum || r.phase !== phase) return false;
+        const survey = (state.surveys || []).find(s => s.id === r.surveyId);
+        return Boolean(survey && survey.sessionType === type);
+      });
     }
 
     const qualRows = rows.filter(r => qualIds.some(id => r[id] && String(r[id]).trim()));

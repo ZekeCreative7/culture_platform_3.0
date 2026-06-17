@@ -4009,27 +4009,6 @@ async function loadSurveysFromFirestore() {
   }
 }
 
-async function loadResponsesFromFirestore() {
-  try {
-    const snap = await getDocs(collection(db, 'responses'));
-    const firestoreResponses = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        ...data,
-        id: d.id,
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-      };
-    });
-    // Merge: Firestore responses take precedence; keep local-only entries not in Firestore
-    const firestoreIds = new Set(firestoreResponses.map(r => r.id));
-    const localOnly = (state.responses || []).filter(r => !firestoreIds.has(r.id));
-    state.responses = [...firestoreResponses, ...localOnly];
-    saveState();
-  } catch (e) {
-    console.error('Firestore 응답 로드 실패:', e);
-  }
-}
-
 async function loadSessionsFromFirestore() {
   try {
     const snap = await getDocs(collection(db, 'sessions'));
@@ -4246,9 +4225,9 @@ async function initApp() {
       }
       return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString() };
     });
-    const firestoreIds = new Set(firestoreResponses.map(r => r.id));
-    const localOnly = (state.responses || []).filter(r => !firestoreIds.has(r.id));
-    state.responses = [...firestoreResponses, ...localOnly];
+    // Firestore is authoritative — replacing (not merging) is what lets a deletion on one
+    // device (e.g. survey data reset) actually disappear on every other device.
+    state.responses = firestoreResponses;
     saveState();
     render();
   }, (err) => {

@@ -2760,13 +2760,13 @@ function qualResponseRows(cohort, type, sessionId = "") {
   const sessionIds = new Set(sessionId
     ? [sessionId]
     : (state.sessions || []).filter((s) => s.type === type).map((s) => s.id));
-  // Collect all qual question IDs from relevant surveys
-  const qualIds = [...new Set([
-    'q9', 'q10', 'q11',
-    ...(state.surveys || [])
-      .filter(s => sessionIds.has(s.sessionId) || Number(s.sessionCohort) === cohortNum)
-      .flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id))
-  ])];
+  const relevantSurveys = (state.surveys || []).filter(s => sessionIds.has(s.sessionId) || Number(s.sessionCohort) === cohortNum);
+  const configuredQualIds = [...new Set(relevantSurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
+  // Trust each survey's own question type (so a 5점 척도 question placed at q9/q10/q11 never
+  // leaks into 정성 응답). Only fall back to the legacy q9~q11 guess when none of the matched
+  // surveys have any question config at all — e.g. orphaned CSV-only data with no survey doc.
+  const hasExplicitConfig = relevantSurveys.some(s => (s.questions || []).length > 0);
+  const qualIds = hasExplicitConfig ? configuredQualIds : ['q9', 'q10', 'q11'];
   // Match by sessionId first, fall back to cohort-only
   let rows = (state.responses || []).filter(r =>
     r.cohort === cohortNum && sessionIds.has(r.sessionId) && qualIds.some(id => r[id])

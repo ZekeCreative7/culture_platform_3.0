@@ -164,6 +164,7 @@ const blankState = () => ({
   duplicateSessionWarning: null,
   showQualAnswersModal: null,
   qualAnswersGroupBy: 'question',
+  editingSurveyId: null,
   uploadRows: [],
   uploadErrors: [],
   uploadFileName: "",
@@ -1846,7 +1847,12 @@ function renderSurveyCreator() {
     <div class="workspace-grid">
       <!-- Left: Create Survey -->
       <div class="panel">
-        <h3>새 설문 조사 설계</h3>
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h3>${state.editingSurveyId ? '설문 수정' : '새 설문 조사 설계'}</h3>
+          ${state.editingSurveyId ? `
+            <span style="font-size:12px;color:#0ea5e9;font-weight:700;">✏️ 설문 수정 중</span>
+          ` : ''}
+        </div>
         <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
           <label>설문 제목
             <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 팀장 세션 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
@@ -1933,7 +1939,10 @@ function renderSurveyCreator() {
             </div>
           </div>
 
-          <button class="primary" id="btn-create-survey-submit">배포 및 QR 생성</button>
+          <div style="display:flex; gap:8px;">
+            ${state.editingSurveyId ? `<button class="ghost" id="cancel-edit-survey" type="button">취소</button>` : ''}
+            <button class="primary" id="btn-create-survey-submit" style="flex:1;">${state.editingSurveyId ? '수정 완료' : '배포 및 QR 생성'}</button>
+          </div>
         </div>
       </div>
 
@@ -1980,6 +1989,7 @@ function renderSurveyCreator() {
                     <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.title)}</strong>
                     <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${escapeHtml(sessLabel)} · ${escapeHtml(s.phase)} · 대상 ${collapsedTarget || "-"}명 · 응답 ${collapsedRows.length}건${s.googleFormUrl ? ' · 구글 폼' : ''}</span>
                   </div>
+                  <button onclick="startEditSurvey('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--blue-mid); cursor:pointer; white-space:nowrap; flex-shrink:0;">수정</button>
                   <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; flex-shrink:0;">펼치기 ▾</button>
                   <button class="delete-survey-btn" onclick="deleteSurvey('${s.id}')" style="position:static; margin-left:0;">&times;</button>
                 </div>
@@ -1994,6 +2004,7 @@ function renderSurveyCreator() {
                     <span>${escapeHtml(sessLabel)} [${escapeHtml(s.phase)}]${s.googleFormUrl ? ' · <span style="color:#0ea5e9;font-weight:800;">구글 폼</span>' : ''}</span>
                   </div>
                   <div style="display:flex; gap:6px; flex-shrink:0;">
+                    <button onclick="startEditSurvey('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--blue-mid); cursor:pointer;">수정</button>
                     <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--muted); cursor:pointer;">접기 ▴</button>
                     <button class="delete-survey-btn" onclick="deleteSurvey('${s.id}')" style="position:static; margin-left:0;">&times;</button>
                   </div>
@@ -3189,7 +3200,7 @@ function bindSessions() {
     if (!state.surveys) state.surveys = [];
 
     const sess = (state.sessions || []).find(s => s.id === sessionId);
-    const newSurvey = {
+    const surveyData = {
       title,
       sessionId,
       phase,
@@ -3199,9 +3210,25 @@ function bindSessions() {
       questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
     };
 
+    if (state.editingSurveyId) {
+      const idx = state.surveys.findIndex(s => s.id === state.editingSurveyId);
+      const editedId = state.editingSurveyId;
+      if (idx >= 0) state.surveys[idx] = { ...state.surveys[idx], ...surveyData };
+      state.editingSurveyId = null;
+      state.draftSurveyTitle = "";
+      state.draftGoogleFormUrl = "";
+      state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+      saveState();
+      render();
+      updateSurveyInFirestore(editedId, surveyData).catch(e => {
+        alert('설문 수정 저장 실패: ' + e.message);
+      });
+      return;
+    }
+
     // Save to Firestore, use returned doc ID
-    saveSurveyToFirestore(newSurvey).then(firestoreId => {
-      state.surveys.push({ ...newSurvey, id: firestoreId });
+    saveSurveyToFirestore(surveyData).then(firestoreId => {
+      state.surveys.push({ ...surveyData, id: firestoreId });
       state.draftSurveyTitle = "";
       state.draftGoogleFormUrl = "";
       state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
@@ -3210,6 +3237,14 @@ function bindSessions() {
     }).catch(e => {
       alert('설문 저장 실패: ' + e.message);
     });
+  });
+  document.querySelector("#cancel-edit-survey")?.addEventListener("click", () => {
+    state.editingSurveyId = null;
+    state.draftSurveyTitle = "";
+    state.draftGoogleFormUrl = "";
+    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+    saveState();
+    render();
   });
 
   const typeSelect = document.querySelector("#session-type");
@@ -4022,6 +4057,22 @@ window.deleteSurvey = function(id) {
   deleteSurveyFromFirestore(id).catch(e => console.error('Firestore 삭제 실패:', e));
 };
 
+window.startEditSurvey = function(id) {
+  const survey = (state.surveys || []).find(s => s.id === id);
+  if (!survey) return;
+  state.editingSurveyId = id;
+  state.draftSurveyTitle = survey.title || '';
+  state.draftSurveySessionId = survey.sessionId || '';
+  state.draftSurveyPhase = survey.phase || '사전';
+  state.draftGoogleFormUrl = survey.googleFormUrl || '';
+  state.draftSurveyQuestions = survey.questions && survey.questions.length
+    ? JSON.parse(JSON.stringify(survey.questions))
+    : defaultQuestions(survey.phase || '사전');
+  saveState();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
 window.resetSurveyResponses = function(id) {
   const survey = (state.surveys || []).find(s => s.id === id);
   if (!survey) return;
@@ -4124,6 +4175,10 @@ async function saveSurveyToFirestore(survey) {
 
 async function deleteSurveyFromFirestore(id) {
   await deleteDoc(doc(db, 'surveys', id));
+}
+
+async function updateSurveyInFirestore(id, data) {
+  await setDoc(doc(db, 'surveys', id), { ...data, updatedAt: serverTimestamp() });
 }
 
 async function loadPulseYears(years = PULSE_YEARS) {

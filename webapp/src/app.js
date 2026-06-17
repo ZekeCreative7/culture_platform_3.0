@@ -162,7 +162,6 @@ const blankState = () => ({
   draftCohort: 1,
   draftYear: new Date().getFullYear(),
   duplicateSessionWarning: null,
-  showQualAnswersModal: null,
   qualAnswersGroupBy: 'question',
   editingSurveyId: null,
   uploadRows: [],
@@ -2196,17 +2195,10 @@ function renderAnalytics() {
       </section>
 
       <section>
-        <div class="section-title">
-          <h2>정성 응답</h2>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span>${session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`}</span>
-            <button class="ghost compact" type="button" id="open-qual-answers">전체보기</button>
-          </div>
-        </div>
-        ${renderQualitative(cohort, type, sessionId)}
+        ${sectionTitle("정성 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`)}
+        ${renderQualSection(cohort, type, sessionId)}
       </section>`;
     })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
-    ${state.showQualAnswersModal ? renderQualAnswersModal() : ""}
   `;
 }
 
@@ -2818,15 +2810,6 @@ function qualQuestionLabel(qid, type) {
   return qid;
 }
 
-function renderQualitative(cohort, type, sessionId = "") {
-  const { qualIds, rows } = qualResponseRows(cohort, type, sessionId);
-  if (!rows.length) return emptyCard("정성 응답이 없습니다.");
-  return `<div class="quote-grid">${rows.slice(0, 8).map((row) => {
-    const answer = qualIds.map(id => row[id]).filter(Boolean)[0] || '';
-    return `<article><span>${row.phase || ''}</span><p>${escapeHtml(answer)}</p></article>`;
-  }).join("")}</div>`;
-}
-
 function renderQualByQuestion(rows, qualIds, type, showPhase) {
   return qualIds.map((id) => {
     const answers = rows.filter((r) => r[id]).map((r) => ({ phase: r.phase || '', answer: r[id] }));
@@ -2864,14 +2847,8 @@ function renderQualByPerson(rows, qualIds, type, showPhase) {
   }).join("");
 }
 
-function renderQualAnswersModal() {
-  const ctx = state.showQualAnswersModal;
-  if (!ctx) return "";
-  const { cohort, type, sessionId } = ctx;
-  const session = sessionId ? state.sessions.find(s => s.id === sessionId) : null;
+function renderQualSection(cohort, type, sessionId = "") {
   const { qualIds, rows } = qualResponseRows(cohort, type, sessionId);
-  const yearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
-  const title = session ? sessionLabel(session) : `${yearLabel}${cohort}기`;
   const phases = [...new Set(rows.map((r) => r.phase).filter(Boolean))];
   const singlePhase = phases.length === 1 ? phases[0] : '';
   const showPhase = !singlePhase;
@@ -2881,29 +2858,15 @@ function renderQualAnswersModal() {
     ? renderQualByPerson(rows, qualIds, type, showPhase)
     : renderQualByQuestion(rows, qualIds, type, showPhase);
   return `
-    <div class="modal-overlay">
-      <div class="modal-card" style="max-width:680px; width:96%;">
-        <div class="modal-header">
-          <div>
-            <h2>주관식 응답 전체보기 — ${escapeHtml(String(title))}</h2>
-            ${singlePhase ? `<span class="muted" style="font-size:12px;">${escapeHtml(singlePhase)} 설문</span>` : ''}
-          </div>
-          <button type="button" class="close-btn" id="close-qual-answers">&times;</button>
-        </div>
-        <div class="qual-answers-toolbar">
-          <div class="pulse-segmented" aria-label="보기 방식">
-            <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question">문항별</button>
-            <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person">같은 사람별</button>
-          </div>
-        </div>
-        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px; max-height:64vh; overflow-y:auto;">
-          ${totalAnswers ? body : emptyCard("정성 응답이 없습니다.")}
-        </div>
-        <div class="modal-footer" style="justify-content:space-between;">
-          <span class="muted" style="font-size:12px;">총 ${totalAnswers}건</span>
-          <button class="secondary" type="button" id="close-qual-answers-footer">닫기</button>
-        </div>
+    <div class="qual-section-toolbar">
+      <span class="muted" style="font-size:12px;">${singlePhase ? `${escapeHtml(singlePhase)} 설문 · ` : ''}총 ${totalAnswers}건</span>
+      <div class="pulse-segmented" aria-label="보기 방식">
+        <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question">문항별</button>
+        <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person">같은 사람별</button>
       </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:16px; margin-top:14px;">
+      ${totalAnswers ? body : emptyCard("정성 응답이 없습니다.")}
     </div>
   `;
 }
@@ -3634,22 +3597,6 @@ function bindReport() {
     render();
   });
 
-  document.querySelector("#open-qual-answers")?.addEventListener("click", () => {
-    const cohort = state.selectedAnalyticsCohort;
-    const sessionId = state.selectedAnalyticsSessionId;
-    const session = (state.sessions || []).find((item) => item.id === sessionId);
-    const type = session?.type || state.selectedAnalyticsType || "팀장";
-    state.showQualAnswersModal = { cohort, type, sessionId };
-    render();
-  });
-  document.querySelector("#close-qual-answers")?.addEventListener("click", () => {
-    state.showQualAnswersModal = null;
-    render();
-  });
-  document.querySelector("#close-qual-answers-footer")?.addEventListener("click", () => {
-    state.showQualAnswersModal = null;
-    render();
-  });
   document.querySelectorAll("[data-qual-groupby]").forEach((button) => {
     button.addEventListener("click", () => {
       state.qualAnswersGroupBy = button.dataset.qualGroupby;

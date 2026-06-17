@@ -1794,7 +1794,10 @@ function renderSurveyResponsePanel(survey, session) {
           <strong>${target ? `${target}명 대상 · ${answered}건 응답` : `${answered}건 응답`}</strong>
           <span>${target ? `진행률 ${rate}%${answered > target ? " · 중복/재제출 포함" : ""}` : "대상 인원은 세션 구성원 등록 후 표시"}</span>
         </div>
-        <b>${answered}</b>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <b>${answered}</b>
+          <button class="ghost compact" style="font-size:11px; color:#ef4444; border-color:#fecaca;" onclick="resetSurveyResponses('${survey.id}')" ${answered ? "" : "disabled"}>데이터 리셋</button>
+        </div>
       </div>
       ${target ? `
         <div class="survey-progress"><i style="width:${rate}%"></i></div>
@@ -3966,6 +3969,19 @@ window.deleteSurvey = function(id) {
   deleteSurveyFromFirestore(id).catch(e => console.error('Firestore 삭제 실패:', e));
 };
 
+window.resetSurveyResponses = function(id) {
+  const survey = (state.surveys || []).find(s => s.id === id);
+  if (!survey) return;
+  const rows = surveyRows(survey);
+  if (!rows.length) { alert('리셋할 응답 데이터가 없습니다.'); return; }
+  if (!confirm(`"${survey.title}" 설문의 응답 ${rows.length}건을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  const removedIds = new Set(rows.map(r => r.id));
+  state.responses = (state.responses || []).filter(r => !removedIds.has(r.id));
+  saveState();
+  render();
+  Promise.all(rows.map(r => deleteResponseFromFirestore(r.id))).catch(e => console.error('Firestore 응답 삭제 실패:', e));
+};
+
 window.toggleSurveyCard = function(id) {
   state.collapsedSurveyIds = state.collapsedSurveyIds || [];
   const idx = state.collapsedSurveyIds.indexOf(id);
@@ -4047,6 +4063,14 @@ async function deleteSessionFromFirestore(id) {
     await deleteDoc(doc(db, 'sessions', id));
   } catch (e) {
     console.error('Firestore 세션 삭제 실패:', e);
+  }
+}
+
+async function deleteResponseFromFirestore(id) {
+  try {
+    await deleteDoc(doc(db, 'responses', id));
+  } catch (e) {
+    console.error('Firestore 응답 삭제 실패:', e);
   }
 }
 

@@ -15,26 +15,33 @@ const QUANT_LABELS = {
 };
 const SESSION_TYPES = {
   팀빌딩: {
+    english: "Teambuilding",
     weeks: 8,
     accent: "#0071e3",
     desc: "특정 팀의 팀장과 팀원이 함께 참여합니다.",
     template: ["WOW세션", "명상세션", "커뮤니케이션세션", "간담회", "파트너요가", "에너지회복"],
     duration: 60,
   },
-  팀장: {
+  리더십: {
+    english: "Leadership",
     weeks: 4,
     accent: "#138a66",
-    desc: "협업이 필요한 팀장 그룹을 운영합니다.",
+    desc: "협업이 필요한 리더십 그룹을 운영합니다.",
     template: ["웰니스 + WOW세션", "웰니스 + WOW세션", "웰니스 + WOW세션", "웰니스 + WOW세션"],
     duration: 120,
   },
-  크로스펑셔널: {
+  협업: {
+    english: "Collaboration",
     weeks: 6,
     accent: "#b86e00",
-    desc: "팀장 세션에서 차출된 구성원이 실행 과제를 다룹니다.",
-    template: Array(6).fill("크로스펑셔널 세션"),
+    desc: "여러 팀에서 모인 구성원이 실행 과제를 다룹니다.",
+    template: Array(6).fill("협업 세션"),
     duration: 120,
   },
+};
+const SESSION_TYPE_ALIASES = {
+  팀장: "리더십",
+  크로스펑셔널: "협업",
 };
 const POSITION_OPTIONS = ["사장", "부사장", "부문장", "본부장", "이사", "부장", "차장", "과장", "대리", "사원"];
 const POSITION_ALIASES = {
@@ -119,6 +126,16 @@ const addWeeks = (date, weeks) => {
 const uid = () => Math.floor(Date.now() + Math.random() * 100000).toString(36);
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const normalizeSessionType = (value) => {
+  const clean = String(value || "").trim();
+  return SESSION_TYPE_ALIASES[clean] || (SESSION_TYPES[clean] ? clean : "리더십");
+};
+const sessionTypeLabel = (value) => {
+  const type = normalizeSessionType(value);
+  return `${type} (${SESSION_TYPES[type].english})`;
+};
+const sessionTypeDef = (value) => SESSION_TYPES[normalizeSessionType(value)] || SESSION_TYPES.리더십;
+const sameSessionType = (a, b) => normalizeSessionType(a) === normalizeSessionType(b);
 const normalizePosition = (value, fallback = "사원") => {
   const clean = String(value || "").trim();
   if (!clean) return fallback;
@@ -157,8 +174,8 @@ const blankState = () => ({
   activeView: "dashboard",
   sessions: [],
   responses: [],
-  draftType: "팀장",
-  draftSchedule: makeSchedule("팀장"),
+  draftType: "리더십",
+  draftSchedule: makeSchedule("리더십"),
   draftCohort: 1,
   draftYear: new Date().getFullYear(),
   duplicateSessionWarning: null,
@@ -190,10 +207,10 @@ const blankState = () => ({
     ? 'https://zekecreative7.github.io/culture_platform_3.0/webapp'
     : new URL('.', window.location.href).href.replace(/\/$/, ''),
   selectedAnalyticsCohort: "",
-  selectedAnalyticsType: "팀장",
+  selectedAnalyticsType: "리더십",
   selectedAnalyticsSessionId: "",
   selectedReportCohort: "",
-  selectedReportType: "팀장",
+  selectedReportType: "리더십",
   selectedReportSessionId: "",
   mobileNavOpen: false,
   draftDivisionId: "",
@@ -223,15 +240,16 @@ function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY));
     if (saved && Array.isArray(saved.sessions) && Array.isArray(saved.responses)) {
-      return { ...blankState(), ...saved, uploadRows: [], uploadErrors: [] };
+      return normalizeAppState({ ...blankState(), ...saved, uploadRows: [], uploadErrors: [] });
     }
   } catch {
     // Ignore broken local data and start clean.
   }
-  return blankState();
+  return normalizeAppState(blankState());
 }
 
 function saveState() {
+  normalizeAppState(state);
   const { 
     activeView, sessions, responses, draftType, draftSchedule, draftCohort, draftYear,
     orgUnits, orgMembers, surveys,
@@ -259,14 +277,16 @@ function saveState() {
 }
 
 function makeSchedule(type) {
+  const sessionType = normalizeSessionType(type);
+  const config = sessionTypeDef(sessionType);
   const base = todayISO();
-  return SESSION_TYPES[type].template.map((content, index) => ({
+  return config.template.map((content, index) => ({
     id: uid(),
     seq: index + 1,
     confirmed: index < 2,
     date: addWeeks(base, index),
     startTime: "10:00",
-    duration: SESSION_TYPES[type].duration,
+    duration: config.duration,
     content,
     note: "",
     status: index < 2 ? "confirmed" : "planned",
@@ -274,22 +294,30 @@ function makeSchedule(type) {
   }));
 }
 
+function sessionYear(session) {
+  const explicit = Number(session?.year);
+  if (explicit) return explicit;
+  const firstDate = sessionStartDate(session);
+  if (firstDate) return Number(firstDate.slice(0, 4));
+  const createdYear = session?.createdAt ? Number(String(session.createdAt).slice(0, 4)) : 0;
+  return createdYear || new Date().getFullYear();
+}
+
 function cohortPrefix(session) {
-  return session.year ? `${session.year}년 ${session.cohort}기` : `${session.cohort}기`;
+  return `${sessionYear(session)}년 ${Number(session?.cohort || 1)}기`;
 }
 
 function sessionLabel(session) {
   if (!session) return "";
-  if (session.type === "팀빌딩") return `${cohortPrefix(session)} · ${session.team || "팀 미지정"}`;
-  if (session.type === "팀장") return `${cohortPrefix(session)} · ${session.participatingTeams || session.hq || "팀장 그룹"}`;
-  if (session.type === "크로스펑셔널" && session.sourceMode === "random") return `${cohortPrefix(session)} · 무작위 크로스펑셔널`;
-  return `${cohortPrefix(session)} · 크로스펑셔널`;
+  const type = normalizeSessionType(session.type);
+  if (type === "팀빌딩") return `${cohortPrefix(session)} · ${session.team || "팀 미지정"}`;
+  return cohortPrefix(session);
 }
 
 function yearForCohort(cohort) {
   const cohortNum = Number(cohort);
-  const match = (state.sessions || []).find((session) => Number(session.cohort) === cohortNum && session.year);
-  return match ? match.year : "";
+  const match = (state.sessions || []).find((session) => Number(session.cohort) === cohortNum);
+  return match ? sessionYear(match) : "";
 }
 
 function hasRoundPassed(item) {
@@ -302,6 +330,31 @@ function hasRoundPassed(item) {
 function sessionStartDate(session) {
   const dates = (session.schedule || []).map((item) => item.date).filter(Boolean);
   return dates.length ? dates.sort()[0] : null;
+}
+
+function normalizeSessionRecord(session) {
+  if (!session) return session;
+  const type = normalizeSessionType(session.type);
+  return {
+    ...session,
+    type,
+    year: sessionYear({ ...session, type }),
+    targetWeeks: session.targetWeeks || sessionTypeDef(type).weeks,
+  };
+}
+
+function normalizeAppState(nextState) {
+  nextState.sessions = (nextState.sessions || []).map(normalizeSessionRecord);
+  nextState.surveys = (nextState.surveys || []).map((survey) => ({
+    ...survey,
+    sessionType: survey.sessionType ? normalizeSessionType(survey.sessionType) : survey.sessionType,
+  }));
+  nextState.draftType = normalizeSessionType(nextState.draftType);
+  nextState.selectedAnalyticsType = normalizeSessionType(nextState.selectedAnalyticsType);
+  nextState.selectedReportType = normalizeSessionType(nextState.selectedReportType);
+  if (!nextState.draftYear) nextState.draftYear = new Date().getFullYear();
+  if (!nextState.draftSchedule?.length) nextState.draftSchedule = makeSchedule(nextState.draftType);
+  return nextState;
 }
 
 function sessionsSortedByStart() {
@@ -318,14 +371,14 @@ function sessionsSortedByStart() {
 function sessionsByTypeGrouped() {
   const sorted = sessionsSortedByStart();
   return Object.keys(SESSION_TYPES).map((type) => {
-    const group = sorted.filter((s) => s.type === type);
+    const group = sorted.filter((s) => sameSessionType(s.type, type));
     if (!group.length) return "";
     const collapsed = (state.collapsedSessionTypeGroups || []).includes(type);
     return `
       <div class="session-type-group">
         <button type="button" class="session-type-group-head" style="--accent:${SESSION_TYPES[type].accent}" onclick="toggleSessionTypeGroup('${type}')">
           <span class="session-type-group-chevron">${collapsed ? "▸" : "▾"}</span>
-          <strong>${escapeHtml(type)}</strong>
+          <strong>${escapeHtml(sessionTypeLabel(type))}</strong>
           <span>${group.length}개</span>
         </button>
         ${collapsed ? "" : `<div class="session-card-grid">${group.map(sessionCard).join("")}</div>`}
@@ -351,7 +404,7 @@ function phasesForSession(sessionId) {
 }
 
 function getQuestionsForCohort(cohort, type) {
-  const sessionIds = state.sessions.filter(s => s.type === type && s.cohort === Number(cohort)).map(s => s.id);
+  const sessionIds = state.sessions.filter(s => sameSessionType(s.type, type) && s.cohort === Number(cohort)).map(s => s.id);
   const survey = state.surveys.find(s => sessionIds.includes(s.sessionId));
   if (survey && survey.questions && survey.questions.length > 0) {
     return survey.questions.filter(q => q.type === "quant");
@@ -410,7 +463,7 @@ function ensureScopedSelection(kind, cohorts = allCohorts()) {
 function scopedSessionOptions(cohort, selectedSessionId = "") {
   const sessions = sessionsForCohort(cohort);
   return sessions.length
-    ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</option>`).join("")
+    ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</option>`).join("")
     : `<option value="">선택 가능한 세션 없음</option>`;
 }
 
@@ -648,7 +701,7 @@ function allMemberCandidates(includeLeaders = false) {
 }
 
 function leaderSessions() {
-  return state.sessions.filter((session) => session.type === "팀장" && Array.isArray(session.leaderGroup) && session.leaderGroup.length);
+  return state.sessions.filter((session) => sameSessionType(session.type, "리더십") && Array.isArray(session.leaderGroup) && session.leaderGroup.length);
 }
 
 function selectedLeaderSession() {
@@ -723,11 +776,11 @@ function applyLeaderSelection(unit, selectValue) {
   unit.leaderRole = UNIT_LEADER_LABELS[unit.level] || "리더";
 }
 
-function statsForCohort(cohort, type = "팀장") {
+function statsForCohort(cohort, type = "리더십") {
   const dynamicQuestions = getQuestionsForCohort(cohort, type);
   return PHASES.map((phase) => {
     const rows = state.responses.filter((row) => row.cohort === Number(cohort) && row.phase === phase);
-    const sessionIds = new Set(state.sessions.filter((s) => s.type === type).map((s) => s.id));
+    const sessionIds = new Set(state.sessions.filter((s) => sameSessionType(s.type, type)).map((s) => s.id));
     const scoped = rows.filter((row) => sessionIds.has(row.sessionId));
     const stats = { phase, n: scoped.length };
     dynamicQuestions.forEach((q) => {
@@ -1043,21 +1096,21 @@ function renderLeaderSessionPanel(divisionList, hqList, teamList) {
   const group = state.draftLeaderGroup || [];
   const alreadyAdded = leader && group.some((item) => item.teamId === leader.teamId);
   return `
-    <div class="session-config-panel">
-      <div class="session-config-head">
-        <strong>팀장 그룹 구성</strong>
-        <span>부문/본부/팀을 선택하고 팀장을 추가합니다. 권장 인원은 6명입니다.</span>
+      <div class="session-config-panel">
+        <div class="session-config-head">
+        <strong>리더십 그룹 구성</strong>
+        <span>부문/본부/팀을 선택하고 리더를 추가합니다. 권장 인원은 6명입니다.</span>
       </div>
       ${renderOrgSelectRow(divisionList, hqList, teamList)}
       <div class="session-picker-actions">
         <div>
-          <strong>${leader ? `${escapeHtml(leader.name)} · ${escapeHtml(leader.teamName)}` : "팀장을 선택해 주세요"}</strong>
+          <strong>${leader ? `${escapeHtml(leader.name)} · ${escapeHtml(leader.teamName)}` : "리더를 선택해 주세요"}</strong>
           <span>${leader ? `${escapeHtml(leader.divisionName)} > ${escapeHtml(leader.hqName)}` : "팀에 등록된 팀장 정보가 있어야 추가할 수 있습니다."}</span>
         </div>
-        <button type="button" class="primary compact" id="add-team-leader" ${!leader || alreadyAdded ? "disabled" : ""}>팀장 추가</button>
+        <button type="button" class="primary compact" id="add-team-leader" ${!leader || alreadyAdded ? "disabled" : ""}>리더 추가</button>
       </div>
       <div class="selection-summary">
-        <strong>선택된 팀장 ${group.length}명</strong>
+        <strong>선택된 리더 ${group.length}명</strong>
         <span>${group.length < 6 ? `권장 인원까지 ${6 - group.length}명 남음` : "권장 인원 충족"}</span>
       </div>
       ${group.length ? `
@@ -1068,11 +1121,11 @@ function renderLeaderSessionPanel(divisionList, hqList, teamList) {
                 <strong>${escapeHtml(item.name)}</strong>
                 <span>${escapeHtml(item.teamName)} · ${escapeHtml(item.position || "팀장")}</span>
               </div>
-              <button type="button" data-remove-leader="${escapeHtml(item.teamId)}" aria-label="팀장 제거">삭제</button>
+              <button type="button" data-remove-leader="${escapeHtml(item.teamId)}" aria-label="리더 제거">삭제</button>
             </div>
           `).join("")}
         </div>
-      ` : `<div class="empty compact">아직 추가된 팀장이 없습니다.</div>`}
+      ` : `<div class="empty compact">아직 추가된 리더가 없습니다.</div>`}
     </div>
   `;
 }
@@ -1085,15 +1138,15 @@ function renderCrossFunctionalPanel() {
   const memberPool = crossMemberPool();
   const selectedMembers = selectedCrossMembers();
   return `
-    <div class="session-config-panel">
-      <div class="session-config-head">
-        <strong>크로스펑셔널 그룹 구성</strong>
-        <span>팀장 세션의 추천 흐름을 쓰거나, 팀장 세션 없이 전체 조직에서 무작위로 구성합니다.</span>
+      <div class="session-config-panel">
+        <div class="session-config-head">
+        <strong>협업 그룹 구성</strong>
+        <span>리더십 세션의 추천 흐름을 쓰거나, 리더십 세션 없이 전체 조직에서 무작위로 구성합니다.</span>
       </div>
       <div class="mode-switch">
         <label class="${mode === "leader-session" ? "active" : ""}">
           <input type="radio" name="cross-mode" value="leader-session" ${mode === "leader-session" ? "checked" : ""} />
-          팀장 세션 기반
+          리더십 세션 기반
         </label>
         <label class="${mode === "random" ? "active" : ""}">
           <input type="radio" name="cross-mode" value="random" ${mode === "random" ? "checked" : ""} />
@@ -1102,9 +1155,9 @@ function renderCrossFunctionalPanel() {
       </div>
 
       ${mode === "leader-session" ? `
-        <label>기준 팀장 세션
+        <label>기준 리더십 세션
           <select id="cross-parent-session" ${sessions.length ? "" : "disabled"}>
-            ${sessions.length ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${parentSession?.id === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))} · ${session.leaderGroup.length}명</option>`).join("") : `<option value="">등록된 팀장 세션 없음</option>`}
+            ${sessions.length ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${parentSession?.id === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))} · ${session.leaderGroup.length}명</option>`).join("") : `<option value="">등록된 리더십 세션 없음</option>`}
           </select>
         </label>
         ${sourceTeams.length ? `
@@ -1120,7 +1173,7 @@ function renderCrossFunctionalPanel() {
               </label>
             `).join("")}
           </div>
-        ` : `<div class="empty compact">먼저 팀장 세션을 등록해야 추천 팀을 불러올 수 있습니다.</div>`}
+        ` : `<div class="empty compact">먼저 리더십 세션을 등록해야 추천 팀을 불러올 수 있습니다.</div>`}
         ${state.draftCrossTeamIds.length ? renderCrossMemberSelector(memberPool, selectedMembers) : ""}
       ` : `
         <div class="random-config-row">
@@ -1174,15 +1227,17 @@ function renderSelectedCrossMembers(selectedMembers) {
 }
 
 function renderSessionConfigPanel(divisionList, hqList, teamList) {
-  if (state.draftType === "팀빌딩") return renderTeamBuildingPanel(divisionList, hqList, teamList);
-  if (state.draftType === "팀장") return renderLeaderSessionPanel(divisionList, hqList, teamList);
+  const type = normalizeSessionType(state.draftType);
+  if (type === "팀빌딩") return renderTeamBuildingPanel(divisionList, hqList, teamList);
+  if (type === "리더십") return renderLeaderSessionPanel(divisionList, hqList, teamList);
   return renderCrossFunctionalPanel();
 }
 
 function canCreateDraftSession() {
-  if (state.draftType === "팀빌딩") return Boolean(state.draftTeamId);
-  if (state.draftType === "팀장") return Boolean((state.draftLeaderGroup || []).length);
-  if (state.draftType === "크로스펑셔널") return Boolean((state.draftCrossMemberIds || []).length);
+  const type = normalizeSessionType(state.draftType);
+  if (type === "팀빌딩") return Boolean(state.draftTeamId);
+  if (type === "리더십") return Boolean((state.draftLeaderGroup || []).length);
+  if (type === "협업") return Boolean((state.draftCrossMemberIds || []).length);
   return false;
 }
 
@@ -1202,7 +1257,7 @@ function renderSessions() {
           <div class="session-meta-row">
             <label>세션 유형
               <select id="session-type">
-                ${Object.keys(SESSION_TYPES).map((type) => `<option ${state.draftType === type ? "selected" : ""}>${type}</option>`).join("")}
+                ${Object.keys(SESSION_TYPES).map((type) => `<option value="${type}" ${normalizeSessionType(state.draftType) === type ? "selected" : ""}>${sessionTypeLabel(type)}</option>`).join("")}
               </select>
             </label>
             <label>기수<input id="cohort" type="number" min="1" value="${state.draftCohort}" /></label>
@@ -1212,8 +1267,8 @@ function renderSessions() {
         </div>
         <div class="schedule-head">
           <div>
-            <strong>${state.draftType}</strong>
-            <span>${SESSION_TYPES[state.draftType].desc}</span>
+            <strong>${sessionTypeLabel(state.draftType)}</strong>
+            <span>${sessionTypeDef(state.draftType).desc}</span>
           </div>
           <button class="secondary small" id="add-round">회차 추가</button>
         </div>
@@ -1586,8 +1641,9 @@ function renderMonthCalendar(year, month) {
         <span class="day-num">${day}</span>
         <div class="day-events">
           ${events.map(({ session, item }) => {
-            const accent = SESSION_TYPES[session.type].accent;
-            const label = session.type === "팀빌딩" ? session.team : (session.type === "팀장" ? (session.participatingTeams || session.hq) : "크펑");
+            const type = normalizeSessionType(session.type);
+            const accent = sessionTypeDef(type).accent;
+            const label = type === "팀빌딩" ? session.team : sessionLabel(session);
             return `
               <div class="calendar-event-pill" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
                 <strong>${item.seq}회</strong> ${escapeHtml(label)}
@@ -1640,13 +1696,13 @@ function renderWeekCalendar(anchorDate) {
         </div>
         <div class="week-day-events">
           ${events.length ? events.map(({ session, item }) => {
-            const accent = SESSION_TYPES[session.type].accent;
+            const accent = sessionTypeDef(session.type).accent;
             const label = sessionLabel(session);
             return `
               <div class="week-event-card" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
                 <div class="time-tag">${item.startTime} (${item.duration}분)</div>
                 <strong>${escapeHtml(item.content)} (${item.seq}회차)</strong>
-                <small>${escapeHtml(session.type)} · ${escapeHtml(label)}</small>
+                <small>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(label)}</small>
               </div>
             `;
           }).join("") : `<div class="no-events-placeholder">일정이 없습니다.</div>`}
@@ -1680,14 +1736,14 @@ function renderDayCalendar(anchorDate) {
       </div>
       <div class="day-events-list">
         ${events.length ? events.map(({ session, item }) => {
-          const accent = SESSION_TYPES[session.type].accent;
+          const accent = sessionTypeDef(session.type).accent;
           const label = sessionLabel(session);
           return `
             <div class="day-event-card" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
               <div class="event-time">${item.startTime} ~ ${addMinutes(item.startTime, item.duration)} (${item.duration}분)</div>
               <div class="event-info">
                 <h3>${escapeHtml(item.content)} (${item.seq}회차)</h3>
-                <p>${escapeHtml(session.type)} · ${escapeHtml(label)}</p>
+                <p>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(label)}</p>
                 ${item.note ? `<small>메모: ${escapeHtml(item.note)}</small>` : ""}
               </div>
               <div class="event-action-badge">상태: ${item.status === 'confirmed' ? '확정' : '예정'}</div>
@@ -1746,7 +1802,7 @@ function renderAttendanceModal() {
         </div>
         <div class="modal-body">
           <div class="attendance-meta">
-            <h3>${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</h3>
+            <h3>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</h3>
             <h4>${item.seq}회차: ${escapeHtml(item.content || "콘텐츠 미확정")}</h4>
             <p><strong>일시:</strong> ${item.date || "미정"} ${item.startTime} (${item.duration}분)</p>
           </div>
@@ -1875,7 +1931,7 @@ function renderSurveyCreator() {
         </div>
         <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
           <label>설문 제목
-            <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 팀장 세션 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
+            <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 리더십 세션 2026년 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
           </label>
           <label>대상 세션
             <select id="survey-session-select" onchange="updateSurveyDraftField('draftSurveySessionId', this.value)">
@@ -2070,7 +2126,7 @@ function renderUpload() {
         <div class="form-grid compact">
           <label>세션
             <select id="upload-session">
-              ${state.sessions.map((session) => `<option value="${session.id}">${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</option>`).join("")}
+              ${state.sessions.map((session) => `<option value="${session.id}">${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</option>`).join("")}
             </select>
           </label>
           <label>시점
@@ -2098,7 +2154,7 @@ function renderAnalytics() {
   const cohort = scope.cohort;
   const session = scope.session;
   const sessionId = session?.id || "";
-  const type = session?.type || state.selectedAnalyticsType || "팀장";
+  const type = normalizeSessionType(session?.type || state.selectedAnalyticsType || "리더십");
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
 
   return `
@@ -2115,9 +2171,9 @@ function renderAnalytics() {
         <label>대상 기수 선택
           <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics')">
             ${cohorts.length ? cohorts.map(c => {
-              const teamNames = [...new Set((state.sessions || []).filter(s => s.cohort === c).map(s => s.team || s.participatingTeams || '').filter(Boolean))].slice(0, 2).join(', ');
               const yearLabel = yearForCohort(c) ? `${yearForCohort(c)}년 ` : '';
-              return `<option value="${c}" ${cohort === c ? "selected" : ""}>${yearLabel}${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
+              const count = (state.sessions || []).filter(s => Number(s.cohort) === Number(c)).length;
+              return `<option value="${c}" ${cohort === c ? "selected" : ""}>${yearLabel}${c}기${count ? ` · ${count}개 세션` : ''}</option>`;
             }).join("") : `<option value="">응답 없음</option>`}
           </select>
         </label>
@@ -2128,7 +2184,7 @@ function renderAnalytics() {
         </label>
         <button class="primary" id="apply-analytics-filter" type="button">적용</button>
       </div>
-      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
+      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
     </section>
 
     ${cohort ? (() => {
@@ -2199,13 +2255,15 @@ function renderAnalytics() {
       </section>
 
       <section>
-        ${collapsibleSectionHeader("정량 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`, "quant")}
-        ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session)}
-      </section>
-
-      <section>
-        ${collapsibleSectionHeader("정성 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`, "qual")}
-        ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId)}
+      <section class="analytics-split">
+        <div>
+          ${collapsibleSectionHeader("정량 응답", session ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`, "quant")}
+          ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session)}
+        </div>
+        <div>
+          ${collapsibleSectionHeader("정성 응답", session ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`, "qual")}
+          ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId)}
+        </div>
       </section>`;
     })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
   `;
@@ -2356,7 +2414,7 @@ function renderReport() {
   const cohort = scope.cohort;
   const session = scope.session;
   const sessionId = session?.id || "";
-  const type = session?.type || state.selectedReportType || "팀장";
+  const type = normalizeSessionType(session?.type || state.selectedReportType || "리더십");
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
   const pre  = stats[0] || null;
   const mid  = stats[1] || null;
@@ -2380,9 +2438,9 @@ function renderReport() {
         <label>대상 기수
           <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
             ${cohorts.length ? cohorts.map(c => {
-              const teamNames = [...new Set((state.sessions || []).filter(s => s.cohort === c).map(s => s.team || s.participatingTeams || '').filter(Boolean))].slice(0, 2).join(', ');
               const yearLabel = yearForCohort(c) ? `${yearForCohort(c)}년 ` : '';
-              return `<option value="${c}" ${cohort===c?"selected":""}>${yearLabel}${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
+              const count = (state.sessions || []).filter(s => Number(s.cohort) === Number(c)).length;
+              return `<option value="${c}" ${cohort===c?"selected":""}>${yearLabel}${c}기${count ? ` · ${count}개 세션` : ''}</option>`;
             }).join("") : `<option value="">세션 없음</option>`}
           </select>
         </label>
@@ -2393,7 +2451,7 @@ function renderReport() {
         </label>
         <button class="primary" id="apply-report-filter" type="button">적용</button>
       </div>
-      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
+      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
     </section>
 
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
@@ -2613,13 +2671,13 @@ function emptyCard(text, tone = "") {
 }
 
 function eventCard(session, item) {
-  const accent = SESSION_TYPES[session.type].accent;
+  const accent = sessionTypeDef(session.type).accent;
   return `
     <article class="list-card" style="--accent:${accent}">
       <div>
         <span>${item.date} · ${item.startTime} · ${item.duration}분</span>
         <strong>${escapeHtml(item.content)}</strong>
-        <small>${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</small>
+        <small>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</small>
       </div>
       <em>${item.seq}회</em>
     </article>
@@ -2629,9 +2687,9 @@ function eventCard(session, item) {
 function uploadStateCard(session) {
   const done = phasesForSession(session.id);
   return `
-    <article class="list-card" style="--accent:${SESSION_TYPES[session.type].accent}">
+    <article class="list-card" style="--accent:${sessionTypeDef(session.type).accent}">
       <div>
-        <span>${escapeHtml(session.type)}</span>
+        <span>${escapeHtml(sessionTypeLabel(session.type))}</span>
         <strong>${escapeHtml(sessionLabel(session))}</strong>
         <small>${PHASES.map((phase) => `<b class="pill ${done.includes(phase) ? "done" : ""}">${phase} ${done.includes(phase) ? "완료" : "대기"}</b>`).join("")}</small>
       </div>
@@ -2645,18 +2703,18 @@ function alertCard(session) {
     <article class="list-card warning" style="--accent:#b86e00">
       <div>
         <span>미정 ${count}회차</span>
-        <strong>${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</strong>
+        <strong>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</strong>
       </div>
     </article>
   `;
 }
 
 function typeSummary(type) {
-  const list = state.sessions.filter((session) => session.type === type);
+  const list = state.sessions.filter((session) => sameSessionType(session.type, type));
   const active = list.filter((session) => getStatus(session)[0] === "진행중").length;
   return `
     <article class="type-card" style="--accent:${SESSION_TYPES[type].accent}">
-      <span>${type}</span>
+      <span>${sessionTypeLabel(type)}</span>
       <strong>${list.length}</strong>
       <small>진행중 ${active}개</small>
     </article>
@@ -2685,15 +2743,15 @@ function sessionCard(session) {
   const isEditing = state.editingSessionId === session.id;
   return `
     <article class="session-card compact${isEditing ? ' editing' : ''}">
+      <div class="session-card-actions">
+        <b class="status ${tone}">${status}</b>
+        <button class="icon-btn" onclick="startEditSession('${session.id}')" title="${isEditing ? '편집 중' : '수정'}" aria-label="${isEditing ? '편집 중' : '세션 수정'}">${isEditing ? '●' : '✎'}</button>
+        <button class="icon-btn danger" onclick="deleteSession('${session.id}')" title="삭제" aria-label="세션 삭제">×</button>
+      </div>
       <div class="session-top">
         <div>
-          <span>${escapeHtml(session.type)} · ${cohortPrefix(session)}</span>
+          <span>${escapeHtml(sessionTypeLabel(session.type))}</span>
           <h3>${escapeHtml(sessionLabel(session))}</h3>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
-          <b class="status ${tone}">${status}</b>
-          <button class="ghost compact" onclick="startEditSession('${session.id}')">${isEditing ? '편집 중' : '수정'}</button>
-          <button class="ghost compact" onclick="deleteSession('${session.id}')" style="color:#ef4444;">삭제</button>
         </div>
       </div>
       <div class="session-meta">
@@ -2817,11 +2875,11 @@ function qualResponseRows(cohort, type, sessionId = "") {
   const cohortNum = Number(cohort);
   const sessionIds = new Set(sessionId
     ? [sessionId]
-    : (state.sessions || []).filter((s) => s.type === type).map((s) => s.id));
-  // Same cohort number can be shared by a 팀빌딩 session and a 팀장 session at once — always
+    : (state.sessions || []).filter((s) => sameSessionType(s.type, type)).map((s) => s.id));
+  // Same cohort number can be shared by a 팀빌딩 session and a 리더십 session at once — always
   // require the survey's own sessionType to match, so the two never get pooled together.
   const relevantSurveys = (state.surveys || []).filter(s =>
-    sessionIds.has(s.sessionId) || (Number(s.sessionCohort) === cohortNum && s.sessionType === type)
+    sessionIds.has(s.sessionId) || (Number(s.sessionCohort) === cohortNum && sameSessionType(s.sessionType, type))
   );
   const configuredQualIds = [...new Set(relevantSurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
   // Trust each survey's own question type (so a 5점 척도 question placed at q9/q10/q11 never
@@ -2835,19 +2893,19 @@ function qualResponseRows(cohort, type, sessionId = "") {
   );
   // Fallback for orphaned rows whose sessionId no longer matches any session (e.g. CSV upload
   // with a stale id) — only keep them if their linked survey confirms the same session type,
-  // so a 팀빌딩 1기 response never shows up under 팀장 1기 just because the cohort number matches.
+  // so a 팀빌딩 1기 response never shows up under 리더십 1기 just because the cohort number matches.
   if (!rows.length && !sessionId) {
     rows = (state.responses || []).filter(r => {
       if (r.cohort !== cohortNum || !qualIds.some(id => r[id])) return false;
       const survey = (state.surveys || []).find(s => s.id === r.surveyId);
-      return Boolean(survey && survey.sessionType === type);
+      return Boolean(survey && sameSessionType(survey.sessionType, type));
     });
   }
   return { qualIds, rows };
 }
 
 function qualQuestionLabel(qid, type) {
-  const survey = (state.surveys || []).find(s => s.sessionType === type && (s.questions || []).some(q => q.id === qid));
+  const survey = (state.surveys || []).find(s => sameSessionType(s.sessionType, type) && (s.questions || []).some(q => q.id === qid));
   const text = survey?.questions?.find(q => q.id === qid)?.text;
   if (text) return text;
   if (qid === 'q9')  return '세션 참여 전 기대하는 점';
@@ -3230,7 +3288,7 @@ function bindSessions() {
       title,
       sessionId,
       phase,
-      sessionType: sess ? (sess.type || '') : '',
+      sessionType: sess ? normalizeSessionType(sess.type) : '',
       sessionCohort: sess ? (sess.cohort || '') : '',
       googleFormUrl: googleFormUrl || null,
       questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
@@ -3276,9 +3334,9 @@ function bindSessions() {
   const typeSelect = document.querySelector("#session-type");
   if (!typeSelect) return;
   typeSelect.addEventListener("change", () => {
-    state.draftType = typeSelect.value;
-    state.draftSchedule = makeSchedule(typeSelect.value);
-    if (state.draftType !== "크로스펑셔널") {
+    state.draftType = normalizeSessionType(typeSelect.value);
+    state.draftSchedule = makeSchedule(state.draftType);
+    if (!sameSessionType(state.draftType, "협업")) {
       resetCrossDraft();
     }
     saveState();
@@ -3407,7 +3465,7 @@ function bindSessions() {
   });
   document.querySelector("#add-round")?.addEventListener("click", () => {
     const next = state.draftSchedule.length + 1;
-    state.draftSchedule.push({ id: uid(), seq: next, confirmed: false, date: todayISO(), startTime: "10:00", duration: SESSION_TYPES[state.draftType].duration, content: "", note: "", status: "planned", absences: [] });
+    state.draftSchedule.push({ id: uid(), seq: next, confirmed: false, date: todayISO(), startTime: "10:00", duration: sessionTypeDef(state.draftType).duration, content: "", note: "", status: "planned", absences: [] });
     saveState();
     render();
   });
@@ -3421,7 +3479,7 @@ function bindSessions() {
 
   document.querySelector("#create-session")?.addEventListener("click", () => {
     if (!canCreateDraftSession()) return;
-    const type = state.draftType;
+    const type = normalizeSessionType(state.draftType);
     const cohort = state.draftCohort;
     const year = state.draftYear;
     const updatedSchedule = state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? "confirmed" : "planned", absences: item.absences || [] }));
@@ -3440,15 +3498,15 @@ function bindSessions() {
             division: state.draftDivision, hq: state.draftHq, team: state.draftTeam,
             participatingTeams: "", leader: state.draftLeader, leaderTitle: state.draftLeaderTitle, members: state.draftMembers,
           });
-        } else if (type === "팀장") {
+        } else if (type === "리더십") {
           const leaderGroup = [...(state.draftLeaderGroup || [])];
           Object.assign(updatedSession, {
             participatingTeams: leaderGroup.map(l => l.teamName).join(", "),
-            leaderGroup, leader: `${leaderGroup.length}명 팀장 그룹`, leaderTitle: "팀장",
+            leaderGroup, leader: `${leaderGroup.length}명 리더십 그룹`, leaderTitle: "팀장",
             members: leaderGroup.map(l => ({ id: l.id, name: l.name, position: l.position || "팀장", teamId: l.teamId, teamName: l.teamName, divisionName: l.divisionName, hqName: l.hqName })),
           });
           state.draftLeaderGroup = [];
-        } else if (type === "크로스펑셔널") {
+        } else if (type === "협업") {
           const members = selectedCrossMembers();
           const sourceTeamIds = state.draftCrossMode === "leader-session" ? [...state.draftCrossTeamIds] : [...new Set(members.map(m => m.teamId))];
           Object.assign(updatedSession, {
@@ -3472,10 +3530,10 @@ function bindSessions() {
     // Duplicate cohort guard — same batch (type + cohort), narrowed by team/source for types that
     // legitimately run several parallel sessions under one cohort number.
     const duplicate = (state.sessions || []).find((s) => {
-      if (s.type !== type || Number(s.cohort) !== Number(cohort)) return false;
+      if (!sameSessionType(s.type, type) || Number(s.cohort) !== Number(cohort)) return false;
       if (type === "팀빌딩") return s.teamId === state.draftTeamId;
-      if (type === "크로스펑셔널") return s.sourceMode === state.draftCrossMode;
-      return true; // 팀장: one group per cohort
+      if (type === "협업") return s.sourceMode === state.draftCrossMode;
+      return true; // 리더십: one group per cohort
     });
     if (duplicate) {
       state.duplicateSessionWarning = duplicate.id;
@@ -3489,7 +3547,7 @@ function bindSessions() {
       type,
       cohort,
       year,
-      targetWeeks: SESSION_TYPES[type].weeks,
+      targetWeeks: sessionTypeDef(type).weeks,
       createdAt: new Date().toISOString(),
       schedule: updatedSchedule,
     };
@@ -3508,12 +3566,12 @@ function bindSessions() {
         leaderTitle: state.draftLeaderTitle,
         members: state.draftMembers,
       });
-    } else if (type === "팀장") {
+    } else if (type === "리더십") {
       const leaderGroup = [...(state.draftLeaderGroup || [])];
       Object.assign(session, {
         participatingTeams: leaderGroup.map((leader) => leader.teamName).join(", "),
         leaderGroup,
-        leader: `${leaderGroup.length}명 팀장 그룹`,
+        leader: `${leaderGroup.length}명 리더십 그룹`,
         leaderTitle: "팀장",
         members: leaderGroup.map((leader) => ({
           id: leader.id,
@@ -3526,7 +3584,7 @@ function bindSessions() {
         })),
       });
       state.draftLeaderGroup = [];
-    } else if (type === "크로스펑셔널") {
+    } else if (type === "협업") {
       const members = selectedCrossMembers();
       const sourceTeamIds = state.draftCrossMode === "leader-session"
         ? [...state.draftCrossTeamIds]
@@ -3611,7 +3669,7 @@ function bindReport() {
     const cohort = Number(state.selectedReportCohort || (cohorts.length ? cohorts[0] : 0));
     const sessionId = state.selectedReportSessionId || "";
     const session = (state.sessions || []).find((item) => item.id === sessionId);
-    const type = session?.type || state.selectedReportType || "팀장";
+    const type = normalizeSessionType(session?.type || state.selectedReportType || "리더십");
     const stats = sessionId ? statsForSession(cohort, sessionId) : statsForCohort(cohort, type);
     const dynamicQuestions = sessionId ? questionSetForSession(sessionId) : getQuestionsForCohort(cohort, type);
     
@@ -3799,7 +3857,7 @@ window.startEditSession = function(id) {
   if (!session) return;
   state.editingSessionId = id;
   state.activeSessionTab = 'list';
-  state.draftType = session.type;
+  state.draftType = normalizeSessionType(session.type);
   state.draftSchedule = JSON.parse(JSON.stringify(session.schedule));
   state.draftCohort = session.cohort || 1;
   state.draftYear = session.year || new Date().getFullYear();
@@ -4145,7 +4203,7 @@ async function loadSessionsFromFirestore() {
   try {
     const snap = await getDocs(collection(db, 'sessions'));
     if (snap.docs.length > 0) {
-      const firestoreSessions = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      const firestoreSessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
       const firestoreIds = new Set(firestoreSessions.map(s => s.id));
       const localOnly = (state.sessions || []).filter(s => !firestoreIds.has(s.id));
       state.sessions = [...firestoreSessions, ...localOnly];
@@ -4273,11 +4331,12 @@ async function downloadStateFromDb() {
     const data = snap.data();
     const savedAt = data.savedAt?.toDate?.()?.toLocaleString('ko-KR') || '알 수 없음';
     if (!confirm(`저장 시각: ${savedAt}\n\n현재 로컬 데이터를 DB 상태로 덮어쓸까요?`)) return;
-    if (data.sessions)    state.sessions    = data.sessions;
+    if (data.sessions)    state.sessions    = data.sessions.map(normalizeSessionRecord);
     if (data.surveys)     state.surveys     = data.surveys;
     if (data.orgUnits)    state.orgUnits    = data.orgUnits;
     if (data.orgMembers)  state.orgMembers  = data.orgMembers;
     if (data.qualAnalysis) state.qualAnalysis = data.qualAnalysis;
+    normalizeAppState(state);
     saveState();
     render();
   } catch (e) {
@@ -4434,7 +4493,7 @@ function buildQualPrompt(cohort, type, sessionId = "") {
   const cohortNum = Number(cohort);
   const sessionIds = new Set(sessionId
     ? [sessionId]
-    : (state.sessions || []).filter(s => s.type === type && s.cohort === cohortNum).map(s => s.id)
+    : (state.sessions || []).filter(s => sameSessionType(s.type, type) && s.cohort === cohortNum).map(s => s.id)
   );
   const selectedSession = (state.sessions || []).find((session) => session.id === sessionId);
 
@@ -4442,7 +4501,7 @@ function buildQualPrompt(cohort, type, sessionId = "") {
   // so a different session type sharing the same cohort number is never pulled in).
   const relevantSurveys = (state.surveys || []).filter(s =>
     sessionIds.has(s.sessionId) ||
-    (Number(s.sessionCohort) === cohortNum && s.sessionType === type)
+    (Number(s.sessionCohort) === cohortNum && sameSessionType(s.sessionType, type))
   );
 
   // Trust each survey's own question type — only fall back to the legacy q9~q11 guess when
@@ -4464,7 +4523,7 @@ function buildQualPrompt(cohort, type, sessionId = "") {
   };
 
   const promptYearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
-  let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션: ${selectedSession ? sessionLabel(selectedSession) : `${type} / ${promptYearLabel}${cohort}기`}\n세션 유형: ${type} / 기수: ${promptYearLabel}${cohort}기\n\n`;
+  let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션: ${selectedSession ? sessionLabel(selectedSession) : `${sessionTypeLabel(type)} / ${promptYearLabel}${cohort}기`}\n세션 유형: ${sessionTypeLabel(type)} / 기수: ${promptYearLabel}${cohort}기\n\n`;
   let totalQualRows = 0;
 
   PHASES.forEach(phase => {
@@ -4478,7 +4537,7 @@ function buildQualPrompt(cohort, type, sessionId = "") {
       rows = (state.responses || []).filter(r => {
         if (r.cohort !== cohortNum || r.phase !== phase) return false;
         const survey = (state.surveys || []).find(s => s.id === r.surveyId);
-        return Boolean(survey && survey.sessionType === type);
+        return Boolean(survey && sameSessionType(survey.sessionType, type));
       });
     }
 

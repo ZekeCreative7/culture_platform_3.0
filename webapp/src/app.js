@@ -314,6 +314,23 @@ function sessionsSortedByStart() {
   });
 }
 
+function sessionsByTypeGrouped() {
+  const sorted = sessionsSortedByStart();
+  return Object.keys(SESSION_TYPES).map((type) => {
+    const group = sorted.filter((s) => s.type === type);
+    if (!group.length) return "";
+    return `
+      <div class="session-type-group">
+        <div class="session-type-group-head" style="--accent:${SESSION_TYPES[type].accent}">
+          <strong>${escapeHtml(type)}</strong>
+          <span>${group.length}개</span>
+        </div>
+        ${group.map(sessionCard).join("")}
+      </div>
+    `;
+  }).join("");
+}
+
 function getStatus(session) {
   const schedule = session.schedule || [];
   const confirmed = schedule.filter((item) => item.confirmed && item.date);
@@ -1212,7 +1229,7 @@ function renderSessions() {
       </section>
       <section>
         ${sectionTitle("등록된 세션", `${state.sessions.length}개`)}
-        ${state.sessions.length ? sessionsSortedByStart().map(sessionCard).join("") : emptyCard("아직 등록된 세션이 없습니다.")}
+        ${state.sessions.length ? sessionsByTypeGrouped() : emptyCard("아직 등록된 세션이 없습니다.")}
       </section>
     `;
   }

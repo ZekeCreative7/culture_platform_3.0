@@ -875,6 +875,17 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: po
 /* ─── Panel Actions ─── */
 .panel-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
 
+/* ─── Session Type Grouping ─── */
+.session-type-group { margin-bottom: 18px; }
+.session-type-group-head {
+  --accent: var(--blue);
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 0 0 10px 2px;
+  padding-left: 10px; border-left: 3px solid var(--accent);
+}
+.session-type-group-head strong { color: var(--ink); font-size: var(--fs-card-title); font-weight: 800; }
+.session-type-group-head span { color: var(--faint); font-size: var(--fs-caption); font-weight: 700; }
+
 /* ─── Session Card ─── */
 .session-card { padding: 10px 16px; margin-bottom: 6px; }
 .session-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

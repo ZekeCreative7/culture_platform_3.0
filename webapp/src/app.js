@@ -1,4 +1,6 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp } from './firebase.js';
+import { bindPulse, renderPulse } from './pulse/pulseViews.js';
+import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 
 const PHASES = ["사전", "중간", "사후"];
 const QUANT_LABELS = {
@@ -77,6 +79,7 @@ const VIEWS = [
   ["upload", "Upload", "데이터 업로드"],
   ["analytics", "Change", "변화 분석"],
   ["report", "Report", "리포트"],
+  ["pulse", "Pulse Insights", "조직 진단"],
 ];
 const NAV_ICONS = {
   dashboard: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M2 10a8 8 0 1 1 16 0A8 8 0 0 1 2 10Zm8-5a1 1 0 0 1 1 1v4.586l2.707 2.707a1 1 0 0 1-1.414 1.414l-3-3A1 1 0 0 1 9 11V6a1 1 0 0 1 1-1Z"/></svg>`,
@@ -86,8 +89,10 @@ const NAV_ICONS = {
   upload: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M3 17a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1ZM6.293 9.293a1 1 0 0 1 1.414 0L9 10.586V3a1 1 0 0 1 2 0v7.586l1.293-1.293a1 1 0 1 1 1.414 1.414l-3 3a1 1 0 0 1-1.414 0l-3-3a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"/></svg>`,
   analytics: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M2 11a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-5ZM8 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V7ZM14 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V4Z"/></svg>`,
   report: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 15.414 6L12 2.586A2 2 0 0 0 10.586 2H6Zm2 6a1 1 0 0 0 0 2h4a1 1 0 1 0 0-2H8Zm-1 4a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1Z" clip-rule="evenodd"/></svg>`,
+  pulse: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm1 3a1 1 0 0 0-1 1v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1H4Zm3 7a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v4a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1v-1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Z"/></svg>`,
 };
 const STORE_KEY = "culture-platform-webapp-v1";
+const pulseCache = { years: {}, loading: false, loaded: false, error: "" };
 
 let dbStatus = 'connecting';
 function setDbStatus(status) {
@@ -196,6 +201,10 @@ const blankState = () => ({
   activeQualKey: null,
   sidebarCollapsed: false,
   collapsedSurveyIds: [],
+  pulseView: "overview",
+  pulseDeptId: "",
+  pulseLayer: "easy",
+  pulseYear: 2026,
 });
 
 let state = loadState();
@@ -222,7 +231,8 @@ function saveState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed, collapsedSurveyIds
+    qualAnalysis, sidebarCollapsed, collapsedSurveyIds,
+    pulseView, pulseDeptId, pulseLayer, pulseYear
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, responses, draftType, draftSchedule,
@@ -233,7 +243,8 @@ function saveState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedReportCohort, selectedReportType,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed, collapsedSurveyIds
+    qualAnalysis, sidebarCollapsed, collapsedSurveyIds,
+    pulseView, pulseDeptId, pulseLayer, pulseYear
   }));
 }
 
@@ -749,6 +760,7 @@ function renderView() {
   if (state.activeView === "upload") return renderUpload();
   if (state.activeView === "analytics") return renderAnalytics();
   if (state.activeView === "report") return renderReport();
+  if (state.activeView === "pulse") return renderPulse({ state, pulseCache });
   return renderDashboard();
 }
 
@@ -2560,6 +2572,9 @@ function bindGlobal() {
       state.mobileNavOpen = false;
       saveState();
       render();
+      if (state.activeView === "pulse") {
+        loadPulseYears([2024, 2025, 2026]).then(render);
+      }
     });
   });
   document.querySelector(".menu-toggle")?.addEventListener("click", () => {
@@ -2579,6 +2594,7 @@ function bindGlobal() {
   bindOrg();
   bindUpload();
   bindReport();
+  bindPulse({ state, saveState, render, loadPulseYears, downloadPulseTemplate });
 }
 
 function bindOrg() {
@@ -3707,6 +3723,30 @@ async function deleteSurveyFromFirestore(id) {
   await deleteDoc(doc(db, 'surveys', id));
 }
 
+async function loadPulseYears(years = [2024, 2025, 2026]) {
+  if (pulseCache.loading) return pulseCache.years;
+  pulseCache.loading = true;
+  pulseCache.error = "";
+  try {
+    const docs = await Promise.all(years.map(async (year) => {
+      const snap = await getDoc(doc(db, 'pulseResults', String(year)));
+      return [year, snap.exists() ? snap.data() : null];
+    }));
+    docs.forEach(([year, data]) => {
+      pulseCache.years[year] = data;
+    });
+    pulseCache.loaded = true;
+    setDbStatus('connected');
+  } catch (e) {
+    pulseCache.error = e.message || "알 수 없는 오류";
+    console.error('Firestore Pulse 로드 실패:', e);
+    setDbStatus('error');
+  } finally {
+    pulseCache.loading = false;
+  }
+  return pulseCache.years;
+}
+
 async function uploadStateToDb() {
   const btn = document.querySelector("#btn-db-upload");
   if (btn) { btn.disabled = true; btn.textContent = '전송 중...'; }
@@ -3803,6 +3843,9 @@ async function initApp() {
   // Load sessions and surveys from Firestore on startup
   loadSessionsFromFirestore().then(() => render());
   loadSurveysFromFirestore().then(() => render());
+  if (state.activeView === "pulse") {
+    loadPulseYears([2024, 2025, 2026]).then(() => render());
+  }
 
   // Real-time listener for responses — updates dashboard whenever a phone submits
   onSnapshot(collection(db, 'responses'), (snap) => {

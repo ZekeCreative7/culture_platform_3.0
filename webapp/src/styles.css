@@ -511,6 +511,107 @@ button:disabled { cursor: not-allowed; opacity: 0.42; transform: none !important
   background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
 }
 
+/* ─── Pulse Insights ─── */
+.pulse-head { align-items: flex-end; gap: 18px; }
+.pulse-head-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
+}
+.pulse-segmented {
+  display: inline-flex; padding: 4px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.68);
+}
+.pulse-segmented button, .pulse-tabs button {
+  border: 0; background: transparent; color: var(--muted);
+  font-weight: 800; font-size: 12px;
+}
+.pulse-segmented button {
+  min-height: 32px; padding: 0 12px; border-radius: 6px;
+}
+.pulse-segmented button.active {
+  color: #ffffff; background: var(--blue-mid); box-shadow: var(--shadow-low);
+}
+.pulse-year {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: var(--muted); font-size: 12px; font-weight: 800;
+}
+.pulse-year select {
+  min-height: 40px; height: 40px; border-radius: var(--radius-sm);
+  font-weight: 800;
+}
+.pulse-tabs {
+  display: flex; gap: 6px; margin: -10px 0 18px; padding: 4px;
+  width: fit-content; max-width: 100%;
+  border-radius: var(--radius-md); background: rgba(255,255,255,0.62);
+  border: 1px solid var(--line);
+}
+.pulse-tabs button {
+  min-height: 36px; padding: 0 14px; border-radius: var(--radius-sm);
+}
+.pulse-tabs button.active {
+  background: #ffffff; color: var(--blue-mid); box-shadow: var(--shadow-low);
+}
+.pulse-hero, .pulse-empty-panel {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 18px;
+}
+.pulse-hero h1, .pulse-empty-panel h2 {
+  margin: 8px 0 0; font-size: 22px; line-height: 1.35;
+}
+.pulse-hero p, .pulse-empty-panel p, .pulse-note p {
+  margin: 8px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.7;
+}
+.pulse-score-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px;
+}
+.pulse-score {
+  min-height: 128px; padding: 20px; border-radius: var(--radius-md);
+  background: #ffffff; border: 1.5px solid #dbeafe;
+  box-shadow: var(--shadow-low); position: relative; overflow: hidden;
+}
+.pulse-score::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--blue);
+}
+.pulse-score.red::before { background: var(--red); }
+.pulse-score.green::before { background: var(--green); }
+.pulse-score span, .pulse-score small {
+  display: block; color: var(--muted); font-size: 11.5px; font-weight: 800;
+}
+.pulse-score strong {
+  display: block; margin: 8px 0; color: var(--ink); font-size: 34px; line-height: 1; font-weight: 800;
+}
+.pulse-trend {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+}
+.pulse-trend-point {
+  padding: 16px; border: 1px solid #dbeafe; border-radius: var(--radius-sm); background: #f8fbff;
+}
+.pulse-trend-point strong, .pulse-trend-point span, .pulse-trend-point small { display: block; }
+.pulse-trend-point strong { color: var(--blue-deep); font-size: 24px; font-weight: 800; }
+.pulse-trend-point span { margin-top: 4px; color: var(--ink); font-weight: 800; font-size: 13px; }
+.pulse-trend-point small { color: var(--faint); font-size: 11.5px; font-weight: 700; }
+.pulse-theme-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;
+}
+.pulse-theme-grid article {
+  padding: 14px; border: 1px solid #dbeafe; border-radius: var(--radius-sm); background: #ffffff;
+}
+.pulse-theme-grid strong { display: block; margin-bottom: 8px; font-size: 13px; color: var(--ink); }
+.pulse-theme-grid div { display: flex; flex-wrap: wrap; gap: 6px; }
+.pulse-theme-grid span {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px;
+  border-radius: 999px; background: #eff6ff; color: var(--blue-deep);
+  font-size: 11px; font-weight: 800;
+}
+.pulse-empty-actions {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0;
+}
+.pulse-note strong { color: var(--ink); font-size: 14px; }
+.pulse-note small { display: block; margin-top: 8px; color: var(--faint); font-weight: 700; }
+.pulse-mini-empty {
+  padding: 18px; border-radius: var(--radius-sm); background: #f8fafc;
+  color: var(--muted); font-weight: 700; text-align: center;
+}
+
 /* ─── Form Layout ─── */
 .form-grid         { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
 .form-grid.compact { grid-template-columns: 1.2fr 0.7fr 1.1fr; }
@@ -1019,6 +1120,9 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
   .org-workspace { height: 500px; }
   .form-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
   .page-head h1 { font-size: 20px; } .page-head { padding: 18px 20px; }
+  .pulse-score-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .pulse-hero, .pulse-empty-panel { flex-direction: column; }
+  .pulse-empty-actions { justify-content: flex-start; }
 }
 @media (max-width: 767px) {
   /* Override collapsed sidebar specificity — mobile is always full-width single column */
@@ -1094,6 +1198,11 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
   .chart-row { grid-template-columns: 90px minmax(0,1fr) 44px; gap: 10px; }
   .chart-label-text { font-size: 11px; }
   .feature-band { flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px; }
+  .pulse-head-actions { justify-content: flex-start; width: 100%; }
+  .pulse-tabs { width: 100%; }
+  .pulse-tabs button { flex: 1; padding: 0 8px; }
+  .pulse-score-grid, .pulse-trend { grid-template-columns: 1fr; }
+  .pulse-score strong { font-size: 28px; }
 }
 @media (max-width: 480px) {
   .metric-grid, .metric-grid.slim { grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -1103,4 +1212,7 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
   .org-column { flex: 0 0 178px; min-width: 178px; }
   .attendance-members-grid { grid-template-columns: 1fr; }
   .chart-row { grid-template-columns: 76px minmax(0,1fr) 40px; gap: 8px; }
+  .pulse-segmented, .pulse-year { width: 100%; }
+  .pulse-segmented button { flex: 1; }
+  .pulse-year select { flex: 1; }
 }

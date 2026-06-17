@@ -159,6 +159,10 @@ const blankState = () => ({
   responses: [],
   draftType: "팀장",
   draftSchedule: makeSchedule("팀장"),
+  draftCohort: 1,
+  draftYear: new Date().getFullYear(),
+  duplicateSessionWarning: null,
+  showQualAnswersModal: null,
   uploadRows: [],
   uploadErrors: [],
   uploadFileName: "",
@@ -226,8 +230,8 @@ function loadState() {
 
 function saveState() {
   const { 
-    activeView, sessions, responses, draftType, draftSchedule, 
-    orgUnits, orgMembers, surveys, 
+    activeView, sessions, responses, draftType, draftSchedule, draftCohort, draftYear,
+    orgUnits, orgMembers, surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
@@ -238,7 +242,7 @@ function saveState() {
     pulseView, pulseDeptId, pulseLayer, pulseYear
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
-    activeView, sessions, responses, draftType, draftSchedule,
+    activeView, sessions, responses, draftType, draftSchedule, draftCohort, draftYear,
     orgUnits, orgMembers, surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
@@ -267,21 +271,53 @@ function makeSchedule(type) {
   }));
 }
 
+function cohortPrefix(session) {
+  return session.year ? `${session.year}년 ${session.cohort}기` : `${session.cohort}기`;
+}
+
 function sessionLabel(session) {
   if (!session) return "";
-  if (session.type === "팀빌딩") return `${session.cohort}기 · ${session.team || "팀 미지정"}`;
-  if (session.type === "팀장") return `${session.cohort}기 · ${session.participatingTeams || session.hq || "팀장 그룹"}`;
-  if (session.type === "크로스펑셔널" && session.sourceMode === "random") return `${session.cohort}기 · 무작위 크로스펑셔널`;
-  return `${session.cohort}기 · 크로스펑셔널`;
+  if (session.type === "팀빌딩") return `${cohortPrefix(session)} · ${session.team || "팀 미지정"}`;
+  if (session.type === "팀장") return `${cohortPrefix(session)} · ${session.participatingTeams || session.hq || "팀장 그룹"}`;
+  if (session.type === "크로스펑셔널" && session.sourceMode === "random") return `${cohortPrefix(session)} · 무작위 크로스펑셔널`;
+  return `${cohortPrefix(session)} · 크로스펑셔널`;
+}
+
+function yearForCohort(cohort) {
+  const cohortNum = Number(cohort);
+  const match = (state.sessions || []).find((session) => Number(session.cohort) === cohortNum && session.year);
+  return match ? match.year : "";
+}
+
+function hasRoundPassed(item) {
+  if (!item.date) return false;
+  const end = new Date(`${item.date}T${item.startTime || "00:00"}:00`);
+  end.setMinutes(end.getMinutes() + Number(item.duration || 0));
+  return end.getTime() <= Date.now();
+}
+
+function sessionStartDate(session) {
+  const dates = (session.schedule || []).map((item) => item.date).filter(Boolean);
+  return dates.length ? dates.sort()[0] : null;
+}
+
+function sessionsSortedByStart() {
+  return [...state.sessions].sort((a, b) => {
+    const da = sessionStartDate(a);
+    const db = sessionStartDate(b);
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return da.localeCompare(db);
+  });
 }
 
 function getStatus(session) {
-  const now = todayISO();
   const schedule = session.schedule || [];
   const confirmed = schedule.filter((item) => item.confirmed && item.date);
   if (!confirmed.length) return ["시작전", "muted"];
-  const past = confirmed.filter((item) => item.date <= now);
-  const future = confirmed.filter((item) => item.date > now);
+  const past = confirmed.filter((item) => hasRoundPassed(item));
+  const future = confirmed.filter((item) => !hasRoundPassed(item));
   const pending = schedule.filter((item) => !item.confirmed || !item.date);
   if (!past.length) return ["시작전", "amber"];
   if (future.length || pending.length) return ["진행중", "blue"];
@@ -1131,6 +1167,7 @@ function canCreateDraftSession() {
 function renderSessions() {
   const orgPopupHtml = state.showOrgPopup ? renderOrgPopup() : "";
   const attendanceModalHtml = state.showAttendanceModal ? renderAttendanceModal() : "";
+  const duplicateWarningHtml = state.duplicateSessionWarning ? renderDuplicateWarningModal() : "";
   const { divisionList, hqList, teamList } = ensureDraftOrgSelection();
   
   let mainContentHtml = "";
@@ -1146,7 +1183,8 @@ function renderSessions() {
                 ${Object.keys(SESSION_TYPES).map((type) => `<option ${state.draftType === type ? "selected" : ""}>${type}</option>`).join("")}
               </select>
             </label>
-            <label>기수<input id="cohort" type="number" min="1" value="1" /></label>
+            <label>기수<input id="cohort" type="number" min="1" value="${state.draftCohort}" /></label>
+            <label>연도<input id="cohort-year" type="number" min="2000" value="${state.draftYear}" /></label>
           </div>
           ${renderSessionConfigPanel(divisionList, hqList, teamList)}
         </div>
@@ -1172,7 +1210,7 @@ function renderSessions() {
       </section>
       <section>
         ${sectionTitle("등록된 세션", `${state.sessions.length}개`)}
-        ${state.sessions.length ? state.sessions.map(sessionCard).join("") : emptyCard("아직 등록된 세션이 없습니다.")}
+        ${state.sessions.length ? sessionsSortedByStart().map(sessionCard).join("") : emptyCard("아직 등록된 세션이 없습니다.")}
       </section>
     `;
   }
@@ -1199,6 +1237,7 @@ function renderSessions() {
     </div>
     ${orgPopupHtml}
     ${attendanceModalHtml}
+    ${duplicateWarningHtml}
   `;
 }
 
@@ -1645,6 +1684,28 @@ function addMinutes(timeStr, mins) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function renderDuplicateWarningModal() {
+  const existing = state.sessions.find(s => s.id === state.duplicateSessionWarning);
+  if (!existing) return "";
+  return `
+    <div class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>이미 등록된 기수입니다</h2>
+          <button type="button" class="close-btn" id="close-duplicate-warning">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>${escapeHtml(existing.type)} · ${escapeHtml(sessionLabel(existing))} 세션이 이미 있습니다. 새로 만드는 대신 기존 세션을 수정하시겠습니까?</p>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary" type="button" id="cancel-duplicate-warning">취소</button>
+          <button class="primary" type="button" id="edit-existing-session">기존 세션 수정하기</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderAttendanceModal() {
   const session = state.sessions.find(s => s.id === state.activeAttendanceSessionId);
   const item = session ? session.schedule.find(i => i.id === state.activeAttendanceItemId) : null;
@@ -2020,7 +2081,8 @@ function renderAnalytics() {
           <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics')">
             ${cohorts.length ? cohorts.map(c => {
               const teamNames = [...new Set((state.sessions || []).filter(s => s.cohort === c).map(s => s.team || s.participatingTeams || '').filter(Boolean))].slice(0, 2).join(', ');
-              return `<option value="${c}" ${cohort === c ? "selected" : ""}>${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
+              const yearLabel = yearForCohort(c) ? `${yearForCohort(c)}년 ` : '';
+              return `<option value="${c}" ${cohort === c ? "selected" : ""}>${yearLabel}${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
             }).join("") : `<option value="">응답 없음</option>`}
           </select>
         </label>
@@ -2102,10 +2164,17 @@ function renderAnalytics() {
       </section>
 
       <section>
-        ${sectionTitle("정성 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${cohort}기`)}
+        <div class="section-title">
+          <h2>정성 응답</h2>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span>${session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`}</span>
+            <button class="ghost compact" type="button" id="open-qual-answers">전체보기</button>
+          </div>
+        </div>
         ${renderQualitative(cohort, type, sessionId)}
       </section>`;
     })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
+    ${state.showQualAnswersModal ? renderQualAnswersModal() : ""}
   `;
 }
 
@@ -2279,7 +2348,8 @@ function renderReport() {
           <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
             ${cohorts.length ? cohorts.map(c => {
               const teamNames = [...new Set((state.sessions || []).filter(s => s.cohort === c).map(s => s.team || s.participatingTeams || '').filter(Boolean))].slice(0, 2).join(', ');
-              return `<option value="${c}" ${cohort===c?"selected":""}>${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
+              const yearLabel = yearForCohort(c) ? `${yearForCohort(c)}년 ` : '';
+              return `<option value="${c}" ${cohort===c?"selected":""}>${yearLabel}${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
             }).join("") : `<option value="">세션 없음</option>`}
           </select>
         </label>
@@ -2299,7 +2369,7 @@ function renderReport() {
     <section style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>① 현 상황 진단</h2>
-        <span>사전 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${cohort}기 ${type}`} · N=${pre ? pre.n : 0}</span>
+        <span>사전 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기 ${type}`} · N=${pre ? pre.n : 0}</span>
       </div>
       ${!hasPreData ? `<div class="empty">사전 설문 응답이 없습니다. 사전 설문을 진행한 후 진단이 가능합니다.</div>` : `
       <div style="display:grid; grid-template-columns: 220px 1fr; gap:20px; align-items:start;">
@@ -2556,7 +2626,7 @@ function sessionCard(session) {
     <article class="session-card compact${isEditing ? ' editing' : ''}">
       <div class="session-top">
         <div>
-          <span>${escapeHtml(session.type)} · ${session.cohort}기</span>
+          <span>${escapeHtml(session.type)} · ${cohortPrefix(session)}</span>
           <h3>${escapeHtml(sessionLabel(session))}</h3>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
@@ -2682,7 +2752,7 @@ function renderStatsTable(stats, masked, cohort, type, sessionId = "") {
   `;
 }
 
-function renderQualitative(cohort, type, sessionId = "") {
+function qualResponseRows(cohort, type, sessionId = "") {
   const cohortNum = Number(cohort);
   const sessionIds = new Set(sessionId
     ? [sessionId]
@@ -2703,11 +2773,61 @@ function renderQualitative(cohort, type, sessionId = "") {
       r.cohort === cohortNum && qualIds.some(id => r[id])
     );
   }
+  return { qualIds, rows };
+}
+
+function qualQuestionLabel(qid, type) {
+  const survey = (state.surveys || []).find(s => s.sessionType === type && (s.questions || []).some(q => q.id === qid));
+  const text = survey?.questions?.find(q => q.id === qid)?.text;
+  if (text) return text;
+  if (qid === 'q9')  return '세션 참여 전 기대하는 점';
+  if (qid === 'q10') return '세션 중 도움이 된 점';
+  if (qid === 'q11') return '운영진에게 전달하고 싶은 메시지';
+  return qid;
+}
+
+function renderQualitative(cohort, type, sessionId = "") {
+  const { qualIds, rows } = qualResponseRows(cohort, type, sessionId);
   if (!rows.length) return emptyCard("정성 응답이 없습니다.");
   return `<div class="quote-grid">${rows.slice(0, 8).map((row) => {
     const answer = qualIds.map(id => row[id]).filter(Boolean)[0] || '';
     return `<article><span>${row.phase || ''}</span><p>${escapeHtml(answer)}</p></article>`;
   }).join("")}</div>`;
+}
+
+function renderQualAnswersModal() {
+  const ctx = state.showQualAnswersModal;
+  if (!ctx) return "";
+  const { cohort, type, sessionId } = ctx;
+  const session = sessionId ? state.sessions.find(s => s.id === sessionId) : null;
+  const { qualIds, rows } = qualResponseRows(cohort, type, sessionId);
+  const yearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
+  const title = session ? sessionLabel(session) : `${yearLabel}${cohort}기`;
+  const entries = rows.flatMap((row) =>
+    qualIds.filter((id) => row[id]).map((id) => ({ phase: row.phase || '', label: qualQuestionLabel(id, type), answer: row[id] }))
+  );
+  return `
+    <div class="modal-overlay">
+      <div class="modal-card" style="max-width:680px; width:96%;">
+        <div class="modal-header">
+          <h2>주관식 응답 전체보기 — ${escapeHtml(String(title))}</h2>
+          <button type="button" class="close-btn" id="close-qual-answers">&times;</button>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; max-height:72vh; overflow-y:auto;">
+          ${entries.length ? entries.map((entry) => `
+            <article class="qual-answer-row">
+              <div class="qual-answer-meta"><span>${escapeHtml(entry.phase)}</span><strong>${escapeHtml(entry.label)}</strong></div>
+              <p>${escapeHtml(entry.answer)}</p>
+            </article>
+          `).join("") : emptyCard("정성 응답이 없습니다.")}
+        </div>
+        <div class="modal-footer" style="justify-content:space-between;">
+          <span class="muted" style="font-size:12px;">총 ${entries.length}건</span>
+          <button class="secondary" type="button" id="close-qual-answers-footer">닫기</button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function fmt(value) {
@@ -2921,6 +3041,20 @@ function bindSessions() {
     render();
   });
 
+  document.querySelector("#close-duplicate-warning")?.addEventListener("click", () => {
+    state.duplicateSessionWarning = null;
+    render();
+  });
+  document.querySelector("#cancel-duplicate-warning")?.addEventListener("click", () => {
+    state.duplicateSessionWarning = null;
+    render();
+  });
+  document.querySelector("#edit-existing-session")?.addEventListener("click", () => {
+    const id = state.duplicateSessionWarning;
+    state.duplicateSessionWarning = null;
+    startEditSession(id);
+  });
+
   document.querySelector("#close-attendance")?.addEventListener("click", () => {
     state.showAttendanceModal = false;
     render();
@@ -3038,6 +3172,14 @@ function bindSessions() {
     }
     saveState();
     render();
+  });
+  document.querySelector("#cohort")?.addEventListener("input", (event) => {
+    state.draftCohort = Number(event.target.value || 1);
+    saveState();
+  });
+  document.querySelector("#cohort-year")?.addEventListener("input", (event) => {
+    state.draftYear = Number(event.target.value || new Date().getFullYear());
+    saveState();
   });
   document.querySelector("#session-division")?.addEventListener("change", (event) => {
     state.draftDivisionId = event.target.value;
@@ -3169,7 +3311,8 @@ function bindSessions() {
   document.querySelector("#create-session")?.addEventListener("click", () => {
     if (!canCreateDraftSession()) return;
     const type = state.draftType;
-    const cohort = Number(document.querySelector("#cohort").value || 1);
+    const cohort = state.draftCohort;
+    const year = state.draftYear;
     const updatedSchedule = state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? "confirmed" : "planned", absences: item.absences || [] }));
 
     if (state.editingSessionId) {
@@ -3177,7 +3320,7 @@ function bindSessions() {
       const idx = state.sessions.findIndex(s => s.id === state.editingSessionId);
       if (idx >= 0) {
         const existing = state.sessions[idx];
-        const updatedSession = { ...existing, type, cohort, schedule: updatedSchedule };
+        const updatedSession = { ...existing, type, cohort, year, schedule: updatedSchedule };
 
         if (type === "팀빌딩") {
           syncDraftOrgFromTeam(state.draftTeamId);
@@ -3215,11 +3358,26 @@ function bindSessions() {
       return;
     }
 
+    // Duplicate cohort guard — same batch (type + cohort), narrowed by team/source for types that
+    // legitimately run several parallel sessions under one cohort number.
+    const duplicate = (state.sessions || []).find((s) => {
+      if (s.type !== type || Number(s.cohort) !== Number(cohort)) return false;
+      if (type === "팀빌딩") return s.teamId === state.draftTeamId;
+      if (type === "크로스펑셔널") return s.sourceMode === state.draftCrossMode;
+      return true; // 팀장: one group per cohort
+    });
+    if (duplicate) {
+      state.duplicateSessionWarning = duplicate.id;
+      render();
+      return;
+    }
+
     // Create new session
     const session = {
       id: uid(),
       type,
       cohort,
+      year,
       targetWeeks: SESSION_TYPES[type].weeks,
       createdAt: new Date().toISOString(),
       schedule: updatedSchedule,
@@ -3374,6 +3532,23 @@ function bindReport() {
     render();
   });
 
+  document.querySelector("#open-qual-answers")?.addEventListener("click", () => {
+    const cohort = state.selectedAnalyticsCohort;
+    const sessionId = state.selectedAnalyticsSessionId;
+    const session = (state.sessions || []).find((item) => item.id === sessionId);
+    const type = session?.type || state.selectedAnalyticsType || "팀장";
+    state.showQualAnswersModal = { cohort, type, sessionId };
+    render();
+  });
+  document.querySelector("#close-qual-answers")?.addEventListener("click", () => {
+    state.showQualAnswersModal = null;
+    render();
+  });
+  document.querySelector("#close-qual-answers-footer")?.addEventListener("click", () => {
+    state.showQualAnswersModal = null;
+    render();
+  });
+
   document.querySelector("#apply-report-filter")?.addEventListener("click", () => {
     const cohort = document.querySelector("#report-cohort-select")?.value || "";
     const sessionId = document.querySelector("#report-session-select")?.value || "";
@@ -3525,6 +3700,8 @@ window.startEditSession = function(id) {
   state.activeSessionTab = 'list';
   state.draftType = session.type;
   state.draftSchedule = JSON.parse(JSON.stringify(session.schedule));
+  state.draftCohort = session.cohort || 1;
+  state.draftYear = session.year || new Date().getFullYear();
   state.draftDivisionId  = session.divisionId  || '';
   state.draftHqId        = session.hqId        || '';
   state.draftTeamId      = session.teamId      || '';
@@ -3539,10 +3716,6 @@ window.startEditSession = function(id) {
   saveState();
   render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  setTimeout(() => {
-    const cohortEl = document.querySelector('#cohort');
-    if (cohortEl) cohortEl.value = session.cohort;
-  }, 50);
 };
 
 window.deleteSession = function(id) {
@@ -3560,6 +3733,7 @@ window.downloadSurveyTemplate = function(surveyId) {
   const session = state.sessions.find(s => s.id === survey?.sessionId);
   if (!survey) { alert('설문 정보를 찾을 수 없습니다.'); return; }
   const cohort = session ? session.cohort : 1;
+  const yearLabel = session?.year ? `${session.year}년_` : '';
   const qCols  = (survey.questions || []).filter(q => q.type === 'quant').map(q => q.id);
   if (qCols.length === 0) qCols.push(...['q1','q2','q3','q4','q5','q6','q7','q8']);
   const headers  = ['[기수]', ...qCols.map(q => `[${q}]`)];
@@ -3568,7 +3742,7 @@ window.downloadSurveyTemplate = function(surveyId) {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href = url; a.download = `설문응답_템플릿_${cohort}기_${survey.phase}.csv`;
+  a.href = url; a.download = `설문응답_템플릿_${yearLabel}${cohort}기_${survey.phase}.csv`;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
 };
@@ -4068,12 +4242,13 @@ function renderQualModal(qualKey, cohort, type, sessionId = "") {
   // Count total responses for this cohort (any qual field)
   const cohortNum = Number(cohort);
   const totalResponses = (state.responses || []).filter(r => r.cohort === cohortNum).length;
+  const cohortYearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
 
   return `
     <div class="modal-overlay" id="qual-modal-overlay">
       <div class="modal-card" style="max-width:660px; width:96%;">
         <div class="modal-header">
-          <h2>주관식 AI 분석 — ${cohort}기 ${type}</h2>
+          <h2>주관식 AI 분석 — ${cohortYearLabel}${cohort}기 ${type}</h2>
           <button type="button" class="close-btn" onclick="closeQualModal()">&times;</button>
         </div>
         <div class="modal-body" style="display:flex; flex-direction:column; gap:16px; max-height:72vh; overflow-y:auto;">
@@ -4081,7 +4256,7 @@ function renderQualModal(qualKey, cohort, type, sessionId = "") {
             <div style="padding:16px; background:#fff8f0; border:1.5px solid #fed7aa; border-radius:10px;">
               <p style="margin:0 0 8px; font-weight:700; color:#c2410c; font-size:13.5px;">주관식 응답 데이터를 찾지 못했습니다.</p>
               <p style="margin:0; color:#92400e; font-size:12.5px; line-height:1.6;">
-                • 현재 ${cohort}기 응답 총 ${totalResponses}건 적재됨<br>
+                • 현재 ${cohortYearLabel}${cohort}기 응답 총 ${totalResponses}건 적재됨<br>
                 • 리포트의 "세션 유형" 선택이 업로드한 세션 유형과 일치하는지 확인하세요<br>
                 • 주관식 질문이 포함된 설문의 CSV를 설문 카드에서 업로드하면 자동으로 감지됩니다
               </p>
@@ -4148,7 +4323,8 @@ function buildQualPrompt(cohort, type, sessionId = "") {
     return qid;
   };
 
-  let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션: ${selectedSession ? sessionLabel(selectedSession) : `${type} / ${cohort}기`}\n세션 유형: ${type} / 기수: ${cohort}기\n\n`;
+  const promptYearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
+  let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션: ${selectedSession ? sessionLabel(selectedSession) : `${type} / ${promptYearLabel}${cohort}기`}\n세션 유형: ${type} / 기수: ${promptYearLabel}${cohort}기\n\n`;
   let totalQualRows = 0;
 
   PHASES.forEach(phase => {

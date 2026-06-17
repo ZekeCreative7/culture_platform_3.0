@@ -30,25 +30,51 @@ function clippedPct(value) {
   return Math.round(n * 100);
 }
 
-function sparkline(points, width = 360, height = 120) {
+function smoothPath(coords) {
+  if (coords.length < 2) return "";
+  let path = `M${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const curr = coords[i];
+    const next = coords[i + 1];
+    const midX = (curr.x + next.x) / 2;
+    const midY = (curr.y + next.y) / 2;
+    path += ` Q${curr.x.toFixed(1)} ${curr.y.toFixed(1)} ${midX.toFixed(1)} ${midY.toFixed(1)}`;
+  }
+  const last = coords[coords.length - 1];
+  path += ` T${last.x.toFixed(1)} ${last.y.toFixed(1)}`;
+  return path;
+}
+
+function sparkline(points, width = 360, height = 130) {
   const values = points.map((point) => point.value).filter((value) => typeof value === "number");
   if (!values.length) return "";
   const min = Math.min(...values, 0.3);
   const max = Math.max(...values, 0.8);
-  const pad = 22;
+  const pad = 24;
   const xStep = points.length > 1 ? (width - pad * 2) / (points.length - 1) : 0;
   const yFor = (value) => height - pad - ((value - min) / (max - min || 1)) * (height - pad * 2);
-  const coords = points.map((point, index) => ({ ...point, x: pad + xStep * index, y: yFor(point.value) }));
-  const path = coords.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+  const coords = points.map((point, index) => {
+    const prev = points[index - 1]?.value;
+    const delta = prev !== undefined ? point.value - prev : null;
+    return { ...point, delta, x: pad + xStep * index, y: yFor(point.value) };
+  });
+  const path = smoothPath(coords);
   return `
     <svg class="pulse-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="전사 추이 라인">
+      <defs>
+        <linearGradient id="pulseTrendGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="var(--blue-mid)" />
+          <stop offset="100%" stop-color="var(--neon-purple)" />
+        </linearGradient>
+      </defs>
       <path class="grid" d="M${pad} ${height - pad} H${width - pad}" />
       <path class="line" d="${path}" />
       ${coords.map((point) => `
         <g>
           <circle cx="${point.x}" cy="${point.y}" r="5" />
-          <text x="${point.x}" y="${point.y - 12}" text-anchor="middle">${pct(point.value)}</text>
-          <text x="${point.x}" y="${height - 5}" text-anchor="middle">${point.year}</text>
+          <text class="value" x="${point.x}" y="${point.y - 22}" text-anchor="middle">${pct(point.value)}</text>
+          ${point.delta !== null ? `<text class="delta ${toneForDelta(point.delta)}" x="${point.x}" y="${point.y - 10}" text-anchor="middle">${deltaLabel(point.delta)}</text>` : ""}
+          <text class="year" x="${point.x}" y="${height - 5}" text-anchor="middle">${point.year}</text>
         </g>
       `).join("")}
     </svg>
@@ -157,19 +183,6 @@ function renderTrend(yearDocs) {
   return `
     <div class="pulse-trend-visual">
       ${sparkline(points)}
-      <div class="pulse-trend">
-        ${points.map((point, index) => {
-          const prev = points[index - 1]?.value;
-          const delta = prev !== undefined ? point.value - prev : null;
-          return `
-            <div class="pulse-trend-point">
-              <strong>${pct(point.value)}</strong>
-              <span>${point.year}</span>
-              <small class="${toneForDelta(delta)}">${delta === null ? `${point.questionCount}문항 기준` : deltaLabel(delta)}</small>
-            </div>
-          `;
-        }).join("")}
-      </div>
     </div>
   `;
 }

@@ -445,6 +445,34 @@ function sessionsForCohort(cohort) {
     .sort((a, b) => `${a.type} ${sessionLabel(a)}`.localeCompare(`${b.type} ${sessionLabel(b)}`, "ko"));
 }
 
+// 기수(cohort)는 세션 유형별로 따로 매겨진다 — 팀빌딩 1·2기, 리더십 1·2기, 협업 1·2기는 서로 다른
+// 기수다. 분석/리포트 필터는 "유형 → 기수 → 세션" 순으로 좁혀야 하므로 유형 기준 헬퍼를 둔다.
+function availableSessionTypes() {
+  const present = new Set((state.sessions || []).map((s) => normalizeSessionType(s.type)));
+  return Object.keys(SESSION_TYPES).filter((t) => present.has(t));
+}
+
+function cohortsForType(type) {
+  const cohorts = (state.sessions || [])
+    .filter((s) => sameSessionType(s.type, type))
+    .map((s) => Number(s.cohort))
+    .filter(Boolean);
+  return [...new Set(cohorts)].sort((a, b) => a - b);
+}
+
+function sessionsForTypeCohort(type, cohort) {
+  const cohortNum = Number(cohort);
+  return (state.sessions || [])
+    .filter((s) => sameSessionType(s.type, type) && Number(s.cohort) === cohortNum)
+    .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
+}
+
+function yearForCohortType(cohort, type) {
+  const cohortNum = Number(cohort);
+  const match = (state.sessions || []).find((s) => sameSessionType(s.type, type) && Number(s.cohort) === cohortNum);
+  return match ? sessionYear(match) : "";
+}
+
 function targetCountForSession(session) {
   if (!session) return 0;
   if (Array.isArray(session.members) && session.members.length) return session.members.length;
@@ -487,22 +515,48 @@ function statsForSession(cohort, sessionId) {
   });
 }
 
-function ensureScopedSelection(kind, cohorts = allCohorts()) {
-  const cohortField = kind === "analytics" ? "selectedAnalyticsCohort" : "selectedReportCohort";
-  const sessionField = kind === "analytics" ? "selectedAnalyticsSessionId" : "selectedReportSessionId";
-  if (!state[cohortField] && cohorts.length) state[cohortField] = String(cohorts[0]);
-  const sessions = sessionsForCohort(state[cohortField]);
+function ensureScopedSelection(kind) {
+  const typeField    = kind === "analytics" ? "selectedAnalyticsType"     : "selectedReportType";
+  const cohortField  = kind === "analytics" ? "selectedAnalyticsCohort"   : "selectedReportCohort";
+  const sessionField = kind === "analytics" ? "selectedAnalyticsSessionId": "selectedReportSessionId";
+
+  // 1) 유형: 세션이 존재하는 유형으로 보정
+  const types = availableSessionTypes();
+  if (!types.includes(normalizeSessionType(state[typeField]))) {
+    state[typeField] = types[0] || normalizeSessionType(state[typeField] || "팀빌딩");
+  }
+  const type = normalizeSessionType(state[typeField]);
+
+  // 2) 기수: 그 유형에 존재하는 기수로 보정
+  const cohorts = cohortsForType(type);
+  if (!cohorts.includes(Number(state[cohortField]))) {
+    state[cohortField] = cohorts.length ? String(cohorts[0]) : "";
+  }
+  const cohort = Number(state[cohortField] || 0);
+
+  // 3) 세션: 그 유형+기수에 속한 세션으로 보정
+  const sessions = sessionsForTypeCohort(type, cohort);
   if (!sessions.some((session) => session.id === state[sessionField])) {
     state[sessionField] = sessions[0]?.id || "";
   }
-  return { cohort: Number(state[cohortField] || 0), sessions, session: sessions.find((item) => item.id === state[sessionField]) || null };
+  return { type, cohort, cohorts, sessions, session: sessions.find((item) => item.id === state[sessionField]) || null };
 }
 
-function scopedSessionOptions(cohort, selectedSessionId = "") {
-  const sessions = sessionsForCohort(cohort);
+function scopedSessionOptions(type, cohort, selectedSessionId = "") {
+  const sessions = sessionsForTypeCohort(type, cohort);
   return sessions.length
-    ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</option>`).join("")
+    ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(sessionLabel(session))}</option>`).join("")
     : `<option value="">선택 가능한 세션 없음</option>`;
+}
+
+function cohortOptionsHtml(type, selectedCohort) {
+  const cohorts = cohortsForType(type);
+  if (!cohorts.length) return `<option value="">응답 없음</option>`;
+  return cohorts.map((c) => {
+    const yl = yearForCohortType(c, type) ? `${yearForCohortType(c, type)}년 ` : "";
+    const count = sessionsForTypeCohort(type, c).length;
+    return `<option value="${c}" ${Number(selectedCohort) === c ? "selected" : ""}>${yl}${c}기${count ? ` · ${count}개 세션` : ""}</option>`;
+  }).join("");
 }
 
 function surveyRows(survey) {
@@ -2213,12 +2267,13 @@ function allCohorts() {
 }
 
 function renderAnalytics() {
-  const cohorts = allCohorts();
-  const scope = ensureScopedSelection("analytics", cohorts);
+  const scope = ensureScopedSelection("analytics");
+  const type = scope.type;
   const cohort = scope.cohort;
+  const cohorts = scope.cohorts;
   const session = scope.session;
   const sessionId = session?.id || "";
-  const type = normalizeSessionType(session?.type || state.selectedAnalyticsType || "리더십");
+  const types = availableSessionTypes();
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
 
   return `
@@ -2232,23 +2287,24 @@ function renderAnalytics() {
     
     <section class="panel filters-panel" style="margin-bottom:18px;">
       <div class="form-grid compact scoped-filter-grid">
-        <label>대상 기수 선택
+        <label>세션 유형
+          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics')">
+            ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
+          </select>
+        </label>
+        <label>대상 기수
           <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics')">
-            ${cohorts.length ? cohorts.map(c => {
-              const yearLabel = yearForCohort(c) ? `${yearForCohort(c)}년 ` : '';
-              const count = (state.sessions || []).filter(s => Number(s.cohort) === Number(c)).length;
-              return `<option value="${c}" ${cohort === c ? "selected" : ""}>${yearLabel}${c}기${count ? ` · ${count}개 세션` : ''}</option>`;
-            }).join("") : `<option value="">응답 없음</option>`}
+            ${cohortOptionsHtml(type, cohort)}
           </select>
         </label>
         <label>세션 선택
           <select id="analytics-session-select">
-            ${scopedSessionOptions(cohort, sessionId)}
+            ${scopedSessionOptions(type, cohort, sessionId)}
           </select>
         </label>
         <button class="primary" id="apply-analytics-filter" type="button">적용</button>
       </div>
-      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
+      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
     </section>
 
     ${cohort ? (() => {
@@ -2344,7 +2400,7 @@ function renderAnalytics() {
           : (phasesWithData[phasesWithData.length - 1] || "사후");
         const phaseMeta = session
           ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)} · ${activePhase}`
-          : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기 · ${activePhase}`;
+          : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 · ${activePhase}`;
         return `
       <div class="phase-tabs" role="tablist" aria-label="설문 시점">
         ${PHASES.map((p) => {
@@ -2508,12 +2564,13 @@ function dimRecommendation(key, score) {
 }
 
 function renderReport() {
-  const cohorts = allCohorts();
-  const scope = ensureScopedSelection("report", cohorts);
+  const scope = ensureScopedSelection("report");
+  const type = scope.type;
   const cohort = scope.cohort;
+  const cohorts = scope.cohorts;
   const session = scope.session;
   const sessionId = session?.id || "";
-  const type = normalizeSessionType(session?.type || state.selectedReportType || "리더십");
+  const types = availableSessionTypes();
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
   const pre  = stats[0] || null;
   const mid  = stats[1] || null;
@@ -2534,23 +2591,24 @@ function renderReport() {
 
     <section class="panel filters-panel" style="margin-bottom:18px;">
       <div class="form-grid compact scoped-filter-grid">
+        <label>세션 유형
+          <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
+            ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
+          </select>
+        </label>
         <label>대상 기수
           <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
-            ${cohorts.length ? cohorts.map(c => {
-              const yearLabel = yearForCohort(c) ? `${yearForCohort(c)}년 ` : '';
-              const count = (state.sessions || []).filter(s => Number(s.cohort) === Number(c)).length;
-              return `<option value="${c}" ${cohort===c?"selected":""}>${yearLabel}${c}기${count ? ` · ${count}개 세션` : ''}</option>`;
-            }).join("") : `<option value="">세션 없음</option>`}
+            ${cohortOptionsHtml(type, cohort)}
           </select>
         </label>
         <label>세션 선택
           <select id="report-session-select">
-            ${scopedSessionOptions(cohort, sessionId)}
+            ${scopedSessionOptions(type, cohort, sessionId)}
           </select>
         </label>
         <button class="primary" id="apply-report-filter" type="button">적용</button>
       </div>
-      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
+      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
     </section>
 
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
@@ -2559,7 +2617,7 @@ function renderReport() {
     <section style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>① 현 상황 진단</h2>
-        <span>사전 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기 ${type}`} · N=${pre ? pre.n : 0}</span>
+        <span>사전 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${pre ? pre.n : 0}</span>
       </div>
       ${!hasPreData ? `<div class="empty">사전 설문 응답이 없습니다. 사전 설문을 진행한 후 진단이 가능합니다.</div>` : `
       <div style="display:grid; grid-template-columns: 220px 1fr; gap:20px; align-items:start;">
@@ -3811,13 +3869,13 @@ function bindReport() {
   });
 
   document.querySelector("#apply-analytics-filter")?.addEventListener("click", () => {
+    const typeVal = document.querySelector("#analytics-type-select")?.value || "";
     const cohort = document.querySelector("#analytics-cohort-select")?.value || "";
     const sessionId = document.querySelector("#analytics-session-select")?.value || "";
     if (sessionId !== state.selectedAnalyticsSessionId) state.selectedAnalyticsPhase = "";
+    if (typeVal) state.selectedAnalyticsType = normalizeSessionType(typeVal);
     state.selectedAnalyticsCohort = cohort;
     state.selectedAnalyticsSessionId = sessionId;
-    const session = (state.sessions || []).find((item) => item.id === sessionId);
-    state.selectedAnalyticsType = session?.type || state.selectedAnalyticsType;
     saveState();
     render();
   });
@@ -3830,12 +3888,12 @@ function bindReport() {
   });
 
   document.querySelector("#apply-report-filter")?.addEventListener("click", () => {
+    const typeVal = document.querySelector("#report-type-select")?.value || "";
     const cohort = document.querySelector("#report-cohort-select")?.value || "";
     const sessionId = document.querySelector("#report-session-select")?.value || "";
+    if (typeVal) state.selectedReportType = normalizeSessionType(typeVal);
     state.selectedReportCohort = cohort;
     state.selectedReportSessionId = sessionId;
-    const session = (state.sessions || []).find((item) => item.id === sessionId);
-    state.selectedReportType = session?.type || state.selectedReportType;
     saveState();
     render();
   });
@@ -4587,7 +4645,7 @@ function renderQualModal(qualKey, cohort, type, sessionId = "") {
   // Count total responses for this cohort (any qual field)
   const cohortNum = Number(cohort);
   const totalResponses = (state.responses || []).filter(r => r.cohort === cohortNum).length;
-  const cohortYearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
+  const cohortYearLabel = yearForCohortType(cohort, type) ? `${yearForCohortType(cohort, type)}년 ` : '';
 
   return `
     <div class="modal-overlay" id="qual-modal-overlay">
@@ -4672,7 +4730,7 @@ function buildQualPrompt(cohort, type, sessionId = "") {
     return qid;
   };
 
-  const promptYearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
+  const promptYearLabel = yearForCohortType(cohort, type) ? `${yearForCohortType(cohort, type)}년 ` : '';
   let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션: ${selectedSession ? sessionLabel(selectedSession) : `${sessionTypeLabel(type)} / ${promptYearLabel}${cohort}기`}\n세션 유형: ${sessionTypeLabel(type)} / 기수: ${promptYearLabel}${cohort}기\n\n`;
   let totalQualRows = 0;
 
@@ -4760,11 +4818,22 @@ window.updateReportFilter = function(field, val) {
   render();
 };
 
+window.refreshScopedTypeSelect = function(kind) {
+  const typeEl = document.getElementById(`${kind}-type-select`);
+  const cohortEl = document.getElementById(`${kind}-cohort-select`);
+  const sessionEl = document.getElementById(`${kind}-session-select`);
+  if (!typeEl || !cohortEl || !sessionEl) return;
+  const type = typeEl.value;
+  cohortEl.innerHTML = cohortOptionsHtml(type, "");
+  sessionEl.innerHTML = scopedSessionOptions(type, cohortEl.value, "");
+};
+
 window.refreshScopedSessionSelect = function(kind) {
+  const typeEl = document.getElementById(`${kind}-type-select`);
   const cohortEl = document.getElementById(`${kind}-cohort-select`);
   const sessionEl = document.getElementById(`${kind}-session-select`);
   if (!cohortEl || !sessionEl) return;
-  sessionEl.innerHTML = scopedSessionOptions(cohortEl.value, "");
+  sessionEl.innerHTML = scopedSessionOptions(typeEl ? typeEl.value : "", cohortEl.value, "");
 };
 
 window.addEventListener('storage', (e) => {

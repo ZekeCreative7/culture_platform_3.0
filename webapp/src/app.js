@@ -1,6 +1,10 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp } from './firebase.js';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
+import { assertNotQuantInput } from './qual/qual-signal.js';
+import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js';
+import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
+
 
 const PHASES = ["사전", "사후"];
 const QUANT_LABELS = {
@@ -199,6 +203,7 @@ const blankState = () => ({
   activeView: "dashboard",
   sessions: [],
   responses: [],
+  qualSignals: [],
   draftType: "리더십",
   draftSchedule: makeSchedule("리더십"),
   draftCohort: 1,
@@ -277,7 +282,7 @@ function loadState() {
 function saveState() {
   normalizeAppState(state);
   const { 
-    activeView, sessions, responses, draftType, draftSchedule, draftCohort, draftYear,
+    activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
     orgUnits, orgMembers, surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
@@ -289,7 +294,7 @@ function saveState() {
     pulseView, pulseDeptId, pulseLayer, pulseYear
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
-    activeView, sessions, responses, draftType, draftSchedule, draftCohort, draftYear,
+    activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
     orgUnits, orgMembers, surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
@@ -378,6 +383,7 @@ function normalizeAppState(nextState) {
   nextState.draftType = normalizeSessionType(nextState.draftType);
   nextState.selectedAnalyticsType = normalizeSessionType(nextState.selectedAnalyticsType);
   nextState.selectedReportType = normalizeSessionType(nextState.selectedReportType);
+  nextState.qualSignals = nextState.qualSignals || [];
   // 설문 시점은 사전/사후 2단계만 운용한다 — 과거에 저장된 "중간" 초안/선택값은 사전으로 보정.
   if (!PHASES.includes(nextState.draftSurveyPhase)) nextState.draftSurveyPhase = "사전";
   if (nextState.selectedAnalyticsPhase && !PHASES.includes(nextState.selectedAnalyticsPhase)) nextState.selectedAnalyticsPhase = "";
@@ -499,6 +505,7 @@ function phaseHasQuantQuestions(sessionId, phase) {
 }
 
 function statsForSession(cohort, sessionId) {
+  (state.responses || []).forEach(assertNotQuantInput);
   // A sessionId uniquely identifies a session (and therefore its cohort), so we match purely by
   // sessionId + phase. The cohort field on a response is only a snapshot and can drift away from
   // its session (e.g. a survey created while the session was a different 기수) — gating on it here
@@ -872,6 +879,7 @@ function applyLeaderSelection(unit, selectValue) {
 }
 
 function statsForCohort(cohort, type = "리더십") {
+  (state.responses || []).forEach(assertNotQuantInput);
   const dynamicQuestions = getQuestionsForCohort(cohort, type);
   return PHASES.map((phase) => {
     const rows = state.responses.filter((row) => row.cohort === Number(cohort) && row.phase === phase);
@@ -924,7 +932,7 @@ function parseCSV(text, sessionId, phase) {
       cohort: Number(cells[tagToIndex["기수"]] || 0),
       createdAt: new Date().toISOString(),
     };
-    
+
     // Parse quant questions
     questions.filter(q => q.type === "quant").forEach((q) => {
       const key = q.id;
@@ -2520,6 +2528,7 @@ const REPORT_DIMS = [
 ];
 
 function dimAvg(phaseStats, qs) {
+  assertNotQuantInput(phaseStats);
   if (!phaseStats) return null;
   const vals = qs.map(q => phaseStats[`${q}_avg`]).filter(v => typeof v === 'number');
   return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
@@ -2761,27 +2770,57 @@ function renderReport() {
       `}
     </section>
 
-    <!-- ④ 정성 분석 -->
+    <!-- ④ 현장의 목소리 (정성 신호) -->
     ${(() => {
-      const qualKey = `${cohort}-${sessionId || type}`;
-      const saved = (state.qualAnalysis || {})[qualKey] || '';
-      const parsed = parseQualResult(saved);
-      return `
-    <section style="margin-bottom:28px;">
-      <div class="section-title" style="margin-bottom:16px;">
-        <h2>④ 주관식 응답 AI 분석</h2>
-        <button class="secondary compact" onclick="openQualModal('${qualKey}')">
-          ${saved ? '분석 수정' : 'AI 분석 시작'}
-        </button>
-      </div>
-      ${saved
-        ? parsed
-          ? `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">${renderQualSections(parsed)}</div>`
-          : `<div class="panel" style="padding:22px 26px;"><div style="font-size:13.5px; line-height:2; color:#0c2340; white-space:pre-wrap;">${escapeHtml(saved)}</div></div>`
-        : `<div class="empty">아직 AI 분석 결과가 없습니다. <button class="ghost compact" style="margin-left:6px;" onclick="openQualModal('${qualKey}')">분석 시작</button></div>`
+      if (!session) return '';
+
+      const preSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
+      const postSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
+
+      const preQual = qualResponseRows(session.cohort, session.type, session.id, "사전");
+      const postQual = qualResponseRows(session.cohort, session.type, session.id, "사후");
+
+      const hasPreQual = preQual.rows.length > 0;
+      const hasPostQual = postQual.rows.length > 0;
+
+      if (!hasPreQual && !hasPostQual) {
+        return `
+          <section style="margin-bottom:28px;">
+            <div class="section-title" style="margin-bottom:16px;">
+              <h2>④ 현장의 목소리 (정성 신호)</h2>
+            </div>
+            <div class="empty">이 세션에는 분석할 주관식 응답 데이터가 없습니다.</div>
+          </section>
+        `;
       }
-    </section>
-    ${state.showQualModal && state.activeQualKey === qualKey ? renderQualModal(qualKey, cohort, type, sessionId) : ''}
+
+      return `
+        <section style="margin-bottom:28px;">
+          <div class="section-title" style="margin-bottom:16px;">
+            <h2>④ 현장의 목소리 (정성 신호)</h2>
+            <span>AI 정성 분석 · 측정값 아님 · 참고</span>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+            <div>
+              <div style="font-size:14px; font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                <span>사전 정성 신호</span>
+                ${hasPreQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'pre')" style="font-size:11px; padding:3px 8px;">${preSig ? '분석 수정' : '분석 시작'}</button>` : ''}
+              </div>
+              <div id="qual-signal-pre-container">
+                ${preSig ? '' : `<div class="empty">${hasPreQual ? '사전 정성 분석 결과가 없습니다. 위의 버튼을 눌러 분석을 진행하세요.' : '사전 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
+              </div>
+            </div>
+            <div>
+              <div style="font-size:14px; font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                <span>사후 정성 신호</span>
+                ${hasPostQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'post')" style="font-size:11px; padding:3px 8px;">${postSig ? '분석 수정' : '분석 시작'}</button>` : ''}
+              </div>
+              <div id="qual-signal-post-container">
+                ${postSig ? '' : `<div class="empty">${hasPostQual ? '사후 정성 분석 결과가 없습니다. 위의 버튼을 눌러 분석을 진행하세요.' : '사후 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
+              </div>
+            </div>
+          </div>
+        </section>
       `;
     })()}
 
@@ -2902,6 +2941,26 @@ function sessionCard(session) {
   const total     = session.schedule.length;
   const uploadCount = phasesForSession(session.id).length;
   const isEditing = state.editingSessionId === session.id;
+
+  const preQual = qualResponseRows(session.cohort, session.type, session.id, "사전");
+  const postQual = qualResponseRows(session.cohort, session.type, session.id, "사후");
+
+  const hasPreQual = preQual.rows.length > 0;
+  const hasPostQual = postQual.rows.length > 0;
+
+  let qualButtons = '';
+  if (hasPreQual || hasPostQual) {
+    const hasPreSig = (state.qualSignals || []).some(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
+    const hasPostSig = (state.qualSignals || []).some(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
+
+    qualButtons = `
+      <div class="session-qual-actions" style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; border-top: 0.5px solid var(--color-border-tertiary,#eee); padding-top: 10px;">
+        ${hasPreQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'pre')" style="font-size: 11px; padding: 4px 8px;">${hasPreSig ? '정성 분석 수정 (사전) ✓' : '정성 분석 (사전)'}</button>` : ''}
+        ${hasPostQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'post')" style="font-size: 11px; padding: 4px 8px;">${hasPostSig ? '정성 분석 수정 (사후) ✓' : '정성 분석 (사후)'}</button>` : ''}
+      </div>
+    `;
+  }
+
   return `
     <article class="session-card compact${isEditing ? ' editing' : ''}">
       <div class="session-card-actions">
@@ -2920,6 +2979,7 @@ function sessionCard(session) {
         <span title="날짜 미정 또는 미확정 회차">⏳ 미확정 ${total - confirmed}회차</span>
         <span title="사전/사후 설문 CSV 업로드 완료 단계">📊 설문 응답 업로드 ${uploadCount}/2단계</span>
       </div>
+      ${qualButtons}
     </article>
   `;
 }
@@ -3192,7 +3252,7 @@ function bindOrg() {
   document.querySelector("#btn-org-search")?.addEventListener("click", () => {
     const query = document.querySelector("#org-search-input").value.trim();
     state.orgSearchQuery = query;
-    
+
     if (query) {
       // Find matching member or unit and reveal parents
       const matchMember = state.orgMembers.find(m => m.name.toLowerCase().includes(query.toLowerCase()));
@@ -3898,6 +3958,27 @@ function bindReport() {
     saveState();
     render();
   });
+
+  const preContainer = document.getElementById("qual-signal-pre-container");
+  const postContainer = document.getElementById("qual-signal-post-container");
+  if (preContainer || postContainer) {
+    const scope = ensureScopedSelection("report");
+    const session = scope.session;
+    if (session) {
+      if (preContainer) {
+        const preSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
+        if (preSig) {
+          renderQualSignalPanel(preContainer, { qualSignal: preSig });
+        }
+      }
+      if (postContainer) {
+        const postSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
+        if (postSig) {
+          renderQualSignalPanel(postContainer, { qualSignal: postSig });
+        }
+      }
+    }
+  }
 }
 
 // ── Survey Builder Helpers ─────────────────────────────────────
@@ -4634,6 +4715,15 @@ async function initApp() {
   }, (err) => {
     console.error('Firestore 응답 실시간 리스너 오류:', err);
   });
+
+  // Real-time listener for QualSignal — updates report and session status
+  onSnapshot(collection(db, 'QualSignal'), (snap) => {
+    state.qualSignals = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    saveState();
+    render();
+  }, (err) => {
+    console.error('Firestore QualSignal 실시간 리스너 오류:', err);
+  });
 }
 
 // ── Qualitative Analysis Modal ────────────────────────────────────
@@ -4806,6 +4896,82 @@ window.saveQualAnalysisFromModal = function(qualKey) {
   saveState();
   render();
 };
+
+async function saveQualSignalToFirestore(qualSignal) {
+  try {
+    const docId = `${qualSignal.session_id}__${qualSignal.phase}`;
+    await setDoc(doc(db, 'QualSignal', docId), qualSignal);
+
+    const idx = state.qualSignals.findIndex(q => q.id === docId);
+    if (idx >= 0) {
+      state.qualSignals[idx] = { ...qualSignal, id: docId };
+    } else {
+      state.qualSignals.push({ ...qualSignal, id: docId });
+    }
+    saveState();
+    render();
+  } catch (e) {
+    console.error('QualSignal 저장 실패:', e);
+    throw e;
+  }
+}
+
+window.openQualAnalysisModal = function(sessionId, phase) {
+  const session = state.sessions.find(s => s.id === sessionId);
+  if (!session) return;
+  const koreanPhase = phase === 'pre' ? '사전' : '사후';
+  const { qualIds, rows } = qualResponseRows(session.cohort, session.type, session.id, koreanPhase);
+  const formattedResponses = [];
+  rows.forEach(row => {
+    qualIds.forEach(qid => {
+      const ans = row[qid];
+      if (isQualText(ans)) {
+        formattedResponses.push({
+          question: qualQuestionLabel(qid, session.type, session.id, koreanPhase),
+          answer: ans
+        });
+      }
+    });
+  });
+
+  let modalMount = document.getElementById('qual-analysis-modal-container');
+  if (!modalMount) {
+    modalMount = document.createElement('div');
+    modalMount.id = 'qual-analysis-modal-container';
+    document.body.appendChild(modalMount);
+  }
+
+  modalMount.style.position = 'fixed';
+  modalMount.style.top = '0';
+  modalMount.style.left = '0';
+  modalMount.style.right = '0';
+  modalMount.style.bottom = '0';
+  modalMount.style.zIndex = '2000';
+  modalMount.style.display = 'flex';
+  modalMount.style.alignItems = 'center';
+  modalMount.style.justifyContent = 'center';
+  modalMount.style.background = 'rgba(6,15,38,0.45)';
+  modalMount.style.backdropFilter = 'blur(8px)';
+
+  const hasConfig = (state.surveys || []).some(s => s.sessionId === session.id && s.phase === koreanPhase && (s.questions || []).length > 0);
+  const sessionClone = {
+    ...session,
+    analyzed_n: rows.length,
+    team_id: session.type === '팀빌딩' ? (session.team || session.teamId) : (session.team || `${session.cohort}기 ${session.type}`),
+    session_type: session.type === '팀빌딩' ? 'teambuilding' : session.type === '리더십' ? 'leadership' : 'collaboration',
+    phase: phase,
+    instrument_version: hasConfig ? 'current' : 'legacy'
+  };
+
+  renderQualAnalysisModal(modalMount, {
+    session: sessionClone,
+    responses: formattedResponses,
+    onConfirm: async (qualSignal) => {
+      await saveQualSignalToFirestore(qualSignal);
+    }
+  });
+};
+
 
 window.updateAnalyticsFilter = function(field, val) {
   state[field] = val;

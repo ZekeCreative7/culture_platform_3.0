@@ -68,7 +68,9 @@ const UNIT_LEADER_LABELS = {
 const SCORE_MAP = {
   "매우 그렇다": 5,
   그렇다: 4,
+  "조금 그렇다": 3,
   보통: 3,
+  보통이다: 3,
   "그렇지 않다": 2,
   아니다: 2,
   "전혀 그렇지 않다": 1,
@@ -78,6 +80,16 @@ const SCORE_MAP = {
   "해당 없음": null,
   "": null,
 };
+// 척도(객관식) 집계용 점수 변환 — 이미 숫자면 그대로, 척도 보기 텍스트(예: "그렇다")는 SCORE_MAP으로
+// 환산한다. q11처럼 업로드 당시 주관식으로 저장돼 글자로 남은 척도 답변도 정량 집계에 들어오게 한다.
+function scoreOf(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const t = value === undefined || value === null ? "" : String(value).trim();
+  if (t === "") return null;
+  const n = Number(t);
+  if (Number.isFinite(n)) return n;
+  return SCORE_MAP[t] ?? null;
+}
 // 5점 척도(Likert) 선택지 텍스트 모음 — 자유 서술이 아니다. 어떤 문항이 주관식으로 잘못 분류돼도
 // 이런 척도 답변이 정성(주관식) 응답 영역에 새어 들어오지 않게 거른다. (예: DT기획팀 사후 q11)
 const SCALE_LABELS = new Set([
@@ -468,7 +480,7 @@ function statsForSession(cohort, sessionId) {
     const stats = { phase, n: rows.length };
     questions.forEach((q) => {
       const key = q.id;
-      const values = rows.map((row) => row[key]).filter((v) => typeof v === "number");
+      const values = rows.map((row) => scoreOf(row[key])).filter((v) => typeof v === "number");
       stats[`${key}_avg`] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
     });
     return stats;
@@ -811,7 +823,7 @@ function statsForCohort(cohort, type = "리더십") {
     const stats = { phase, n: scoped.length };
     dynamicQuestions.forEach((q) => {
       const key = q.id;
-      const values = scoped.map((row) => row[key]).filter((v) => typeof v === "number");
+      const values = scoped.map((row) => scoreOf(row[key])).filter((v) => typeof v === "number");
       stats[`${key}_avg`] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
     });
     return stats;
@@ -1909,7 +1921,7 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
   const questions = surveyQuestionsForDistribution(survey);
 
   const distributionRows = questions.map((q) => {
-    const counts = [5, 4, 3, 2, 1].map((score) => rows.filter((row) => Number(row[q.id]) === score).length);
+    const counts = [5, 4, 3, 2, 1].map((score) => rows.filter((row) => scoreOf(row[q.id]) === score).length);
     const total = counts.reduce((sum, value) => sum + value, 0);
     const avg = total
       ? [5, 4, 3, 2, 1].reduce((sum, score, index) => sum + score * counts[index], 0) / total

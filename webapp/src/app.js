@@ -2,7 +2,7 @@ import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnap
 import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 
-const PHASES = ["사전", "중간", "사후"];
+const PHASES = ["사전", "사후"];
 const QUANT_LABELS = {
   q1: "심리안전 1",
   q2: "심리안전 2",
@@ -378,6 +378,9 @@ function normalizeAppState(nextState) {
   nextState.draftType = normalizeSessionType(nextState.draftType);
   nextState.selectedAnalyticsType = normalizeSessionType(nextState.selectedAnalyticsType);
   nextState.selectedReportType = normalizeSessionType(nextState.selectedReportType);
+  // 설문 시점은 사전/사후 2단계만 운용한다 — 과거에 저장된 "중간" 초안/선택값은 사전으로 보정.
+  if (!PHASES.includes(nextState.draftSurveyPhase)) nextState.draftSurveyPhase = "사전";
+  if (nextState.selectedAnalyticsPhase && !PHASES.includes(nextState.selectedAnalyticsPhase)) nextState.selectedAnalyticsPhase = "";
   if (!nextState.draftYear) nextState.draftYear = new Date().getFullYear();
   if (!nextState.draftSchedule?.length) nextState.draftSchedule = makeSchedule(nextState.draftType);
   return nextState;
@@ -1107,7 +1110,7 @@ function renderDashboard() {
       <div>
         ${sectionTitle("이번 주 일정", `${weekItems.length}건`)}
         ${weekItems.length ? weekItems.map(({ session, item }) => eventCard(session, item)).join("") : emptyCard("이번 주 확정된 일정이 없습니다.")}
-        ${sectionTitle("업로드 상태", "사전 · 중간 · 사후")}
+        ${sectionTitle("업로드 상태", "사전 · 사후")}
         ${state.sessions.length ? state.sessions.map(uploadStateCard).join("") : emptyCard("등록된 세션이 없습니다.")}
       </div>
       <div>
@@ -2060,7 +2063,6 @@ function renderSurveyCreator() {
           <label>설문 시점
             <select id="survey-phase-select" onchange="updateSurveyDraftPhase(this.value)">
               <option value="사전" ${state.draftSurveyPhase === "사전" ? "selected" : ""}>사전</option>
-              <option value="중간" ${state.draftSurveyPhase === "중간" ? "selected" : ""}>중간</option>
               <option value="사후" ${state.draftSurveyPhase === "사후" ? "selected" : ""}>사후</option>
             </select>
           </label>
@@ -2281,7 +2283,7 @@ function renderAnalytics() {
       <div>
         <span class="eyebrow">Change analysis</span>
         <h1>기수 및 세션 유형별 문화 변화량 분석</h1>
-        <p>각 기수와 세션 유형을 선택하여 사전, 중간, 사후 설문조사의 만족도 및 정성적 피드백 추이를 분석합니다.</p>
+        <p>각 기수와 세션 유형을 선택하여 사전, 사후 설문조사의 만족도 및 정성적 피드백 추이를 분석합니다.</p>
       </div>
     </section>
     
@@ -2308,9 +2310,9 @@ function renderAnalytics() {
     </section>
 
     ${cohort ? (() => {
-      const pre  = stats[0] || null;
-      const mid  = stats[1] || null;
-      const post = stats[2] || null;
+      const pre  = stats.find(s => s.phase === '사전') || null;
+      const mid  = stats.find(s => s.phase === '중간') || null;
+      const post = stats.find(s => s.phase === '사후') || null;
       const compositeOf = (ps) => {
         if (!ps || ps.n < 1) return null;
         const qs = REPORT_DIMS.flatMap(d => d.qs);
@@ -2331,8 +2333,8 @@ function renderAnalytics() {
       return `
       <!-- Pulse Overview -->
       <section style="margin-bottom:20px;">
-        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; margin-bottom:14px;">
-          ${[['사전', pre, preC, null], ['중간', mid, midC, preC !== null && midC !== null ? midC - preC : null], ['사후', post, postC, overallDelta]].map(([phase, ps, sc, delta], idx) => {
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; margin-bottom:14px;">
+          ${[['사전', pre, preC, null], ['사후', post, postC, overallDelta]].map(([phase, ps, sc, delta], idx) => {
             const n = ps ? ps.n : 0;
             const rag = ragInfo(sc);
             const deltaColor = delta === null ? '#94a3b8' : delta > 0.1 ? '#059669' : delta < -0.1 ? '#dc2626' : '#d97706';
@@ -2572,9 +2574,9 @@ function renderReport() {
   const sessionId = session?.id || "";
   const types = availableSessionTypes();
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
-  const pre  = stats[0] || null;
-  const mid  = stats[1] || null;
-  const post = stats[2] || null;
+  const pre  = stats.find(s => s.phase === '사전') || null;
+  const mid  = stats.find(s => s.phase === '중간') || null;
+  const post = stats.find(s => s.phase === '사후') || null;
 
   const hasPreData  = pre  && pre.n  >= 1;
   const hasPostData = post && post.n >= 1;
@@ -2704,7 +2706,7 @@ function renderReport() {
     <section style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>③ 변화 분석</h2>
-        <span>사전 → 중간 → 사후 · N<3 마스킹 적용</span>
+        <span>사전 → 사후 · N<3 마스킹 적용</span>
       </div>
       ${!hasPreData && !hasPostData ? `<div class="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>` : `
       <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px;">
@@ -2916,7 +2918,7 @@ function sessionCard(session) {
       <div class="session-meta">
         <span title="일정이 확정된 회차 수">📅 일정 확정 ${confirmed}/${total}회차</span>
         <span title="날짜 미정 또는 미확정 회차">⏳ 미확정 ${total - confirmed}회차</span>
-        <span title="사전/중간/사후 설문 CSV 업로드 완료 단계">📊 설문 응답 업로드 ${uploadCount}/3단계</span>
+        <span title="사전/사후 설문 CSV 업로드 완료 단계">📊 설문 응답 업로드 ${uploadCount}/2단계</span>
       </div>
     </article>
   `;
@@ -2968,9 +2970,9 @@ function renderUploadPreview() {
 }
 
 function renderChart(stats, cohort, type, sessionId = "") {
-  const pre = stats[0] || {};
-  const mid = stats[1] || {};
-  const post = stats[2] || {};
+  const pre = stats.find(s => s.phase === '사전') || {};
+  const mid = stats.find(s => s.phase === '중간') || {};
+  const post = stats.find(s => s.phase === '사후') || {};
   const dynamicQuestions = sessionId ? questionSetForSession(sessionId) : getQuestionsForCohort(cohort, type);
   return `
     <div class="chart">
@@ -2996,7 +2998,6 @@ function renderChart(stats, cohort, type, sessionId = "") {
       }).join("")}
       <div class="legend">
         <span><i class="legend-pre"></i>사전</span>
-        <span><i class="legend-mid"></i>중간</span>
         <span><i class="legend-post"></i>사후</span>
       </div>
     </div>
@@ -3004,25 +3005,23 @@ function renderChart(stats, cohort, type, sessionId = "") {
 }
 
 function renderStatsTable(stats, masked, cohort, type, sessionId = "") {
-  const pre = stats[0] || { n: 0 };
-  const mid = stats[1] || { n: 0 };
-  const post = stats[2] || { n: 0 };
+  const pre = stats.find(s => s.phase === '사전') || { n: 0 };
+  const post = stats.find(s => s.phase === '사후') || { n: 0 };
   const shouldMask = masked && (pre.n < 3 || post.n < 3);
   const dynamicQuestions = sessionId ? questionSetForSession(sessionId) : getQuestionsForCohort(cohort, type);
   return `
     <div class="table-wrap">
       <table>
-        <thead><tr><th>문항</th><th>사전</th>${masked ? "" : "<th>중간</th>"}<th>사후</th><th>변화량</th></tr></thead>
+        <thead><tr><th>문항</th><th>사전</th><th>사후</th><th>변화량</th></tr></thead>
         <tbody>
           ${dynamicQuestions.map((q) => {
             const key = q.id;
             const label = q.text;
-            if (shouldMask) return `<tr><td class="table-q-text">${escapeHtml(label)}</td><td>N<3 마스킹</td>${masked ? "" : "<td>N<3 마스킹</td>"}<td>N<3 마스킹</td><td>-</td></tr>`;
+            if (shouldMask) return `<tr><td class="table-q-text">${escapeHtml(label)}</td><td>N<3 마스킹</td><td>N<3 마스킹</td><td>-</td></tr>`;
             const pv = pre[`${key}_avg`];
-            const mv = mid[`${key}_avg`];
             const qv = post[`${key}_avg`];
             const delta = typeof pv === "number" && typeof qv === "number" ? qv - pv : null;
-            return `<tr><td class="table-q-text">${escapeHtml(label)}</td><td>${fmt(pv)}</td>${masked ? "" : `<td>${fmt(mv)}</td>`}<td>${fmt(qv)}</td><td class="${delta > 0 ? "plus" : delta < 0 ? "minus" : ""}">${delta === null ? "-" : delta.toFixed(2)}</td></tr>`;
+            return `<tr><td class="table-q-text">${escapeHtml(label)}</td><td>${fmt(pv)}</td><td>${fmt(qv)}</td><td class="${delta > 0 ? "plus" : delta < 0 ? "minus" : ""}">${delta === null ? "-" : delta.toFixed(2)}</td></tr>`;
           }).join("")}
         </tbody>
       </table>
@@ -3851,13 +3850,15 @@ function bindReport() {
     const stats = sessionId ? statsForSession(cohort, sessionId) : statsForCohort(cohort, type);
     const dynamicQuestions = sessionId ? questionSetForSession(sessionId) : getQuestionsForCohort(cohort, type);
     
+    const preStats = stats.find(s => s.phase === '사전');
+    const postStats = stats.find(s => s.phase === '사후');
     const rows = [["문항", "사전 평균", "사후 평균", "변화량"]];
     dynamicQuestions.forEach((q) => {
       const key = q.id;
       const label = q.text;
-      const pre = stats[0] ? stats[0][`${key}_avg`] : null;
-      const post = stats[2] ? stats[2][`${key}_avg`] : null;
-      const masked = (stats[0] ? stats[0].n : 0) < 3 || (stats[2] ? stats[2].n : 0) < 3;
+      const pre = preStats ? preStats[`${key}_avg`] : null;
+      const post = postStats ? postStats[`${key}_avg`] : null;
+      const masked = (preStats ? preStats.n : 0) < 3 || (postStats ? postStats.n : 0) < 3;
       rows.push(masked ? [label, "N<3 마스킹", "N<3 마스킹", "-"] : [label, fmt(pre), fmt(post), typeof pre === "number" && typeof post === "number" ? (post - pre).toFixed(2) : "-"]);
     });
     const blob = new Blob([rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
@@ -4769,7 +4770,7 @@ function buildQualPrompt(cohort, type, sessionId = "") {
   prompt += `---\n위 응답을 바탕으로 아래 형식에 정확히 맞춰 한국어로 분석해 주세요.\n각 섹션은 반드시 ## 제목으로 시작하세요.\n\n`;
   prompt += `## 핵심 키워드\n(응답 전반에서 가장 자주 등장하는 감정·주제 키워드 5개를 · 로 구분하여 한 줄에)\n\n`;
   prompt += `## 주요 테마\n(사전~사후에 걸쳐 반복되는 핵심 주제 3가지를 **굵은 제목**: 1~2문장 설명 형식으로)\n\n`;
-  prompt += `## 대표 발언\n(가장 인상적인 참가자 발언 2~3개를 각 줄에 "..." 형식으로 인용, 끝에 [사전/중간/사후] 표기)\n\n`;
+  prompt += `## 대표 발언\n(가장 인상적인 참가자 발언 2~3개를 각 줄에 "..." 형식으로 인용, 끝에 [사전/사후] 표기)\n\n`;
   prompt += `## 조직문화 진단\n(Amy Edmondson 심리적 안전감, 팀 회복탄력성, 사일로 현상 등 조직심리 관점에서 이 집단의 특성과 주요 패턴을 3~4문장으로 서술)\n\n`;
   prompt += `## 세션 운영 제언\n(다음 세션을 위한 구체적·실행 가능한 제언 2~3가지를 번호 목록으로)\n`;
   return prompt;

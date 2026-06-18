@@ -15,26 +15,33 @@ const QUANT_LABELS = {
 };
 const SESSION_TYPES = {
   팀빌딩: {
+    english: "Teambuilding",
     weeks: 8,
     accent: "#0071e3",
     desc: "특정 팀의 팀장과 팀원이 함께 참여합니다.",
     template: ["WOW세션", "명상세션", "커뮤니케이션세션", "간담회", "파트너요가", "에너지회복"],
     duration: 60,
   },
-  팀장: {
+  리더십: {
+    english: "Leadership",
     weeks: 4,
     accent: "#138a66",
-    desc: "협업이 필요한 팀장 그룹을 운영합니다.",
+    desc: "협업이 필요한 리더십 그룹을 운영합니다.",
     template: ["웰니스 + WOW세션", "웰니스 + WOW세션", "웰니스 + WOW세션", "웰니스 + WOW세션"],
     duration: 120,
   },
-  크로스펑셔널: {
+  협업: {
+    english: "Collaboration",
     weeks: 6,
     accent: "#b86e00",
-    desc: "팀장 세션에서 차출된 구성원이 실행 과제를 다룹니다.",
-    template: Array(6).fill("크로스펑셔널 세션"),
+    desc: "여러 팀에서 모인 구성원이 실행 과제를 다룹니다.",
+    template: Array(6).fill("협업 세션"),
     duration: 120,
   },
+};
+const SESSION_TYPE_ALIASES = {
+  팀장: "리더십",
+  크로스펑셔널: "협업",
 };
 const POSITION_OPTIONS = ["사장", "부사장", "부문장", "본부장", "이사", "부장", "차장", "과장", "대리", "사원"];
 const POSITION_ALIASES = {
@@ -71,6 +78,19 @@ const SCORE_MAP = {
   "해당 없음": null,
   "": null,
 };
+// 5점 척도(Likert) 선택지 텍스트 모음 — 자유 서술이 아니다. 어떤 문항이 주관식으로 잘못 분류돼도
+// 이런 척도 답변이 정성(주관식) 응답 영역에 새어 들어오지 않게 거른다. (예: DT기획팀 사후 q11)
+const SCALE_LABELS = new Set([
+  "매우 그렇다", "그렇다", "조금 그렇다", "약간 그렇다", "대체로 그렇다",
+  "보통", "보통이다", "그렇지 않다", "조금 그렇지 않다", "약간 그렇지 않다",
+  "아니다", "전혀 그렇지 않다", "전혀 그렇지않다", "전혀 아니다", "전혀아니다", "매우 아니다",
+  "모름", "해당없음", "해당 없음",
+]);
+// 정성 응답으로 표시할 가치가 있는 실제 서술형 답변인지 — 비어있지 않고 척도 선택지가 아닐 것.
+function isQualText(value) {
+  const t = value === undefined || value === null ? "" : String(value).trim();
+  return t !== "" && !SCALE_LABELS.has(t);
+}
 const VIEWS = [
   ["dashboard", "Home", "홈"],
   ["sessions", "Sessions", "세션"],
@@ -119,6 +139,16 @@ const addWeeks = (date, weeks) => {
 const uid = () => Math.floor(Date.now() + Math.random() * 100000).toString(36);
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const normalizeSessionType = (value) => {
+  const clean = String(value || "").trim();
+  return SESSION_TYPE_ALIASES[clean] || (SESSION_TYPES[clean] ? clean : "리더십");
+};
+const sessionTypeLabel = (value) => {
+  const type = normalizeSessionType(value);
+  return `${type} (${SESSION_TYPES[type].english})`;
+};
+const sessionTypeDef = (value) => SESSION_TYPES[normalizeSessionType(value)] || SESSION_TYPES.리더십;
+const sameSessionType = (a, b) => normalizeSessionType(a) === normalizeSessionType(b);
 const normalizePosition = (value, fallback = "사원") => {
   const clean = String(value || "").trim();
   if (!clean) return fallback;
@@ -157,8 +187,8 @@ const blankState = () => ({
   activeView: "dashboard",
   sessions: [],
   responses: [],
-  draftType: "팀장",
-  draftSchedule: makeSchedule("팀장"),
+  draftType: "리더십",
+  draftSchedule: makeSchedule("리더십"),
   draftCohort: 1,
   draftYear: new Date().getFullYear(),
   duplicateSessionWarning: null,
@@ -190,10 +220,11 @@ const blankState = () => ({
     ? 'https://zekecreative7.github.io/culture_platform_3.0/webapp'
     : new URL('.', window.location.href).href.replace(/\/$/, ''),
   selectedAnalyticsCohort: "",
-  selectedAnalyticsType: "팀장",
+  selectedAnalyticsType: "리더십",
   selectedAnalyticsSessionId: "",
+  selectedAnalyticsPhase: "",
   selectedReportCohort: "",
-  selectedReportType: "팀장",
+  selectedReportType: "리더십",
   selectedReportSessionId: "",
   mobileNavOpen: false,
   draftDivisionId: "",
@@ -223,22 +254,23 @@ function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY));
     if (saved && Array.isArray(saved.sessions) && Array.isArray(saved.responses)) {
-      return { ...blankState(), ...saved, uploadRows: [], uploadErrors: [] };
+      return normalizeAppState({ ...blankState(), ...saved, uploadRows: [], uploadErrors: [] });
     }
   } catch {
     // Ignore broken local data and start clean.
   }
-  return blankState();
+  return normalizeAppState(blankState());
 }
 
 function saveState() {
+  normalizeAppState(state);
   const { 
     activeView, sessions, responses, draftType, draftSchedule, draftCohort, draftYear,
     orgUnits, orgMembers, surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
-    selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedReportCohort, selectedReportType, selectedReportSessionId,
+    selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
@@ -250,7 +282,7 @@ function saveState() {
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
-    selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedReportCohort, selectedReportType, selectedReportSessionId,
+    selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
@@ -259,14 +291,16 @@ function saveState() {
 }
 
 function makeSchedule(type) {
+  const sessionType = normalizeSessionType(type);
+  const config = sessionTypeDef(sessionType);
   const base = todayISO();
-  return SESSION_TYPES[type].template.map((content, index) => ({
+  return config.template.map((content, index) => ({
     id: uid(),
     seq: index + 1,
     confirmed: index < 2,
     date: addWeeks(base, index),
     startTime: "10:00",
-    duration: SESSION_TYPES[type].duration,
+    duration: config.duration,
     content,
     note: "",
     status: index < 2 ? "confirmed" : "planned",
@@ -274,22 +308,30 @@ function makeSchedule(type) {
   }));
 }
 
+function sessionYear(session) {
+  const explicit = Number(session?.year);
+  if (explicit) return explicit;
+  const firstDate = sessionStartDate(session);
+  if (firstDate) return Number(firstDate.slice(0, 4));
+  const createdYear = session?.createdAt ? Number(String(session.createdAt).slice(0, 4)) : 0;
+  return createdYear || new Date().getFullYear();
+}
+
 function cohortPrefix(session) {
-  return session.year ? `${session.year}년 ${session.cohort}기` : `${session.cohort}기`;
+  return `${sessionYear(session)}년 ${Number(session?.cohort || 1)}기`;
 }
 
 function sessionLabel(session) {
   if (!session) return "";
-  if (session.type === "팀빌딩") return `${cohortPrefix(session)} · ${session.team || "팀 미지정"}`;
-  if (session.type === "팀장") return `${cohortPrefix(session)} · ${session.participatingTeams || session.hq || "팀장 그룹"}`;
-  if (session.type === "크로스펑셔널" && session.sourceMode === "random") return `${cohortPrefix(session)} · 무작위 크로스펑셔널`;
-  return `${cohortPrefix(session)} · 크로스펑셔널`;
+  const type = normalizeSessionType(session.type);
+  if (type === "팀빌딩") return `${cohortPrefix(session)} · ${session.team || "팀 미지정"}`;
+  return cohortPrefix(session);
 }
 
 function yearForCohort(cohort) {
   const cohortNum = Number(cohort);
-  const match = (state.sessions || []).find((session) => Number(session.cohort) === cohortNum && session.year);
-  return match ? match.year : "";
+  const match = (state.sessions || []).find((session) => Number(session.cohort) === cohortNum);
+  return match ? sessionYear(match) : "";
 }
 
 function hasRoundPassed(item) {
@@ -302,6 +344,31 @@ function hasRoundPassed(item) {
 function sessionStartDate(session) {
   const dates = (session.schedule || []).map((item) => item.date).filter(Boolean);
   return dates.length ? dates.sort()[0] : null;
+}
+
+function normalizeSessionRecord(session) {
+  if (!session) return session;
+  const type = normalizeSessionType(session.type);
+  return {
+    ...session,
+    type,
+    year: sessionYear({ ...session, type }),
+    targetWeeks: session.targetWeeks || sessionTypeDef(type).weeks,
+  };
+}
+
+function normalizeAppState(nextState) {
+  nextState.sessions = (nextState.sessions || []).map(normalizeSessionRecord);
+  nextState.surveys = (nextState.surveys || []).map((survey) => ({
+    ...survey,
+    sessionType: survey.sessionType ? normalizeSessionType(survey.sessionType) : survey.sessionType,
+  }));
+  nextState.draftType = normalizeSessionType(nextState.draftType);
+  nextState.selectedAnalyticsType = normalizeSessionType(nextState.selectedAnalyticsType);
+  nextState.selectedReportType = normalizeSessionType(nextState.selectedReportType);
+  if (!nextState.draftYear) nextState.draftYear = new Date().getFullYear();
+  if (!nextState.draftSchedule?.length) nextState.draftSchedule = makeSchedule(nextState.draftType);
+  return nextState;
 }
 
 function sessionsSortedByStart() {
@@ -318,14 +385,14 @@ function sessionsSortedByStart() {
 function sessionsByTypeGrouped() {
   const sorted = sessionsSortedByStart();
   return Object.keys(SESSION_TYPES).map((type) => {
-    const group = sorted.filter((s) => s.type === type);
+    const group = sorted.filter((s) => sameSessionType(s.type, type));
     if (!group.length) return "";
     const collapsed = (state.collapsedSessionTypeGroups || []).includes(type);
     return `
       <div class="session-type-group">
         <button type="button" class="session-type-group-head" style="--accent:${SESSION_TYPES[type].accent}" onclick="toggleSessionTypeGroup('${type}')">
           <span class="session-type-group-chevron">${collapsed ? "▸" : "▾"}</span>
-          <strong>${escapeHtml(type)}</strong>
+          <strong>${escapeHtml(sessionTypeLabel(type))}</strong>
           <span>${group.length}개</span>
         </button>
         ${collapsed ? "" : `<div class="session-card-grid">${group.map(sessionCard).join("")}</div>`}
@@ -351,7 +418,7 @@ function phasesForSession(sessionId) {
 }
 
 function getQuestionsForCohort(cohort, type) {
-  const sessionIds = state.sessions.filter(s => s.type === type && s.cohort === Number(cohort)).map(s => s.id);
+  const sessionIds = state.sessions.filter(s => sameSessionType(s.type, type) && s.cohort === Number(cohort)).map(s => s.id);
   const survey = state.surveys.find(s => sessionIds.includes(s.sessionId));
   if (survey && survey.questions && survey.questions.length > 0) {
     return survey.questions.filter(q => q.type === "quant");
@@ -379,12 +446,24 @@ function questionSetForSession(sessionId, phase = "사후") {
   return (survey?.questions || defaultQuestions(phase)).filter((q) => q.type === "quant");
 }
 
+// True when this session's 시점(phase) has a survey that is explicitly configured with at least one
+// 객관식(척도) 문항. A survey with no config at all is treated as "has quant" (legacy default set).
+function phaseHasQuantQuestions(sessionId, phase) {
+  const survey = (state.surveys || []).find((s) => s.sessionId === sessionId && s.phase === phase);
+  if (!survey) return true;
+  if (!(survey.questions || []).length) return true;
+  return (survey.questions || []).some((q) => q.type === "quant");
+}
+
 function statsForSession(cohort, sessionId) {
-  const cohortNum = Number(cohort);
+  // A sessionId uniquely identifies a session (and therefore its cohort), so we match purely by
+  // sessionId + phase. The cohort field on a response is only a snapshot and can drift away from
+  // its session (e.g. a survey created while the session was a different 기수) — gating on it here
+  // used to make a session's quant chart go blank even though the responses clearly belong to it.
   const questions = questionSetForSession(sessionId);
   return PHASES.map((phase) => {
     const rows = (state.responses || []).filter((row) =>
-      row.cohort === cohortNum && row.sessionId === sessionId && row.phase === phase
+      row.sessionId === sessionId && row.phase === phase
     );
     const stats = { phase, n: rows.length };
     questions.forEach((q) => {
@@ -410,7 +489,7 @@ function ensureScopedSelection(kind, cohorts = allCohorts()) {
 function scopedSessionOptions(cohort, selectedSessionId = "") {
   const sessions = sessionsForCohort(cohort);
   return sessions.length
-    ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</option>`).join("")
+    ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</option>`).join("")
     : `<option value="">선택 가능한 세션 없음</option>`;
 }
 
@@ -648,7 +727,7 @@ function allMemberCandidates(includeLeaders = false) {
 }
 
 function leaderSessions() {
-  return state.sessions.filter((session) => session.type === "팀장" && Array.isArray(session.leaderGroup) && session.leaderGroup.length);
+  return state.sessions.filter((session) => sameSessionType(session.type, "리더십") && Array.isArray(session.leaderGroup) && session.leaderGroup.length);
 }
 
 function selectedLeaderSession() {
@@ -723,11 +802,11 @@ function applyLeaderSelection(unit, selectValue) {
   unit.leaderRole = UNIT_LEADER_LABELS[unit.level] || "리더";
 }
 
-function statsForCohort(cohort, type = "팀장") {
+function statsForCohort(cohort, type = "리더십") {
   const dynamicQuestions = getQuestionsForCohort(cohort, type);
   return PHASES.map((phase) => {
     const rows = state.responses.filter((row) => row.cohort === Number(cohort) && row.phase === phase);
-    const sessionIds = new Set(state.sessions.filter((s) => s.type === type).map((s) => s.id));
+    const sessionIds = new Set(state.sessions.filter((s) => sameSessionType(s.type, type)).map((s) => s.id));
     const scoped = rows.filter((row) => sessionIds.has(row.sessionId));
     const stats = { phase, n: scoped.length };
     dynamicQuestions.forEach((q) => {
@@ -1043,21 +1122,21 @@ function renderLeaderSessionPanel(divisionList, hqList, teamList) {
   const group = state.draftLeaderGroup || [];
   const alreadyAdded = leader && group.some((item) => item.teamId === leader.teamId);
   return `
-    <div class="session-config-panel">
-      <div class="session-config-head">
-        <strong>팀장 그룹 구성</strong>
-        <span>부문/본부/팀을 선택하고 팀장을 추가합니다. 권장 인원은 6명입니다.</span>
+      <div class="session-config-panel">
+        <div class="session-config-head">
+        <strong>리더십 그룹 구성</strong>
+        <span>부문/본부/팀을 선택하고 리더를 추가합니다. 권장 인원은 6명입니다.</span>
       </div>
       ${renderOrgSelectRow(divisionList, hqList, teamList)}
       <div class="session-picker-actions">
         <div>
-          <strong>${leader ? `${escapeHtml(leader.name)} · ${escapeHtml(leader.teamName)}` : "팀장을 선택해 주세요"}</strong>
+          <strong>${leader ? `${escapeHtml(leader.name)} · ${escapeHtml(leader.teamName)}` : "리더를 선택해 주세요"}</strong>
           <span>${leader ? `${escapeHtml(leader.divisionName)} > ${escapeHtml(leader.hqName)}` : "팀에 등록된 팀장 정보가 있어야 추가할 수 있습니다."}</span>
         </div>
-        <button type="button" class="primary compact" id="add-team-leader" ${!leader || alreadyAdded ? "disabled" : ""}>팀장 추가</button>
+        <button type="button" class="primary compact" id="add-team-leader" ${!leader || alreadyAdded ? "disabled" : ""}>리더 추가</button>
       </div>
       <div class="selection-summary">
-        <strong>선택된 팀장 ${group.length}명</strong>
+        <strong>선택된 리더 ${group.length}명</strong>
         <span>${group.length < 6 ? `권장 인원까지 ${6 - group.length}명 남음` : "권장 인원 충족"}</span>
       </div>
       ${group.length ? `
@@ -1068,11 +1147,11 @@ function renderLeaderSessionPanel(divisionList, hqList, teamList) {
                 <strong>${escapeHtml(item.name)}</strong>
                 <span>${escapeHtml(item.teamName)} · ${escapeHtml(item.position || "팀장")}</span>
               </div>
-              <button type="button" data-remove-leader="${escapeHtml(item.teamId)}" aria-label="팀장 제거">삭제</button>
+              <button type="button" data-remove-leader="${escapeHtml(item.teamId)}" aria-label="리더 제거">삭제</button>
             </div>
           `).join("")}
         </div>
-      ` : `<div class="empty compact">아직 추가된 팀장이 없습니다.</div>`}
+      ` : `<div class="empty compact">아직 추가된 리더가 없습니다.</div>`}
     </div>
   `;
 }
@@ -1085,15 +1164,15 @@ function renderCrossFunctionalPanel() {
   const memberPool = crossMemberPool();
   const selectedMembers = selectedCrossMembers();
   return `
-    <div class="session-config-panel">
-      <div class="session-config-head">
-        <strong>크로스펑셔널 그룹 구성</strong>
-        <span>팀장 세션의 추천 흐름을 쓰거나, 팀장 세션 없이 전체 조직에서 무작위로 구성합니다.</span>
+      <div class="session-config-panel">
+        <div class="session-config-head">
+        <strong>협업 그룹 구성</strong>
+        <span>리더십 세션의 추천 흐름을 쓰거나, 리더십 세션 없이 전체 조직에서 무작위로 구성합니다.</span>
       </div>
       <div class="mode-switch">
         <label class="${mode === "leader-session" ? "active" : ""}">
           <input type="radio" name="cross-mode" value="leader-session" ${mode === "leader-session" ? "checked" : ""} />
-          팀장 세션 기반
+          리더십 세션 기반
         </label>
         <label class="${mode === "random" ? "active" : ""}">
           <input type="radio" name="cross-mode" value="random" ${mode === "random" ? "checked" : ""} />
@@ -1102,9 +1181,9 @@ function renderCrossFunctionalPanel() {
       </div>
 
       ${mode === "leader-session" ? `
-        <label>기준 팀장 세션
+        <label>기준 리더십 세션
           <select id="cross-parent-session" ${sessions.length ? "" : "disabled"}>
-            ${sessions.length ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${parentSession?.id === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))} · ${session.leaderGroup.length}명</option>`).join("") : `<option value="">등록된 팀장 세션 없음</option>`}
+            ${sessions.length ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${parentSession?.id === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))} · ${session.leaderGroup.length}명</option>`).join("") : `<option value="">등록된 리더십 세션 없음</option>`}
           </select>
         </label>
         ${sourceTeams.length ? `
@@ -1120,7 +1199,7 @@ function renderCrossFunctionalPanel() {
               </label>
             `).join("")}
           </div>
-        ` : `<div class="empty compact">먼저 팀장 세션을 등록해야 추천 팀을 불러올 수 있습니다.</div>`}
+        ` : `<div class="empty compact">먼저 리더십 세션을 등록해야 추천 팀을 불러올 수 있습니다.</div>`}
         ${state.draftCrossTeamIds.length ? renderCrossMemberSelector(memberPool, selectedMembers) : ""}
       ` : `
         <div class="random-config-row">
@@ -1174,15 +1253,17 @@ function renderSelectedCrossMembers(selectedMembers) {
 }
 
 function renderSessionConfigPanel(divisionList, hqList, teamList) {
-  if (state.draftType === "팀빌딩") return renderTeamBuildingPanel(divisionList, hqList, teamList);
-  if (state.draftType === "팀장") return renderLeaderSessionPanel(divisionList, hqList, teamList);
+  const type = normalizeSessionType(state.draftType);
+  if (type === "팀빌딩") return renderTeamBuildingPanel(divisionList, hqList, teamList);
+  if (type === "리더십") return renderLeaderSessionPanel(divisionList, hqList, teamList);
   return renderCrossFunctionalPanel();
 }
 
 function canCreateDraftSession() {
-  if (state.draftType === "팀빌딩") return Boolean(state.draftTeamId);
-  if (state.draftType === "팀장") return Boolean((state.draftLeaderGroup || []).length);
-  if (state.draftType === "크로스펑셔널") return Boolean((state.draftCrossMemberIds || []).length);
+  const type = normalizeSessionType(state.draftType);
+  if (type === "팀빌딩") return Boolean(state.draftTeamId);
+  if (type === "리더십") return Boolean((state.draftLeaderGroup || []).length);
+  if (type === "협업") return Boolean((state.draftCrossMemberIds || []).length);
   return false;
 }
 
@@ -1202,7 +1283,7 @@ function renderSessions() {
           <div class="session-meta-row">
             <label>세션 유형
               <select id="session-type">
-                ${Object.keys(SESSION_TYPES).map((type) => `<option ${state.draftType === type ? "selected" : ""}>${type}</option>`).join("")}
+                ${Object.keys(SESSION_TYPES).map((type) => `<option value="${type}" ${normalizeSessionType(state.draftType) === type ? "selected" : ""}>${sessionTypeLabel(type)}</option>`).join("")}
               </select>
             </label>
             <label>기수<input id="cohort" type="number" min="1" value="${state.draftCohort}" /></label>
@@ -1212,8 +1293,8 @@ function renderSessions() {
         </div>
         <div class="schedule-head">
           <div>
-            <strong>${state.draftType}</strong>
-            <span>${SESSION_TYPES[state.draftType].desc}</span>
+            <strong>${sessionTypeLabel(state.draftType)}</strong>
+            <span>${sessionTypeDef(state.draftType).desc}</span>
           </div>
           <button class="secondary small" id="add-round">회차 추가</button>
         </div>
@@ -1586,8 +1667,9 @@ function renderMonthCalendar(year, month) {
         <span class="day-num">${day}</span>
         <div class="day-events">
           ${events.map(({ session, item }) => {
-            const accent = SESSION_TYPES[session.type].accent;
-            const label = session.type === "팀빌딩" ? session.team : (session.type === "팀장" ? (session.participatingTeams || session.hq) : "크펑");
+            const type = normalizeSessionType(session.type);
+            const accent = sessionTypeDef(type).accent;
+            const label = type === "팀빌딩" ? session.team : sessionLabel(session);
             return `
               <div class="calendar-event-pill" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
                 <strong>${item.seq}회</strong> ${escapeHtml(label)}
@@ -1640,13 +1722,13 @@ function renderWeekCalendar(anchorDate) {
         </div>
         <div class="week-day-events">
           ${events.length ? events.map(({ session, item }) => {
-            const accent = SESSION_TYPES[session.type].accent;
+            const accent = sessionTypeDef(session.type).accent;
             const label = sessionLabel(session);
             return `
               <div class="week-event-card" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
                 <div class="time-tag">${item.startTime} (${item.duration}분)</div>
                 <strong>${escapeHtml(item.content)} (${item.seq}회차)</strong>
-                <small>${escapeHtml(session.type)} · ${escapeHtml(label)}</small>
+                <small>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(label)}</small>
               </div>
             `;
           }).join("") : `<div class="no-events-placeholder">일정이 없습니다.</div>`}
@@ -1680,14 +1762,14 @@ function renderDayCalendar(anchorDate) {
       </div>
       <div class="day-events-list">
         ${events.length ? events.map(({ session, item }) => {
-          const accent = SESSION_TYPES[session.type].accent;
+          const accent = sessionTypeDef(session.type).accent;
           const label = sessionLabel(session);
           return `
             <div class="day-event-card" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
               <div class="event-time">${item.startTime} ~ ${addMinutes(item.startTime, item.duration)} (${item.duration}분)</div>
               <div class="event-info">
                 <h3>${escapeHtml(item.content)} (${item.seq}회차)</h3>
-                <p>${escapeHtml(session.type)} · ${escapeHtml(label)}</p>
+                <p>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(label)}</p>
                 ${item.note ? `<small>메모: ${escapeHtml(item.note)}</small>` : ""}
               </div>
               <div class="event-action-badge">상태: ${item.status === 'confirmed' ? '확정' : '예정'}</div>
@@ -1746,7 +1828,7 @@ function renderAttendanceModal() {
         </div>
         <div class="modal-body">
           <div class="attendance-meta">
-            <h3>${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</h3>
+            <h3>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</h3>
             <h4>${item.seq}회차: ${escapeHtml(item.content || "콘텐츠 미확정")}</h4>
             <p><strong>일시:</strong> ${item.date || "미정"} ${item.startTime} (${item.duration}분)</p>
           </div>
@@ -1793,11 +1875,37 @@ function renderAttendanceModal() {
   `;
 }
 
-function renderSurveyResponsePanel(survey, session) {
+function renderSurveyResponsePanel(survey, session, showReset = true) {
   const rows = surveyRows(survey);
   const target = targetCountForSession(session);
   const answered = rows.length;
   const rate = target ? Math.min(100, Math.round((answered / target) * 100)) : 0;
+  // 데이터 리셋은 설문/QR 배포 화면(설문지)에서만 노출한다. Change(변화 분석)는 읽기 전용 분석 화면이라
+  // 실수로 응답을 날리지 않도록 리셋 버튼을 숨긴다.
+  const resetBtn = showReset
+    ? `<button class="ghost compact" style="font-size:11px; color:#ef4444; border-color:#fecaca;" onclick="resetSurveyResponses('${survey.id}')" ${answered ? "" : "disabled"}>데이터 리셋</button>`
+    : "";
+
+  // A survey that is explicitly configured with no 객관식(척도) 문항 — e.g. a 중간 설문 that is
+  // open-ended only — must NOT borrow the default q1~q8 quant questions and show a misleading
+  // distribution against a large response count. Say "객관식 없음" and point to the 정성 영역.
+  const configuredQuant = (survey.questions || []).filter((q) => q.type === "quant");
+  const hasQuestionConfig = (survey.questions || []).length > 0;
+  if (hasQuestionConfig && !configuredQuant.length) {
+    return `
+      <div class="survey-live-panel">
+        <div class="survey-live-head">
+          <div>
+            <strong>객관식 없음</strong>
+            <span>이 설문은 주관식(서술형) 문항만 있습니다. 응답 내용은 정성 응답 영역에서 확인하세요.</span>
+          </div>
+          ${resetBtn ? `<div style="display:flex; align-items:center; gap:10px;">${resetBtn}</div>` : ""}
+        </div>
+        <div class="empty" style="margin-top:12px;">집계할 객관식(척도) 문항이 없습니다.</div>
+      </div>
+    `;
+  }
+
   const questions = surveyQuestionsForDistribution(survey);
 
   const distributionRows = questions.map((q) => {
@@ -1818,7 +1926,7 @@ function renderSurveyResponsePanel(survey, session) {
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           <b>${answered}</b>
-          <button class="ghost compact" style="font-size:11px; color:#ef4444; border-color:#fecaca;" onclick="resetSurveyResponses('${survey.id}')" ${answered ? "" : "disabled"}>데이터 리셋</button>
+          ${resetBtn}
         </div>
       </div>
       ${target ? `
@@ -1875,7 +1983,7 @@ function renderSurveyCreator() {
         </div>
         <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
           <label>설문 제목
-            <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 팀장 세션 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
+            <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 리더십 세션 2026년 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
           </label>
           <label>대상 세션
             <select id="survey-session-select" onchange="updateSurveyDraftField('draftSurveySessionId', this.value)">
@@ -2070,7 +2178,7 @@ function renderUpload() {
         <div class="form-grid compact">
           <label>세션
             <select id="upload-session">
-              ${state.sessions.map((session) => `<option value="${session.id}">${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</option>`).join("")}
+              ${state.sessions.map((session) => `<option value="${session.id}">${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</option>`).join("")}
             </select>
           </label>
           <label>시점
@@ -2098,7 +2206,7 @@ function renderAnalytics() {
   const cohort = scope.cohort;
   const session = scope.session;
   const sessionId = session?.id || "";
-  const type = session?.type || state.selectedAnalyticsType || "팀장";
+  const type = normalizeSessionType(session?.type || state.selectedAnalyticsType || "리더십");
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
 
   return `
@@ -2115,9 +2223,9 @@ function renderAnalytics() {
         <label>대상 기수 선택
           <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics')">
             ${cohorts.length ? cohorts.map(c => {
-              const teamNames = [...new Set((state.sessions || []).filter(s => s.cohort === c).map(s => s.team || s.participatingTeams || '').filter(Boolean))].slice(0, 2).join(', ');
               const yearLabel = yearForCohort(c) ? `${yearForCohort(c)}년 ` : '';
-              return `<option value="${c}" ${cohort === c ? "selected" : ""}>${yearLabel}${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
+              const count = (state.sessions || []).filter(s => Number(s.cohort) === Number(c)).length;
+              return `<option value="${c}" ${cohort === c ? "selected" : ""}>${yearLabel}${c}기${count ? ` · ${count}개 세션` : ''}</option>`;
             }).join("") : `<option value="">응답 없음</option>`}
           </select>
         </label>
@@ -2128,7 +2236,7 @@ function renderAnalytics() {
         </label>
         <button class="primary" id="apply-analytics-filter" type="button">적용</button>
       </div>
-      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
+      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
     </section>
 
     ${cohort ? (() => {
@@ -2160,6 +2268,21 @@ function renderAnalytics() {
             const n = ps ? ps.n : 0;
             const rag = ragInfo(sc);
             const deltaColor = delta === null ? '#94a3b8' : delta > 0.1 ? '#059669' : delta < -0.1 ? '#dc2626' : '#d97706';
+            // A 시점 that has responses but a 주관식 전용 설문 has no composite score to show — say
+            // "객관식 없음" instead of a misleading "— / 5" against a large N.
+            const quantless = sessionId && n > 0 && sc === null && !phaseHasQuantQuestions(sessionId, phase);
+            if (quantless) {
+              return `
+              <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
+                <div style="position:absolute; top:0; left:0; right:0; height:3px; background:#e2e8f0;"></div>
+                <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px;">${phase} 종합</div>
+                <div style="font-size:18px; font-weight:800; color:#94a3b8; line-height:1.2; margin-bottom:4px;">객관식 없음</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px;">
+                  <span style="font-size:11.5px; color:#94a3b8; font-weight:600;">N = ${n} · 주관식 전용</span>
+                  <span style="font-size:11px; color:#cbd5e1;">—</span>
+                </div>
+              </div>`;
+            }
             return `
               <div style="background:#ffffff; border:1.5px solid ${sc !== null ? rag.bar+'40' : '#e2e8f0'}; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
                 <div style="position:absolute; top:0; left:0; right:0; height:3px; background:${sc !== null ? rag.bar : '#e2e8f0'};"></div>
@@ -2198,15 +2321,37 @@ function renderAnalytics() {
         ${renderStatsTable(stats, false, cohort, type, sessionId)}
       </section>
 
-      <section>
-        ${collapsibleSectionHeader("정량 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`, "quant")}
-        ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session)}
-      </section>
-
-      <section>
-        ${collapsibleSectionHeader("정성 응답", session ? `${session.type} · ${sessionLabel(session)}` : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기`, "qual")}
-        ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId)}
+      ${(() => {
+        // 시점(사전·중간·사후) 탭 — 선택한 시점의 정량·정성 응답만 드릴다운해서 본다.
+        const phasesWithData = PHASES.filter((p) =>
+          (state.surveys || []).some((s) => s.sessionId === sessionId && s.phase === p)
+          || (state.responses || []).some((r) => r.sessionId === sessionId && r.phase === p)
+        );
+        const activePhase = (state.selectedAnalyticsPhase && PHASES.includes(state.selectedAnalyticsPhase))
+          ? state.selectedAnalyticsPhase
+          : (phasesWithData[phasesWithData.length - 1] || "사후");
+        const phaseMeta = session
+          ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)} · ${activePhase}`
+          : `${yearForCohort(cohort) ? yearForCohort(cohort) + '년 ' : ''}${cohort}기 · ${activePhase}`;
+        return `
+      <div class="phase-tabs" role="tablist" aria-label="설문 시점">
+        ${PHASES.map((p) => {
+          const has = phasesWithData.includes(p);
+          const isActive = p === activePhase;
+          return `<button type="button" role="tab" aria-selected="${isActive}" class="phase-tab${isActive ? ' active' : ''}${has ? '' : ' empty'}" onclick="setAnalyticsPhase('${p}')" title="${has ? '' : '응답 없음'}">${p}${has ? '' : ' <span class="phase-tab-empty-dot">○</span>'}</button>`;
+        }).join('')}
+      </div>
+      <section class="analytics-split">
+        <div>
+          ${collapsibleSectionHeader("정량 응답", phaseMeta, "quant")}
+          ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session, activePhase)}
+        </div>
+        <div>
+          ${collapsibleSectionHeader("정성 응답", phaseMeta, "qual")}
+          ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId, activePhase)}
+        </div>
       </section>`;
+      })()}`;
     })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
   `;
 }
@@ -2356,7 +2501,7 @@ function renderReport() {
   const cohort = scope.cohort;
   const session = scope.session;
   const sessionId = session?.id || "";
-  const type = session?.type || state.selectedReportType || "팀장";
+  const type = normalizeSessionType(session?.type || state.selectedReportType || "리더십");
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
   const pre  = stats[0] || null;
   const mid  = stats[1] || null;
@@ -2380,9 +2525,9 @@ function renderReport() {
         <label>대상 기수
           <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
             ${cohorts.length ? cohorts.map(c => {
-              const teamNames = [...new Set((state.sessions || []).filter(s => s.cohort === c).map(s => s.team || s.participatingTeams || '').filter(Boolean))].slice(0, 2).join(', ');
               const yearLabel = yearForCohort(c) ? `${yearForCohort(c)}년 ` : '';
-              return `<option value="${c}" ${cohort===c?"selected":""}>${yearLabel}${c}기${teamNames ? ' · ' + teamNames : ''}</option>`;
+              const count = (state.sessions || []).filter(s => Number(s.cohort) === Number(c)).length;
+              return `<option value="${c}" ${cohort===c?"selected":""}>${yearLabel}${c}기${count ? ` · ${count}개 세션` : ''}</option>`;
             }).join("") : `<option value="">세션 없음</option>`}
           </select>
         </label>
@@ -2393,7 +2538,7 @@ function renderReport() {
         </label>
         <button class="primary" id="apply-report-filter" type="button">적용</button>
       </div>
-      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
+      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : "선택된 세션 없음"}</div>
     </section>
 
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
@@ -2594,16 +2739,18 @@ function collapsibleSectionHeader(title, meta, key) {
   `;
 }
 
-function renderQuantSection(sessionId, session) {
+function renderQuantSection(sessionId, session, phase = "") {
   if (!session) return emptyCard("선택된 세션이 없습니다.");
-  const surveys = PHASES
-    .map((phase) => (state.surveys || []).find((s) => s.sessionId === sessionId && s.phase === phase))
+  const surveys = (phase ? [phase] : PHASES)
+    .map((p) => (state.surveys || []).find((s) => s.sessionId === sessionId && s.phase === p))
     .filter(Boolean);
-  if (!surveys.length) return emptyCard("배포된 설문이 없습니다.");
+  if (!surveys.length) {
+    return emptyCard(phase ? `${phase} 시점에 배포된 설문이 없습니다.` : "배포된 설문이 없습니다.");
+  }
   return `<div style="display:flex; flex-direction:column; gap:20px;">${surveys.map((survey) => `
     <div>
       <div class="qual-group-head" style="margin-bottom:8px;"><strong>${escapeHtml(survey.phase)}</strong><span>${escapeHtml(survey.title)}</span></div>
-      ${renderSurveyResponsePanel(survey, session)}
+      ${renderSurveyResponsePanel(survey, session, false)}
     </div>
   `).join("")}</div>`;
 }
@@ -2613,13 +2760,13 @@ function emptyCard(text, tone = "") {
 }
 
 function eventCard(session, item) {
-  const accent = SESSION_TYPES[session.type].accent;
+  const accent = sessionTypeDef(session.type).accent;
   return `
     <article class="list-card" style="--accent:${accent}">
       <div>
         <span>${item.date} · ${item.startTime} · ${item.duration}분</span>
         <strong>${escapeHtml(item.content)}</strong>
-        <small>${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</small>
+        <small>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</small>
       </div>
       <em>${item.seq}회</em>
     </article>
@@ -2629,9 +2776,9 @@ function eventCard(session, item) {
 function uploadStateCard(session) {
   const done = phasesForSession(session.id);
   return `
-    <article class="list-card" style="--accent:${SESSION_TYPES[session.type].accent}">
+    <article class="list-card" style="--accent:${sessionTypeDef(session.type).accent}">
       <div>
-        <span>${escapeHtml(session.type)}</span>
+        <span>${escapeHtml(sessionTypeLabel(session.type))}</span>
         <strong>${escapeHtml(sessionLabel(session))}</strong>
         <small>${PHASES.map((phase) => `<b class="pill ${done.includes(phase) ? "done" : ""}">${phase} ${done.includes(phase) ? "완료" : "대기"}</b>`).join("")}</small>
       </div>
@@ -2645,18 +2792,18 @@ function alertCard(session) {
     <article class="list-card warning" style="--accent:#b86e00">
       <div>
         <span>미정 ${count}회차</span>
-        <strong>${escapeHtml(session.type)} · ${escapeHtml(sessionLabel(session))}</strong>
+        <strong>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</strong>
       </div>
     </article>
   `;
 }
 
 function typeSummary(type) {
-  const list = state.sessions.filter((session) => session.type === type);
+  const list = state.sessions.filter((session) => sameSessionType(session.type, type));
   const active = list.filter((session) => getStatus(session)[0] === "진행중").length;
   return `
     <article class="type-card" style="--accent:${SESSION_TYPES[type].accent}">
-      <span>${type}</span>
+      <span>${sessionTypeLabel(type)}</span>
       <strong>${list.length}</strong>
       <small>진행중 ${active}개</small>
     </article>
@@ -2685,15 +2832,15 @@ function sessionCard(session) {
   const isEditing = state.editingSessionId === session.id;
   return `
     <article class="session-card compact${isEditing ? ' editing' : ''}">
+      <div class="session-card-actions">
+        <b class="status ${tone}">${status}</b>
+        <button class="icon-btn" onclick="startEditSession('${session.id}')" title="${isEditing ? '편집 중' : '수정'}" aria-label="${isEditing ? '편집 중' : '세션 수정'}">${isEditing ? '●' : '✎'}</button>
+        <button class="icon-btn danger" onclick="deleteSession('${session.id}')" title="삭제" aria-label="세션 삭제">×</button>
+      </div>
       <div class="session-top">
         <div>
-          <span>${escapeHtml(session.type)} · ${cohortPrefix(session)}</span>
+          <span>${escapeHtml(sessionTypeLabel(session.type))}</span>
           <h3>${escapeHtml(sessionLabel(session))}</h3>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
-          <b class="status ${tone}">${status}</b>
-          <button class="ghost compact" onclick="startEditSession('${session.id}')">${isEditing ? '편집 중' : '수정'}</button>
-          <button class="ghost compact" onclick="deleteSession('${session.id}')" style="color:#ef4444;">삭제</button>
         </div>
       </div>
       <div class="session-meta">
@@ -2813,41 +2960,60 @@ function renderStatsTable(stats, masked, cohort, type, sessionId = "") {
   `;
 }
 
-function qualResponseRows(cohort, type, sessionId = "") {
+function qualResponseRows(cohort, type, sessionId = "", phase = "") {
   const cohortNum = Number(cohort);
   const sessionIds = new Set(sessionId
     ? [sessionId]
-    : (state.sessions || []).filter((s) => s.type === type).map((s) => s.id));
-  // Same cohort number can be shared by a 팀빌딩 session and a 팀장 session at once — always
+    : (state.sessions || []).filter((s) => sameSessionType(s.type, type)).map((s) => s.id));
+  // Same cohort number can be shared by a 팀빌딩 session and a 리더십 session at once — always
   // require the survey's own sessionType to match, so the two never get pooled together.
   const relevantSurveys = (state.surveys || []).filter(s =>
-    sessionIds.has(s.sessionId) || (Number(s.sessionCohort) === cohortNum && s.sessionType === type)
+    sessionIds.has(s.sessionId) || (Number(s.sessionCohort) === cohortNum && sameSessionType(s.sessionType, type))
   );
-  const configuredQualIds = [...new Set(relevantSurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
-  // Trust each survey's own question type (so a 5점 척도 question placed at q9/q10/q11 never
-  // leaks into 정성 응답). Only fall back to the legacy q9~q11 guess when none of the matched
-  // surveys have any question config at all — e.g. orphaned CSV-only data with no survey doc.
-  const hasExplicitConfig = relevantSurveys.some(s => (s.questions || []).length > 0);
+  // Classify 정성 문항 from the survey(s) of the SELECTED 시점 only. The same q-id can be 주관식 in
+  // one 시점 and 객관식 in another (e.g. DT기획팀 q1~q3: 중간엔 주관식, 사후엔 척도). Pooling qual ids
+  // across phases made 사후 정성 영역에 q1~q3 척도 점수가 새어 나왔다. Scope to the phase to stop it.
+  const classifySurveys = phase ? relevantSurveys.filter(s => s.phase === phase) : relevantSurveys;
+  const configuredQualIds = [...new Set(classifySurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
+  // Only fall back to the legacy q9~q11 guess when the selected phase has no configured survey at
+  // all — e.g. orphaned CSV-only data with no survey doc.
+  const hasExplicitConfig = classifySurveys.some(s => (s.questions || []).length > 0);
   const qualIds = hasExplicitConfig ? configuredQualIds : ['q9', 'q10', 'q11'];
-  // Match by sessionId first.
-  let rows = (state.responses || []).filter(r =>
-    r.cohort === cohortNum && sessionIds.has(r.sessionId) && qualIds.some(id => r[id])
-  );
-  // Fallback for orphaned rows whose sessionId no longer matches any session (e.g. CSV upload
-  // with a stale id) — only keep them if their linked survey confirms the same session type,
-  // so a 팀빌딩 1기 response never shows up under 팀장 1기 just because the cohort number matches.
-  if (!rows.length && !sessionId) {
-    rows = (state.responses || []).filter(r => {
-      if (r.cohort !== cohortNum || !qualIds.some(id => r[id])) return false;
-      const survey = (state.surveys || []).find(s => s.id === r.surveyId);
-      return Boolean(survey && survey.sessionType === type);
-    });
+  const phaseOk = (r) => !phase || r.phase === phase;
+  let rows;
+  if (sessionId) {
+    // A specific session is selected: match purely by sessionId (+ phase). The cohort field on a
+    // response is only a stale snapshot and must NOT gate visibility — that mismatch is exactly
+    // what made 리스크관리팀 정성 응답 disappear while its 정량 응답 still showed.
+    rows = (state.responses || []).filter(r =>
+      sessionIds.has(r.sessionId) && phaseOk(r) && qualIds.some(id => isQualText(r[id]))
+    );
+  } else {
+    // Cohort/type-level aggregation (no single session): scope by cohort + the session set.
+    rows = (state.responses || []).filter(r =>
+      r.cohort === cohortNum && sessionIds.has(r.sessionId) && phaseOk(r) && qualIds.some(id => isQualText(r[id]))
+    );
+    // Fallback for orphaned rows whose sessionId no longer matches any session (e.g. CSV upload
+    // with a stale id) — only keep them if their linked survey confirms the same session type,
+    // so a 팀빌딩 1기 response never shows up under 리더십 1기 just because the cohort number matches.
+    if (!rows.length) {
+      rows = (state.responses || []).filter(r => {
+        if (r.cohort !== cohortNum || !phaseOk(r) || !qualIds.some(id => isQualText(r[id]))) return false;
+        const survey = (state.surveys || []).find(s => s.id === r.surveyId);
+        return Boolean(survey && sameSessionType(survey.sessionType, type));
+      });
+    }
   }
   return { qualIds, rows };
 }
 
-function qualQuestionLabel(qid, type) {
-  const survey = (state.surveys || []).find(s => s.sessionType === type && (s.questions || []).some(q => q.id === qid));
+function qualQuestionLabel(qid, type, sessionId = "", phase = "") {
+  // Prefer the survey that matches this exact 세션 + 시점 so a q-id reused across surveys with
+  // different wording shows the right question text; fall back to any same-type survey, then legacy.
+  let survey = sessionId
+    ? (state.surveys || []).find(s => s.sessionId === sessionId && (!phase || s.phase === phase) && (s.questions || []).some(q => q.id === qid))
+    : null;
+  if (!survey) survey = (state.surveys || []).find(s => sameSessionType(s.sessionType, type) && (s.questions || []).some(q => q.id === qid));
   const text = survey?.questions?.find(q => q.id === qid)?.text;
   if (text) return text;
   if (qid === 'q9')  return '세션 참여 전 기대하는 점';
@@ -2856,13 +3022,13 @@ function qualQuestionLabel(qid, type) {
   return qid;
 }
 
-function renderQualByQuestion(rows, qualIds, type, showPhase) {
+function renderQualByQuestion(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
   return qualIds.map((id) => {
-    const answers = rows.filter((r) => r[id]).map((r) => ({ phase: r.phase || '', answer: r[id] }));
+    const answers = rows.filter((r) => isQualText(r[id])).map((r) => ({ phase: r.phase || '', answer: r[id] }));
     if (!answers.length) return '';
     return `
       <div class="qual-group">
-        <div class="qual-group-head"><strong>${escapeHtml(qualQuestionLabel(id, type))}</strong><span>${answers.length}건</span></div>
+        <div class="qual-group-head"><strong>${escapeHtml(qualQuestionLabel(id, type, sessionId, phase))}</strong><span>${answers.length}건</span></div>
         ${answers.map((a) => `
           <article class="qual-answer-row">
             ${showPhase ? `<div class="qual-answer-meta"><span>${escapeHtml(a.phase)}</span></div>` : ''}
@@ -2874,10 +3040,10 @@ function renderQualByQuestion(rows, qualIds, type, showPhase) {
   }).join("");
 }
 
-function renderQualByPerson(rows, qualIds, type, showPhase) {
-  const peopleRows = rows.filter((row) => qualIds.some((id) => row[id]));
+function renderQualByPerson(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
+  const peopleRows = rows.filter((row) => qualIds.some((id) => isQualText(row[id])));
   return peopleRows.map((row, index) => {
-    const answers = qualIds.filter((id) => row[id]).map((id) => ({ label: qualQuestionLabel(id, type), answer: row[id] }));
+    const answers = qualIds.filter((id) => isQualText(row[id])).map((id) => ({ label: qualQuestionLabel(id, type, sessionId, row.phase || phase), answer: row[id] }));
     if (!answers.length) return '';
     return `
       <div class="qual-group">
@@ -2893,16 +3059,16 @@ function renderQualByPerson(rows, qualIds, type, showPhase) {
   }).join("");
 }
 
-function renderQualSection(cohort, type, sessionId = "") {
-  const { qualIds, rows } = qualResponseRows(cohort, type, sessionId);
+function renderQualSection(cohort, type, sessionId = "", phase = "") {
+  const { qualIds, rows } = qualResponseRows(cohort, type, sessionId, phase);
   const phases = [...new Set(rows.map((r) => r.phase).filter(Boolean))];
-  const singlePhase = phases.length === 1 ? phases[0] : '';
+  const singlePhase = phase || (phases.length === 1 ? phases[0] : '');
   const showPhase = !singlePhase;
-  const totalAnswers = rows.reduce((sum, row) => sum + qualIds.filter((id) => row[id]).length, 0);
+  const totalAnswers = rows.reduce((sum, row) => sum + qualIds.filter((id) => isQualText(row[id])).length, 0);
   const groupBy = state.qualAnswersGroupBy === 'person' ? 'person' : 'question';
   const body = groupBy === 'person'
-    ? renderQualByPerson(rows, qualIds, type, showPhase)
-    : renderQualByQuestion(rows, qualIds, type, showPhase);
+    ? renderQualByPerson(rows, qualIds, type, showPhase, sessionId, phase)
+    : renderQualByQuestion(rows, qualIds, type, showPhase, sessionId, phase);
   return `
     <div class="qual-section-toolbar">
       <span class="muted" style="font-size:12px;">${singlePhase ? `${escapeHtml(singlePhase)} 설문 · ` : ''}총 ${totalAnswers}건</span>
@@ -3230,7 +3396,7 @@ function bindSessions() {
       title,
       sessionId,
       phase,
-      sessionType: sess ? (sess.type || '') : '',
+      sessionType: sess ? normalizeSessionType(sess.type) : '',
       sessionCohort: sess ? (sess.cohort || '') : '',
       googleFormUrl: googleFormUrl || null,
       questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
@@ -3276,9 +3442,9 @@ function bindSessions() {
   const typeSelect = document.querySelector("#session-type");
   if (!typeSelect) return;
   typeSelect.addEventListener("change", () => {
-    state.draftType = typeSelect.value;
-    state.draftSchedule = makeSchedule(typeSelect.value);
-    if (state.draftType !== "크로스펑셔널") {
+    state.draftType = normalizeSessionType(typeSelect.value);
+    state.draftSchedule = makeSchedule(state.draftType);
+    if (!sameSessionType(state.draftType, "협업")) {
       resetCrossDraft();
     }
     saveState();
@@ -3407,7 +3573,7 @@ function bindSessions() {
   });
   document.querySelector("#add-round")?.addEventListener("click", () => {
     const next = state.draftSchedule.length + 1;
-    state.draftSchedule.push({ id: uid(), seq: next, confirmed: false, date: todayISO(), startTime: "10:00", duration: SESSION_TYPES[state.draftType].duration, content: "", note: "", status: "planned", absences: [] });
+    state.draftSchedule.push({ id: uid(), seq: next, confirmed: false, date: todayISO(), startTime: "10:00", duration: sessionTypeDef(state.draftType).duration, content: "", note: "", status: "planned", absences: [] });
     saveState();
     render();
   });
@@ -3421,7 +3587,7 @@ function bindSessions() {
 
   document.querySelector("#create-session")?.addEventListener("click", () => {
     if (!canCreateDraftSession()) return;
-    const type = state.draftType;
+    const type = normalizeSessionType(state.draftType);
     const cohort = state.draftCohort;
     const year = state.draftYear;
     const updatedSchedule = state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? "confirmed" : "planned", absences: item.absences || [] }));
@@ -3440,15 +3606,15 @@ function bindSessions() {
             division: state.draftDivision, hq: state.draftHq, team: state.draftTeam,
             participatingTeams: "", leader: state.draftLeader, leaderTitle: state.draftLeaderTitle, members: state.draftMembers,
           });
-        } else if (type === "팀장") {
+        } else if (type === "리더십") {
           const leaderGroup = [...(state.draftLeaderGroup || [])];
           Object.assign(updatedSession, {
             participatingTeams: leaderGroup.map(l => l.teamName).join(", "),
-            leaderGroup, leader: `${leaderGroup.length}명 팀장 그룹`, leaderTitle: "팀장",
+            leaderGroup, leader: `${leaderGroup.length}명 리더십 그룹`, leaderTitle: "팀장",
             members: leaderGroup.map(l => ({ id: l.id, name: l.name, position: l.position || "팀장", teamId: l.teamId, teamName: l.teamName, divisionName: l.divisionName, hqName: l.hqName })),
           });
           state.draftLeaderGroup = [];
-        } else if (type === "크로스펑셔널") {
+        } else if (type === "협업") {
           const members = selectedCrossMembers();
           const sourceTeamIds = state.draftCrossMode === "leader-session" ? [...state.draftCrossTeamIds] : [...new Set(members.map(m => m.teamId))];
           Object.assign(updatedSession, {
@@ -3472,10 +3638,10 @@ function bindSessions() {
     // Duplicate cohort guard — same batch (type + cohort), narrowed by team/source for types that
     // legitimately run several parallel sessions under one cohort number.
     const duplicate = (state.sessions || []).find((s) => {
-      if (s.type !== type || Number(s.cohort) !== Number(cohort)) return false;
+      if (!sameSessionType(s.type, type) || Number(s.cohort) !== Number(cohort)) return false;
       if (type === "팀빌딩") return s.teamId === state.draftTeamId;
-      if (type === "크로스펑셔널") return s.sourceMode === state.draftCrossMode;
-      return true; // 팀장: one group per cohort
+      if (type === "협업") return s.sourceMode === state.draftCrossMode;
+      return true; // 리더십: one group per cohort
     });
     if (duplicate) {
       state.duplicateSessionWarning = duplicate.id;
@@ -3489,7 +3655,7 @@ function bindSessions() {
       type,
       cohort,
       year,
-      targetWeeks: SESSION_TYPES[type].weeks,
+      targetWeeks: sessionTypeDef(type).weeks,
       createdAt: new Date().toISOString(),
       schedule: updatedSchedule,
     };
@@ -3508,12 +3674,12 @@ function bindSessions() {
         leaderTitle: state.draftLeaderTitle,
         members: state.draftMembers,
       });
-    } else if (type === "팀장") {
+    } else if (type === "리더십") {
       const leaderGroup = [...(state.draftLeaderGroup || [])];
       Object.assign(session, {
         participatingTeams: leaderGroup.map((leader) => leader.teamName).join(", "),
         leaderGroup,
-        leader: `${leaderGroup.length}명 팀장 그룹`,
+        leader: `${leaderGroup.length}명 리더십 그룹`,
         leaderTitle: "팀장",
         members: leaderGroup.map((leader) => ({
           id: leader.id,
@@ -3526,7 +3692,7 @@ function bindSessions() {
         })),
       });
       state.draftLeaderGroup = [];
-    } else if (type === "크로스펑셔널") {
+    } else if (type === "협업") {
       const members = selectedCrossMembers();
       const sourceTeamIds = state.draftCrossMode === "leader-session"
         ? [...state.draftCrossTeamIds]
@@ -3611,7 +3777,7 @@ function bindReport() {
     const cohort = Number(state.selectedReportCohort || (cohorts.length ? cohorts[0] : 0));
     const sessionId = state.selectedReportSessionId || "";
     const session = (state.sessions || []).find((item) => item.id === sessionId);
-    const type = session?.type || state.selectedReportType || "팀장";
+    const type = normalizeSessionType(session?.type || state.selectedReportType || "리더십");
     const stats = sessionId ? statsForSession(cohort, sessionId) : statsForCohort(cohort, type);
     const dynamicQuestions = sessionId ? questionSetForSession(sessionId) : getQuestionsForCohort(cohort, type);
     
@@ -3635,6 +3801,7 @@ function bindReport() {
   document.querySelector("#apply-analytics-filter")?.addEventListener("click", () => {
     const cohort = document.querySelector("#analytics-cohort-select")?.value || "";
     const sessionId = document.querySelector("#analytics-session-select")?.value || "";
+    if (sessionId !== state.selectedAnalyticsSessionId) state.selectedAnalyticsPhase = "";
     state.selectedAnalyticsCohort = cohort;
     state.selectedAnalyticsSessionId = sessionId;
     const session = (state.sessions || []).find((item) => item.id === sessionId);
@@ -3799,7 +3966,7 @@ window.startEditSession = function(id) {
   if (!session) return;
   state.editingSessionId = id;
   state.activeSessionTab = 'list';
-  state.draftType = session.type;
+  state.draftType = normalizeSessionType(session.type);
   state.draftSchedule = JSON.parse(JSON.stringify(session.schedule));
   state.draftCohort = session.cohort || 1;
   state.draftYear = session.year || new Date().getFullYear();
@@ -4105,6 +4272,12 @@ window.toggleAnalyticsSection = function(key) {
   render();
 };
 
+window.setAnalyticsPhase = function(phase) {
+  state.selectedAnalyticsPhase = PHASES.includes(phase) ? phase : "";
+  saveState();
+  render();
+};
+
 window.toggleSessionTypeGroup = function(type) {
   state.collapsedSessionTypeGroups = state.collapsedSessionTypeGroups || [];
   const idx = state.collapsedSessionTypeGroups.indexOf(type);
@@ -4130,11 +4303,27 @@ window.collapseAllSurveys = function(collapse) {
   render();
 };
 
+// The session is the single source of truth for 기수(cohort) and session 유형. A survey only stores
+// a snapshot taken at creation time, so if a session's 기수 is edited afterwards the snapshot drifts
+// — that drift is exactly what spawned the phantom "5기" (리스크관리팀 사후 설문 was tagged 5기 while
+// its session is 2기). Re-align every survey to its current session so nothing downstream trusts a
+// stale 기수.
+function syncSurveysToSessions() {
+  const sessionMap = Object.fromEntries((state.sessions || []).map(s => [s.id, s]));
+  (state.surveys || []).forEach((survey) => {
+    const sess = sessionMap[survey.sessionId];
+    if (!sess) return;
+    if (Number(sess.cohort)) survey.sessionCohort = Number(sess.cohort);
+    survey.sessionType = normalizeSessionType(sess.type);
+  });
+}
+
 // ── Firestore Survey Helpers ─────────────────────────────────────
 async function loadSurveysFromFirestore() {
   try {
     const snap = await getDocs(collection(db, 'surveys'));
     state.surveys = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    syncSurveysToSessions();
     saveState();
   } catch (e) {
     console.error('Firestore 설문 로드 실패:', e);
@@ -4145,7 +4334,7 @@ async function loadSessionsFromFirestore() {
   try {
     const snap = await getDocs(collection(db, 'sessions'));
     if (snap.docs.length > 0) {
-      const firestoreSessions = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      const firestoreSessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
       const firestoreIds = new Set(firestoreSessions.map(s => s.id));
       const localOnly = (state.sessions || []).filter(s => !firestoreIds.has(s.id));
       state.sessions = [...firestoreSessions, ...localOnly];
@@ -4273,11 +4462,12 @@ async function downloadStateFromDb() {
     const data = snap.data();
     const savedAt = data.savedAt?.toDate?.()?.toLocaleString('ko-KR') || '알 수 없음';
     if (!confirm(`저장 시각: ${savedAt}\n\n현재 로컬 데이터를 DB 상태로 덮어쓸까요?`)) return;
-    if (data.sessions)    state.sessions    = data.sessions;
+    if (data.sessions)    state.sessions    = data.sessions.map(normalizeSessionRecord);
     if (data.surveys)     state.surveys     = data.surveys;
     if (data.orgUnits)    state.orgUnits    = data.orgUnits;
     if (data.orgMembers)  state.orgMembers  = data.orgMembers;
     if (data.qualAnalysis) state.qualAnalysis = data.qualAnalysis;
+    normalizeAppState(state);
     saveState();
     render();
   } catch (e) {
@@ -4337,9 +4527,11 @@ async function initApp() {
 
   render();
 
-  // Load sessions and surveys from Firestore on startup
-  loadSessionsFromFirestore().then(() => render());
-  loadSurveysFromFirestore().then(() => render());
+  // Load sessions and surveys BEFORE wiring the response listener: the session is the source of
+  // truth for each response's 기수, so the map below needs sessions in place to resolve it.
+  await Promise.all([loadSessionsFromFirestore(), loadSurveysFromFirestore()]);
+  syncSurveysToSessions();
+  render();
   if (state.activeView === "pulse") {
     loadPulseYears(PULSE_YEARS).then(() => render());
   }
@@ -4352,12 +4544,14 @@ async function initApp() {
     const firestoreResponses = snap.docs.map(d => {
       const data = d.data();
       let cohort = Number(data.cohort) || 0;
-      // Fill missing cohort from linked survey → session
-      if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
+      // The session owns the 기수. Derive from it whenever the session exists so a stale cohort
+      // stored on the response (or copied from a drifted survey snapshot) can never resurrect a
+      // phantom 기수 — e.g. 리스크관리팀 사후 응답이 5기로 저장돼 있어도 세션의 실제 기수(2기)로 해석된다.
+      const sess = data.sessionId ? sessionMap[data.sessionId] : null;
+      if (sess && Number(sess.cohort)) {
+        cohort = Number(sess.cohort);
+      } else if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
         cohort = Number(surveyMap[data.surveyId].sessionCohort) || 0;
-      }
-      if (!cohort && data.sessionId && sessionMap[data.sessionId]) {
-        cohort = Number(sessionMap[data.sessionId].cohort) || 0;
       }
       return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString() };
     });
@@ -4434,7 +4628,7 @@ function buildQualPrompt(cohort, type, sessionId = "") {
   const cohortNum = Number(cohort);
   const sessionIds = new Set(sessionId
     ? [sessionId]
-    : (state.sessions || []).filter(s => s.type === type && s.cohort === cohortNum).map(s => s.id)
+    : (state.sessions || []).filter(s => sameSessionType(s.type, type) && s.cohort === cohortNum).map(s => s.id)
   );
   const selectedSession = (state.sessions || []).find((session) => session.id === sessionId);
 
@@ -4442,15 +4636,18 @@ function buildQualPrompt(cohort, type, sessionId = "") {
   // so a different session type sharing the same cohort number is never pulled in).
   const relevantSurveys = (state.surveys || []).filter(s =>
     sessionIds.has(s.sessionId) ||
-    (Number(s.sessionCohort) === cohortNum && s.sessionType === type)
+    (Number(s.sessionCohort) === cohortNum && sameSessionType(s.sessionType, type))
   );
 
-  // Trust each survey's own question type — only fall back to the legacy q9~q11 guess when
-  // none of the matched surveys have any question config at all (see qualResponseRows()).
-  const hasExplicitConfig = relevantSurveys.some(s => (s.questions || []).length > 0);
-  const qualIds = hasExplicitConfig
-    ? [...new Set(relevantSurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))]
-    : ['q9', 'q10', 'q11'];
+  // 정성 문항 분류는 반드시 시점(phase)별 설문 기준으로 한다. 같은 q-id가 시점마다 주관식/객관식이
+  // 다를 수 있어(예: DT기획팀 q1~q3 — 중간 주관식, 사후 척도) 시점을 섞으면 척도 점수가 정성에 새어 나온다.
+  const qualIdsForPhase = (phase) => {
+    const phaseSurveys = relevantSurveys.filter(s => s.phase === phase);
+    if (phaseSurveys.some(s => (s.questions || []).length > 0)) {
+      return [...new Set(phaseSurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
+    }
+    return ['q9', 'q10', 'q11']; // legacy guess only when this 시점에 설정된 설문이 없을 때
+  };
 
   // Question text lookup helper
   const getQText = (qid, phase) => {
@@ -4464,7 +4661,7 @@ function buildQualPrompt(cohort, type, sessionId = "") {
   };
 
   const promptYearLabel = yearForCohort(cohort) ? `${yearForCohort(cohort)}년 ` : '';
-  let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션: ${selectedSession ? sessionLabel(selectedSession) : `${type} / ${promptYearLabel}${cohort}기`}\n세션 유형: ${type} / 기수: ${promptYearLabel}${cohort}기\n\n`;
+  let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션: ${selectedSession ? sessionLabel(selectedSession) : `${sessionTypeLabel(type)} / ${promptYearLabel}${cohort}기`}\n세션 유형: ${sessionTypeLabel(type)} / 기수: ${promptYearLabel}${cohort}기\n\n`;
   let totalQualRows = 0;
 
   PHASES.forEach(phase => {
@@ -4478,17 +4675,18 @@ function buildQualPrompt(cohort, type, sessionId = "") {
       rows = (state.responses || []).filter(r => {
         if (r.cohort !== cohortNum || r.phase !== phase) return false;
         const survey = (state.surveys || []).find(s => s.id === r.surveyId);
-        return Boolean(survey && survey.sessionType === type);
+        return Boolean(survey && sameSessionType(survey.sessionType, type));
       });
     }
 
-    const qualRows = rows.filter(r => qualIds.some(id => r[id] && String(r[id]).trim()));
+    const phaseQualIds = qualIdsForPhase(phase);
+    const qualRows = rows.filter(r => phaseQualIds.some(id => isQualText(r[id])));
     if (!qualRows.length) return;
     totalQualRows += qualRows.length;
 
     prompt += `【${phase} 설문 — ${qualRows.length}명 응답】\n`;
-    qualIds.forEach(qid => {
-      const answers = qualRows.map(r => String(r[qid] || '')).filter(v => v.trim());
+    phaseQualIds.forEach(qid => {
+      const answers = qualRows.map(r => String(r[qid] || '')).filter(v => isQualText(v));
       if (!answers.length) return;
       prompt += `\n질문: ${getQText(qid, phase)}\n`;
       answers.forEach((a, i) => { prompt += `  응답 ${i + 1}. ${a}\n`; });

@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp } from './firebase.js';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch } from './firebase.js';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
@@ -4546,10 +4546,17 @@ async function deleteResponseFromFirestore(id) {
 }
 
 async function saveResponsesToFirestore(rows) {
-  await Promise.all(rows.map(row => {
-    const { id, ...data } = row;
-    return addDoc(collection(db, 'responses'), { ...data, createdAt: serverTimestamp() });
-  }));
+  const chunkSize = 500;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const batch = writeBatch(db);
+    chunk.forEach(row => {
+      const { id, ...data } = row;
+      const docRef = doc(collection(db, 'responses'));
+      batch.set(docRef, { ...data, createdAt: serverTimestamp() });
+    });
+    await batch.commit();
+  }
 }
 
 async function saveSurveyToFirestore(survey) {

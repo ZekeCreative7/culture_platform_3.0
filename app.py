@@ -535,11 +535,12 @@ def _make_excel_report(cohort: int, stats: list, sessions: list) -> bytes:
             })
 
     qual_rows = []
+    qual_map = db.get_qualitative_for_cohort(cohort)
     for s in sessions:
         if s.get("cohort") != cohort:
             continue
         for ph in PHASES:
-            for r in db.get_qualitative(s["id"], ph):
+            for r in qual_map.get((s["id"], ph), []):
                 if any(v for v in r.values() if v):
                     qual_rows.append({
                         "세션": _session_label(s),
@@ -594,15 +595,17 @@ if page == "홈 대시보드":
     today = datetime.date.today()
     week_end = today + datetime.timedelta(days=7)
     sessions  = db.list_sessions()
-    all_sched = {s["id"]: db.get_schedule(s["id"]) for s in sessions}
+    session_ids = [s["id"] for s in sessions]
+    all_sched = db.get_schedules_for_sessions(session_ids)
+    all_phases = db.get_phases_for_sessions(session_ids)
 
     # Compute stats
-    active_count   = sum(1 for s in sessions if _get_session_status(all_sched[s["id"]])[0] == "진행중")
+    active_count   = sum(1 for s in sessions if _get_session_status(all_sched.get(s["id"], []))[0] == "진행중")
     pending_alerts = []
     this_week_items = []
 
     for s in sessions:
-        sched = all_sched[s["id"]]
+        sched = all_sched.get(s["id"], [])
         unconfirmed = [r for r in sched if not r.get("scheduled_date")]
         if unconfirmed:
             pending_alerts.append((s, len(unconfirmed)))
@@ -620,7 +623,7 @@ if page == "홈 대시보드":
     cohort_count = len({s.get("cohort") for s in sessions if s.get("cohort") is not None})
     completion_ready = sum(
         1 for s in sessions
-        if {"사전", "사후"}.issubset(set(db.get_phases_for_session(s["id"])))
+        if {"사전", "사후"}.issubset(set(all_phases.get(s["id"], [])))
     )
 
     st.markdown(f"""
@@ -672,7 +675,7 @@ if page == "홈 대시보드":
             st.markdown('<div class="lina-card"><p style="color:#6e6e73;margin:0">등록된 세션이 없습니다.</p></div>', unsafe_allow_html=True)
         else:
             for s in sessions:
-                phases_done = db.get_phases_for_session(s["id"])
+                phases_done = all_phases.get(s["id"], [])
                 tc = TYPE_COLOR.get(s["type"], "#5f6dee")
                 badges = _phase_badges_html(phases_done)
                 st.markdown(f"""
@@ -717,9 +720,11 @@ elif page == "세션 관리":
 
     # ── Pending unconfirmed alert ──────────────────────────────────
     sessions_all = db.list_sessions()
+    session_ids_all = [s["id"] for s in sessions_all]
+    all_scheds_all = db.get_schedules_for_sessions(session_ids_all)
     alerts = []
     for s in sessions_all:
-        sched = db.get_schedule(s["id"])
+        sched = all_scheds_all.get(s["id"], [])
         unc = [r for r in sched if not r.get("scheduled_date")]
         if unc:
             alerts.append((s, unc))
@@ -889,6 +894,9 @@ elif page == "세션 관리":
     if not sessions:
         st.info("등록된 세션이 없습니다.")
     else:
+        session_ids = [s["id"] for s in sessions]
+        all_scheds = db.get_schedules_for_sessions(session_ids)
+        all_phases = db.get_phases_for_sessions(session_ids)
         tab_labels = ["전체"] + list(SESSION_TYPE_INFO.keys())
         tabs = st.tabs(tab_labels)
         for ti, tab in enumerate(tabs):
@@ -900,8 +908,8 @@ elif page == "세션 관리":
                     continue
 
                 for s in filtered:
-                    schedule       = db.get_schedule(s["id"])
-                    phases_done    = db.get_phases_for_session(s["id"])
+                    schedule       = all_scheds.get(s["id"], [])
+                    phases_done    = all_phases.get(s["id"], [])
                     status, scls   = _get_session_status(schedule)
                     confirmed_cnt  = len([r for r in schedule if r.get("scheduled_date")])
                     pending_cnt    = len([r for r in schedule if not r.get("scheduled_date")])
@@ -1068,13 +1076,16 @@ elif page == "변화량 조회":
     # ── Qualitative responses ───────────────────────────────────────
     sessions   = db.list_sessions()
     session_ids = [s["id"] for s in sessions if s.get("cohort") == cohort]
+    qual_map = db.get_qualitative_for_cohort(cohort)
     for sid in session_ids:
+        sess = next(s for s in sessions if s["id"] == sid)
+        slabel = _session_label(sess)
         for phase_label in PHASES:
-            qual  = db.get_qualitative(sid, phase_label)
+            qual = qual_map.get((sid, phase_label), [])
             texts = [r for r in qual if any(v for v in r.values() if v)]
             if not texts:
                 continue
-            st.markdown(f"#### 정성 응답 — {phase_label}")
+            st.markdown(f"#### 정성 응답 — {slabel} [{phase_label}]")
             for r in texts:
                 if r.get("q9"):  st.markdown(f"- **[기대]** {r['q9']}")
                 if r.get("q10"): st.markdown(f"- **[좋았던 점]** {r['q10']}")

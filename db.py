@@ -249,3 +249,54 @@ def get_cohort_stats_all_types(cohort: int) -> list:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_schedules_for_sessions(session_ids: list) -> dict:
+    if not session_ids:
+        return {}
+    conn = get_conn()
+    placeholders = ",".join("?" for _ in session_ids)
+    rows = conn.execute(
+        f"SELECT * FROM session_schedule WHERE session_id IN ({placeholders}) ORDER BY seq",
+        session_ids,
+    ).fetchall()
+    conn.close()
+    result = {sid: [] for sid in session_ids}
+    for r in rows:
+        result[r["session_id"]].append(dict(r))
+    return result
+
+
+def get_phases_for_sessions(session_ids: list) -> dict:
+    if not session_ids:
+        return {}
+    conn = get_conn()
+    placeholders = ",".join("?" for _ in session_ids)
+    rows = conn.execute(
+        f"SELECT DISTINCT session_id, phase FROM response WHERE session_id IN ({placeholders})",
+        session_ids,
+    ).fetchall()
+    conn.close()
+    result = {sid: [] for sid in session_ids}
+    for r in rows:
+        result[r["session_id"]].append(r["phase"])
+    return result
+
+
+def get_qualitative_for_cohort(cohort: int) -> dict:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT session_id, phase, q9, q10, q11 FROM response WHERE cohort=?",
+        (cohort,),
+    ).fetchall()
+    conn.close()
+    result = {}
+    for r in rows:
+        key = (r["session_id"], r["phase"])
+        result.setdefault(key, []).append({
+            "q9": r["q9"],
+            "q10": r["q10"],
+            "q11": r["q11"]
+        })
+    return result
+

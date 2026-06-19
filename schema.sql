@@ -66,3 +66,10 @@ SELECT
 FROM response r
 JOIN session s ON s.id = r.session_id
 GROUP BY s.type, r.cohort, r.phase;
+
+-- 인덱스 추가 (조회 속도 최적화)
+CREATE INDEX IF NOT EXISTS idx_session_schedule_session_id ON session_schedule(session_id);
+CREATE INDEX IF NOT EXISTS idx_response_session_id ON response(session_id);
+CREATE INDEX IF NOT EXISTS idx_response_cohort ON response(cohort);
+CREATE INDEX IF NOT EXISTS idx_org_unit_level_parent ON org_unit(level, parent_id);
+

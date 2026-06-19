@@ -6,7 +6,7 @@ import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=2026061
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 
 
-const PHASES = ["사전", "사후"];
+const PHASES = ["사전", "중간", "사후"];
 const QUANT_LABELS = {
   q1: "심리안전 1",
   q2: "심리안전 2",
@@ -3226,7 +3226,17 @@ function fmt(value) {
 function bindGlobal() {
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.activeView = button.dataset.view;
+      const nextView = button.dataset.view;
+      if (nextView === "report" && state.activeView === "analytics") {
+        state.selectedReportType = state.selectedAnalyticsType;
+        state.selectedReportCohort = state.selectedAnalyticsCohort;
+        state.selectedReportSessionId = state.selectedAnalyticsSessionId;
+      } else if (nextView === "analytics" && state.activeView === "report") {
+        state.selectedAnalyticsType = state.selectedReportType;
+        state.selectedAnalyticsCohort = state.selectedReportCohort;
+        state.selectedAnalyticsSessionId = state.selectedReportSessionId;
+      }
+      state.activeView = nextView;
       state.mobileNavOpen = false;
       saveState();
       render();

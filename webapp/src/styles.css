@@ -76,26 +76,6 @@
   pointer-events: none; z-index: -2; overflow: hidden;
   background: linear-gradient(155deg, #dbeeff 0%, #e8f4fd 40%, #eef2ff 70%, #f0e8ff 100%);
 }
-.glow-circle {
-  position: absolute; border-radius: 50%;
-  filter: blur(120px); opacity: 0.7;
-  animation: glowFloat 22s infinite ease-in-out alternate;
-}
-.glow-1 {
-  width: 800px; height: 800px;
-  background: radial-gradient(circle, rgba(14,165,233,0.38) 0%, rgba(56,189,248,0.15) 50%, transparent 70%);
-  top: -18%; right: -8%;
-}
-.glow-2 {
-  width: 860px; height: 860px;
-  background: radial-gradient(circle, rgba(124,58,237,0.22) 0%, rgba(99,102,241,0.1) 45%, transparent 70%);
-  bottom: -20%; left: -12%;
-  animation-delay: -7s;
-}
-@keyframes glowFloat {
-  0%   { transform: translate(0,0) scale(1); }
-  100% { transform: translate(50px,35px) scale(1.09); }
-}
 
 /* ─── Reset ─── */
 * { box-sizing: border-box; }
@@ -3349,10 +3329,6 @@ body {
     radial-gradient(circle at 18% 94%, rgba(123, 92, 214, .13), transparent 34%),
     linear-gradient(145deg, #eef6fc 0%, #f5f8fc 47%, #eef0fb 100%);
 }
-.glow-circle { opacity: .42; filter: blur(150px); }
-.glow-1 { background: #5eb7ee; }
-.glow-2 { background: #9a7ce2; }
-
 #app { grid-template-columns: 252px minmax(0, 1fr); }
 .sidebar {
   padding: 22px 14px 18px;

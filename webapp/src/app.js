@@ -6,7 +6,7 @@ import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=2026061
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 
 
-const PHASES = ["사전", "중간", "사후"];
+const PHASES = ["사전", "사후"];
 const QUANT_LABELS = {
   q1: "심리안전 1",
   q2: "심리안전 2",

@@ -8,12 +8,14 @@ import {
   uid, 
   defaultQuestions 
 } from './utils.js';
+import { normalizePulseDoc } from './pulse/pulseEngine.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
 export const ORG_STORE_KEY = "culture-platform-org-v1";
 export const PULSE_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 
 export const pulseCache = { years: {}, loading: false, loaded: false, error: "" };
+export const commitmentsCache = { loaded: false, loading: false };
 
 export let dbStatus = 'connecting';
 const listeners = [];
@@ -92,9 +94,12 @@ export const blankState = () => ({
   sidebarCollapsed: false,
   collapsedSurveyIds: [],
   pulseView: "overview",
-  pulseDeptId: "",
+  pulseScopeId: "company",
   pulseLayer: "easy",
   pulseYear: 2026,
+  pulseCommitments: [],
+  pulseCommitmentDraft: null,
+  pulseExpertSections: {},
 });
 
 export const state = {};
@@ -171,7 +176,7 @@ export function saveState() {
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
-    pulseView, pulseDeptId, pulseLayer, pulseYear
+    pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
@@ -183,7 +188,7 @@ export function saveState() {
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
-    pulseView, pulseDeptId, pulseLayer, pulseYear
+    pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections
   }));
   notify();
 }
@@ -303,18 +308,31 @@ export async function updateSurveyInFirestore(id, data) {
   await setDoc(doc(db, 'surveys', id), { ...data, updatedAt: serverTimestamp() });
 }
 
-export async function loadPulseYears(years = PULSE_YEARS) {
+export async function loadPulseYears() {
+  if (pulseCache.loaded) return pulseCache.years;
   if (pulseCache.loading) return pulseCache.years;
   pulseCache.loading = true;
   pulseCache.error = "";
   try {
-    const docs = await Promise.all(years.map(async (year) => {
-      const snap = await getDoc(doc(db, 'pulseResults', String(year)));
-      return [year, snap.exists() ? snap.data() : null];
-    }));
-    docs.forEach(([year, data]) => {
-      pulseCache.years[year] = data;
+    const snap = await getDocs(collection(db, 'pulseResults'));
+    const yearsData = {};
+    snap.docs.forEach((d) => {
+      const year = Number(d.id);
+      if (Number.isFinite(year)) {
+        yearsData[year] = normalizePulseDoc(d.data(), year);
+      }
     });
+    pulseCache.years = yearsData;
+
+    const availableYears = Object.keys(yearsData).map(Number).filter(Number.isFinite);
+    if (availableYears.length > 0) {
+      const maxYear = Math.max(...availableYears);
+      if (!state.pulseYear || !availableYears.includes(state.pulseYear)) {
+        state.pulseYear = maxYear;
+        saveState();
+      }
+    }
+
     pulseCache.loaded = true;
     setDbStatus('connected');
   } catch (e) {
@@ -329,13 +347,57 @@ export async function loadPulseYears(years = PULSE_YEARS) {
 
 export async function savePulseResultToFirestore(payload) {
   if (!payload?.year) throw new Error("저장할 Pulse 연도가 없습니다.");
+  const normalized = normalizePulseDoc(payload, payload.year);
   await setDoc(doc(db, 'pulseResults', String(payload.year)), {
-    ...payload,
+    ...normalized,
     updatedAt: serverTimestamp(),
   });
-  pulseCache.years[payload.year] = payload;
+  pulseCache.years[payload.year] = normalized;
   pulseCache.loaded = true;
   setDbStatus('connected');
+}
+
+export async function loadPulseCommitments() {
+  if (commitmentsCache.loaded || commitmentsCache.loading) return;
+  commitmentsCache.loading = true;
+  try {
+    const snap = await getDocs(collection(db, 'pulseCommitments'));
+    state.pulseCommitments = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    commitmentsCache.loaded = true;
+    saveState();
+  } catch (e) {
+    console.error('Firestore 약속 로드 실패:', e);
+  } finally {
+    commitmentsCache.loading = false;
+  }
+}
+
+export async function savePulseCommitmentToFirestore(commitment) {
+  try {
+    const { id, ...data } = commitment;
+    await setDoc(doc(db, 'pulseCommitments', id), { ...data, updatedAt: serverTimestamp() });
+    const idx = state.pulseCommitments.findIndex(c => c.id === id);
+    if (idx >= 0) {
+      state.pulseCommitments[idx] = commitment;
+    } else {
+      state.pulseCommitments.push(commitment);
+    }
+    saveState();
+  } catch (e) {
+    console.error('Firestore 약속 저장 실패:', e);
+    throw e;
+  }
+}
+
+export async function deletePulseCommitmentFromFirestore(id) {
+  try {
+    await deleteDoc(doc(db, 'pulseCommitments', id));
+    state.pulseCommitments = state.pulseCommitments.filter(c => c.id !== id);
+    saveState();
+  } catch (e) {
+    console.error('Firestore 약속 삭제 실패:', e);
+    throw e;
+  }
 }
 
 export async function uploadStateToDb() {

@@ -14,12 +14,13 @@ import {
 } from './utils.js';
 
 import {
-  STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, dbStatus, subscribe, notify, setDbStatus,
+  STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
   blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, normalizeAppState,
   syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
   deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore,
   saveSurveyToFirestore, deleteSurveyFromFirestore, updateSurveyInFirestore, loadPulseYears,
-  savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore
+  savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore,
+  loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
 } from './state.js?v=20260619-fix-syntax-error-v2';
 
 const VIEWS = [
@@ -27,10 +28,10 @@ const VIEWS = [
   ["sessions", "Sessions", "세션"],
   ["org", "Organization", "조직"],
   ["survey", "Survey Creator", "설문지"],
-  ["upload", "Upload", "데이터 업로드"],
   ["analytics", "Survey Result Viewer", "설문 결과 보기"],
   ["report", "Analysis Report", "분석 결과"],
   ["pulse", "Pulse Insights", "조직 진단"],
+  ["upload", "Upload", "데이터 업로드"],
 ];
 const NAV_ICONS = {
   dashboard: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M2 10a8 8 0 1 1 16 0A8 8 0 0 1 2 10Zm8-5a1 1 0 0 1 1 1v4.586l2.707 2.707a1 1 0 0 1-1.414 1.414l-3-3A1 1 0 0 1 9 11V6a1 1 0 0 1 1-1Z"/></svg>`,
@@ -650,56 +651,99 @@ function render() {
 
   const dbStatusLabel = dbStatus === 'connected' ? 'DB 연결됨' : dbStatus === 'error' ? 'DB 오류' : '연결 중...';
 
-  app.innerHTML = `
-    <aside class="sidebar">
-      <div class="brand">
-        <img src="./assets/lina_logo_square.png" alt="" />
-        <div class="brand-text">
-          <strong>Culture Platform</strong>
-          <span>Operator OS</span>
+  const sidebar = app.querySelector(".sidebar");
+  const main = app.querySelector("main");
+
+  if (sidebar && main) {
+    const toggleBtn = app.querySelector("#toggle-sidebar");
+    if (toggleBtn) {
+      toggleBtn.innerHTML = toggleIcon;
+      toggleBtn.title = state.sidebarCollapsed ? '메뉴 펼치기' : '메뉴 접기';
+    }
+    const navButtons = app.querySelectorAll("nav button");
+    navButtons.forEach(btn => {
+      const viewId = btn.dataset.view;
+      if (viewId === state.activeView) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    });
+    const dbDot = app.querySelector(".db-dot");
+    if (dbDot) {
+      dbDot.className = `db-dot ${dbStatus}`;
+    }
+    const dbText = app.querySelector(".db-status-text");
+    if (dbText) {
+      dbText.textContent = dbStatusLabel;
+    }
+    const menuToggle = app.querySelector(".menu-toggle");
+    if (menuToggle) {
+      menuToggle.setAttribute("aria-expanded", state.mobileNavOpen ? "true" : "false");
+      menuToggle.setAttribute("aria-label", state.mobileNavOpen ? "메뉴 닫기" : "메뉴 열기");
+    }
+    const sessionCountSpan = app.querySelector(".topbar-actions span");
+    if (sessionCountSpan) {
+      sessionCountSpan.textContent = `${state.sessions.length} sessions`;
+    }
+
+    const canvas = app.querySelector(".canvas");
+    if (canvas) {
+      canvas.innerHTML = renderView();
+    }
+  } else {
+    app.innerHTML = `
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="./assets/lina_logo_square.png" alt="" />
+          <div class="brand-text">
+            <strong>Culture Platform</strong>
+            <span>Operator OS</span>
+          </div>
+          <button type="button" class="sidebar-toggle-btn" id="toggle-sidebar" title="${state.sidebarCollapsed ? '메뉴 펼치기' : '메뉴 접기'}">${toggleIcon}</button>
         </div>
-        <button type="button" class="sidebar-toggle-btn" id="toggle-sidebar" title="${state.sidebarCollapsed ? '메뉴 펼치기' : '메뉴 접기'}">${toggleIcon}</button>
-      </div>
-      <nav>
-        <span class="nav-label">Workspace</span>
-        ${VIEWS.map(([id, en, ko]) => `
-          <button class="${state.activeView === id ? "active" : ""}" data-view="${id}" title="${ko}">
-            <span class="nav-icon">${NAV_ICONS[id] || ''}</span>
-            <span class="nav-text"><span class="nav-en">${en}</span><span class="nav-ko">${ko}</span></span>
-          </button>`).join("")}
-      </nav>
-      <div class="sidebar-note">
-        <div class="db-status">
-          <div class="db-dot ${dbStatus}"></div>
-          <span class="db-status-text">${dbStatusLabel}</span>
+        <nav>
+          <span class="nav-label">Workspace</span>
+          ${VIEWS.map(([id, en, ko]) => `
+            <button class="${state.activeView === id ? "active" : ""}" data-view="${id}" title="${ko}">
+              <span class="nav-icon">${NAV_ICONS[id] || ''}</span>
+              <span class="nav-text"><span class="nav-en">${en}</span><span class="nav-ko">${ko}</span></span>
+            </button>`).join("")}
+        </nav>
+        <div class="sidebar-note">
+          <div class="db-status">
+            <div class="db-dot ${dbStatus}"></div>
+            <span class="db-status-text">${dbStatusLabel}</span>
+          </div>
+          <div class="sidebar-note-meta">
+            <b>Private operator</b>
+            <small>${new Date().toLocaleDateString("ko-KR")}</small>
+          </div>
         </div>
-        <div class="sidebar-note-meta">
-          <b>Private operator</b>
-          <small>${new Date().toLocaleDateString("ko-KR")}</small>
+      </aside>
+      <button type="button" class="mobile-nav-backdrop" aria-label="메뉴 닫기"></button>
+      <main>
+        <header class="topbar">
+          <button type="button" class="menu-toggle" aria-label="${state.mobileNavOpen ? "메뉴 닫기" : "메뉴 열기"}" aria-expanded="${state.mobileNavOpen}">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="searchbox">Search sessions, cohorts, uploads</div>
+          <div class="topbar-actions">
+            <span>${state.sessions.length} sessions</span>
+            <button class="ghost" data-view="upload">Import CSV</button>
+            <button class="primary compact" data-view="sessions">New session</button>
+          </div>
+        </header>
+        <div class="canvas">
+          ${renderView()}
         </div>
-      </div>
-    </aside>
-    <button type="button" class="mobile-nav-backdrop" aria-label="메뉴 닫기"></button>
-    <main>
-      <header class="topbar">
-        <button type="button" class="menu-toggle" aria-label="${state.mobileNavOpen ? "메뉴 닫기" : "메뉴 열기"}" aria-expanded="${state.mobileNavOpen}">
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
-        <div class="searchbox">Search sessions, cohorts, uploads</div>
-        <div class="topbar-actions">
-          <span>${state.sessions.length} sessions</span>
-          <button class="ghost" data-view="upload">Import CSV</button>
-          <button class="primary compact" data-view="sessions">New session</button>
-        </div>
-      </header>
-      <div class="canvas">
-        ${renderView()}
-      </div>
-    </main>
-  `;
-  bindGlobal();
+      </main>
+    `;
+    bindLayout();
+  }
+  bindCanvasEvents();
 }
 
 function renderView() {
@@ -2831,7 +2875,7 @@ function fmt(value) {
   return typeof value === "number" ? value.toFixed(2) : "-";
 }
 
-function bindGlobal() {
+function bindLayout() {
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
       const nextView = button.dataset.view;
@@ -2848,8 +2892,8 @@ function bindGlobal() {
       state.mobileNavOpen = false;
       saveState();
       render();
-      if (state.activeView === "pulse") {
-        loadPulseYears(PULSE_YEARS).then(render);
+      if (state.activeView === "pulse" && (!pulseCache.loaded || !commitmentsCache.loaded)) {
+        Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
       }
     });
   });
@@ -2866,11 +2910,31 @@ function bindGlobal() {
     saveState();
     render();
   });
-  bindSessions();
-  bindOrg();
-  bindUpload();
-  bindReport();
-  bindPulse({ state, saveState, render, loadPulseYears, savePulseResult: savePulseResultToFirestore, downloadPulseTemplate });
+}
+
+function bindCanvasEvents() {
+  if (state.activeView === "sessions") {
+    bindSessions();
+  } else if (state.activeView === "org") {
+    bindOrg();
+  } else if (state.activeView === "upload") {
+    bindUpload();
+  } else if (state.activeView === "report") {
+    bindReport();
+  } else if (state.activeView === "pulse") {
+    bindPulse({
+      state,
+      pulseCache,
+      saveState,
+      render,
+      loadPulseYears,
+      loadPulseCommitments,
+      savePulseCommitment: savePulseCommitmentToFirestore,
+      deletePulseCommitment: deletePulseCommitmentFromFirestore,
+      savePulseResult: savePulseResultToFirestore,
+      downloadPulseTemplate
+    });
+  }
 }
 
 function bindOrg() {
@@ -4182,8 +4246,8 @@ async function initApp() {
   await Promise.all([loadSessionsFromFirestore(), loadSurveysFromFirestore()]);
   syncSurveysToSessions();
   render();
-  if (state.activeView === "pulse") {
-    loadPulseYears(PULSE_YEARS).then(() => render());
+  if (state.activeView === "pulse" && (!pulseCache.loaded || !commitmentsCache.loaded)) {
+    Promise.all([loadPulseYears(), loadPulseCommitments()]).then(() => render());
   }
 
   // Survey configuration can be repaired or reassigned while another operator tab is already open.
@@ -4192,8 +4256,11 @@ async function initApp() {
   onSnapshot(collection(db, 'surveys'), (snap) => {
     state.surveys = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     syncSurveysToSessions();
-    saveState();
-    render();
+    const shouldRender = ["sessions", "survey", "analytics", "report"].includes(state.activeView);
+    if (shouldRender) {
+      saveState();
+      render();
+    }
   }, (err) => {
     console.error('Firestore 설문 실시간 갱신 오류:', err);
   });
@@ -4206,9 +4273,6 @@ async function initApp() {
     const firestoreResponses = snap.docs.map(d => {
       const data = d.data();
       let cohort = Number(data.cohort) || 0;
-      // The session owns the 기수. Derive from it whenever the session exists so a stale cohort
-      // stored on the response (or copied from a drifted survey snapshot) can never resurrect a
-      // phantom 기수 — e.g. 리스크관리팀 사후 응답이 5기로 저장돼 있어도 세션의 실제 기수(2기)로 해석된다.
       const sess = data.sessionId ? sessionMap[data.sessionId] : null;
       if (sess && Number(sess.cohort)) {
         cohort = Number(sess.cohort);
@@ -4221,11 +4285,11 @@ async function initApp() {
       const bTime = Date.parse(b.createdAt) || 0;
       return bTime - aTime;
     });
-    // Firestore is authoritative — replacing (not merging) is what lets a deletion on one
-    // device (e.g. survey data reset) actually disappear on every other device.
     state.responses = firestoreResponses;
-    saveState();
-    render();
+    const shouldRender = ["dashboard", "sessions", "analytics", "report"].includes(state.activeView);
+    if (shouldRender) {
+      render();
+    }
   }, (err) => {
     console.error('Firestore 응답 실시간 리스너 오류:', err);
   });
@@ -4233,8 +4297,11 @@ async function initApp() {
   // Real-time listener for QualSignal — updates report and session status
   onSnapshot(collection(db, 'QualSignal'), (snap) => {
     state.qualSignals = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    saveState();
-    render();
+    const shouldRender = ["analytics", "report"].includes(state.activeView);
+    if (shouldRender) {
+      saveState();
+      render();
+    }
   }, (err) => {
     console.error('Firestore QualSignal 실시간 리스너 오류:', err);
   });

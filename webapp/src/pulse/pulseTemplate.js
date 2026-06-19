@@ -91,19 +91,40 @@ function makeNSheet() {
 
 function makeEngagementSheet(year) {
   const XLSX = sheetjs();
+  const headers = ["구분", "2024", "2025", "2026", "2026(이상치제외)"];
+  const targetYear = Number(year);
+  if (targetYear !== 2026) {
+    headers.push(String(targetYear), `${targetYear}(이상치제외)`);
+  }
+
   const rows = [
     ["본사 제공 Engagement Score"],
     ["플랫폼은 이 값을 계산하지 않고 그대로 저장·표시합니다."],
     [""],
-    ["구분", "2024", "2025", "2026", String(year)],
+    headers,
   ];
+
   const labels = ["전사", ...PULSE_DIVISIONS.map((item) => item.id)];
   labels.forEach((label) => {
     const seed = ENGAGEMENT_SCORE_HISTORY[label] || {};
-    rows.push([label, seed.y2024 || "", seed.y2025 || "", seed.y2026 || "", ""]);
+    const row = [
+      label,
+      seed.y2024 || "",
+      seed.y2025 || "",
+      seed.y2026 || "",
+      seed.exOutlier2026 || "",
+    ];
+    if (targetYear !== 2026) {
+      row.push("", "");
+    }
+    rows.push(row);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  setWidths(ws, [32, 12, 12, 12, 12]);
+  const widths = [32, 12, 12, 12, 18];
+  if (targetYear !== 2026) {
+    widths.push(12, 18);
+  }
+  setWidths(ws, widths);
   return ws;
 }
 

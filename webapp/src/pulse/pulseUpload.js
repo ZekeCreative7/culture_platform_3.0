@@ -103,10 +103,16 @@ function parsePulseSheet(rows, errors) {
       }
       items[`Q${qNo}`] = item;
     });
-    if (groupName === "전사") {
+    let normalizedGroupName = groupName;
+    if (groupName === "고객경험혁신본부CE" || groupName === "고객혁신본부CE") {
+      normalizedGroupName = "고객혁신본부CE";
+    } else if (groupName === "고객경험혁신본부본사" || groupName === "고객혁신본부본사") {
+      normalizedGroupName = "고객혁신본부본사";
+    }
+    if (normalizedGroupName === "전사") {
       Object.assign(companywide, items);
-    } else if (validDivisionIds.has(groupName)) {
-      divisions[groupName] = { items };
+    } else if (validDivisionIds.has(normalizedGroupName)) {
+      divisions[normalizedGroupName] = { items };
     }
   });
 
@@ -123,7 +129,12 @@ function parseNSheet(workbook) {
   const rows = readRows(workbook, name);
   const result = {};
   rows.slice(1).forEach((row) => {
-    const dept = asText(row[0]);
+    let dept = asText(row[0]);
+    if (dept === "고객경험혁신본부CE" || dept === "고객혁신본부CE") {
+      dept = "고객혁신본부CE";
+    } else if (dept === "고객경험혁신본부본사" || dept === "고객혁신본부본사") {
+      dept = "고객혁신본부본사";
+    }
     const n = Number(row[1]);
     if (dept && Number.isFinite(n)) result[dept] = n;
   });
@@ -152,15 +163,25 @@ function parseEngagementScore(workbook, year, errors) {
   const headers = rows[headerIndex].map(asText);
   const yearCols = headers
     .map((label, index) => ({ label, index }))
-    .filter((item) => /^\d{4}$/.test(item.label));
+    .filter((item) => /^\d{4}(\(이상치제외\))?$/.test(item.label));
 
   rows.slice(headerIndex + 1).forEach((row) => {
-    const label = asText(row[0]);
+    let label = asText(row[0]);
     if (!label) return;
+    if (label === "고객경험혁신본부CE" || label === "고객혁신본부CE") {
+      label = "고객혁신본부CE";
+    } else if (label === "고객경험혁신본부본사" || label === "고객혁신본부본사") {
+      label = "고객혁신본부본사";
+    }
     const values = {};
     yearCols.forEach(({ label: yearLabel, index }) => {
       const value = percentValue(row[index]);
-      if (value !== null) values[`y${yearLabel}`] = value;
+      if (value !== null) {
+        const isExOutlier = yearLabel.includes("이상치제외");
+        const cleanYear = yearLabel.replace("(이상치제외)", "");
+        const key = isExOutlier ? `exOutlier${cleanYear}` : `y${cleanYear}`;
+        values[key] = value;
+      }
     });
     if (label === "전사") output.company = values;
     else output.divisions[label] = values;

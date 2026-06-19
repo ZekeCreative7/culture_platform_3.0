@@ -40,26 +40,56 @@ export function dashboardSnapshot({ state, pulseCache, today }) {
     return sessionPhases.length === 2;
   }).length;
 
-  let stage = "경청";
-  if (overdueCommitments > 0 || responseWaiting > 0) {
-    stage = "응답";
-  } else if ((state.pulseCommitments || []).some(c => c.status === "shared")) {
-    stage = "공동설계";
+  const activeSessions = (state.sessions || []).filter(session => getSessionStatus(session) === "진행중").length;
+
+  // A cumulative lifecycle stage gets stuck once any old session reaches the final step.
+  // Surface the most actionable current condition instead, so this summary changes as work moves.
+  let focus = {
+    tone: "ready",
+    label: "운영 준비",
+    title: "새 운영 사이클을 준비할 수 있습니다",
+    description: "기한이 지난 약속이나 응답 대기 작업이 없습니다. 다음 세션과 설문 일정을 확인하세요."
+  };
+  if (overdueCommitments > 0) {
+    focus = {
+      tone: "urgent",
+      label: "우선 조치",
+      title: `기한이 지난 약속 ${overdueCommitments}건`,
+      description: "담당자와 진행 상황을 확인하고 기한 또는 실행 계획을 오늘 업데이트하세요."
+    };
+  } else if (responseWaiting > 0) {
+    focus = {
+      tone: "response",
+      label: "응답 필요",
+      title: `구성원에게 답해야 할 약속 ${responseWaiting}건`,
+      description: "들은 내용을 어떻게 이해했고 무엇을 할지 공감 피드백을 작성하세요."
+    };
   } else if (activeCommitments > 0) {
-    stage = "실행";
-  } else if (reportReady > 0) {
-    stage = "확인";
+    focus = {
+      tone: "active",
+      label: "실행 중",
+      title: `진행 중인 실행 약속 ${activeCommitments}건`,
+      description: "약속별 진척 상황과 다음 공유 일정을 확인하세요."
+    };
+  } else if (activeSessions > 0) {
+    focus = {
+      tone: "session",
+      label: "세션 진행",
+      title: `현재 운영 중인 세션 ${activeSessions}건`,
+      description: "남은 회차 일정과 구성원 피드백 수집 상태를 점검하세요."
+    };
   }
 
   const availableYears = Object.keys(pulseCache?.years || {}).map(Number).filter(Number.isFinite);
   const latestPulseYear = availableYears.length > 0 ? Math.max(...availableYears) : null;
 
   return {
-    stage,
+    focus,
     latestPulseYear,
     overdueCommitments,
     responseWaiting,
     activeCommitments,
+    activeSessions,
     reportReady
   };
 }

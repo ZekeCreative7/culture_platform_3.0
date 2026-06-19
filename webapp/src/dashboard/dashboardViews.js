@@ -66,30 +66,17 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
         </div>
       </header>
 
-      <!-- 5.1 Status Strip -->
+      <!-- 5.1 Current operating focus -->
       <div class="dashboard-status-strip panel">
         <div class="strip-left">
-          <span class="strip-eyebrow">현재 운영 상태</span>
-          <div class="status-badge-container">
-            ${["경청", "응답", "공동설계", "실행", "확인"].map(st => `
-              <span class="status-stage-node ${snapshot.stage === st ? 'active' : ''}">${st}</span>
-            `).join('<span class="status-stage-arrow">→</span>')}
-          </div>
-          <details class="dashboard-help">
-            <summary class="tooltip-icon" aria-label="현재 운영 상태 설명 보기">?</summary>
-            <div class="dashboard-help-popover">
-              <strong>현재 운영 상태란?</strong>
-              <p>구성원의 이야기를 듣고 실제 변화까지 연결하는 운영 단계입니다.</p>
-              <dl>
-                <div><dt>경청</dt><dd>의견을 듣거나 세션을 준비하는 단계</dd></div>
-                <div><dt>응답</dt><dd>들은 내용에 회사가 답하는 단계</dd></div>
-                <div><dt>공동설계</dt><dd>구성원과 실행 방법을 구체화하는 단계</dd></div>
-                <div><dt>실행</dt><dd>세션과 약속을 실제로 운영하는 단계</dd></div>
-                <div><dt>확인</dt><dd>사후 설문으로 변화를 점검하는 단계</dd></div>
-              </dl>
-              <small>현재 데이터 기준으로 가장 진행된 단계가 강조됩니다.</small>
+          <span class="strip-eyebrow">오늘의 운영 포커스</span>
+          <div class="operation-focus operation-focus-${snapshot.focus.tone}">
+            <span class="operation-focus-label">${snapshot.focus.label}</span>
+            <div class="operation-focus-copy">
+              <strong>${snapshot.focus.title}</strong>
+              <span>${snapshot.focus.description}</span>
             </div>
-          </details>
+          </div>
         </div>
         <div class="strip-right">
           <div class="strip-meta">

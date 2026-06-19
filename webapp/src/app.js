@@ -4,7 +4,7 @@ import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
-import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
+import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-live-focus';
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js';
 
 import {

@@ -6,7 +6,7 @@ import {
   dashboardWeekSchedule,
   dashboardPulseSignals,
   dashboardSupportOrgs
-} from './dashboardEngine.js';
+} from './dashboardEngine.js?v=20260620-live-focus';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
 import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260619-fix-syntax-error-v2';
 

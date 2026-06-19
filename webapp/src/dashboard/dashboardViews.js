@@ -75,7 +75,21 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
               <span class="status-stage-node ${snapshot.stage === st ? 'active' : ''}">${st}</span>
             `).join('<span class="status-stage-arrow">→</span>')}
           </div>
-          <span class="tooltip-icon" style="margin-left:8px;" title="경청: 등록된 약속이나 진행중인 세션 대기 상태\n응답: 기한 초과 혹은 응답 피드백 대기 상태\n공동설계: 공유됨 상태의 약속 존재 시\n실행: 실행 중인 약속이나 활성 세션 존재 시\n확인: 사전/사후 적재 완료된 세션 분석 보고 준비 완료 시">?</span>
+          <details class="dashboard-help">
+            <summary class="tooltip-icon" aria-label="현재 운영 상태 설명 보기">?</summary>
+            <div class="dashboard-help-popover">
+              <strong>현재 운영 상태란?</strong>
+              <p>구성원의 이야기를 듣고 실제 변화까지 연결하는 운영 단계입니다.</p>
+              <dl>
+                <div><dt>경청</dt><dd>의견을 듣거나 세션을 준비하는 단계</dd></div>
+                <div><dt>응답</dt><dd>들은 내용에 회사가 답하는 단계</dd></div>
+                <div><dt>공동설계</dt><dd>구성원과 실행 방법을 구체화하는 단계</dd></div>
+                <div><dt>실행</dt><dd>세션과 약속을 실제로 운영하는 단계</dd></div>
+                <div><dt>확인</dt><dd>사후 설문으로 변화를 점검하는 단계</dd></div>
+              </dl>
+              <small>현재 데이터 기준으로 가장 진행된 단계가 강조됩니다.</small>
+            </div>
+          </details>
         </div>
         <div class="strip-right">
           <div class="strip-meta">
@@ -528,7 +542,6 @@ export function bindHomeDashboard({ state, saveState, render }) {
 
       state.activeView = targetView;
       saveState();
-      render();
 
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
@@ -560,7 +573,6 @@ export function bindHomeDashboard({ state, saveState, render }) {
 
       state.activeView = targetView;
       saveState();
-      render();
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
       }
@@ -583,7 +595,6 @@ export function bindHomeDashboard({ state, saveState, render }) {
     dayCol.addEventListener("click", () => {
       state.dashboardSelectedDate = dayCol.dataset.date;
       saveState();
-      render();
     });
   });
 
@@ -600,7 +611,6 @@ export function bindHomeDashboard({ state, saveState, render }) {
       state.dashboardSelectedDate = startDay.toISOString().slice(0, 10);
 
       saveState();
-      render();
     });
   });
 }

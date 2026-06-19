@@ -5,6 +5,7 @@ import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
+import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -45,9 +46,15 @@ const NAV_ICONS = {
   pulse: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm1 3a1 1 0 0 0-1 1v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1H4Zm3 7a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v4a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1v-1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Z"/></svg>`,
 };
 
-// Register main render loop to state changes
+// Coalesce rapid state notifications into one paint. Firestore and local persistence can
+// notify during the same frame; rendering each notification made the Home canvas flash.
+let scheduledRenderFrame = 0;
 subscribe(() => {
-  render();
+  if (scheduledRenderFrame) return;
+  scheduledRenderFrame = window.requestAnimationFrame(() => {
+    scheduledRenderFrame = 0;
+    render();
+  });
 });
 
 
@@ -2143,16 +2150,27 @@ function renderReport() {
   const hasDiagnosisData = Boolean(diagnosis?.n >= 1);
 
   return `
-    <section class="page-head">
+    <div id="report-export-content" class="report-export-content">
+    <section class="page-head report-export-header">
       <div>
         <span class="eyebrow">Analysis Report</span>
         <h1>분석 결과</h1>
         <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
       </div>
-      ${cohort ? `<button class="primary" id="download-report">CSV 다운로드</button>` : ""}
+      ${cohort && session ? `
+        <div class="report-export-actions" data-html2canvas-ignore="true">
+          <button class="report-export-button excel" id="download-report-xlsx" type="button">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 10l2 3m0-3-2 3m4-3h2v3h-2"/></svg>
+            <span><b>엑셀 다운로드</b><small>질문·익명 응답</small></span>
+          </button>
+          <button class="report-export-button pdf" id="download-report-pdf" type="button">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 11h6M7 14h4"/></svg>
+            <span><b>PDF 리포트</b><small>화면 디자인 포함</small></span>
+          </button>
+        </div>` : ""}
     </section>
 
-    <section class="panel filters-panel" style="margin-bottom:18px;">
+    <section class="panel filters-panel" style="margin-bottom:18px;" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
         <label>세션 유형
           <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
@@ -2177,7 +2195,7 @@ function renderReport() {
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
 
     <!-- ① 현 상황 진단 -->
-    <section style="margin-bottom:28px;">
+    <section class="report-export-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>① 현 상황 진단</h2>
         <span>${diagnosisPhase} 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${diagnosis ? diagnosis.n : 0}</span>
@@ -2233,7 +2251,7 @@ function renderReport() {
     </section>
 
     <!-- ② 세션 운영 제안 -->
-    <section style="margin-bottom:28px;">
+    <section class="report-export-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>② 세션 운영 제안</h2>
         <span>${diagnosisPhase} 진단 기반 퍼실리테이션 가이드</span>
@@ -2246,7 +2264,7 @@ function renderReport() {
           const priority = score !== null && score < 3.5 ? '우선 집중' : score !== null && score < 4.0 ? '강화 권장' : '강점 유지';
           const priorityColor = score !== null && score < 3.5 ? '#dc2626' : score !== null && score < 4.0 ? '#d97706' : '#059669';
           return `
-            <div class="panel" style="padding:16px 20px; display:flex; gap:16px; align-items:flex-start;">
+            <div class="panel report-recommendation-card" style="padding:16px 20px; display:flex; gap:16px; align-items:flex-start;">
               <div style="min-width:32px; height:32px; border-radius:8px; background:${dim.color}18; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; color:${dim.color};">${idx+1}</div>
               <div style="flex:1;">
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
@@ -2264,7 +2282,7 @@ function renderReport() {
     </section>
 
     <!-- ③ 변화 분석 -->
-    <section style="margin-bottom:28px;">
+    <section class="report-export-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>③ 변화 분석</h2>
         <span>사전 → 사후 · N<3 마스킹 적용</span>
@@ -2285,7 +2303,7 @@ function renderReport() {
             : '점수 하락 — 환경 요인 점검 필요';
           const bar = (score, color) => score !== null ? `<div style="height:8px; border-radius:99px; width:${Math.round((score/5)*100)}%; background:${color}; transition:width 0.5s;"></div>` : `<div style="height:8px; border-radius:99px; width:30%; background:#e2e8f0;"></div>`;
           return `
-            <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
+            <div class="report-change-card" style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
               <div style="position:absolute; top:0; left:0; right:0; height:3px; background:${dim.color};"></div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
                 <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
@@ -2337,7 +2355,7 @@ function renderReport() {
 
       if (!hasPreQual && !hasPostQual) {
         return `
-          <section style="margin-bottom:28px;">
+          <section class="report-export-section" style="margin-bottom:28px;">
             <div class="section-title" style="margin-bottom:16px;">
               <h2>④ 현장의 목소리 (정성 신호)</h2>
             </div>
@@ -2347,7 +2365,7 @@ function renderReport() {
       }
 
       return `
-        <section style="margin-bottom:28px;">
+        <section class="report-export-section" style="margin-bottom:28px;">
           <div class="section-title" style="margin-bottom:16px;">
             <h2>④ 현장의 목소리 (정성 신호)</h2>
             <span>AI 정성 분석 · 측정값 아님 · 참고</span>
@@ -2375,6 +2393,7 @@ function renderReport() {
     })()}
 
     `}
+    </div>
   `;
 }
 
@@ -2800,8 +2819,8 @@ function renderQualSection(cohort, type, sessionId = "", phase = "") {
         ${aiButtonHtml}
       </div>
       <div class="pulse-segmented" aria-label="보기 방식">
-        <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question">문항별</button>
-        <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person">같은 사람별</button>
+        <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question">질문으로 보기</button>
+        <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person">사람으로 보기</button>
       </div>
     </div>
     <div style="display:flex; flex-direction:column; gap:16px; margin-top:14px;">
@@ -2830,7 +2849,6 @@ function bindLayout() {
       state.activeView = nextView;
       state.mobileNavOpen = false;
       saveState();
-      render();
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
       }
@@ -2847,7 +2865,6 @@ function bindLayout() {
   document.querySelector("#toggle-sidebar")?.addEventListener("click", () => {
     state.sidebarCollapsed = !state.sidebarCollapsed;
     saveState();
-    render();
   });
 }
 
@@ -2858,7 +2875,7 @@ function bindCanvasEvents() {
     bindOrg();
   } else if (state.activeView === "upload") {
     bindUpload();
-  } else if (state.activeView === "report") {
+  } else if (["analytics", "report"].includes(state.activeView)) {
     bindReport();
   } else if (state.activeView === "pulse") {
     bindPulse({
@@ -3547,33 +3564,100 @@ function bindUpload() {
   });
 }
 
+function reportExportPayload() {
+  const scope = ensureScopedSelection("report");
+  const session = scope.session;
+  if (!session) throw new Error("내보낼 세션을 선택해 주세요.");
+
+  const sessionResponses = (state.responses || []).filter((row) => row.sessionId === session.id);
+  const sessionSurveys = (state.surveys || []).filter((survey) => survey.sessionId === session.id);
+  const phases = [...new Set([
+    ...PHASES,
+    ...sessionSurveys.map((survey) => survey.phase),
+    ...sessionResponses.map((response) => response.phase),
+  ].filter(Boolean))];
+  const questions = phases.flatMap((phase) => {
+    const survey = sessionSurveys.find((item) => item.phase === phase);
+    const phaseQuestions = survey?.questions?.length ? survey.questions : defaultQuestions(phase);
+    return phaseQuestions.map((question) => ({
+      phase,
+      id: question.id,
+      type: question.type || (isQualText(question.text) ? "qual" : "quant"),
+      text: question.text || question.label || question.id,
+    }));
+  }).filter((question, index, list) => list.findIndex((item) => item.phase === question.phase && item.id === question.id) === index);
+
+  const stats = statsForSession(scope.cohort, session.id);
+  const pre = stats.find((item) => item.phase === "사전") || null;
+  const mid = stats.find((item) => item.phase === "중간") || null;
+  const post = stats.find((item) => item.phase === "사후") || null;
+  const current = post?.n ? post : (mid?.n ? mid : pre);
+  const analysis = REPORT_DIMS.map((dimension) => {
+    const currentScore = current ? dimAvg(current, dimension.qs) : null;
+    const preScore = pre?.n >= 3 ? dimAvg(pre, dimension.qs) : null;
+    const postScore = post?.n >= 3 ? dimAvg(post, dimension.qs) : null;
+    return {
+      label: dimension.label,
+      current: currentScore === null ? "-" : Number(currentScore.toFixed(2)),
+      pre: preScore === null ? "N<3" : Number(preScore.toFixed(2)),
+      post: postScore === null ? "N<3" : Number(postScore.toFixed(2)),
+      delta: preScore === null || postScore === null ? "-" : Number((postScore - preScore).toFixed(2)),
+      recommendation: dimRecommendation(dimension.key, currentScore),
+    };
+  });
+
+  return {
+    meta: {
+      typeLabel: sessionTypeLabel(session.type),
+      sessionLabel: sessionLabel(session),
+      cohort: session.cohort || scope.cohort,
+      year: sessionYear(session),
+    },
+    questions,
+    responses: sessionResponses,
+    analysis,
+  };
+}
+
 function bindReport() {
-  document.querySelector("#download-report")?.addEventListener("click", () => {
-    const cohorts = [...new Set(state.responses.map((row) => row.cohort))].filter(Boolean).sort((a, b) => a - b);
-    const cohort = Number(state.selectedReportCohort || (cohorts.length ? cohorts[0] : 0));
-    const sessionId = state.selectedReportSessionId || "";
-    const session = (state.sessions || []).find((item) => item.id === sessionId);
-    const type = normalizeSessionType(session?.type || state.selectedReportType || "리더십");
-    const stats = sessionId ? statsForSession(cohort, sessionId) : statsForCohort(cohort, type);
-    const dynamicQuestions = sessionId ? questionSetForSession(sessionId) : getQuestionsForCohort(cohort, type);
-    
-    const preStats = stats.find(s => s.phase === '사전');
-    const postStats = stats.find(s => s.phase === '사후');
-    const rows = [["문항", "사전 평균", "사후 평균", "변화량"]];
-    dynamicQuestions.forEach((q) => {
-      const key = q.id;
-      const label = q.text;
-      const pre = preStats ? preStats[`${key}_avg`] : null;
-      const post = postStats ? postStats[`${key}_avg`] : null;
-      const masked = (preStats ? preStats.n : 0) < 3 || (postStats ? postStats.n : 0) < 3;
-      rows.push(masked ? [label, "N<3 마스킹", "N<3 마스킹", "-"] : [label, fmt(pre), fmt(post), typeof pre === "number" && typeof post === "number" ? (post - pre).toFixed(2) : "-"]);
-    });
-    const blob = new Blob([rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `culture_report_${type}_${cohort || "cohort"}${sessionId ? "_session" : ""}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+  document.querySelector("#download-report-xlsx")?.addEventListener("click", (event) => {
+    const button = event.currentTarget;
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    button.innerHTML = `<span><b>엑셀 생성 중</b><small>잠시만 기다려 주세요</small></span>`;
+    try {
+      downloadReportWorkbook(reportExportPayload());
+    } catch (error) {
+      console.error("엑셀 리포트 생성 실패:", error);
+      window.alert(error.message || "엑셀 파일을 만들지 못했습니다.");
+    } finally {
+      button.disabled = false;
+      button.classList.remove("is-loading");
+      button.innerHTML = original;
+    }
+  });
+
+  document.querySelector("#download-report-pdf")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    button.innerHTML = `<span><b>PDF 생성 중</b><small>분석 화면을 정리하고 있어요</small></span>`;
+    try {
+      const payload = reportExportPayload();
+      await downloadReportPdf({
+        element: document.querySelector("#report-export-content"),
+        meta: payload.meta,
+      });
+    } catch (error) {
+      console.error("PDF 리포트 생성 실패:", error);
+      window.alert(error.message || "PDF 파일을 만들지 못했습니다.");
+    } finally {
+      button.disabled = false;
+      button.classList.remove("is-loading");
+      button.innerHTML = original;
+    }
   });
 
   document.querySelector("#apply-analytics-filter")?.addEventListener("click", () => {

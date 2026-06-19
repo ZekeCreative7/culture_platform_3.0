@@ -4693,6 +4693,18 @@ async function initApp() {
     loadPulseYears(PULSE_YEARS).then(() => render());
   }
 
+  // Survey configuration can be repaired or reassigned while another operator tab is already open.
+  // Keep it live just like responses so newly linked qualitative question IDs become visible without
+  // requiring a hard refresh (otherwise the tab keeps falling back to the legacy q9~q11 set).
+  onSnapshot(collection(db, 'surveys'), (snap) => {
+    state.surveys = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    syncSurveysToSessions();
+    saveState();
+    render();
+  }, (err) => {
+    console.error('Firestore 설문 실시간 갱신 오류:', err);
+  });
+
   // Real-time listener for responses — updates dashboard whenever a phone submits
   onSnapshot(collection(db, 'responses'), (snap) => {
     const surveyMap = Object.fromEntries((state.surveys || []).map(s => [s.id, s]));

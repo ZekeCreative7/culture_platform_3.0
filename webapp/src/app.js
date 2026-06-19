@@ -4036,7 +4036,35 @@ window.updateSurveyDraftQuestionType = function(qid, type) {
   if (q) {
     q.type = type;
     saveState();
-    render();
+    
+    // 전체 페이지를 다시 그리지 않고(render() 미호출) 클릭된 문항 카드의 DOM 노드만 정밀 수정
+    const radioInputs = document.querySelectorAll(`input[name="qtype-${qid}"]`);
+    if (radioInputs.length) {
+      const row = radioInputs[0].closest('.draft-q-row');
+      if (row) {
+        // 1. 헤더의 문항 타입 텍스트 실시간 반영
+        const span = row.querySelector('span');
+        if (span) {
+          span.textContent = `${qid.toUpperCase()} · ${type === 'quant' ? '5점 척도' : '주관식 텍스트'}`;
+        }
+        
+        // 2. 선택된 라벨과 해제된 라벨의 배경색 및 글자색 정밀 조절
+        radioInputs.forEach(input => {
+          const label = input.closest('label');
+          if (label) {
+            const isSelected = input.value === type;
+            input.checked = isSelected;
+            if (isSelected) {
+              label.style.color = '#fff';
+              label.style.background = 'var(--neon-blue)';
+            } else {
+              label.style.color = 'var(--muted)';
+              label.style.background = 'transparent';
+            }
+          }
+        });
+      }
+    }
   }
 };
 

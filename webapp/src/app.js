@@ -2676,25 +2676,35 @@ function qualResponseRows(cohort, type, sessionId = "", phase = "") {
   const hasExplicitConfig = classifySurveys.some(s => (s.questions || []).length > 0);
   const qualIds = hasExplicitConfig ? configuredQualIds : ['q9', 'q10', 'q11'];
   const phaseOk = (r) => !phase || r.phase === phase;
+
+  // Filter helper: check if a response has qualitative text in fields that are qualitative in its own survey
+  const hasQualTextInSurvey = (r) => {
+    const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
+    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
+      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+      : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+    return rQualIds.some(id => isQualText(r[id]));
+  };
+
   let rows;
   if (sessionId) {
     // A specific session is selected: match purely by sessionId (+ phase). The cohort field on a
     // response is only a stale snapshot and must NOT gate visibility — that mismatch is exactly
     // what made 리스크관리팀 정성 응답 disappear while its 정량 응답 still showed.
     rows = (state.responses || []).filter(r =>
-      sessionIds.has(r.sessionId) && phaseOk(r) && qualIds.some(id => isQualText(r[id]))
+      sessionIds.has(r.sessionId) && phaseOk(r) && hasQualTextInSurvey(r)
     );
   } else {
     // Cohort/type-level aggregation (no single session): scope by cohort + the session set.
     rows = (state.responses || []).filter(r =>
-      r.cohort === cohortNum && sessionIds.has(r.sessionId) && phaseOk(r) && qualIds.some(id => isQualText(r[id]))
+      r.cohort === cohortNum && sessionIds.has(r.sessionId) && phaseOk(r) && hasQualTextInSurvey(r)
     );
     // Fallback for orphaned rows whose sessionId no longer matches any session (e.g. CSV upload
     // with a stale id) — only keep them if their linked survey confirms the same session type,
     // so a 팀빌딩 1기 response never shows up under 리더십 1기 just because the cohort number matches.
     if (!rows.length) {
       rows = (state.responses || []).filter(r => {
-        if (r.cohort !== cohortNum || !phaseOk(r) || !qualIds.some(id => isQualText(r[id]))) return false;
+        if (r.cohort !== cohortNum || !phaseOk(r) || !hasQualTextInSurvey(r)) return false;
         const survey = (state.surveys || []).find(s => s.id === r.surveyId);
         return Boolean(survey && sameSessionType(survey.sessionType, type));
       });
@@ -2720,7 +2730,14 @@ function qualQuestionLabel(qid, type, sessionId = "", phase = "") {
 
 function renderQualByQuestion(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
   return qualIds.map((id) => {
-    const answers = rows.filter((r) => isQualText(r[id])).map((r) => ({ phase: r.phase || '', answer: r[id] }));
+    const answers = rows.filter((r) => {
+      const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
+      const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
+        ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+        : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+      return rQualIds.includes(id) && isQualText(r[id]);
+    }).map((r) => ({ phase: r.phase || '', answer: r[id] }));
+
     if (!answers.length) return '';
     return `
       <div class="qual-group">
@@ -2737,9 +2754,25 @@ function renderQualByQuestion(rows, qualIds, type, showPhase, sessionId = "", ph
 }
 
 function renderQualByPerson(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
-  const peopleRows = rows.filter((row) => qualIds.some((id) => isQualText(row[id])));
+  const peopleRows = rows.filter((row) => {
+    const rSurvey = state.surveys.find(s => s.id === row.surveyId || (s.sessionId === row.sessionId && s.phase === row.phase));
+    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
+      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+      : defaultQuestions(row.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+    return rQualIds.some((id) => isQualText(row[id]));
+  });
+
   return peopleRows.map((row, index) => {
-    const answers = qualIds.filter((id) => isQualText(row[id])).map((id) => ({ label: qualQuestionLabel(id, type, sessionId, row.phase || phase), answer: row[id] }));
+    const rSurvey = state.surveys.find(s => s.id === row.surveyId || (s.sessionId === row.sessionId && s.phase === row.phase));
+    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
+      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+      : defaultQuestions(row.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+
+    const answers = qualIds.filter((id) => rQualIds.includes(id) && isQualText(row[id])).map((id) => ({ 
+      label: qualQuestionLabel(id, type, sessionId, row.phase || phase), 
+      answer: row[id] 
+    }));
+
     if (!answers.length) return '';
     return `
       <div class="qual-group">
@@ -4322,13 +4355,25 @@ function buildQualPrompt(cohort, type, sessionId = "") {
     }
 
     const phaseQualIds = qualIdsForPhase(phase);
-    const qualRows = rows.filter(r => phaseQualIds.some(id => isQualText(r[id])));
+    const qualRows = rows.filter(r => {
+      const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
+      const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
+        ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+        : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+      return rQualIds.some(id => isQualText(r[id]));
+    });
     if (!qualRows.length) return;
     totalQualRows += qualRows.length;
 
     prompt += `【${phase} 설문 — ${qualRows.length}명 응답】\n`;
     phaseQualIds.forEach(qid => {
-      const answers = qualRows.map(r => String(r[qid] || '')).filter(v => isQualText(v));
+      const answers = qualRows.filter(r => {
+        const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
+        const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
+          ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+          : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+        return rQualIds.includes(qid);
+      }).map(r => String(r[qid] || '')).filter(v => isQualText(v));
       if (!answers.length) return;
       prompt += `\n질문: ${getQText(qid, phase)}\n`;
       answers.forEach((a, i) => { prompt += `  응답 ${i + 1}. ${a}\n`; });

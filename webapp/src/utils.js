@@ -105,8 +105,12 @@ export function scoreOf(value) {
 }
 
 export function isQualText(value) {
-  const t = value === undefined || value === null ? "" : String(value).trim();
-  return t !== "" && !SCALE_LABELS.has(t);
+  if (value === undefined || value === null) return false;
+  if (typeof value === "number") return false;
+  const t = String(value).trim();
+  if (t === "") return false;
+  if (/^[1-5]$/.test(t)) return false;
+  return !SCALE_LABELS.has(t);
 }
 
 export const todayISO = () => {

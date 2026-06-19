@@ -2405,9 +2405,11 @@ function renderAnalytics() {
           (state.surveys || []).some((s) => s.sessionId === sessionId && s.phase === p)
           || (state.responses || []).some((r) => r.sessionId === sessionId && r.phase === p)
         );
+        // 기본 탭은 데이터가 있는 첫 시점(보통 사전) — 변화 분석은 사전→사후 순으로 읽고, 방금 올린
+        // 사전 결과가 사후 탭에 가려 안 보이는 일을 막는다.
         const activePhase = (state.selectedAnalyticsPhase && PHASES.includes(state.selectedAnalyticsPhase))
           ? state.selectedAnalyticsPhase
-          : (phasesWithData[phasesWithData.length - 1] || "사후");
+          : (phasesWithData[0] || PHASES[0]);
         const phaseMeta = session
           ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)} · ${activePhase}`
           : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 · ${activePhase}`;
@@ -3897,6 +3899,18 @@ function bindUpload() {
     state.responses.push(...rowsToSave);
     state.uploadRows = [];
     state.uploadErrors = [];
+    // Land the 변화 분석 화면 exactly on the session + 시점 we just uploaded, so freshly added
+    // (e.g. 사전) data is visible immediately instead of defaulting to another phase tab.
+    const first = rowsToSave[0];
+    if (first) {
+      const sess = (state.sessions || []).find((s) => s.id === first.sessionId);
+      if (sess) {
+        state.selectedAnalyticsType = normalizeSessionType(sess.type);
+        state.selectedAnalyticsCohort = String(sess.cohort || "");
+        state.selectedAnalyticsSessionId = first.sessionId;
+      }
+      if (first.phase && PHASES.includes(first.phase)) state.selectedAnalyticsPhase = first.phase;
+    }
     saveState();
     state.activeView = "analytics";
     render();

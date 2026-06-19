@@ -20,7 +20,7 @@ import {
   deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore,
   saveSurveyToFirestore, deleteSurveyFromFirestore, updateSurveyInFirestore, loadPulseYears,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore
-} from './state.js';
+} from './state.js?v=20260619-fix-syntax-error-v2';
 
 const VIEWS = [
   ["dashboard", "Home", "홈"],

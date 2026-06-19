@@ -29,7 +29,7 @@ export function renderCommitmentsBoard({ state, savePulseCommitment, deletePulse
   return `
     <div class="pulse-commitments-board">
       <header class="commitments-header">
-        <h3>🤝 신뢰 회복 약속 보드 (${year}년 · ${scopeId === "company" ? "전사" : escapeHtml(scopeId)})</h3>
+        <h3>신뢰 회복 약속 보드 (${year}년 · ${scopeId === "company" ? "전사" : escapeHtml(scopeId)})</h3>
         <p>구성원들의 의견을 깊이 경청하고, 회사가 이해한 바를 정리하여 실현 가능한 작은 약속으로 관리합니다. (권장: 동시 활성 약속 최대 2개)</p>
       </header>
 
@@ -45,7 +45,7 @@ export function renderCommitmentsBoard({ state, savePulseCommitment, deletePulse
       <div class="commitment-form-container panel">
         ${draft 
           ? renderCommitmentForm(draft) 
-          : `<button class="primary" id="btn-show-commitment-form">➕ 신규 약속 등록하기</button>`
+          : `<button class="primary" id="btn-show-commitment-form">신규 약속 등록</button>`
         }
       </div>
 
@@ -78,27 +78,27 @@ function renderCommitmentCard(c, state) {
       
       <div class="card-flow">
         <div class="flow-step voice">
-          <strong>💬 You Said (직원 의견)</strong>
+          <strong>You Said (직원 의견)</strong>
           <p>${escapeHtml(c.employeeVoice)}</p>
         </div>
         <div class="flow-step heard">
-          <strong>👂 We Heard (회사의 공감·이해)</strong>
+          <strong>We Heard (회사의 공감·이해)</strong>
           <p>${escapeHtml(c.acknowledgement)}</p>
         </div>
         <div class="flow-step will">
-          <strong>🤝 We Will (작은 약속)</strong>
+          <strong>We Will (작은 약속)</strong>
           <p>${escapeHtml(c.commitment)}</p>
         </div>
         ${c.evidence ? `
           <div class="flow-step did">
-            <strong>✅ We Did (완료 증거)</strong>
+            <strong>We Did (완료 증거)</strong>
             <p>${escapeHtml(c.evidence)}</p>
           </div>
         ` : ""}
       </div>
 
       <div class="card-footer">
-        <span class="owner">담당: 👤 ${escapeHtml(c.ownerRole || "미정")}</span>
+        <span class="owner">담당: ${escapeHtml(c.ownerRole || "미정")}</span>
         <div class="actions">
           <button class="secondary compact" data-commitment-action="edit" data-id="${c.id}">수정</button>
           <button class="secondary compact danger" data-commitment-action="delete" data-id="${c.id}">삭제</button>
@@ -114,39 +114,39 @@ function renderCommitmentForm(c, isEdit = false) {
     <form class="commitment-form" data-id="${c.id || ''}" data-is-edit="${isEdit}">
       <div class="form-row">
         <label>
-          <strong>💬 You Said (직원에게서 들은 핵심 주제)</strong>
+          <strong>You Said (직원에게서 들은 핵심 주제)</strong>
           <textarea name="employeeVoice" required placeholder="예: '조치 결과 피드백이 부재하여 말해도 소용없다고 느낀다' 등">${escapeHtml(c.employeeVoice)}</textarea>
         </label>
       </div>
 
       <div class="form-row">
         <label>
-          <strong>👂 We Heard (회사가 이해하고 공감한 내용)</strong>
+          <strong>We Heard (회사가 이해하고 공감한 내용)</strong>
           <textarea name="acknowledgement" required placeholder="예: '제안의 처리 상태를 명확히 공유하지 못해 무력감을 드렸음을 통감하고 인정합니다.'">${escapeHtml(c.acknowledgement)}</textarea>
         </label>
       </div>
 
       <div class="form-row">
         <label>
-          <strong>🤝 We Will (실제로 지킬 수 있는 작은 약속)</strong>
+          <strong>We Will (실제로 지킬 수 있는 작은 약속)</strong>
           <textarea name="commitment" required placeholder="예: '접수된 의견의 진행 상태를 격주 수요일 사내 인트라넷에 투명하게 공개하겠다.'">${escapeHtml(c.commitment)}</textarea>
         </label>
       </div>
 
       <div class="form-grid">
         <label>
-          <strong>👤 담당 역할/부서 (Owner)</strong>
+          <strong>담당 역할/부서 (Owner)</strong>
           <input type="text" name="ownerRole" required value="${escapeHtml(c.ownerRole)}" placeholder="예: 조직문화실장" />
         </label>
         <label>
-          <strong>📅 완료 예정일 (Due)</strong>
+          <strong>완료 예정일 (Due)</strong>
           <input type="date" name="dueDate" required value="${c.dueDate || ''}" />
         </label>
       </div>
 
       <div class="form-row">
         <label>
-          <strong>⚙️ 상태 (Status)</strong>
+          <strong>상태 (Status)</strong>
           <select name="status" class="status-select">
             <option value="draft" ${c.status === "draft" ? "selected" : ""}>검토 중</option>
             <option value="shared" ${c.status === "shared" ? "selected" : ""}>공유됨</option>
@@ -159,12 +159,12 @@ function renderCommitmentForm(c, isEdit = false) {
 
       <div class="form-row evidence-row ${isDone ? "" : "hidden"}">
         <label>
-          <strong>✅ 완료 증거 (Evidence) <span class="required-star">*</span></strong>
+          <strong>완료 증거 (Evidence) <span class="required-star">*</span></strong>
           <textarea name="evidence" placeholder="상태가 '완료'일 때 필수입니다. 예: '인트라넷 게시판 개설 링크 및 게시글 번호...'" ${isDone ? "required" : ""}>${escapeHtml(c.evidence)}</textarea>
         </label>
       </div>
 
-      <div class="pii-warning hidden">⚠️ 경고: 입력란에 개인 식별 정보(이름, 이메일, 사번 등)가 감지되었습니다. 개인정보가 노출되지 않도록 주의해 주세요.</div>
+      <div class="pii-warning hidden">경고: 입력란에 개인 식별 정보(이름, 이메일, 사번 등)가 감지되었습니다. 개인정보가 노출되지 않도록 주의해 주세요.</div>
 
       <div class="form-actions">
         <button type="submit" class="primary">${isEdit ? "수정 완료" : "약속 저장"}</button>
@@ -214,7 +214,7 @@ ${commitments.map((c, i) => `
       <h4>🤖 경영진 응답문 생성을 위한 GPT 프롬프트</h4>
       <p>아래 프롬프트를 복사하여 대화형 AI에 붙여넣으면, 등록된 약속을 바탕으로 진정성 있는 경영진 소통 메시지를 초안으로 작성할 수 있습니다.</p>
       <textarea id="gpt-prompt-textarea" readonly>${escapeHtml(promptText)}</textarea>
-      <button class="secondary compact" id="btn-copy-gpt-prompt">📋 프롬프트 복사</button>
+      <button class="secondary compact" id="btn-copy-gpt-prompt">프롬프트 복사</button>
     </section>
   `;
 }
@@ -375,9 +375,9 @@ export function bindCommitmentsEvents({ state, saveState, savePulseCommitment, d
         .then(() => {
           const btn = document.querySelector("#btn-copy-gpt-prompt");
           if (btn) {
-            btn.textContent = "✅ 복사 완료!";
+            btn.textContent = "복사 완료";
             setTimeout(() => {
-              btn.textContent = "📋 프롬프트 복사";
+              btn.textContent = "프롬프트 복사";
             }, 2000);
           }
         })

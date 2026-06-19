@@ -4,6 +4,7 @@ import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
+import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -729,11 +730,11 @@ function render() {
             <span></span>
             <span></span>
           </button>
-          <div class="searchbox">Search sessions, cohorts, uploads</div>
+          <div class="searchbox">세션, 조직, 설문 검색</div>
           <div class="topbar-actions">
             <span>${state.sessions.length} sessions</span>
-            <button class="ghost" data-view="upload">Import CSV</button>
-            <button class="primary compact" data-view="sessions">New session</button>
+            <button class="ghost" data-view="upload">데이터 가져오기</button>
+            <button class="primary compact" data-view="sessions">새 세션</button>
           </div>
         </header>
         <div class="canvas">
@@ -754,73 +755,11 @@ function renderView() {
   if (state.activeView === "analytics") return renderAnalytics();
   if (state.activeView === "report") return renderReport();
   if (state.activeView === "pulse") return renderPulse({ state, pulseCache });
-  return renderDashboard();
+  return renderHomeDashboard({ state, pulseCache, commitmentsCache: state.pulseCommitments });
 }
 
 function renderDashboard() {
-  const active = state.sessions.filter((session) => getStatus(session)[0] === "진행중").length;
-  const weekEnd = new Date();
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  const weekEndISO = weekEnd.toISOString().slice(0, 10);
-  const weekItems = state.sessions
-    .flatMap((session) => (session.schedule || []).filter((item) => item.confirmed && item.date >= todayISO() && item.date <= weekEndISO).map((item) => ({ session, item })))
-    .sort((a, b) => a.item.date.localeCompare(b.item.date));
-  const pending = state.sessions.filter((session) => (session.schedule || []).some((item) => !item.confirmed || !item.date));
-  const ready = state.sessions.filter((session) => ["사전", "사후"].every((phase) => phasesForSession(session.id).includes(phase))).length;
-
-  return `
-    <section class="hero dashboard-hero">
-      <div class="hero-copy">
-        <div class="eyebrow">Culture Platform 3.0</div>
-        <h1>Culture sessions, measured from plan to report.</h1>
-        <p>세션 운영과 설문 변화량을 한 흐름으로 연결해, 운영자는 다음 액션을 보고 경영진은 안전하게 결과를 봅니다.</p>
-        <div class="hero-actions">
-          <button class="primary" data-view="sessions">세션 만들기</button>
-          <button class="secondary" data-view="upload">CSV 업로드</button>
-        </div>
-      </div>
-      <div class="flow-canvas" aria-hidden="true">
-        <div class="flow-toolbar">
-          <span></span><span></span><span></span>
-          <b>Session flow</b>
-        </div>
-        <div class="flow-line"></div>
-        <div class="flow-node node-plan"><strong>Plan</strong><small>target teams</small></div>
-        <div class="flow-node node-run"><strong>Run</strong><small>round schedule</small></div>
-        <div class="flow-node node-pulse"><strong>Measure</strong><small>pre · mid · post</small></div>
-        <div class="flow-node node-report"><strong>Report</strong><small>N&lt;3 masked</small></div>
-        <div class="flow-card mini-a"><span>Active</span><b>${active}</b></div>
-        <div class="flow-card mini-b"><span>Ready</span><b>${ready}</b></div>
-      </div>
-    </section>
-    <section class="metric-grid command-grid">
-      ${metricCard("전체 세션", state.sessions.length, "등록된 운영 단위")}
-      ${metricCard("진행중", active, "일정이 열린 세션")}
-      ${metricCard("이번 주 일정", weekItems.length, "7일 이내 확정")}
-      ${metricCard("보고 준비", ready, "사전/사후 적재 완료")}
-    </section>
-    <section class="feature-band">
-      <div>
-        <span>Next operating loop</span>
-        <strong>세션 설계 → CSV 검증 → 변화량 확인 → 경영진 보고</strong>
-      </div>
-      <button data-view="upload">업로드로 이동</button>
-    </section>
-    <section class="workspace-grid">
-      <div>
-        ${sectionTitle("이번 주 일정", `${weekItems.length}건`)}
-        ${weekItems.length ? weekItems.map(({ session, item }) => eventCard(session, item)).join("") : emptyCard("이번 주 확정된 일정이 없습니다.")}
-        ${sectionTitle("업로드 상태", "사전 · 사후")}
-        ${state.sessions.length ? state.sessions.map(uploadStateCard).join("") : emptyCard("등록된 세션이 없습니다.")}
-      </div>
-      <div>
-        ${sectionTitle("미정 회차", `${pending.length}개 세션`)}
-        ${pending.length ? pending.map((session) => alertCard(session)).join("") : emptyCard("모든 회차 일정이 확정되었습니다.", "good")}
-        ${sectionTitle("세션 구성", "유형별")}
-        <div class="stack">${Object.keys(SESSION_TYPES).map(typeSummary).join("")}</div>
-      </div>
-    </section>
-  `;
+  return "";
 }
 
 function renderOrgSelectRow(divisionList, hqList, teamList) {
@@ -1072,7 +1011,7 @@ function renderSessions() {
         </div>
         <div class="panel-actions">
           ${state.editingSessionId ? `
-            <span style="font-size:12px;color:#0ea5e9;font-weight:700;margin-right:8px;">✏️ 세션 수정 중</span>
+            <span style="font-size:12px;color:#0ea5e9;font-weight:700;margin-right:8px;">세션 수정 중</span>
             <button class="ghost" id="cancel-edit-session">취소</button>
           ` : ''}
           <button class="primary" id="create-session" ${canCreateDraftSession() ? "" : "disabled"}>
@@ -1747,7 +1686,7 @@ function renderSurveyCreator() {
         <div style="display:flex; align-items:center; justify-content:space-between;">
           <h3>${state.editingSurveyId ? '설문 수정' : '새 설문 조사 설계'}</h3>
           ${state.editingSurveyId ? `
-            <span style="font-size:12px;color:#0ea5e9;font-weight:700;">✏️ 설문 수정 중</span>
+            <span style="font-size:12px;color:#0ea5e9;font-weight:700;">설문 수정 중</span>
           ` : ''}
         </div>
         <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
@@ -1769,7 +1708,7 @@ function renderSurveyCreator() {
 
           ${(state.qrBaseUrl || '').includes('localhost') || (state.qrBaseUrl || '').includes('127.0.0.1') ? `
           <div style="background:#fef3c7; border:1.5px solid #fbbf24; border-radius:8px; padding:12px 14px; font-size:12px; color:#92400e; line-height:1.6;">
-            ⚠️ QR 베이스 주소가 <strong>localhost</strong>로 설정되어 있어 모바일에서 열리지 않습니다.<br/>
+            <strong>주의</strong> · QR 베이스 주소가 <strong>localhost</strong>로 설정되어 있어 모바일에서 열리지 않습니다.<br/>
             배포 설문은 <strong>GitHub Pages URL</strong>을 사용하세요:<br/>
             <code style="font-size:11px; word-break:break-all;">https://zekecreative7.github.io/culture_platform_3.0/webapp</code>
           </div>
@@ -1778,7 +1717,7 @@ function renderSurveyCreator() {
           <!-- Google Form URL (primary method) -->
           <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #bae6fd; border-radius:10px; padding:16px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-              <span style="font-size:16px;">🔗</span>
+              <span style="font-size:11px;font-weight:800;color:var(--blue-mid);">URL</span>
               <strong style="font-size:13px; color:var(--ink);">구글 폼 URL 연결 (권장)</strong>
             </div>
             <p style="font-size:11.5px; color:var(--muted); margin:0 0 10px 0; line-height:1.6;">구글 폼에서 설문을 직접 만들고 배포용 링크를 붙여넣으세요. 해당 링크로 QR 코드가 생성됩니다.</p>
@@ -2092,11 +2031,11 @@ function parseQualResult(text) {
 }
 
 function renderQualSections(sections) {
-  const ICONS = { '핵심 키워드': '🏷', '주요 테마': '🔍', '대표 발언': '💬', '조직문화 진단': '🧠', '세션 운영 제언': '📋' };
+  const ICONS = { '핵심 키워드': '01', '주요 테마': '02', '대표 발언': '03', '조직문화 진단': '04', '세션 운영 제언': '05' };
   const COLOR = { '핵심 키워드': '#0ea5e9', '주요 테마': '#8b5cf6', '대표 발언': '#14b8a6', '조직문화 진단': '#f59e0b', '세션 운영 제언': '#10b981' };
 
   return Object.entries(sections).map(([k, v]) => {
-    const icon = ICONS[k] || '📄';
+    const icon = ICONS[k] || '•';
     const accent = COLOR[k] || '#64748b';
     // For 핵심 키워드, render as pill tags
     if (k === '핵심 키워드') {
@@ -2586,9 +2525,9 @@ function sessionCard(session) {
         </div>
       </div>
       <div class="session-meta">
-        <span title="일정이 확정된 회차 수">📅 일정 확정 ${confirmed}/${total}회차</span>
+        <span title="일정이 확정된 회차 수">일정 확정 ${confirmed}/${total}회차</span>
         <span title="날짜 미정 또는 미확정 회차">⏳ 미확정 ${total - confirmed}회차</span>
-        <span title="사전/사후 설문 CSV 업로드 완료 단계">📊 설문 응답 업로드 ${uploadCount}/2단계</span>
+        <span title="사전/사후 설문 CSV 업로드 완료 단계">설문 응답 업로드 ${uploadCount}/2단계</span>
       </div>
       ${qualButtons}
     </article>
@@ -2849,7 +2788,7 @@ function renderQualSection(cohort, type, sessionId = "", phase = "") {
     const hasSig = (state.qualSignals || []).some(q => q.session_id === sessionId && q.phase === dbPhase && q.review?.status === 'confirmed');
     aiButtonHtml = `
       <button class="secondary compact" onclick="window.openQualAnalysisModal('${sessionId}', '${dbPhase}')" style="font-size: 11.5px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; margin-left: 8px;">
-        ✨ AI 정성 분석 ${hasSig ? '수정 ✓' : '시작'}
+        AI 정성 분석 ${hasSig ? '수정 ✓' : '시작'}
       </button>
     `;
   }
@@ -2892,7 +2831,7 @@ function bindLayout() {
       state.mobileNavOpen = false;
       saveState();
       render();
-      if (state.activeView === "pulse" && (!pulseCache.loaded || !commitmentsCache.loaded)) {
+      if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
       }
     });
@@ -2933,6 +2872,12 @@ function bindCanvasEvents() {
       deletePulseCommitment: deletePulseCommitmentFromFirestore,
       savePulseResult: savePulseResultToFirestore,
       downloadPulseTemplate
+    });
+  } else if (state.activeView === "dashboard") {
+    bindHomeDashboard({
+      state,
+      saveState,
+      render
     });
   }
 }
@@ -4246,7 +4191,7 @@ async function initApp() {
   await Promise.all([loadSessionsFromFirestore(), loadSurveysFromFirestore()]);
   syncSurveysToSessions();
   render();
-  if (state.activeView === "pulse" && (!pulseCache.loaded || !commitmentsCache.loaded)) {
+  if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
     Promise.all([loadPulseYears(), loadPulseCommitments()]).then(() => render());
   }
 

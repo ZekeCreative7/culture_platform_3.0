@@ -116,7 +116,7 @@ function renderUploadPanel(state) {
   return `
     <section class="panel pulse-upload-panel ${isExpanded ? "expanded" : "collapsed"}">
       <div class="panel-toggle-header" id="btn-toggle-upload-panel">
-        <strong>📁 데이터 업로드 및 템플릿 관리 ${isExpanded ? "▲" : "▼"}</strong>
+        <strong>데이터 업로드 및 템플릿 관리 ${isExpanded ? "▲" : "▼"}</strong>
       </div>
       
       <div class="upload-panel-content">
@@ -323,7 +323,7 @@ function renderOverviewView({ state, cache }) {
     <article class="story-scene scene-0 panel highlight-blue">
       <div class="scene-header">
         <span class="eyebrow">진단 목적</span>
-        <h2>🎯 Pulse Survey 분석의 본질</h2>
+        <h2>Pulse Survey 분석의 본질</h2>
       </div>
       <p class="scene-lead">
         이 결과는 어느 조직이나 직원이 문제인지 찾아내 감점하는 평가표가 아닙니다.<br>
@@ -338,7 +338,7 @@ function renderOverviewView({ state, cache }) {
       <h1>${escapeHtml(headline.title)}</h1>
       <p class="scene-desc">${escapeHtml(headline.description)}</p>
       <div class="action-direction">
-        <strong>💡 권장 방향:</strong> <span>${escapeHtml(headline.direction)}</span>
+        <strong>권장 방향:</strong> <span>${escapeHtml(headline.direction)}</span>
       </div>
     </article>
 
@@ -346,7 +346,7 @@ function renderOverviewView({ state, cache }) {
     <article class="story-scene scene-2 panel">
       <div class="scene-header">
         <span class="eyebrow">핵심 동인 변화</span>
-        <h2>📊 우리가 마주한 세 가지 변화 흐름</h2>
+        <h2>우리가 마주한 세 가지 변화 흐름</h2>
         <p>구성원들의 에너지는 회복되고 있으나 전사적 신뢰와 소속감은 보완이 필요한 지점입니다.</p>
       </div>
 
@@ -366,7 +366,7 @@ function renderOverviewView({ state, cache }) {
         </div>
 
         <div class="movement-card trust-card">
-          <span class="card-title">💬 목소리와 실행 신뢰</span>
+          <span class="card-title">목소리와 실행 신뢰</span>
           <div class="card-value-row">
             <strong>Q19: ${pct(currentTrust)}</strong>
             ${prevYear ? `<span class="delta ${toneForDelta(trustDelta)}">${deltaLabel(trustDelta)}</span>` : ""}
@@ -378,7 +378,7 @@ function renderOverviewView({ state, cache }) {
         </div>
 
         <div class="movement-card belonging-card">
-          <span class="card-title">🤝 소속과 연결 (포용·소속)</span>
+          <span class="card-title">소속과 연결 (포용·소속)</span>
           <div class="card-value-row">
             <strong>${pct(currentBelonging)}</strong>
             ${prevYear ? `<span class="delta ${toneForDelta(belongingDelta)}">${deltaLabel(belongingDelta)}</span>` : ""}
@@ -414,7 +414,7 @@ function renderOverviewView({ state, cache }) {
           </ul>
         </div>
         <div class="change-summary-column negative">
-          <h4>⚠️ 가장 큰 약화를 보인 문항 (TOP 3)</h4>
+          <h4>가장 큰 약화를 보인 문항 (TOP 3)</h4>
           <ul>
             ${topWeakened.map(item => `
               <li>
@@ -431,7 +431,7 @@ function renderOverviewView({ state, cache }) {
     <article class="story-scene scene-3 panel">
       <div class="scene-header">
         <span class="eyebrow">관계 불일치 분석 (깨진 커플링)</span>
-        <h2>🔍 숫자 사이에서 발견한 엇박자 신호</h2>
+        <h2>숫자 사이에서 발견한 엇박자 신호</h2>
         <p>단순 만족도 평균 점수로는 보이지 않는 문항들 간 격차는 조직의 숨은 병목을 드러냅니다.</p>
       </div>
 
@@ -445,7 +445,7 @@ function renderOverviewView({ state, cache }) {
               
               <div class="mismatch-details">
                 <div class="mismatch-section">
-                  <strong>💡 가설 분석:</strong>
+                  <strong>가설 분석:</strong>
                   <p>${escapeHtml(insight.hypothesis)}</p>
                 </div>
                 <div class="mismatch-section">
@@ -453,7 +453,7 @@ function renderOverviewView({ state, cache }) {
                   <p class="question-highlight">"${escapeHtml(insight.checkQuestion)}"</p>
                 </div>
                 <div class="mismatch-section">
-                  <strong>⚠️ 경영진 소통 방향:</strong>
+                  <strong>경영진 소통 방향:</strong>
                   <p>${escapeHtml(insight.responseGuidance)}</p>
                 </div>
               </div>
@@ -475,12 +475,12 @@ function renderOverviewView({ state, cache }) {
         <div class="gap-visualization">
           <div class="gap-bar-chart">
             <div class="gap-bar-segment">
-              <span>🗣️ 의견 제안 가능성 (Q5·Q17·Q18 평균)</span>
+              <span>의견 제안 가능성 (Q5·Q17·Q18 평균)</span>
               <div class="progress-container"><div class="progress-fill blue" style="width: ${clippedPct(voiceImpact.voiceCapacity)}%"></div></div>
               <strong>${pct(voiceImpact.voiceCapacity)}</strong>
             </div>
             <div class="gap-bar-segment">
-              <span>🚀 실행 신뢰 (Q19 설문 조치 신뢰)</span>
+              <span>실행 신뢰 (Q19 설문 조치 신뢰)</span>
               <div class="progress-container"><div class="progress-fill purple" style="width: ${clippedPct(voiceImpact.actionTrust)}%"></div></div>
               <strong>${pct(voiceImpact.actionTrust)}</strong>
             </div>
@@ -588,7 +588,7 @@ function renderOverviewView({ state, cache }) {
     <article class="story-scene scene-6 panel">
       <div class="scene-header">
         <span class="eyebrow">신뢰 회복과 응답</span>
-        <h2>🤝 들은 이야기에 대한 회사의 응답</h2>
+        <h2>들은 이야기에 대한 회사의 응답</h2>
         <p>조사가 조사로만 끝나지 않고 실질적 개선 순환 구조를 만드는 약속 보드입니다.</p>
       </div>
       ${renderCommitmentsBoard({ state, savePulseCommitment: null, deletePulseCommitment: null, render: null })}
@@ -598,7 +598,7 @@ function renderOverviewView({ state, cache }) {
     <article class="story-scene scene-7 panel highlight-gray">
       <div class="scene-header">
         <span class="eyebrow">Data Confidence</span>
-        <h2>⚙️ 데이터 신뢰 경계 및 유의사항</h2>
+        <h2>데이터 신뢰 경계 및 유의사항</h2>
       </div>
       <div class="confidence-summary-box">
         <p><strong>전체 응답 표본수(N):</strong> ${confidence?.n ? `${confidence.n}명` : "미확인"}</p>
@@ -606,7 +606,7 @@ function renderOverviewView({ state, cache }) {
         
         ${confidence?.warnings?.length ? `
           <ul class="confidence-warnings">
-            ${confidence.warnings.map(w => `<li>⚠️ ${escapeHtml(w)}</li>`).join("")}
+            ${confidence.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("")}
           </ul>
         ` : "<p class='no-warnings'>데이터 품질 및 비교 신뢰도가 양호합니다.</p>"}
       </div>
@@ -747,7 +747,7 @@ function renderListeningView({ state, cache }) {
   if (selectedDivId === "고객혁신본부CE") {
     warningBanner = `
       <div class="pulse-outlier-note" style="margin: 0 0 20px 0; background: #fff2f2; border: 1.5px solid #fecaca; color: #dc2626; padding: 16px 20px; border-radius: var(--radius-md); font-size: 13.5px; font-weight: 800; display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-low);">
-        <span>⚠️</span>
+        <span class="warning-mark">!</span>
         <span><strong>데이터 신뢰 의심:</strong> 이 조직(고객혁신본부CE)은 응답 데이터의 신뢰성이 의심됩니다. (비정상적인 긍정률 쏠림 또는 표본 불일치 의심)</span>
       </div>
     `;
@@ -786,7 +786,7 @@ function renderListeningView({ state, cache }) {
     <article class="story-scene panel">
       <div class="scene-header">
         <span class="eyebrow">전사 격차</span>
-        <h2>📊 전사 평균과 비교해 가장 차이나는 3가지 문항</h2>
+        <h2>전사 평균과 비교해 가장 차이나는 3가지 문항</h2>
         <p>전사 평균치와 비교해 해당 조직의 강점과 보완이 요구되는 고유한 컨텍스트를 도출합니다.</p>
       </div>
       
@@ -815,7 +815,7 @@ function renderListeningView({ state, cache }) {
     <article class="story-scene panel">
       <div class="scene-header">
         <span class="eyebrow">경험 영역 현황</span>
-        <h2>🔍 4대 경험 도메인 상태</h2>
+        <h2>4대 경험 도메인 상태</h2>
         <p>본부 내 주요 경험 영역별 긍정률 기준선입니다.</p>
       </div>
 
@@ -847,7 +847,7 @@ function renderListeningView({ state, cache }) {
             <div class="mismatch-card">
               <h3>${escapeHtml(insight.title)}</h3>
               <div class="mismatch-evidence">${escapeHtml(insight.evidence)}</div>
-              <p class="mismatch-hyp">💡 <strong>가설:</strong> ${escapeHtml(insight.hypothesis)}</p>
+              <p class="mismatch-hyp"><strong>가설:</strong> ${escapeHtml(insight.hypothesis)}</p>
             </div>
           `).join("")
         }
@@ -858,13 +858,13 @@ function renderListeningView({ state, cache }) {
     <article class="story-scene panel">
       <div class="scene-header">
         <span class="eyebrow">입체적 분석</span>
-        <h2>⚖️ 양대 관점으로 바라본 진단 결과</h2>
+        <h2>양대 관점으로 바라본 진단 결과</h2>
         <p>사람의 심리적 에너지 상태와, 시스템 및 제도가 일하는 방식을 가로막는 영역을 구분하여 파악합니다.</p>
       </div>
 
       <div class="dual-perspective-grid">
         <div class="perspective-column psych panel">
-          <h3>🧠 심리학적 관점 (안전·에너지·소속)</h3>
+          <h3>심리학적 관점 (안전·에너지·소속)</h3>
           <div class="perspective-content">
             <div class="main-issue">
               <strong>핵심 진단:</strong>
@@ -884,7 +884,7 @@ function renderListeningView({ state, cache }) {
         </div>
 
         <div class="perspective-column org panel">
-          <h3>⚙️ 조직 운영 관점 (리더십·의사결정·협업)</h3>
+          <h3>조직 운영 관점 (리더십·의사결정·협업)</h3>
           <div class="perspective-content">
             <div class="main-issue">
               <strong>핵심 진단:</strong>
@@ -913,7 +913,7 @@ function renderListeningView({ state, cache }) {
       </div>
       <div class="listening-guide-box">
         <div class="guide-row">
-          <strong>🗣️ 경청 세션에서 멤버들에게 직접 물어볼 질문:</strong>
+          <strong>경청 세션에서 멤버들에게 직접 물어볼 질문:</strong>
           <p class="big-question">"${escapeHtml(summary.question)}"</p>
         </div>
         <div class="guide-row">
@@ -927,7 +927,7 @@ function renderListeningView({ state, cache }) {
     <article class="story-scene panel">
       <div class="scene-header">
         <span class="eyebrow">부서 실행 약속</span>
-        <h2>🤝 ${escapeHtml(selectedDivId)}의 실행 약속 리스트</h2>
+        <h2>${escapeHtml(selectedDivId)}의 실행 약속 리스트</h2>
         <p>이 부서만의 개선 흐름을 추적 관리합니다.</p>
       </div>
       ${renderCommitmentsBoard({ state, savePulseCommitment: null, deletePulseCommitment: null, render: null })}
@@ -947,7 +947,7 @@ function renderExpertView({ state, cache }) {
   return `
     <section class="panel">
       <div class="section-title">
-        <h2>📊 연도별 문항 추세 (최근 3개년 추이)</h2>
+        <h2>연도별 문항 추세 (최근 3개년 추이)</h2>
         <span>세 해 모두 데이터가 존재하는 공통 문항 기준 전사 평균값</span>
       </div>
       ${renderTrendSection(cache.years || {})}
@@ -972,7 +972,7 @@ function renderExpertView({ state, cache }) {
     <!-- RAG 우선순위 작업 큐 테이블 -->
     <section class="panel">
       <div class="section-title">
-        <h2>📋 경청·지원 순서 전체 테이블 (우선순위 작업 큐)</h2>
+        <h2>경청·지원 순서 전체 테이블 (우선순위 작업 큐)</h2>
         <span>우선순위 가중 지수(priority score)를 기준으로 나열하여 집중 관리가 먼저 요구되는 작업 순서를 제공합니다.</span>
       </div>
       

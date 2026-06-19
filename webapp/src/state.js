@@ -100,6 +100,8 @@ export const blankState = () => ({
   pulseCommitments: [],
   pulseCommitmentDraft: null,
   pulseExpertSections: {},
+  dashboardWeekOffset: 0,
+  dashboardSelectedDate: "",
 });
 
 export const state = {};
@@ -176,7 +178,8 @@ export function saveState() {
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
-    pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections
+    pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
+    dashboardWeekOffset, dashboardSelectedDate
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
@@ -188,7 +191,8 @@ export function saveState() {
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
-    pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections
+    pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
+    dashboardWeekOffset, dashboardSelectedDate
   }));
   notify();
 }

@@ -388,8 +388,17 @@ export async function saveQualSignalToFirestore(qualSignal) {
     const docId = `${qualSignal.session_id}__${qualSignal.phase}`;
     await setDoc(doc(db, 'QualSignal', docId), { ...qualSignal, updatedAt: serverTimestamp() });
     setDbStatus('connected');
+
+    const idx = state.qualSignals.findIndex(q => q.id === docId);
+    if (idx >= 0) {
+      state.qualSignals[idx] = { ...qualSignal, id: docId };
+    } else {
+      state.qualSignals.push({ ...qualSignal, id: docId });
+    }
+    saveState();
   } catch (e) {
     console.error('Firestore QualSignal 저장 실패:', e);
     setDbStatus('error');
+    throw e;
   }
 }

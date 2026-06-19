@@ -4423,25 +4423,6 @@ window.saveQualAnalysisFromModal = function(qualKey) {
   render();
 };
 
-async function saveQualSignalToFirestore(qualSignal) {
-  try {
-    const docId = `${qualSignal.session_id}__${qualSignal.phase}`;
-    await setDoc(doc(db, 'QualSignal', docId), qualSignal);
-
-    const idx = state.qualSignals.findIndex(q => q.id === docId);
-    if (idx >= 0) {
-      state.qualSignals[idx] = { ...qualSignal, id: docId };
-    } else {
-      state.qualSignals.push({ ...qualSignal, id: docId });
-    }
-    saveState();
-    render();
-  } catch (e) {
-    console.error('QualSignal 저장 실패:', e);
-    throw e;
-  }
-}
-
 window.openQualAnalysisModal = function(sessionId, phase) {
   const session = state.sessions.find(s => s.id === sessionId);
   if (!session) return;

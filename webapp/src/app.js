@@ -113,8 +113,8 @@ const VIEWS = [
   ["org", "Organization", "조직"],
   ["survey", "Survey Creator", "설문지"],
   ["upload", "Upload", "데이터 업로드"],
-  ["analytics", "Change", "변화 분석"],
-  ["report", "Report", "리포트"],
+  ["analytics", "Survey Result Viewer", "설문 결과 보기"],
+  ["report", "Analysis Report", "분석 결과"],
   ["pulse", "Pulse Insights", "조직 진단"],
 ];
 const NAV_ICONS = {
@@ -2284,14 +2284,13 @@ function renderAnalytics() {
   const session = scope.session;
   const sessionId = session?.id || "";
   const types = availableSessionTypes();
-  const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
 
   return `
     <section class="page-head">
       <div>
-        <span class="eyebrow">Change analysis</span>
-        <h1>기수 및 세션 유형별 문화 변화량 분석</h1>
-        <p>각 기수와 세션 유형을 선택하여 사전, 사후 설문조사의 만족도 및 정성적 피드백 추이를 분석합니다.</p>
+        <span class="eyebrow">Survey Result Viewer</span>
+        <h1>설문 결과 보기</h1>
+        <p>각 기수와 세션 유형을 선택하여 설문 문항별 객관식 응답 분포와 주관식 답변 원문을 확인합니다.</p>
       </div>
     </section>
     
@@ -2318,120 +2317,35 @@ function renderAnalytics() {
     </section>
 
     ${cohort ? (() => {
-      const pre  = stats.find(s => s.phase === '사전') || null;
-      const mid  = stats.find(s => s.phase === '중간') || null;
-      const post = stats.find(s => s.phase === '사후') || null;
-      const compositeOf = (ps) => {
-        if (!ps || ps.n < 1) return null;
-        const qs = REPORT_DIMS.flatMap(d => d.qs);
-        const vals = qs.map(q => ps[`${q}_avg`]).filter(v => typeof v === 'number');
-        return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
-      };
-      const preC = compositeOf(pre), midC = compositeOf(mid), postC = compositeOf(post);
-      const overallDelta = preC !== null && postC !== null ? postC - preC : null;
-
-      // Dimension-level deltas for summary strip
-      const dimDeltas = REPORT_DIMS.map(dim => {
-        const ps = pre && pre.n >= 3 ? dimAvg(pre, dim.qs) : null;
-        const qs = post && post.n >= 3 ? dimAvg(post, dim.qs) : null;
-        const d = ps !== null && qs !== null ? qs - ps : null;
-        return { ...dim, preScore: ps, postScore: qs, delta: d };
-      });
-
+      const phasesWithData = PHASES.filter((p) =>
+        (state.surveys || []).some((s) => s.sessionId === sessionId && s.phase === p)
+        || (state.responses || []).some((r) => r.sessionId === sessionId && r.phase === p)
+      );
+      const activePhase = (state.selectedAnalyticsPhase && PHASES.includes(state.selectedAnalyticsPhase))
+        ? state.selectedAnalyticsPhase
+        : (phasesWithData[0] || PHASES[0]);
+      const phaseMeta = session
+        ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)} · ${activePhase}`
+        : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 · ${activePhase}`;
       return `
-      <!-- Pulse Overview -->
-      <section style="margin-bottom:20px;">
-        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; margin-bottom:14px;">
-          ${[['사전', pre, preC, null], ['사후', post, postC, overallDelta]].map(([phase, ps, sc, delta], idx) => {
-            const n = ps ? ps.n : 0;
-            const rag = ragInfo(sc);
-            const deltaColor = delta === null ? '#94a3b8' : delta > 0.1 ? '#059669' : delta < -0.1 ? '#dc2626' : '#d97706';
-            // A 시점 that has responses but a 주관식 전용 설문 has no composite score to show — say
-            // "객관식 없음" instead of a misleading "— / 5" against a large N.
-            const quantless = sessionId && n > 0 && sc === null && !phaseHasQuantQuestions(sessionId, phase);
-            if (quantless) {
-              return `
-              <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
-                <div style="position:absolute; top:0; left:0; right:0; height:3px; background:#e2e8f0;"></div>
-                <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px;">${phase} 종합</div>
-                <div style="font-size:18px; font-weight:800; color:#94a3b8; line-height:1.2; margin-bottom:4px;">객관식 없음</div>
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px;">
-                  <span style="font-size:11.5px; color:#94a3b8; font-weight:600;">N = ${n} · 주관식 전용</span>
-                  <span style="font-size:11px; color:#cbd5e1;">—</span>
-                </div>
-              </div>`;
-            }
-            return `
-              <div style="background:#ffffff; border:1.5px solid ${sc !== null ? rag.bar+'40' : '#e2e8f0'}; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
-                <div style="position:absolute; top:0; left:0; right:0; height:3px; background:${sc !== null ? rag.bar : '#e2e8f0'};"></div>
-                <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px;">${phase} 종합</div>
-                <div style="font-size:32px; font-weight:800; color:${sc !== null ? rag.color : '#cbd5e1'}; line-height:1; margin-bottom:4px;">${sc !== null ? sc.toFixed(2) : '—'}<span style="font-size:14px; color:#94a3b8; font-weight:500;"> / 5</span></div>
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px;">
-                  <span style="font-size:11.5px; color:#94a3b8; font-weight:600;">N = ${n}</span>
-                  ${delta !== null ? `<span style="font-size:12px; font-weight:800; color:${deltaColor};">${delta > 0 ? '+' : ''}${delta.toFixed(2)} ${delta > 0.1 ? '↑' : delta < -0.1 ? '↓' : '→'}</span>` : idx === 0 ? `<span style="font-size:11px; color:#cbd5e1;">기준선</span>` : `<span style="font-size:11px; color:#cbd5e1;">—</span>`}
-                </div>
-              </div>`;
+        <div class="phase-tabs" role="tablist" aria-label="설문 시점">
+          ${PHASES.map((p) => {
+            const has = phasesWithData.includes(p);
+            const isActive = p === activePhase;
+            return `<button type="button" role="tab" aria-selected="${isActive}" class="phase-tab${isActive ? ' active' : ''}${has ? '' : ' empty'}" onclick="setAnalyticsPhase('${p}')" title="${has ? '' : '응답 없음'}">${p}${has ? '' : ' <span class="phase-tab-empty-dot">○</span>'}</button>`;
           }).join('')}
         </div>
-
-        <!-- 4 Dimension Summary Strip -->
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">
-          ${dimDeltas.map(d => {
-            const rag = ragInfo(d.postScore ?? d.preScore);
-            const deltaColor = d.delta === null ? '#94a3b8' : d.delta > 0.1 ? '#059669' : d.delta < -0.1 ? '#dc2626' : '#d97706';
-            return `
-              <div style="background:#ffffff; border:1.5px solid #f1f5f9; border-radius:10px; padding:12px 14px;">
-                <div style="font-size:11px; font-weight:700; color:${d.color}; margin-bottom:6px;">${d.label}</div>
-                <div style="display:flex; align-items:baseline; gap:6px;">
-                  ${d.preScore !== null ? `<span style="font-size:13px; color:#94a3b8; font-weight:600;">${d.preScore.toFixed(1)}</span><span style="color:#e2e8f0; font-size:11px;">→</span>` : ''}
-                  <span style="font-size:16px; font-weight:800; color:${d.postScore !== null ? rag.color : '#cbd5e1'};">${d.postScore !== null ? d.postScore.toFixed(1) : '—'}</span>
-                </div>
-                ${d.delta !== null ? `<div style="font-size:11px; font-weight:800; color:${deltaColor}; margin-top:4px;">${d.delta > 0 ? '+' : ''}${d.delta.toFixed(2)} ${d.delta > 0.1 ? '개선' : d.delta < -0.1 ? '하락' : '유지'}</div>` : ''}
-              </div>`;
-          }).join('')}
-        </div>
-      </section>
-
-      <!-- Detailed Chart -->
-      <section class="panel" style="margin-bottom:20px;">
-        <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:14px;">문항별 상세 변화</div>
-        ${renderChart(stats, cohort, type, sessionId)}
-        ${renderStatsTable(stats, false, cohort, type, sessionId)}
-      </section>
-
-      ${(() => {
-        // 시점(사전·중간·사후) 탭 — 선택한 시점의 정량·정성 응답만 드릴다운해서 본다.
-        const phasesWithData = PHASES.filter((p) =>
-          (state.surveys || []).some((s) => s.sessionId === sessionId && s.phase === p)
-          || (state.responses || []).some((r) => r.sessionId === sessionId && r.phase === p)
-        );
-        // 기본 탭은 데이터가 있는 첫 시점(보통 사전) — 변화 분석은 사전→사후 순으로 읽고, 방금 올린
-        // 사전 결과가 사후 탭에 가려 안 보이는 일을 막는다.
-        const activePhase = (state.selectedAnalyticsPhase && PHASES.includes(state.selectedAnalyticsPhase))
-          ? state.selectedAnalyticsPhase
-          : (phasesWithData[0] || PHASES[0]);
-        const phaseMeta = session
-          ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)} · ${activePhase}`
-          : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 · ${activePhase}`;
-        return `
-      <div class="phase-tabs" role="tablist" aria-label="설문 시점">
-        ${PHASES.map((p) => {
-          const has = phasesWithData.includes(p);
-          const isActive = p === activePhase;
-          return `<button type="button" role="tab" aria-selected="${isActive}" class="phase-tab${isActive ? ' active' : ''}${has ? '' : ' empty'}" onclick="setAnalyticsPhase('${p}')" title="${has ? '' : '응답 없음'}">${p}${has ? '' : ' <span class="phase-tab-empty-dot">○</span>'}</button>`;
-        }).join('')}
-      </div>
-      <section class="analytics-split">
-        <div>
-          ${collapsibleSectionHeader("정량 응답", phaseMeta, "quant")}
-          ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session, activePhase)}
-        </div>
-        <div>
-          ${collapsibleSectionHeader("정성 응답", phaseMeta, "qual")}
-          ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId, activePhase)}
-        </div>
-      </section>`;
-      })()}`;
+        <section class="analytics-split">
+          <div>
+            ${collapsibleSectionHeader("정량 응답", phaseMeta, "quant")}
+            ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session, activePhase)}
+          </div>
+          <div>
+            ${collapsibleSectionHeader("정성 응답", phaseMeta, "qual")}
+            ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId, activePhase)}
+          </div>
+        </section>
+      `;
     })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
   `;
 }
@@ -2600,8 +2514,8 @@ function renderReport() {
   return `
     <section class="page-head">
       <div>
-        <span class="eyebrow">Expert Report</span>
-        <h1>전문가 분석 리포트</h1>
+        <span class="eyebrow">Analysis Report</span>
+        <h1>분석 결과</h1>
         <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
       </div>
       ${cohort ? `<button class="primary" id="download-report">CSV 다운로드</button>` : ""}
@@ -2809,21 +2723,19 @@ function renderReport() {
           </div>
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
             <div>
-              <div style="font-size:14px; font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:14px; font-weight:600; margin-bottom:8px;">
                 <span>사전 정성 신호</span>
-                ${hasPreQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'pre')" style="font-size:11px; padding:3px 8px;">${preSig ? '분석 수정' : '분석 시작'}</button>` : ''}
               </div>
               <div id="qual-signal-pre-container">
-                ${preSig ? '' : `<div class="empty">${hasPreQual ? '사전 정성 분석 결과가 없습니다. 위의 버튼을 눌러 분석을 진행하세요.' : '사전 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
+                ${preSig ? '' : `<div class="empty">${hasPreQual ? '사전 정성 분석 결과가 없습니다. "설문 결과 보기" 페이지에서 AI 분석을 먼저 완료해 주세요.' : '사전 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
               </div>
             </div>
             <div>
-              <div style="font-size:14px; font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:14px; font-weight:600; margin-bottom:8px;">
                 <span>사후 정성 신호</span>
-                ${hasPostQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'post')" style="font-size:11px; padding:3px 8px;">${postSig ? '분석 수정' : '분석 시작'}</button>` : ''}
               </div>
               <div id="qual-signal-post-container">
-                ${postSig ? '' : `<div class="empty">${hasPostQual ? '사후 정성 분석 결과가 없습니다. 위의 버튼을 눌러 분석을 진행하세요.' : '사후 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
+                ${postSig ? '' : `<div class="empty">${hasPostQual ? '사후 정성 분석 결과가 없습니다. "설문 결과 보기" 페이지에서 AI 분석을 먼저 완료해 주세요.' : '사후 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
               </div>
             </div>
           </div>
@@ -3205,9 +3117,24 @@ function renderQualSection(cohort, type, sessionId = "", phase = "") {
   const body = groupBy === 'person'
     ? renderQualByPerson(rows, qualIds, type, showPhase, sessionId, phase)
     : renderQualByQuestion(rows, qualIds, type, showPhase, sessionId, phase);
+
+  let aiButtonHtml = '';
+  if (sessionId && (singlePhase === '사전' || singlePhase === '사후')) {
+    const dbPhase = singlePhase === '사전' ? 'pre' : 'post';
+    const hasSig = (state.qualSignals || []).some(q => q.session_id === sessionId && q.phase === dbPhase && q.review?.status === 'confirmed');
+    aiButtonHtml = `
+      <button class="secondary compact" onclick="window.openQualAnalysisModal('${sessionId}', '${dbPhase}')" style="font-size: 11.5px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; margin-left: 8px;">
+        ✨ AI 정성 분석 ${hasSig ? '수정 ✓' : '시작'}
+      </button>
+    `;
+  }
+
   return `
     <div class="qual-section-toolbar">
-      <span class="muted" style="font-size:12px;">${singlePhase ? `${escapeHtml(singlePhase)} 설문 · ` : ''}총 ${totalAnswers}건</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="muted" style="font-size:12px;">${singlePhase ? `${escapeHtml(singlePhase)} 설문 · ` : ''}총 ${totalAnswers}건</span>
+        ${aiButtonHtml}
+      </div>
       <div class="pulse-segmented" aria-label="보기 방식">
         <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question">문항별</button>
         <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person">같은 사람별</button>

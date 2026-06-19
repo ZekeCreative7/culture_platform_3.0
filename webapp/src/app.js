@@ -1,8 +1,8 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp } from './firebase.js';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
-import { assertNotQuantInput } from './qual/qual-signal.js';
-import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js';
+import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
+import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 
 
@@ -2449,7 +2449,7 @@ function renderRadarChart(dimScores) {
   ];
   const scorePts = dimScores.map((d, i) => ptAt(angles[i], d.score !== null ? d.score / 5 : 0));
   return `
-    <svg viewBox="0 0 220 220" width="220" height="220" style="overflow:visible; display:block;">
+    <svg class="report-radar-chart" viewBox="0 0 220 220" width="220" height="220" style="overflow:visible; display:block;">
       ${gridLevels.map(f => `<path d="${pathOf(angles.map(a => ptAt(a, f)))}" fill="none" stroke="#e2e8f0" stroke-width="${f === 1 ? 1.5 : 1}" stroke-dasharray="${f < 1 ? '3 3' : ''}"/>`).join('')}
       ${angles.map(a => { const p = ptAt(a, 1); return `<line x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="#cbd5e1" stroke-width="1.2"/>`; }).join('')}
       <path d="${pathOf(scorePts)}" fill="rgba(14,165,233,0.15)" stroke="#0ea5e9" stroke-width="2.5" stroke-linejoin="round"/>
@@ -2589,6 +2589,11 @@ function renderReport() {
 
   const hasPreData  = pre  && pre.n  >= 1;
   const hasPostData = post && post.n >= 1;
+  // "현 상황"은 가장 최근에 확보된 설문을 보여준다. DT기획팀처럼 사후 설문만 있는
+  // 세션도 진단 카드와 운영 제안이 비어 보이지 않도록 사후 → 중간 → 사전 순으로 선택한다.
+  const diagnosis = hasPostData ? post : (mid?.n >= 1 ? mid : (hasPreData ? pre : null));
+  const diagnosisPhase = diagnosis?.phase || '사전';
+  const hasDiagnosisData = Boolean(diagnosis?.n >= 1);
 
   return `
     <section class="page-head">
@@ -2628,20 +2633,20 @@ function renderReport() {
     <section style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>① 현 상황 진단</h2>
-        <span>사전 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${pre ? pre.n : 0}</span>
+        <span>${diagnosisPhase} 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${diagnosis ? diagnosis.n : 0}</span>
       </div>
-      ${!hasPreData ? `<div class="empty">사전 설문 응답이 없습니다. 사전 설문을 진행한 후 진단이 가능합니다.</div>` : `
-      <div style="display:grid; grid-template-columns: 220px 1fr; gap:20px; align-items:start;">
+      ${!hasDiagnosisData ? `<div class="empty">진단에 사용할 설문 응답이 없습니다.</div>` : `
+      <div class="report-diagnosis-grid">
         <!-- Radar Chart -->
-        <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:20px; display:flex; flex-direction:column; align-items:center; gap:8px;">
+        <div class="report-radar-card">
           <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em;">영역별 현황</div>
-          ${renderRadarChart(REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(pre, d.qs), color: d.color })))}
-          <div style="font-size:11px; color:#94a3b8; text-align:center; line-height:1.5;">사전 설문 · N=${pre.n}</div>
+          ${renderRadarChart(REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs), color: d.color })))}
+          <div style="font-size:11px; color:#94a3b8; text-align:center; line-height:1.5;">${diagnosisPhase} 설문 · N=${diagnosis.n}</div>
         </div>
         <!-- Dimension Score Cards -->
-        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+        <div class="report-dimension-grid">
           ${REPORT_DIMS.map(dim => {
-            const score = dimAvg(pre, dim.qs);
+            const score = dimAvg(diagnosis, dim.qs);
             const rag = ragInfo(score);
             const pct = score ? Math.round((score/5)*100) : 0;
             const subLabel = { psych: 'Psychological Safety', silo: 'Silo Reduction', resilience: 'Resilience', mood: 'Team Climate' }[dim.key] || '';
@@ -2667,10 +2672,10 @@ function renderReport() {
           <div style="grid-column: 1 / -1; background:#f0f9ff; border:1.5px solid #bae6fd; border-radius:12px; padding:14px 18px;">
             <p style="font-size:12.5px; line-height:1.8; color:#0c2340; margin:0;">
               ${(() => {
-                const scores = REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(pre, d.qs) })).filter(d => d.score !== null).sort((a,b) => a.score - b.score);
+                const scores = REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs) })).filter(d => d.score !== null).sort((a,b) => a.score - b.score);
                 if (!scores.length) return '데이터가 충분하지 않습니다.';
                 const low = scores[0], high = scores[scores.length - 1];
-                const allRag = REPORT_DIMS.map(d => { const s = dimAvg(pre, d.qs); return { ...d, s, rag: ragInfo(s) }; }).filter(d => d.s !== null);
+                const allRag = REPORT_DIMS.map(d => { const s = dimAvg(diagnosis, d.qs); return { ...d, s, rag: ragInfo(s) }; }).filter(d => d.s !== null);
                 return `<strong>집중 개입 필요</strong>: ${low.label} (${low.score.toFixed(1)}) · <strong>강점 활용 가능</strong>: ${high.label} (${high.score.toFixed(1)}). ${allRag.some(d => d.s < 3.0) ? '심리적 안전 수준이 위험 구간에 있어 세션 초반 안전 계약 수립이 최우선입니다.' : allRag.every(d => d.s >= 4.0) ? '전 영역이 양호 이상으로 심화 세션 및 확산 활동으로 진입할 수 있습니다.' : '전반적으로 관리 가능한 수준이며 집중 영역 중심으로 세션을 설계하세요.'}`;
               })()}
             </p>
@@ -2684,12 +2689,12 @@ function renderReport() {
     <section style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>② 세션 운영 제안</h2>
-        <span>사전 진단 기반 퍼실리테이션 가이드</span>
+        <span>${diagnosisPhase} 진단 기반 퍼실리테이션 가이드</span>
       </div>
-      ${!hasPreData ? `<div class="empty">사전 설문 데이터가 있어야 제안을 생성할 수 있습니다.</div>` : `
+      ${!hasDiagnosisData ? `<div class="empty">설문 데이터가 있어야 제안을 생성할 수 있습니다.</div>` : `
       <div style="display:flex; flex-direction:column; gap:12px;">
         ${REPORT_DIMS.map((dim, idx) => {
-          const score = dimAvg(pre, dim.qs);
+          const score = dimAvg(diagnosis, dim.qs);
           const rag = ragInfo(score);
           const priority = score !== null && score < 3.5 ? '우선 집중' : score !== null && score < 4.0 ? '강화 권장' : '강점 유지';
           const priorityColor = score !== null && score < 3.5 ? '#dc2626' : score !== null && score < 4.0 ? '#d97706' : '#059669';
@@ -4927,15 +4932,19 @@ window.openQualAnalysisModal = function(sessionId, phase) {
   const { qualIds, rows } = qualResponseRows(session.cohort, session.type, session.id, koreanPhase);
   const formattedResponses = [];
   rows.forEach(row => {
-    qualIds.forEach(qid => {
+    // tone_distribution은 답변 문장 수가 아니라 응답자 수 기준이다. 한 사람이 여러 주관식
+    // 문항에 답해도 GPT에는 한 묶음으로 전달해야 analyzed_n과 감성 분포 합계가 일치한다.
+    const answers = qualIds.map(qid => {
       const ans = row[qid];
-      if (isQualText(ans)) {
-        formattedResponses.push({
-          question: qualQuestionLabel(qid, session.type, session.id, koreanPhase),
-          answer: ans
-        });
-      }
-    });
+      if (!isQualText(ans)) return '';
+      return `[${qualQuestionLabel(qid, session.type, session.id, koreanPhase)}] ${ans}`;
+    }).filter(Boolean);
+    if (answers.length) {
+      formattedResponses.push({
+        question: `응답자 ${formattedResponses.length + 1}`,
+        answer: answers.join('\n')
+      });
+    }
   });
 
   let modalMount = document.getElementById('qual-analysis-modal-container');

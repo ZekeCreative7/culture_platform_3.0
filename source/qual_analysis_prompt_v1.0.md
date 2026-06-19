@@ -89,6 +89,7 @@
 - `strength`/`direction`/`mention_count`/`tone_distribution`는 정성 요약 수치다. **ACRI 축 점수가 아니다.**
 - 점수(0~100), 5점 평균, "axis_score" 같은 키를 출력하면 그 응답은 무효 처리된다(앱 파서가 거부).
 - `tone_distribution`의 합은 analyzed_n과 같거나 작아야 한다(중복/무응답 허용).
+- `tone_distribution`은 문항별 답변 수가 아니라 **응답자 수 기준**이다. 한 응답자가 여러 문항에 답해도 한 명으로만 분류한다.
 - 인용은 원문에서 짧게 발췌. 의역·요약 금지(검증용).
 
 ---

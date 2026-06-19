@@ -31,7 +31,8 @@ const SYSTEM_PROMPT = [
   '3. 6개 마스터 축 각각에 대해 먼저 "언급 여부"를 판정한다. 언급된 축만 강도(strong/moderate/weak)와 방향(positive/negative/mixed)을 매긴다. 언급되지 않은 축은 mentioned=false, 나머지는 null이어야 한다.',
   '4. 모든 신호엔 근거 인용을 원문 그대로 짧게 붙인다. 인용 없이는 신호를 만들지 마라.',
   '5. 불확실하면 강도를 낮추거나 null로 둔다.',
-  '6. 출력은 지정 JSON 스키마 그대로, JSON만 출력한다(코드펜스·설명 없이).',
+  '6. tone_distribution은 답변 문장 수가 아니라 응답자 수 기준이다. 한 응답자가 여러 문항에 답해도 한 명으로만 분류하며, positive+neutral+negative 합계는 analyzed_n 이하여야 한다.',
+  '7. 출력은 지정 JSON 스키마 그대로, JSON만 출력한다(코드펜스·설명 없이).',
   '',
   '6축 키: team_climate, wellness, psych_safety, dialogue_safety, change_adaptability, collaboration',
   '',
@@ -80,9 +81,9 @@ export function buildPrompt(meta, responses) {
     `- 세션 타입: ${meta.session_type || ''}`,
     `- 단계(phase): ${meta.phase || ''}`,
     `- 설문 버전: ${meta.instrument_version || ''}`,
-    `- 분석 대상 응답 수: ${(meta.analyzed_n !== undefined && meta.analyzed_n !== null) ? meta.analyzed_n : responses.length}`,
+    `- 분석 대상 응답자 수: ${(meta.analyzed_n !== undefined && meta.analyzed_n !== null) ? meta.analyzed_n : responses.length}`,
     '',
-    '주관식 응답(번호. [문항] 응답):',
+    '응답자별 주관식 답변(한 번호가 한 명이며, 여러 문항 답변이 한 묶음일 수 있음):',
     ...lines,
     '',
     '위 응답을 시스템 규칙에 따라 분석하고, 지정 스키마의 JSON만 출력하라.',
@@ -173,7 +174,7 @@ export function parseQualJson(text, expectedMeta = null) {
 
     const targetN = (expectedMeta && expectedMeta.analyzed_n !== undefined) ? expectedMeta.analyzed_n : (data.session_meta ? data.session_meta.analyzed_n : null);
     if (targetN !== null && Number.isInteger(targetN) && toneSum > targetN) {
-      errors.push(`tone_distribution의 합계(${toneSum})는 분석 대상 응답자 수(${targetN})보다 작거나 같아야 합니다.`);
+      errors.push(`tone_distribution의 합계(${toneSum})는 분석 대상 응답자 수(${targetN})보다 작거나 같아야 합니다. 문항별 답변 수가 아니라 응답자 기준으로 분류해 주세요.`);
     }
   }
 

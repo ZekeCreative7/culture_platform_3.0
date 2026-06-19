@@ -1,7 +1,7 @@
 // js/qual/qual-analysis-modal.js
 // "정성 분석" 버튼이 여는 팝업. 워크플로우:
 // 프롬프트 자동 생성·복사 → (앱 밖 GPT/Claude) → 결과 붙여넣기 → 파싱 → 검수 → 확정.
-import { buildPrompt, parseQualJson, AXIS_KEYS, AXIS_LABEL, PROMPT_VERSION } from './qual-signal.js';
+import { buildPrompt, parseQualJson, AXIS_KEYS, AXIS_LABEL, PROMPT_VERSION } from './qual-signal.js?v=20260619-respondent-tone';
 
 const STRENGTHS = ['strong', 'moderate', 'weak'];
 const DIRECTIONS = ['positive', 'mixed', 'negative'];

@@ -5,108 +5,23 @@ import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 
+import {
+  PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
+  UNIT_LABELS, UNIT_LEADER_LABELS, SCORE_MAP, SCALE_LABELS, scoreOf, isQualText, todayISO,
+  addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
+  normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
+  sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
+} from './utils.js';
 
-const PHASES = ["사전", "사후"];
-const QUANT_LABELS = {
-  q1: "심리안전 1",
-  q2: "심리안전 2",
-  q3: "심리안전 3",
-  q4: "사일로 해소 1",
-  q5: "사일로 해소 2",
-  q6: "사일로 해소 3",
-  q7: "회복/긴장",
-  q8: "전반 분위기",
-};
-const SESSION_TYPES = {
-  팀빌딩: {
-    english: "Teambuilding",
-    weeks: 8,
-    accent: "#0071e3",
-    desc: "특정 팀의 팀장과 팀원이 함께 참여합니다.",
-    template: ["WOW세션", "명상세션", "커뮤니케이션세션", "간담회", "파트너요가", "에너지회복"],
-    duration: 60,
-  },
-  리더십: {
-    english: "Leadership",
-    weeks: 4,
-    accent: "#138a66",
-    desc: "협업이 필요한 리더십 그룹을 운영합니다.",
-    template: ["웰니스 + WOW세션", "웰니스 + WOW세션", "웰니스 + WOW세션", "웰니스 + WOW세션"],
-    duration: 120,
-  },
-  협업: {
-    english: "Collaboration",
-    weeks: 6,
-    accent: "#b86e00",
-    desc: "여러 팀에서 모인 구성원이 실행 과제를 다룹니다.",
-    template: Array(6).fill("협업 세션"),
-    duration: 120,
-  },
-};
-const SESSION_TYPE_ALIASES = {
-  팀장: "리더십",
-  크로스펑셔널: "협업",
-};
-const POSITION_OPTIONS = ["사장", "부사장", "부문장", "본부장", "이사", "부장", "차장", "과장", "대리", "사원"];
-const POSITION_ALIASES = {
-  CEO: "사장",
-  대표: "사장",
-  대표이사: "사장",
-  전무: "부사장",
-  상무: "이사",
-  구성원: "사원",
-  팀원: "사원",
-};
-const UNIT_LABELS = {
-  company: "전사",
-  division: "부문",
-  hq: "본부",
-  team: "팀",
-};
-const UNIT_LEADER_LABELS = {
-  company: "대표",
-  division: "부문장",
-  hq: "본부장",
-  team: "팀장",
-};
-const SCORE_MAP = {
-  "매우 그렇다": 5,
-  그렇다: 4,
-  "조금 그렇다": 3,
-  보통: 3,
-  보통이다: 3,
-  "그렇지 않다": 2,
-  아니다: 2,
-  "전혀 그렇지 않다": 1,
-  "전혀아니다": 1,
-  모름: null,
-  해당없음: null,
-  "해당 없음": null,
-  "": null,
-};
-// 척도(객관식) 집계용 점수 변환 — 이미 숫자면 그대로, 척도 보기 텍스트(예: "그렇다")는 SCORE_MAP으로
-// 환산한다. q11처럼 업로드 당시 주관식으로 저장돼 글자로 남은 척도 답변도 정량 집계에 들어오게 한다.
-function scoreOf(value) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  const t = value === undefined || value === null ? "" : String(value).trim();
-  if (t === "") return null;
-  const n = Number(t);
-  if (Number.isFinite(n)) return n;
-  return SCORE_MAP[t] ?? null;
-}
-// 5점 척도(Likert) 선택지 텍스트 모음 — 자유 서술이 아니다. 어떤 문항이 주관식으로 잘못 분류돼도
-// 이런 척도 답변이 정성(주관식) 응답 영역에 새어 들어오지 않게 거른다. (예: DT기획팀 사후 q11)
-const SCALE_LABELS = new Set([
-  "매우 그렇다", "그렇다", "조금 그렇다", "약간 그렇다", "대체로 그렇다",
-  "보통", "보통이다", "그렇지 않다", "조금 그렇지 않다", "약간 그렇지 않다",
-  "아니다", "전혀 그렇지 않다", "전혀 그렇지않다", "전혀 아니다", "전혀아니다", "매우 아니다",
-  "모름", "해당없음", "해당 없음",
-]);
-// 정성 응답으로 표시할 가치가 있는 실제 서술형 답변인지 — 비어있지 않고 척도 선택지가 아닐 것.
-function isQualText(value) {
-  const t = value === undefined || value === null ? "" : String(value).trim();
-  return t !== "" && !SCALE_LABELS.has(t);
-}
+import {
+  STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, dbStatus, subscribe, notify, setDbStatus,
+  blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, normalizeAppState,
+  syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
+  deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore,
+  saveSurveyToFirestore, deleteSurveyFromFirestore, updateSurveyInFirestore, loadPulseYears,
+  savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore
+} from './state.js';
+
 const VIEWS = [
   ["dashboard", "Home", "홈"],
   ["sessions", "Sessions", "세션"],
@@ -127,270 +42,12 @@ const NAV_ICONS = {
   report: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 15.414 6L12 2.586A2 2 0 0 0 10.586 2H6Zm2 6a1 1 0 0 0 0 2h4a1 1 0 1 0 0-2H8Zm-1 4a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1Z" clip-rule="evenodd"/></svg>`,
   pulse: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm1 3a1 1 0 0 0-1 1v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1H4Zm3 7a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v4a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1v-1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Z"/></svg>`,
 };
-const STORE_KEY = "culture-platform-webapp-v1";
-const PULSE_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
-const pulseCache = { years: {}, loading: false, loaded: false, error: "" };
 
-let dbStatus = 'connecting';
-function setDbStatus(status) {
-  dbStatus = status;
-  const dot = document.querySelector('.db-dot');
-  const txt = document.querySelector('.db-status-text');
-  if (dot) { dot.className = `db-dot ${status}`; }
-  if (txt) {
-    txt.textContent = status === 'connected' ? 'DB 연결됨' : status === 'error' ? 'DB 오류' : '연결 중...';
-  }
-}
-
-const todayISO = () => {
-  const d = new Date();
-  const offset = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - offset).toISOString().slice(0, 10);
-};
-const addWeeks = (date, weeks) => {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + weeks * 7);
-  return d.toISOString().slice(0, 10);
-};
-const uid = () => Math.floor(Date.now() + Math.random() * 100000).toString(36);
-const escapeHtml = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
-const normalizeSessionType = (value) => {
-  const clean = String(value || "").trim();
-  return SESSION_TYPE_ALIASES[clean] || (SESSION_TYPES[clean] ? clean : "리더십");
-};
-const sessionTypeLabel = (value) => {
-  const type = normalizeSessionType(value);
-  return `${type} (${SESSION_TYPES[type].english})`;
-};
-const sessionTypeDef = (value) => SESSION_TYPES[normalizeSessionType(value)] || SESSION_TYPES.리더십;
-const sameSessionType = (a, b) => normalizeSessionType(a) === normalizeSessionType(b);
-const normalizePosition = (value, fallback = "사원") => {
-  const clean = String(value || "").trim();
-  if (!clean) return fallback;
-  if (POSITION_OPTIONS.includes(clean)) return clean;
-  return POSITION_ALIASES[clean] || clean;
-};
-const rankOptions = (selected = "사원") => {
-  const current = normalizePosition(selected);
-  const options = POSITION_OPTIONS.includes(current) ? POSITION_OPTIONS : [current, ...POSITION_OPTIONS];
-  return options.map((position) => `<option value="${escapeHtml(position)}" ${position === current ? "selected" : ""}>${escapeHtml(position)}</option>`).join("");
-};
-
-function defaultQuestions(phase) {
-  const list = [
-    { id: "q1", type: "quant", text: "우리 팀원들은 서로의 실수를 이해하고 비난하지 않는다." },
-    { id: "q2", type: "quant", text: "우리 팀원들은 독특하고 다양한 가치를 소중히 여긴다." },
-    { id: "q3", type: "quant", text: "우리 팀에서는 도전적인 의견이나 문제를 제기하기 안전하다." },
-    { id: "q4", type: "quant", text: "나는 타 부서나 팀원들과 정보 및 아이디어를 적극 공유한다." },
-    { id: "q5", type: "quant", text: "부서 간 협업 시 갈등이 생기면 건설적으로 해결한다." },
-    { id: "q6", type: "quant", text: "조직 내 타 부서의 업무 환경이나 고충을 잘 알고 공감한다." },
-    { id: "q7", type: "quant", text: "업무 수행 중 느끼는 정신적 긴장이나 회복력이 원만하게 관리된다." },
-    { id: "q8", type: "quant", text: "전반적으로 우리 조직의 소통과 분위기에 만족한다." }
-  ];
-  if (phase === "사전") {
-    list.push({ id: "q9", type: "qual", text: "본 조직문화 세션 과정에 기대하는 점이나 바라는 점은 무엇입니까?" });
-  } else if (phase === "중간") {
-    list.push({ id: "q9", type: "qual", text: "현재까지 진행된 세션에서 가장 도움이 되었던 내용이나 좋았던 점은 무엇입니까?" });
-  } else {
-    list.push({ id: "q9", type: "qual", text: "세션을 마무리하며 가장 도움이 되었던 점은 무엇입니까?" });
-    list.push({ id: "q10", type: "qual", text: "운영진이나 회사에 전하고 싶은 메시지나 의견이 있으시면 적어주세요." });
-  }
-  return list;
-}
-
-const blankState = () => ({
-  activeView: "dashboard",
-  sessions: [],
-  responses: [],
-  qualSignals: [],
-  draftType: "리더십",
-  draftSchedule: makeSchedule("리더십"),
-  draftCohort: 1,
-  draftYear: new Date().getFullYear(),
-  duplicateSessionWarning: null,
-  qualAnswersGroupBy: 'question',
-  collapsedSessionTypeGroups: [],
-  collapsedAnalyticsSections: [],
-  editingSurveyId: null,
-  uploadRows: [],
-  uploadErrors: [],
-  uploadFileName: "",
-  orgUnits: [],
-  orgMembers: [],
-  surveys: [],
-  selectedCompany: "CEO",
-  selectedDivision: "",
-  selectedHq: "",
-  selectedTeam: "",
-  editingSessionId: null,
-  activeSessionTab: "list",
-  calendarView: "month",
-  calendarDate: todayISO(),
-  orgSearchQuery: "",
-  draftSurveyTitle: "",
-  draftSurveyPhase: "사전",
-  draftSurveySessionId: "",
-  draftSurveyQuestions: defaultQuestions("사전"),
-  draftGoogleFormUrl: "",
-  qrBaseUrl: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.origin.startsWith('file'))
-    ? 'https://zekecreative7.github.io/culture_platform_3.0/webapp'
-    : new URL('.', window.location.href).href.replace(/\/$/, ''),
-  selectedAnalyticsCohort: "",
-  selectedAnalyticsType: "리더십",
-  selectedAnalyticsSessionId: "",
-  selectedAnalyticsPhase: "",
-  selectedReportCohort: "",
-  selectedReportType: "리더십",
-  selectedReportSessionId: "",
-  mobileNavOpen: false,
-  draftDivisionId: "",
-  draftHqId: "",
-  draftTeamId: "",
-  draftLeaderGroup: [],
-  draftCrossMode: "leader-session",
-  draftCrossParentSessionId: "",
-  draftCrossTeamIds: [],
-  draftCrossMemberIds: [],
-  draftCrossRandomCount: 6,
-  orgEditor: null,
-  qualAnalysis: {},
-  showQualModal: false,
-  activeQualKey: null,
-  sidebarCollapsed: false,
-  collapsedSurveyIds: [],
-  pulseView: "overview",
-  pulseDeptId: "",
-  pulseLayer: "easy",
-  pulseYear: 2026,
+// Register main render loop to state changes
+subscribe(() => {
+  render();
 });
 
-let state = loadState();
-
-function loadState() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (saved && Array.isArray(saved.sessions) && Array.isArray(saved.responses)) {
-      return normalizeAppState({ ...blankState(), ...saved, uploadRows: [], uploadErrors: [] });
-    }
-  } catch {
-    // Ignore broken local data and start clean.
-  }
-  return normalizeAppState(blankState());
-}
-
-function saveState() {
-  normalizeAppState(state);
-  const { 
-    activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
-    orgUnits, orgMembers, surveys,
-    selectedCompany, selectedDivision, selectedHq, selectedTeam,
-    activeSessionTab, calendarView, calendarDate, orgSearchQuery,
-    draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
-    selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
-    draftDivisionId, draftHqId, draftTeamId,
-    draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
-    pulseView, pulseDeptId, pulseLayer, pulseYear
-  } = state;
-  localStorage.setItem(STORE_KEY, JSON.stringify({
-    activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
-    orgUnits, orgMembers, surveys,
-    selectedCompany, selectedDivision, selectedHq, selectedTeam,
-    activeSessionTab, calendarView, calendarDate, orgSearchQuery,
-    draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
-    selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
-    draftDivisionId, draftHqId, draftTeamId,
-    draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
-    pulseView, pulseDeptId, pulseLayer, pulseYear
-  }));
-}
-
-function makeSchedule(type) {
-  const sessionType = normalizeSessionType(type);
-  const config = sessionTypeDef(sessionType);
-  const base = todayISO();
-  return config.template.map((content, index) => ({
-    id: uid(),
-    seq: index + 1,
-    confirmed: index < 2,
-    date: addWeeks(base, index),
-    startTime: "10:00",
-    duration: config.duration,
-    content,
-    note: "",
-    status: index < 2 ? "confirmed" : "planned",
-    absences: [],
-  }));
-}
-
-function sessionYear(session) {
-  const explicit = Number(session?.year);
-  if (explicit) return explicit;
-  const firstDate = sessionStartDate(session);
-  if (firstDate) return Number(firstDate.slice(0, 4));
-  const createdYear = session?.createdAt ? Number(String(session.createdAt).slice(0, 4)) : 0;
-  return createdYear || new Date().getFullYear();
-}
-
-function cohortPrefix(session) {
-  return `${sessionYear(session)}년 ${Number(session?.cohort || 1)}기`;
-}
-
-function sessionLabel(session) {
-  if (!session) return "";
-  const type = normalizeSessionType(session.type);
-  if (type === "팀빌딩") return `${cohortPrefix(session)} · ${session.team || "팀 미지정"}`;
-  return cohortPrefix(session);
-}
-
-function yearForCohort(cohort) {
-  const cohortNum = Number(cohort);
-  const match = (state.sessions || []).find((session) => Number(session.cohort) === cohortNum);
-  return match ? sessionYear(match) : "";
-}
-
-function hasRoundPassed(item) {
-  if (!item.date) return false;
-  const end = new Date(`${item.date}T${item.startTime || "00:00"}:00`);
-  end.setMinutes(end.getMinutes() + Number(item.duration || 0));
-  return end.getTime() <= Date.now();
-}
-
-function sessionStartDate(session) {
-  const dates = (session.schedule || []).map((item) => item.date).filter(Boolean);
-  return dates.length ? dates.sort()[0] : null;
-}
-
-function normalizeSessionRecord(session) {
-  if (!session) return session;
-  const type = normalizeSessionType(session.type);
-  return {
-    ...session,
-    type,
-    year: sessionYear({ ...session, type }),
-    targetWeeks: session.targetWeeks || sessionTypeDef(type).weeks,
-  };
-}
-
-function normalizeAppState(nextState) {
-  nextState.sessions = (nextState.sessions || []).map(normalizeSessionRecord);
-  nextState.surveys = (nextState.surveys || []).map((survey) => ({
-    ...survey,
-    sessionType: survey.sessionType ? normalizeSessionType(survey.sessionType) : survey.sessionType,
-  }));
-  nextState.draftType = normalizeSessionType(nextState.draftType);
-  nextState.selectedAnalyticsType = normalizeSessionType(nextState.selectedAnalyticsType);
-  nextState.selectedReportType = normalizeSessionType(nextState.selectedReportType);
-  nextState.qualSignals = nextState.qualSignals || [];
-  // 설문 시점은 사전/사후 2단계만 운용한다 — 과거에 저장된 "중간" 초안/선택값은 사전으로 보정.
-  if (!PHASES.includes(nextState.draftSurveyPhase)) nextState.draftSurveyPhase = "사전";
-  if (nextState.selectedAnalyticsPhase && !PHASES.includes(nextState.selectedAnalyticsPhase)) nextState.selectedAnalyticsPhase = "";
-  if (!nextState.draftYear) nextState.draftYear = new Date().getFullYear();
-  if (!nextState.draftSchedule?.length) nextState.draftSchedule = makeSchedule(nextState.draftType);
-  return nextState;
-}
 
 function sessionsSortedByStart() {
   return [...state.sessions].sort((a, b) => {
@@ -896,10 +553,24 @@ function statsForCohort(cohort, type = "리더십") {
 }
 
 function parseCSV(text, sessionId, phase) {
-  const rows = text.replace(/\r/g, "").split("\n").filter((line) => line.trim().length);
-  if (rows.length < 2) return { parsed: [], errors: ["CSV에 데이터 행이 없습니다."] };
-  const matrix = rows.map(parseCSVLine);
-  const headers = matrix[0].map((h) => h.trim());
+  const XLSX = globalThis.XLSX;
+  if (!XLSX) {
+    return { parsed: [], errors: ["SheetJS 라이브러리를 로드하지 못했습니다."] };
+  }
+  
+  let matrix;
+  try {
+    const workbook = XLSX.read(text, { type: "string" });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    matrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+  } catch (e) {
+    return { parsed: [], errors: ["CSV 파일 형식이 올바르지 않거나 손상되었습니다: " + e.message] };
+  }
+
+  if (matrix.length < 2) return { parsed: [], errors: ["CSV에 데이터 행이 없습니다."] };
+  
+  const headers = matrix[0].map((h) => String(h || "").trim());
   const errors = [];
   const piiHeaders = headers.filter((h) => /(이름|사번|이메일|email|전화|phone|휴대폰)/i.test(h));
   if (piiHeaders.length) errors.push(`개인 식별 컬럼이 포함되어 있습니다: ${piiHeaders.join(", ")}`);
@@ -924,7 +595,7 @@ function parseCSV(text, sessionId, phase) {
   });
   if (errors.length) return { parsed: [], errors };
 
-  const parsed = matrix.slice(1).map((cells) => {
+  const parsed = matrix.slice(1).filter(cells => cells.some(c => String(c).trim() !== "")).map((cells) => {
     const row = {
       id: uid(),
       sessionId,
@@ -950,29 +621,6 @@ function parseCSV(text, sessionId, phase) {
     return row;
   });
   return { parsed, errors: [] };
-}
-
-function parseCSVLine(line) {
-  const cells = [];
-  let current = "";
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    const next = line[i + 1];
-    if (ch === '"' && quoted && next === '"') {
-      current += '"';
-      i += 1;
-    } else if (ch === '"') {
-      quoted = !quoted;
-    } else if (ch === "," && !quoted) {
-      cells.push(current);
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  cells.push(current);
-  return cells;
 }
 
 function appShellClasses() {
@@ -3327,6 +2975,7 @@ function bindOrg() {
 
     state.orgEditor = null;
     syncDraftOrgFromTeam(state.draftTeamId);
+    saveOrgData();
     saveState();
     render();
   });
@@ -4297,6 +3946,7 @@ window.deleteOrgNode = function(id) {
   if (toDelete.includes(state.selectedDivision)) state.selectedDivision = "";
   if (toDelete.includes(state.selectedCompany)) state.selectedCompany = "";
 
+  saveOrgData();
   saveState();
   render();
 };
@@ -4320,6 +3970,7 @@ window.renameMember = function(id) {
 window.deleteMember = function(id) {
   if (!confirm("정말 이 팀원을 삭제하시겠습니까?")) return;
   state.orgMembers = state.orgMembers.filter(m => m.id !== id);
+  saveOrgData();
   saveState();
   render();
 };
@@ -4340,6 +3991,7 @@ window.deleteTeamLeader = function(teamId) {
     team.leaderRole = "";
     team.leaderMemberId = "";
   }
+  saveOrgData();
   saveState();
   render();
 };
@@ -4439,186 +4091,7 @@ window.collapseAllSurveys = function(collapse) {
   render();
 };
 
-// The session is the single source of truth for 기수(cohort) and session 유형. A survey only stores
-// a snapshot taken at creation time, so if a session's 기수 is edited afterwards the snapshot drifts
-// — that drift is exactly what spawned the phantom "5기" (리스크관리팀 사후 설문 was tagged 5기 while
-// its session is 2기). Re-align every survey to its current session so nothing downstream trusts a
-// stale 기수.
-function syncSurveysToSessions() {
-  const sessionMap = Object.fromEntries((state.sessions || []).map(s => [s.id, s]));
-  (state.surveys || []).forEach((survey) => {
-    const sess = sessionMap[survey.sessionId];
-    if (!sess) return;
-    if (Number(sess.cohort)) survey.sessionCohort = Number(sess.cohort);
-    survey.sessionType = normalizeSessionType(sess.type);
-  });
-}
 
-// ── Firestore Survey Helpers ─────────────────────────────────────
-async function loadSurveysFromFirestore() {
-  try {
-    const snap = await getDocs(collection(db, 'surveys'));
-    state.surveys = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    syncSurveysToSessions();
-    saveState();
-  } catch (e) {
-    console.error('Firestore 설문 로드 실패:', e);
-  }
-}
-
-async function loadSessionsFromFirestore() {
-  try {
-    const snap = await getDocs(collection(db, 'sessions'));
-    if (snap.docs.length > 0) {
-      const firestoreSessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
-      const firestoreIds = new Set(firestoreSessions.map(s => s.id));
-      const localOnly = (state.sessions || []).filter(s => !firestoreIds.has(s.id));
-      state.sessions = [...firestoreSessions, ...localOnly];
-      saveState();
-    }
-    setDbStatus('connected');
-  } catch (e) {
-    console.error('Firestore 세션 로드 실패:', e);
-    setDbStatus('error');
-  }
-}
-
-async function saveSessionToFirestore(session) {
-  try {
-    const { id, ...data } = session;
-    await setDoc(doc(db, 'sessions', id), { ...data, updatedAt: serverTimestamp() });
-    setDbStatus('connected');
-  } catch (e) {
-    console.error('Firestore 세션 저장 실패:', e);
-    setDbStatus('error');
-  }
-}
-
-async function deleteSessionFromFirestore(id) {
-  try {
-    await deleteDoc(doc(db, 'sessions', id));
-  } catch (e) {
-    console.error('Firestore 세션 삭제 실패:', e);
-  }
-}
-
-async function deleteResponseFromFirestore(id) {
-  try {
-    await deleteDoc(doc(db, 'responses', id));
-  } catch (e) {
-    console.error('Firestore 응답 삭제 실패:', e);
-  }
-}
-
-async function saveResponsesToFirestore(rows) {
-  const chunkSize = 500;
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize);
-    const batch = writeBatch(db);
-    chunk.forEach(row => {
-      const { id, ...data } = row;
-      const docRef = doc(collection(db, 'responses'));
-      batch.set(docRef, { ...data, createdAt: serverTimestamp() });
-    });
-    await batch.commit();
-  }
-}
-
-async function saveSurveyToFirestore(survey) {
-  const { id, ...data } = survey;
-  const docRef = await addDoc(collection(db, 'surveys'), {
-    ...data,
-    createdAt: serverTimestamp()
-  });
-  return docRef.id;
-}
-
-async function deleteSurveyFromFirestore(id) {
-  await deleteDoc(doc(db, 'surveys', id));
-}
-
-async function updateSurveyInFirestore(id, data) {
-  await setDoc(doc(db, 'surveys', id), { ...data, updatedAt: serverTimestamp() });
-}
-
-async function loadPulseYears(years = PULSE_YEARS) {
-  if (pulseCache.loading) return pulseCache.years;
-  pulseCache.loading = true;
-  pulseCache.error = "";
-  try {
-    const docs = await Promise.all(years.map(async (year) => {
-      const snap = await getDoc(doc(db, 'pulseResults', String(year)));
-      return [year, snap.exists() ? snap.data() : null];
-    }));
-    docs.forEach(([year, data]) => {
-      pulseCache.years[year] = data;
-    });
-    pulseCache.loaded = true;
-    setDbStatus('connected');
-  } catch (e) {
-    pulseCache.error = e.message || "알 수 없는 오류";
-    console.error('Firestore Pulse 로드 실패:', e);
-    setDbStatus('error');
-  } finally {
-    pulseCache.loading = false;
-  }
-  return pulseCache.years;
-}
-
-async function savePulseResultToFirestore(payload) {
-  if (!payload?.year) throw new Error("저장할 Pulse 연도가 없습니다.");
-  await setDoc(doc(db, 'pulseResults', String(payload.year)), {
-    ...payload,
-    updatedAt: serverTimestamp(),
-  });
-  pulseCache.years[payload.year] = payload;
-  pulseCache.loaded = true;
-  setDbStatus('connected');
-}
-
-async function uploadStateToDb() {
-  const btn = document.querySelector("#btn-db-upload");
-  if (btn) { btn.disabled = true; btn.textContent = '전송 중...'; }
-  try {
-    await setDoc(doc(db, 'appState', 'main'), {
-      sessions:    state.sessions    || [],
-      surveys:     state.surveys     || [],
-      orgUnits:    state.orgUnits    || [],
-      orgMembers:  state.orgMembers  || [],
-      qualAnalysis: state.qualAnalysis || {},
-      savedAt:     serverTimestamp(),
-    });
-    alert('현재 상태가 DB에 저장되었습니다.');
-  } catch (e) {
-    alert('DB 전송 실패: ' + e.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'DB 전송'; }
-  }
-}
-
-async function downloadStateFromDb() {
-  const btn = document.querySelector("#btn-db-download");
-  if (btn) { btn.disabled = true; btn.textContent = '다운로드 중...'; }
-  try {
-    const snap = await getDoc(doc(db, 'appState', 'main'));
-    if (!snap.exists()) { alert('저장된 DB 상태가 없습니다. 먼저 DB 전송을 해주세요.'); return; }
-    const data = snap.data();
-    const savedAt = data.savedAt?.toDate?.()?.toLocaleString('ko-KR') || '알 수 없음';
-    if (!confirm(`저장 시각: ${savedAt}\n\n현재 로컬 데이터를 DB 상태로 덮어쓸까요?`)) return;
-    if (data.sessions)    state.sessions    = data.sessions.map(normalizeSessionRecord);
-    if (data.surveys)     state.surveys     = data.surveys;
-    if (data.orgUnits)    state.orgUnits    = data.orgUnits;
-    if (data.orgMembers)  state.orgMembers  = data.orgMembers;
-    if (data.qualAnalysis) state.qualAnalysis = data.qualAnalysis;
-    normalizeAppState(state);
-    saveState();
-    render();
-  } catch (e) {
-    alert('DB 다운로드 실패: ' + e.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'DB 다운로드'; }
-  }
-}
 
 // ── Async Startup Initializer ───────────────────────────────────
 function computeQrBaseUrl() {
@@ -4629,7 +4102,7 @@ function computeQrBaseUrl() {
 }
 
 async function initApp() {
-  state = loadState();
+  reassignState(loadState());
   // Always recompute qrBaseUrl — stale localhost values from localStorage break mobile QR
   state.qrBaseUrl = computeQrBaseUrl();
   if (!state.orgUnits || state.orgUnits.length < 10 || !state.orgMembers || state.orgMembers.length < 10) {
@@ -4642,6 +4115,7 @@ async function initApp() {
       if (ceo) {
         state.selectedCompany = ceo.id;
       }
+      saveOrgData();
       saveState();
     } catch (e) {
       console.error("Failed to load org_data.json:", e);
@@ -5016,7 +4490,7 @@ window.refreshScopedSessionSelect = function(kind) {
 
 window.addEventListener('storage', (e) => {
   if (e.key === STORE_KEY) {
-    state = loadState();
+    reassignState(loadState());
     render();
   }
 });

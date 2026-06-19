@@ -4705,7 +4705,11 @@ async function initApp() {
       } else if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
         cohort = Number(surveyMap[data.surveyId].sessionCohort) || 0;
       }
-      return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString() };
+      return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || "" };
+    }).sort((a, b) => {
+      const aTime = Date.parse(a.createdAt) || 0;
+      const bTime = Date.parse(b.createdAt) || 0;
+      return bTime - aTime;
     });
     // Firestore is authoritative — replacing (not merging) is what lets a deletion on one
     // device (e.g. survey data reset) actually disappear on every other device.

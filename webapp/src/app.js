@@ -1,10 +1,10 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch } from './firebase.js';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260620-operating-insights-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
-import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-operating-insights-v1';
+import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-mvp-optimize-v2';
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260620-pdf-a4-fix-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-operating-insights-v1';
@@ -23,10 +23,10 @@ import {
   blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, saveStateQuiet, normalizeAppState,
   syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
   deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore,
-  saveSurveyToFirestore, deleteSurveyFromFirestore, updateSurveyInFirestore, loadPulseYears,
+  deleteSurveyFromFirestore, updateSurveyInFirestore, loadPulseYears,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260620-survey-input-fix-v1';
+} from './state.js?v=20260620-mvp-optimize-v2';
 
 const VIEWS = [
   ["dashboard", "Home", "홈"],
@@ -48,6 +48,7 @@ const NAV_ICONS = {
   report: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 15.414 6L12 2.586A2 2 0 0 0 10.586 2H6Zm2 6a1 1 0 0 0 0 2h4a1 1 0 1 0 0-2H8Zm-1 4a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H8a1 1 0 0 1-1-1Z" clip-rule="evenodd"/></svg>`,
   pulse: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm1 3a1 1 0 0 0-1 1v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1H4Zm3 7a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v4a1 1 0 0 1-1 1Zm3 0a1 1 0 0 1-1-1v-1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Z"/></svg>`,
 };
+const lockSvg = `<svg viewBox="0 0 24 24" width="11" height="11" style="fill:currentColor; display:inline-block; vertical-align:middle; margin-right:2px;"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>`;
 
 // Coalesce rapid state notifications into one paint. Firestore and local persistence can
 // notify during the same frame; rendering each notification made the Home canvas flash.
@@ -1377,9 +1378,13 @@ function renderCalendar() {
   let headerHtml = `
     <div class="calendar-controls">
       <div class="calendar-nav-buttons">
-        <button class="ghost compact" id="cal-prev-btn">&lt; 이전달</button>
+        <button class="calendar-nav-btn" id="cal-prev-btn" aria-label="이전달">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
         <h3>${year}년 ${month + 1}월</h3>
-        <button class="ghost compact" id="cal-next-btn">다음달 &gt;</button>
+        <button class="calendar-nav-btn" id="cal-next-btn" aria-label="다음달">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
       </div>
       <div class="calendar-view-toggle">
         <button class="tab-btn small ${state.calendarView === 'month' ? 'active' : ''}" id="cal-view-month">월별</button>
@@ -1725,6 +1730,184 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
 function renderSurveyCreator() {
   const activeSessions = state.sessions || [];
   const draftQuestions = state.draftSurveyQuestions || [];
+  const currentStep = state.surveyCreatorStep || 1;
+
+  // Real-time validation checks for Step 3
+  const hasTitle = Boolean((state.draftSurveyTitle || "").trim());
+  const hasSession = Boolean(state.draftSurveySessionId);
+  const hasSource = Boolean((state.draftGoogleFormUrl || "").trim() || draftQuestions.length > 0);
+  const isValid = hasTitle && hasSession && hasSource;
+
+  // Stepper Header HTML
+  const stepperHtml = `
+    <div class="stepper-bar" style="display:flex; justify-content:space-between; margin-bottom:24px; position:relative; padding:0 24px;">
+      <!-- Background track line -->
+      <div style="position:absolute; top:15px; left:24px; right:24px; height:3px; background:#e2e8f0; z-index:1; border-radius:2px;"></div>
+      <div style="position:absolute; top:15px; left:24px; width:calc(${(currentStep - 1) * 50}% - ${(currentStep - 1) * 12}px); height:3px; background:var(--neon-blue); z-index:2; transition:width 0.3s ease; border-radius:2px;"></div>
+      
+      <!-- Step 1 -->
+      <div onclick="window.setSurveyCreatorStep(1)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
+        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 1 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 1 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 1 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">1</div>
+        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 1 ? 'var(--ink)' : 'var(--muted)'};">기본 정보</span>
+      </div>
+      
+      <!-- Step 2 -->
+      <div onclick="window.setSurveyCreatorStep(2)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
+        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 2 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 2 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 2 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">2</div>
+        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 2 ? 'var(--ink)' : 'var(--muted)'};">설문 설계</span>
+      </div>
+
+      <!-- Step 3 -->
+      <div onclick="window.setSurveyCreatorStep(3)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
+        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 3 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 3 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 3 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">3</div>
+        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 3 ? 'var(--ink)' : 'var(--muted)'};">검증 및 배포</span>
+      </div>
+    </div>
+  `;
+
+  // Step 1: Basic Settings HTML
+  const step1Html = `
+    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
+      <label>설문 제목
+        <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 리더십 세션 2026년 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
+      </label>
+      <label>대상 세션
+        <select id="survey-session-select" onchange="updateSurveyDraftField('draftSurveySessionId', this.value)">
+          <option value="">-- 세션 선택 --</option>
+          ${activeSessions.map(s => `<option value="${s.id}" ${state.draftSurveySessionId === s.id ? "selected" : ""}>${escapeHtml(s.type)} · ${escapeHtml(sessionLabel(s))}</option>`).join("")}
+        </select>
+      </label>
+      <label>설문 시점
+        <select id="survey-phase-select" onchange="updateSurveyDraftPhase(this.value)">
+          <option value="사전" ${state.draftSurveyPhase === "사전" ? "selected" : ""}>사전</option>
+          <option value="사후" ${state.draftSurveyPhase === "사후" ? "selected" : ""}>사후</option>
+        </select>
+      </label>
+      
+      <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+        <button class="primary" type="button" onclick="window.setSurveyCreatorStep(2)" style="width:120px;">다음 단계 ➔</button>
+      </div>
+    </div>
+  `;
+
+  // Step 2: Survey Design HTML
+  const step2Html = `
+    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
+      <!-- Google Form URL (primary method) -->
+      <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #bae6fd; border-radius:10px; padding:16px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+          <span style="font-size:11px;font-weight:800;color:var(--blue-mid);">URL</span>
+          <strong style="font-size:13px; color:var(--ink);">구글 폼 URL 연결 (권장)</strong>
+        </div>
+        <p style="font-size:11.5px; color:var(--muted); margin:0 0 10px 0; line-height:1.6;">구글 폼에서 설문을 직접 만들고 배포용 링크를 붙여넣으세요. 해당 링크로 QR 코드가 생성됩니다.</p>
+        <label style="font-size:12px; font-weight:700; color:var(--ink-2);">구글 폼 URL
+          <input id="survey-google-form-url" value="${escapeHtml(state.draftGoogleFormUrl)}" placeholder="https://forms.gle/... 또는 https://docs.google.com/forms/..." oninput="updateSurveyDraftField('draftGoogleFormUrl', this.value)" style="margin-top:6px;" />
+        </label>
+      </div>
+
+      <!-- Divider -->
+      <div style="display:flex; align-items:center; gap:10px; color:var(--muted); font-size:11px; font-weight:700;">
+        <div style="flex:1; height:1px; background:var(--line);"></div>
+        또는 자체 설문 직접 설계
+        <div style="flex:1; height:1px; background:var(--line);"></div>
+      </div>
+
+      <!-- Template loader -->
+      ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length > 0 ? `
+      <div style="display:flex; gap:8px; align-items:flex-end;">
+        <label style="flex:1; font-size:12px; font-weight:700; color:var(--ink-2);">기존 설문에서 질문 불러오기
+          <select id="survey-template-select" style="margin-top:4px;">
+            <option value="">-- 템플릿 선택 --</option>
+            ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).map(s => `<option value="${s.id}">${escapeHtml(s.title)} (${s.questions.length}문항 · ${s.phase})</option>`).join('')}
+          </select>
+        </label>
+        <button class="secondary compact" style="white-space:nowrap; flex-shrink:0;" onclick="loadSurveyTemplate()">불러오기</button>
+      </div>
+      ` : ''}
+
+      <!-- Questions Editor -->
+      <div class="survey-questions-preview" style="background:var(--surface-soft); border-radius:8px; padding:16px; border:1px solid var(--line); ${state.draftGoogleFormUrl ? 'opacity:0.45; pointer-events:none;' : ''}">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h4 style="margin:0;">설문지 질문 구성 (${draftQuestions.length}문항)</h4>
+          <button class="secondary small compact" onclick="addSurveyDraftQuestion()">+ 질문 추가</button>
+        </div>
+
+        <div class="draft-questions-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:10px;">
+          ${draftQuestions.map((q, idx) => `
+            <div class="draft-q-row">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-size:11px; font-weight:800; color:var(--cyan); text-transform:uppercase; letter-spacing:0.04em;">${q.id.toUpperCase()} · ${q.type === 'quant' ? '5점 척도' : '주관식 텍스트'}</span>
+                <button onclick="deleteSurveyDraftQuestion('${q.id}')" style="background:transparent; border:none; padding:3px 8px; font-size:12px; color:var(--muted); cursor:pointer; border-radius:4px; transition:all 0.15s; font-weight:700;">&times; 삭제</button>
+              </div>
+              <input style="min-height:38px; font-size:13px; width:100%; border:1.5px solid #e5e7eb; border-radius:var(--radius-sm); background:#ffffff; color:var(--ink); padding:8px 12px; outline:none; box-sizing:border-box;" value="${escapeHtml(q.text)}" placeholder="질문 내용을 입력하세요." oninput="updateSurveyDraftQuestionText('${q.id}', this.value)" />
+              <div style="display:inline-flex; gap:4px; background:#f3f4f6; padding:3px; border-radius:8px; border:1px solid #e5e7eb; margin-top:2px;">
+                <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'quant' ? '#fff' : 'var(--muted)'}; background:${q.type === 'quant' ? 'var(--neon-blue)' : 'transparent'};">
+                  <input type="radio" name="qtype-${q.id}" value="quant" ${q.type === 'quant' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'quant')" style="display:none;" /> 5점 척도
+                </label>
+                <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'qual' ? '#fff' : 'var(--muted)'}; background:${q.type === 'qual' ? 'var(--neon-blue)' : 'transparent'};">
+                  <input type="radio" name="qtype-${q.id}" value="qual" ${q.type === 'qual' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'qual')" style="display:none;" /> 주관식
+                </label>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+      
+      <div style="display:flex; justify-content:space-between; margin-top:10px;">
+        <button class="secondary" type="button" onclick="window.setSurveyCreatorStep(1)" style="width:120px;">➔ 이전 단계</button>
+        <button class="primary" type="button" onclick="window.setSurveyCreatorStep(3)" style="width:120px;">다음 단계 ➔</button>
+      </div>
+    </div>
+  `;
+
+  // Step 3: Verification & Submit HTML
+  const checkIcon = (valid) => valid 
+    ? `<span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#e6f4ea; color:#137333; font-weight:800; font-size:12px;">✓</span>`
+    : `<span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#fce8e6; color:#c5221f; font-weight:800; font-size:12px;">✗</span>`;
+
+  const step3Html = `
+    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+        <h4 style="margin:0 0 14px 0; font-size:14px; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">배포 활성 조건 검증 체크리스트</h4>
+        
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasTitle ? '#1e293b' : '#64748b'};">
+            ${checkIcon(hasTitle)}
+            <span>설문 제목 입력</span>
+            ${state.draftSurveyTitle ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${escapeHtml(state.draftSurveyTitle)})</small>` : ''}
+          </div>
+          
+          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasSession ? '#1e293b' : '#64748b'};">
+            ${checkIcon(hasSession)}
+            <span>대상 세션 선택</span>
+            ${hasSession && activeSessions.find(s => s.id === state.draftSurveySessionId) ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${escapeHtml(activeSessions.find(s => s.id === state.draftSurveySessionId).type)})</small>` : ''}
+          </div>
+          
+          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasSource ? '#1e293b' : '#64748b'};">
+            ${checkIcon(hasSource)}
+            <span>설문 소스 구성 (구글 폼 또는 자체 질문)</span>
+            ${hasSource ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${state.draftGoogleFormUrl ? '구글 폼 URL' : `${draftQuestions.length}개 질문`})</small>` : ''}
+          </div>
+        </div>
+      </div>
+
+      ${(state.qrBaseUrl || '').includes('localhost') || (state.qrBaseUrl || '').includes('127.0.0.1') ? `
+      <div style="background:#fef3c7; border:1.5px solid #fbbf24; border-radius:8px; padding:12px 14px; font-size:12px; color:#92400e; line-height:1.6;">
+        <strong>주의</strong> · QR 베이스 주소가 <strong>localhost</strong>로 설정되어 있어 모바일에서 열리지 않습니다.<br/>
+        배포 설문은 <strong>GitHub Pages URL</strong>을 사용하세요:<br/>
+        <code style="font-size:11px; word-break:break-all;">https://zekecreative7.github.io/culture_platform_3.0/webapp</code>
+      </div>
+      ` : ''}
+
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="secondary" type="button" onclick="window.setSurveyCreatorStep(2)" style="width:120px;">➔ 이전 단계</button>
+        ${state.editingSurveyId ? `<button class="ghost" id="cancel-edit-survey" type="button" onclick="window.cancelSurveyEdit()">취소</button>` : ''}
+        <button class="primary" id="btn-create-survey-submit" style="flex:1;" onclick="window.submitSurveyDraft()" ${isValid ? '' : 'disabled'}>
+          ${state.editingSurveyId ? '수정 완료' : '배포 및 QR 생성'}
+        </button>
+      </div>
+    </div>
+  `;
 
   return `
     <section class="page-head">
@@ -1738,102 +1921,18 @@ function renderSurveyCreator() {
     <div class="workspace-grid">
       <!-- Left: Create Survey -->
       <div class="panel">
-        <div style="display:flex; align-items:center; justify-content:space-between;">
-          <h3>${state.editingSurveyId ? '설문 수정' : '새 설문 조사 설계'}</h3>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+          <h3 style="margin:0;">${state.editingSurveyId ? '설문 수정' : '새 설문 조사 설계'}</h3>
           ${state.editingSurveyId ? `
             <span style="font-size:12px;color:#0ea5e9;font-weight:700;">설문 수정 중</span>
           ` : ''}
         </div>
-        <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
-          <label>설문 제목
-            <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 리더십 세션 2026년 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
-          </label>
-          <label>대상 세션
-            <select id="survey-session-select" onchange="updateSurveyDraftField('draftSurveySessionId', this.value)">
-              <option value="">-- 세션 선택 --</option>
-              ${activeSessions.map(s => `<option value="${s.id}" ${state.draftSurveySessionId === s.id ? "selected" : ""}>${escapeHtml(s.type)} · ${escapeHtml(sessionLabel(s))}</option>`).join("")}
-            </select>
-          </label>
-          <label>설문 시점
-            <select id="survey-phase-select" onchange="updateSurveyDraftPhase(this.value)">
-              <option value="사전" ${state.draftSurveyPhase === "사전" ? "selected" : ""}>사전</option>
-              <option value="사후" ${state.draftSurveyPhase === "사후" ? "selected" : ""}>사후</option>
-            </select>
-          </label>
-
-          ${(state.qrBaseUrl || '').includes('localhost') || (state.qrBaseUrl || '').includes('127.0.0.1') ? `
-          <div style="background:#fef3c7; border:1.5px solid #fbbf24; border-radius:8px; padding:12px 14px; font-size:12px; color:#92400e; line-height:1.6;">
-            <strong>주의</strong> · QR 베이스 주소가 <strong>localhost</strong>로 설정되어 있어 모바일에서 열리지 않습니다.<br/>
-            배포 설문은 <strong>GitHub Pages URL</strong>을 사용하세요:<br/>
-            <code style="font-size:11px; word-break:break-all;">https://zekecreative7.github.io/culture_platform_3.0/webapp</code>
-          </div>
-          ` : ''}
-
-          <!-- Google Form URL (primary method) -->
-          <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #bae6fd; border-radius:10px; padding:16px;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-              <span style="font-size:11px;font-weight:800;color:var(--blue-mid);">URL</span>
-              <strong style="font-size:13px; color:var(--ink);">구글 폼 URL 연결 (권장)</strong>
-            </div>
-            <p style="font-size:11.5px; color:var(--muted); margin:0 0 10px 0; line-height:1.6;">구글 폼에서 설문을 직접 만들고 배포용 링크를 붙여넣으세요. 해당 링크로 QR 코드가 생성됩니다.</p>
-            <label style="font-size:12px; font-weight:700; color:var(--ink-2);">구글 폼 URL
-              <input id="survey-google-form-url" value="${escapeHtml(state.draftGoogleFormUrl)}" placeholder="https://forms.gle/... 또는 https://docs.google.com/forms/..." oninput="updateSurveyDraftField('draftGoogleFormUrl', this.value)" style="margin-top:6px;" />
-            </label>
-          </div>
-
-          <!-- Divider -->
-          <div style="display:flex; align-items:center; gap:10px; color:var(--muted); font-size:11px; font-weight:700;">
-            <div style="flex:1; height:1px; background:var(--line);"></div>
-            또는 자체 설문 직접 설계
-            <div style="flex:1; height:1px; background:var(--line);"></div>
-          </div>
-
-          <!-- Template loader -->
-          ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length > 0 ? `
-          <div style="display:flex; gap:8px; align-items:flex-end;">
-            <label style="flex:1; font-size:12px; font-weight:700; color:var(--ink-2);">기존 설문에서 질문 불러오기
-              <select id="survey-template-select" style="margin-top:4px;">
-                <option value="">-- 템플릿 선택 --</option>
-                ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).map(s => `<option value="${s.id}">${escapeHtml(s.title)} (${s.questions.length}문항 · ${s.phase})</option>`).join('')}
-              </select>
-            </label>
-            <button class="secondary compact" style="white-space:nowrap; flex-shrink:0;" onclick="loadSurveyTemplate()">불러오기</button>
-          </div>
-          ` : ''}
-
-          <!-- Questions Editor -->
-          <div class="survey-questions-preview" style="background:var(--surface-soft); border-radius:8px; padding:16px; border:1px solid var(--line); ${state.draftGoogleFormUrl ? 'opacity:0.45; pointer-events:none;' : ''}">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-              <h4 style="margin:0;">설문지 질문 구성 (${draftQuestions.length}문항)</h4>
-              <button class="secondary small compact" onclick="addSurveyDraftQuestion()">+ 질문 추가</button>
-            </div>
-
-            <div class="draft-questions-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:10px;">
-              ${draftQuestions.map((q, idx) => `
-                <div class="draft-q-row">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <span style="font-size:11px; font-weight:800; color:var(--cyan); text-transform:uppercase; letter-spacing:0.04em;">${q.id.toUpperCase()} · ${q.type === 'quant' ? '5점 척도' : '주관식 텍스트'}</span>
-                    <button onclick="deleteSurveyDraftQuestion('${q.id}')" style="background:transparent; border:none; padding:3px 8px; font-size:12px; color:var(--muted); cursor:pointer; border-radius:4px; transition:all 0.15s; font-weight:700;">&times; 삭제</button>
-                  </div>
-                  <input style="min-height:38px; font-size:13px; width:100%; border:1.5px solid #e5e7eb; border-radius:var(--radius-sm); background:#ffffff; color:var(--ink); padding:8px 12px; outline:none; box-sizing:border-box;" value="${escapeHtml(q.text)}" placeholder="질문 내용을 입력하세요." oninput="updateSurveyDraftQuestionText('${q.id}', this.value)" />
-                  <div style="display:inline-flex; gap:4px; background:#f3f4f6; padding:3px; border-radius:8px; border:1px solid #e5e7eb; margin-top:2px;">
-                    <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'quant' ? '#fff' : 'var(--muted)'}; background:${q.type === 'quant' ? 'var(--neon-blue)' : 'transparent'};">
-                      <input type="radio" name="qtype-${q.id}" value="quant" ${q.type === 'quant' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'quant')" style="display:none;" /> 5점 척도
-                    </label>
-                    <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'qual' ? '#fff' : 'var(--muted)'}; background:${q.type === 'qual' ? 'var(--neon-blue)' : 'transparent'};">
-                      <input type="radio" name="qtype-${q.id}" value="qual" ${q.type === 'qual' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'qual')" style="display:none;" /> 주관식
-                    </label>
-                  </div>
-                </div>
-              `).join("")}
-            </div>
-          </div>
-
-          <div style="display:flex; gap:8px;">
-            ${state.editingSurveyId ? `<button class="ghost" id="cancel-edit-survey" type="button">취소</button>` : ''}
-            <button class="primary" id="btn-create-survey-submit" style="flex:1;">${state.editingSurveyId ? '수정 완료' : '배포 및 QR 생성'}</button>
-          </div>
-        </div>
+        
+        <!-- Stepper Navigation -->
+        ${stepperHtml}
+        
+        <!-- Step Contents -->
+        ${currentStep === 1 ? step1Html : currentStep === 2 ? step2Html : step3Html}
       </div>
 
       <!-- Right: Generated Surveys -->
@@ -1997,7 +2096,7 @@ function renderAnalytics() {
             ${scopedSessionOptions(type, cohort, sessionId)}
           </select>
         </label>
-        <button class="primary" id="apply-analytics-filter" type="button">적용</button>
+        <button class="primary" id="apply-analytics-filter" type="button" onclick="window.applyAnalyticsFilter()">적용</button>
       </div>
       <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
     </section>
@@ -2207,11 +2306,11 @@ function renderReport() {
       </div>
       ${cohort && session ? `
         <div class="report-export-actions" data-html2canvas-ignore="true">
-          <button class="report-export-button excel" id="download-report-xlsx" type="button">
+          <button class="report-export-button excel" id="download-report-xlsx" type="button" onclick="window.downloadReportXlsx(event)">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 10l2 3m0-3-2 3m4-3h2v3h-2"/></svg>
             <span><b>엑셀 다운로드</b><small>질문·익명 응답</small></span>
           </button>
-          <button class="report-export-button pdf" id="download-report-pdf" type="button">
+          <button class="report-export-button pdf" id="download-report-pdf" type="button" onclick="window.downloadReportPdf(event)">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 11h6M7 14h4"/></svg>
             <span><b>PDF 리포트</b><small>화면 디자인 포함</small></span>
           </button>
@@ -2235,7 +2334,7 @@ function renderReport() {
             ${scopedSessionOptions(type, cohort, sessionId)}
           </select>
         </label>
-        <button class="primary" id="apply-report-filter" type="button">적용</button>
+        <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
       </div>
       <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
     </section>
@@ -2344,42 +2443,78 @@ function renderReport() {
           const delta = preScore !== null && postScore !== null ? postScore - preScore : null;
           const midDelta = preScore !== null && midScore !== null ? midScore - preScore : null;
           const deltaColor = delta === null ? '#94a3b8' : delta > 0.2 ? '#059669' : delta < -0.2 ? '#dc2626' : '#d97706';
+          
+          const shortInterpretation = delta === null ? ''
+            : delta > 0.5 ? '유의미 개선'
+            : delta > 0.2 ? '긍정 변화'
+            : delta > -0.2 ? '변화 미미'
+            : '주의';
+
           const interpretation = delta === null ? ''
             : delta > 0.5 ? '뚜렷한 긍정 변화 — 세션 효과 확인'
             : delta > 0.2 ? '긍정적 변화 — 방향성 적절'
             : delta > -0.2 ? '변화 미미 — 추가 개입 필요'
             : '점수 하락 — 환경 요인 점검 필요';
-          const bar = (score, color) => score !== null ? `<div style="height:8px; border-radius:99px; width:${Math.round((score/5)*100)}%; background:${color}; transition:width 0.5s;"></div>` : `<div style="height:8px; border-radius:99px; width:30%; background:#e2e8f0;"></div>`;
+            
+          const prePct = preScore !== null ? (preScore - 1) * 25 : 0;
+          const postPct = postScore !== null ? (postScore - 1) * 25 : 0;
+          const minPct = Math.min(prePct, postPct);
+          const widthPct = Math.abs(postPct - prePct);
+          
           return `
             <div class="report-change-card" style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
               <div style="position:absolute; top:0; left:0; right:0; height:3px; background:${dim.color};"></div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
                 <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
-                ${delta !== null ? `<span style="font-size:12px; font-weight:800; color:${deltaColor}; background:${deltaColor}14; padding:3px 10px; border-radius:99px;">${delta > 0 ? '+' : ''}${delta.toFixed(2)} ${delta > 0.2 ? '↑' : delta < -0.2 ? '↓' : '→'}</span>` : `<span style="font-size:11px; color:#94a3b8;">N<3 마스킹</span>`}
+                ${delta !== null 
+                  ? `<span style="font-size:12px; font-weight:800; color:${deltaColor}; background:${deltaColor}14; padding:3px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:4px;">
+                      ${delta > 0 ? '+' : ''}${delta.toFixed(2)} ${delta > 0.2 ? '↑' : delta < -0.2 ? '↓' : '→'}
+                      <span style="font-size:10px; opacity:0.85; font-weight:700; border-left:1px solid ${deltaColor}40; padding-left:4px; margin-left:2px;">${shortInterpretation}</span>
+                     </span>` 
+                  : `<span class="masked-badge" style="border:none; padding:3px 10px; border-radius:99px; background:rgba(148, 163, 184, 0.1); color:#64748b; font-size:11px; display:inline-flex; align-items:center; gap:4px;">${lockSvg} N&lt;3 보호</span>`}
               </div>
-              <div style="display:flex; flex-direction:column; gap:8px;">
-                <div>
-                  <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span style="font-size:11px; font-weight:700; color:#94a3b8;">사전</span>
-                    <span style="font-size:11.5px; font-weight:800; color:${ragInfo(preScore).color};">${preScore !== null ? preScore.toFixed(2) : 'N<3'}</span>
+              
+              ${preScore !== null && postScore !== null ? `
+                <!-- Dumbbell Chart (Slope Line) -->
+                <div class="dumbbell-chart-container" style="margin: 16px 0; padding: 0 6px;">
+                  <div style="display:flex; justify-content:space-between; margin-bottom: 6px; font-size:10.5px; font-weight:700; color:#94a3b8; letter-spacing:0.02em;">
+                    <span>1.0</span>
+                    <span>2.0</span>
+                    <span>3.0</span>
+                    <span>4.0</span>
+                    <span>5.0</span>
                   </div>
-                  <div style="background:#f1f5f9; border-radius:99px; overflow:hidden;">${bar(preScore, '#cbd5e1')}</div>
+                  <div class="dumbbell-track" style="position:relative; height:10px; background:#f1f5f9; border-radius:5px; display:flex; align-items:center;">
+                    <!-- scale ticks -->
+                    <div style="position:absolute; left:25%; width:1px; height:10px; background:#e2e8f0;"></div>
+                    <div style="position:absolute; left:50%; width:1px; height:10px; background:#e2e8f0;"></div>
+                    <div style="position:absolute; left:75%; width:1px; height:10px; background:#e2e8f0;"></div>
+                    
+                    <!-- connecting line -->
+                    <div style="position:absolute; left:${minPct}%; width:${widthPct}%; height:4px; background:${deltaColor}; border-radius:2px; opacity:0.85; z-index:1;"></div>
+                    
+                    <!-- pre dot -->
+                    <div style="position:absolute; left:${prePct}%; transform:translateX(-50%); width:12px; height:12px; border-radius:50%; background:#94a3b8; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); z-index:2;" title="사전: ${preScore.toFixed(2)}"></div>
+                    
+                    <!-- post dot -->
+                    <div style="position:absolute; left:${postPct}%; transform:translateX(-50%); width:14px; height:14px; border-radius:50%; background:${dim.color}; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.2); z-index:3;" title="사후: ${postScore.toFixed(2)}">
+                      <span style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#fff; font-size:8px; font-weight:900; pointer-events:none;">
+                        ${delta > 0.05 ? '▶' : delta < -0.05 ? '◀' : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:11.5px;">
+                    <span style="color:#64748b; font-weight:600;">사전: <strong style="color:#475569;">${preScore.toFixed(2)}</strong></span>
+                    ${midScore !== null ? `<span style="color:#d97706; font-weight:600;">중간: <strong>${midScore.toFixed(2)}</strong></span>` : ''}
+                    <span style="color:${dim.color}; font-weight:700;">사후: <strong>${postScore.toFixed(2)}</strong></span>
+                  </div>
                 </div>
-                ${midScore !== null ? `<div>
-                  <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span style="font-size:11px; font-weight:700; color:#94a3b8;">중간</span>
-                    <span style="font-size:11.5px; font-weight:800; color:${ragInfo(midScore).color};">${midScore.toFixed(2)}${midDelta !== null ? ` <span style="color:${midDelta > 0 ? '#059669' : '#dc2626'}; font-size:10px;">(${midDelta > 0 ? '+' : ''}${midDelta.toFixed(2)})</span>` : ''}</span>
-                  </div>
-                  <div style="background:#f1f5f9; border-radius:99px; overflow:hidden;">${bar(midScore, '#fbbf24')}</div>
-                </div>` : ''}
-                <div>
-                  <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span style="font-size:11px; font-weight:700; color:#94a3b8;">사후</span>
-                    <span style="font-size:11.5px; font-weight:800; color:${ragInfo(postScore).color};">${postScore !== null ? postScore.toFixed(2) : 'N<3'}</span>
-                  </div>
-                  <div style="background:#f1f5f9; border-radius:99px; overflow:hidden;">${bar(postScore, dim.color)}</div>
+              ` : `
+                <!-- Masked view -->
+                <div class="masked-cell" style="padding:14px; border-radius:10px; display:flex; align-items:center; justify-content:center; min-height:80px; margin: 12px 0;">
+                  <span class="masked-badge">${lockSvg} N&lt;3 보호 마스킹됨</span>
                 </div>
-              </div>
+              `}
               ${interpretation ? `<p style="font-size:11.5px; color:#64748b; margin:10px 0 0; line-height:1.5;">${interpretation}</p>` : ''}
             </div>`;
         }).join("")}
@@ -2694,7 +2829,14 @@ function renderStatsTable(stats, masked, cohort, type, sessionId = "") {
           ${dynamicQuestions.map((q) => {
             const key = q.id;
             const label = q.text;
-            if (shouldMask) return `<tr><td class="table-q-text">${escapeHtml(label)}</td><td>N<3 마스킹</td><td>N<3 마스킹</td><td>-</td></tr>`;
+            if (shouldMask) {
+              return `<tr>
+                <td class="table-q-text">${escapeHtml(label)}</td>
+                <td class="masked-cell"><span class="masked-badge">${lockSvg} N&lt;3 보호</span></td>
+                <td class="masked-cell"><span class="masked-badge">${lockSvg} N&lt;3 보호</span></td>
+                <td>-</td>
+              </tr>`;
+            }
             const pv = pre[`${key}_avg`];
             const qv = post[`${key}_avg`];
             const delta = typeof pv === "number" && typeof qv === "number" ? qv - pv : null;
@@ -2867,8 +3009,8 @@ function renderQualSection(cohort, type, sessionId = "", phase = "") {
         ${aiButtonHtml}
       </div>
       <div class="pulse-segmented" aria-label="보기 방식">
-        <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question">질문으로 보기</button>
-        <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person">사람으로 보기</button>
+        <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question" onclick="window.setQualAnswersGroupBy('question')">질문으로 보기</button>
+        <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person" onclick="window.setQualAnswersGroupBy('person')">사람으로 보기</button>
       </div>
     </div>
     <div style="display:flex; flex-direction:column; gap:16px; margin-top:14px;">
@@ -2925,8 +3067,6 @@ function bindCanvasEvents() {
     bindOrg();
   } else if (state.activeView === "upload") {
     bindUpload();
-  } else if (["analytics", "report"].includes(state.activeView)) {
-    bindReport();
   } else if (state.activeView === "pulse") {
     bindPulse({
       state,
@@ -2946,6 +3086,8 @@ function bindCanvasEvents() {
       saveState,
       render
     });
+  } else if (["analytics", "report"].includes(state.activeView)) {
+    bindReportQualSignals();
   }
 }
 
@@ -3094,83 +3236,89 @@ function bindOrg() {
 // 여기서 바인딩한다(과거에는 bindSessions 안에 있어 "survey" 뷰에서는 호출되지 않아
 // "배포 및 QR 생성" 버튼이 동작하지 않았다).
 function bindSurveyCreator() {
-  document.querySelector("#btn-create-survey-submit")?.addEventListener("click", () => {
-    const title = (state.draftSurveyTitle || "").trim();
-    const sessionId = state.draftSurveySessionId;
-    const phase = state.draftSurveyPhase;
-    const questions = state.draftSurveyQuestions || [];
-    const googleFormUrl = (state.draftGoogleFormUrl || "").trim();
+  // 이 화면의 버튼 동작은 renderSurveyCreator() 내부 인라인 onclick으로 바인딩됩니다.
+}
 
-    if (!title) {
-      alert("설문 제목을 입력해 주세요.");
-      return;
-    }
-    if (!sessionId) {
-      alert("대상 세션을 선택해 주세요.");
-      return;
-    }
-    if (!googleFormUrl && questions.length === 0) {
-      alert("구글 폼 URL을 입력하거나 질문을 추가해 주세요.");
-      return;
-    }
+window.submitSurveyDraft = function() {
+  const title = (state.draftSurveyTitle || "").trim();
+  const sessionId = state.draftSurveySessionId;
+  const phase = state.draftSurveyPhase;
+  const questions = state.draftSurveyQuestions || [];
+  const googleFormUrl = (state.draftGoogleFormUrl || "").trim();
 
-    if (!state.surveys) state.surveys = [];
+  if (!title) {
+    alert("설문 제목을 입력해 주세요.");
+    return;
+  }
+  if (!sessionId) {
+    alert("대상 세션을 선택해 주세요.");
+    return;
+  }
+  if (!googleFormUrl && questions.length === 0) {
+    alert("구글 폼 URL을 입력하거나 질문을 추가해 주세요.");
+    return;
+  }
 
-    const sess = (state.sessions || []).find(s => s.id === sessionId);
-    const surveyData = {
-      title,
-      sessionId,
-      phase,
-      sessionType: sess ? normalizeSessionType(sess.type) : '',
-      sessionCohort: sess ? (sess.cohort || '') : '',
-      googleFormUrl: googleFormUrl || null,
-      questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
-    };
+  if (!state.surveys) state.surveys = [];
 
-    if (state.editingSurveyId) {
-      const idx = state.surveys.findIndex(s => s.id === state.editingSurveyId);
-      const editedId = state.editingSurveyId;
-      if (idx >= 0) state.surveys[idx] = { ...state.surveys[idx], ...surveyData };
-      state.editingSurveyId = null;
-      state.draftSurveyTitle = "";
-      state.draftGoogleFormUrl = "";
-      state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
-      saveState();
-      render();
-      updateSurveyInFirestore(editedId, surveyData).catch(e => {
-        alert('설문 수정 저장 실패: ' + e.message);
-      });
-      return;
-    }
+  const sess = (state.sessions || []).find(s => s.id === sessionId);
+  const surveyData = {
+    title,
+    sessionId,
+    phase,
+    sessionType: sess ? normalizeSessionType(sess.type) : '',
+    sessionCohort: sess ? (sess.cohort || '') : '',
+    googleFormUrl: googleFormUrl || null,
+    questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
+  };
 
-    // 로컬에서 먼저 생성하고 QR을 즉시 띄운다. Firestore 동기화는 백그라운드로 처리해
-    // 네트워크/App Check/권한 문제로 "배포 및 QR 생성"이 통째로 막히지 않도록 한다.
-    const newId = uid();
-    state.surveys.push({ ...surveyData, id: newId });
-    state.draftSurveyTitle = "";
-    state.draftGoogleFormUrl = "";
-    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
-    saveState();
-    render();
+  // Reset creator step on submit
+  state.surveyCreatorStep = 1;
 
-    updateSurveyInFirestore(newId, surveyData).catch(e => {
-      console.error('Firestore 설문 저장 실패:', e);
-      alert(
-        'QR은 생성됐지만 서버 동기화에 실패했습니다.\n' +
-        '구글 폼 URL로 만든 설문은 QR이 정상 동작합니다.\n' +
-        '자체 설계 설문은 다른 기기/모바일에서 열리지 않을 수 있습니다.\n\n오류: ' + e.message
-      );
-    });
-  });
-  document.querySelector("#cancel-edit-survey")?.addEventListener("click", () => {
+  if (state.editingSurveyId) {
+    const idx = state.surveys.findIndex(s => s.id === state.editingSurveyId);
+    const editedId = state.editingSurveyId;
+    if (idx >= 0) state.surveys[idx] = { ...state.surveys[idx], ...surveyData };
     state.editingSurveyId = null;
     state.draftSurveyTitle = "";
     state.draftGoogleFormUrl = "";
     state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
     saveState();
     render();
+    updateSurveyInFirestore(editedId, surveyData).catch(e => {
+      alert('설문 수정 저장 실패: ' + e.message);
+    });
+    return;
+  }
+
+  const newId = uid();
+  state.surveys.push({ ...surveyData, id: newId });
+  state.draftSurveyTitle = "";
+  state.draftGoogleFormUrl = "";
+  state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+  saveState();
+  render();
+
+  updateSurveyInFirestore(newId, surveyData).catch(e => {
+    console.error('Firestore 설문 저장 실패:', e);
+    alert(
+      'QR은 생성됐지만 서버 동기화에 실패했습니다.\n' +
+      '구글 폼 URL로 만든 설문은 QR이 정상 동작합니다.\n' +
+      '자체 설계 설문은 다른 기기/모바일에서 열리지 않을 수 있습니다.\n\n오류: ' + e.message
+    );
   });
-}
+};
+
+window.cancelSurveyEdit = function() {
+  state.editingSurveyId = null;
+  state.draftSurveyTitle = "";
+  state.draftGoogleFormUrl = "";
+  state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+  // Reset creator step on cancel
+  state.surveyCreatorStep = 1;
+  saveState();
+  render();
+};
 
 function bindSessions() {
   document.querySelector("#btn-session-list")?.addEventListener("click", () => {
@@ -3564,6 +3712,7 @@ function bindSessions() {
     state.draftSchedule = makeSchedule(type);
     saveState();
     saveSessionToFirestore(session);
+    window.updateResponsesSubscription();
     render();
   });
   document.querySelector("#btn-db-upload")?.addEventListener("click", uploadStateToDb);
@@ -3681,77 +3830,7 @@ function reportExportPayload() {
   };
 }
 
-function bindReport() {
-  document.querySelector("#download-report-xlsx")?.addEventListener("click", (event) => {
-    const button = event.currentTarget;
-    const original = button.innerHTML;
-    button.disabled = true;
-    button.classList.add("is-loading");
-    button.innerHTML = `<span><b>엑셀 생성 중</b><small>잠시만 기다려 주세요</small></span>`;
-    try {
-      downloadReportWorkbook(reportExportPayload());
-    } catch (error) {
-      console.error("엑셀 리포트 생성 실패:", error);
-      window.alert(error.message || "엑셀 파일을 만들지 못했습니다.");
-    } finally {
-      button.disabled = false;
-      button.classList.remove("is-loading");
-      button.innerHTML = original;
-    }
-  });
-
-  document.querySelector("#download-report-pdf")?.addEventListener("click", async (event) => {
-    const button = event.currentTarget;
-    const original = button.innerHTML;
-    button.disabled = true;
-    button.classList.add("is-loading");
-    button.innerHTML = `<span><b>PDF 생성 중</b><small>분석 화면을 정리하고 있어요</small></span>`;
-    try {
-      const payload = reportExportPayload();
-      await downloadReportPdf({
-        element: document.querySelector("#report-export-content"),
-        meta: payload.meta,
-      });
-    } catch (error) {
-      console.error("PDF 리포트 생성 실패:", error);
-      window.alert(error.message || "PDF 파일을 만들지 못했습니다.");
-    } finally {
-      button.disabled = false;
-      button.classList.remove("is-loading");
-      button.innerHTML = original;
-    }
-  });
-
-  document.querySelector("#apply-analytics-filter")?.addEventListener("click", () => {
-    const typeVal = document.querySelector("#analytics-type-select")?.value || "";
-    const cohort = document.querySelector("#analytics-cohort-select")?.value || "";
-    const sessionId = document.querySelector("#analytics-session-select")?.value || "";
-    if (sessionId !== state.selectedAnalyticsSessionId) state.selectedAnalyticsPhase = "";
-    if (typeVal) state.selectedAnalyticsType = normalizeSessionType(typeVal);
-    state.selectedAnalyticsCohort = cohort;
-    state.selectedAnalyticsSessionId = sessionId;
-    saveState();
-    render();
-  });
-
-  document.querySelectorAll("[data-qual-groupby]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.qualAnswersGroupBy = button.dataset.qualGroupby;
-      render();
-    });
-  });
-
-  document.querySelector("#apply-report-filter")?.addEventListener("click", () => {
-    const typeVal = document.querySelector("#report-type-select")?.value || "";
-    const cohort = document.querySelector("#report-cohort-select")?.value || "";
-    const sessionId = document.querySelector("#report-session-select")?.value || "";
-    if (typeVal) state.selectedReportType = normalizeSessionType(typeVal);
-    state.selectedReportCohort = cohort;
-    state.selectedReportSessionId = sessionId;
-    saveState();
-    render();
-  });
-
+function bindReportQualSignals() {
   const preContainer = document.getElementById("qual-signal-pre-container");
   const postContainer = document.getElementById("qual-signal-post-container");
   if (preContainer || postContainer) {
@@ -3774,7 +3853,12 @@ function bindReport() {
   }
 }
 
-// ── Survey Builder Helpers ─────────────────────────────────────
+window.setSurveyCreatorStep = function(step) {
+  state.surveyCreatorStep = step;
+  saveState();
+  render();
+};
+
 window.updateSurveyDraftField = function(field, val) {
   state[field] = val;
   // saveStateQuiet(): 입력 중 render()를 일으키지 않아 포커스를 유지한다.
@@ -3979,6 +4063,7 @@ window.deleteSession = function(id) {
   if (state.editingSessionId === id) state.editingSessionId = null;
   saveState();
   deleteSessionFromFirestore(id);
+  window.updateResponsesSubscription();
   render();
 };
 
@@ -4235,6 +4320,7 @@ window.startEditSurvey = function(id) {
   state.draftSurveyQuestions = survey.questions && survey.questions.length
     ? JSON.parse(JSON.stringify(survey.questions))
     : defaultQuestions(survey.phase || '사전');
+  state.surveyCreatorStep = 1;
   saveState();
   render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -4373,34 +4459,8 @@ async function initApp() {
     console.error('Firestore 설문 실시간 갱신 오류:', err);
   });
 
-  // Real-time listener for responses — updates dashboard whenever a phone submits
-  onSnapshot(collection(db, 'responses'), (snap) => {
-    const surveyMap = Object.fromEntries((state.surveys || []).map(s => [s.id, s]));
-    const sessionMap = Object.fromEntries((state.sessions || []).map(s => [s.id, s]));
-
-    const firestoreResponses = snap.docs.map(d => {
-      const data = d.data();
-      let cohort = Number(data.cohort) || 0;
-      const sess = data.sessionId ? sessionMap[data.sessionId] : null;
-      if (sess && Number(sess.cohort)) {
-        cohort = Number(sess.cohort);
-      } else if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
-        cohort = Number(surveyMap[data.surveyId].sessionCohort) || 0;
-      }
-      return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || "" };
-    }).sort((a, b) => {
-      const aTime = Date.parse(a.createdAt) || 0;
-      const bTime = Date.parse(b.createdAt) || 0;
-      return bTime - aTime;
-    });
-    state.responses = firestoreResponses;
-    const shouldRender = ["dashboard", "sessions", "analytics", "report"].includes(state.activeView);
-    if (shouldRender) {
-      render();
-    }
-  }, (err) => {
-    console.error('Firestore 응답 실시간 리스너 오류:', err);
-  });
+  // Real-time listener for responses — scoped to active sessions
+  window.updateResponsesSubscription();
 
   // Real-time listener for QualSignal — updates report and session status
   onSnapshot(collection(db, 'QualSignal'), (snap) => {
@@ -4415,188 +4475,6 @@ async function initApp() {
   });
 }
 
-// ── Qualitative Analysis Modal ────────────────────────────────────
-function renderQualModal(qualKey, cohort, type, sessionId = "") {
-  const saved = (state.qualAnalysis || {})[qualKey] || '';
-  const prompt = buildQualPrompt(cohort, type, sessionId);
-  // hasQual = prompt has at least one "응답" line with actual content
-  const hasQual = /응답 \d+\./.test(prompt);
-
-  // Count total responses for this cohort (any qual field)
-  const cohortNum = Number(cohort);
-  const totalResponses = (state.responses || []).filter(r => r.cohort === cohortNum).length;
-  const cohortYearLabel = yearForCohortType(cohort, type) ? `${yearForCohortType(cohort, type)}년 ` : '';
-
-  return `
-    <div class="modal-overlay" id="qual-modal-overlay">
-      <div class="modal-card" style="max-width:660px; width:96%;">
-        <div class="modal-header">
-          <h2>주관식 AI 분석 — ${cohortYearLabel}${cohort}기 ${type}</h2>
-          <button type="button" class="close-btn" onclick="closeQualModal()">&times;</button>
-        </div>
-        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px; max-height:72vh; overflow-y:auto;">
-          ${!hasQual ? `
-            <div style="padding:16px; background:#fff8f0; border:1.5px solid #fed7aa; border-radius:10px;">
-              <p style="margin:0 0 8px; font-weight:700; color:#c2410c; font-size:13.5px;">주관식 응답 데이터를 찾지 못했습니다.</p>
-              <p style="margin:0; color:#92400e; font-size:12.5px; line-height:1.6;">
-                • 현재 ${cohortYearLabel}${cohort}기 응답 총 ${totalResponses}건 적재됨<br>
-                • 리포트의 "세션 유형" 선택이 업로드한 세션 유형과 일치하는지 확인하세요<br>
-                • 주관식 질문이 포함된 설문의 CSV를 설문 카드에서 업로드하면 자동으로 감지됩니다
-              </p>
-            </div>
-          ` : `
-          <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:12px; flex-wrap:wrap;">
-              <div>
-                <span style="font-size:12px; font-weight:800; color:var(--blue-mid); text-transform:uppercase; letter-spacing:0.06em;">Step 1</span>
-                <span style="font-size:12px; font-weight:600; color:var(--muted); margin-left:6px;">아래 프롬프트를 Claude / ChatGPT에 붙여넣으세요</span>
-              </div>
-              <button class="primary compact" onclick="copyQualPrompt('${qualKey}')">프롬프트 복사</button>
-            </div>
-            <textarea id="qual-prompt-${qualKey}" readonly style="width:100%; height:200px; font-size:11px; font-family:monospace; resize:vertical; border:1px solid #bae6fd; border-radius:8px; padding:10px 12px; background:#ffffff; color:#0c2340; box-sizing:border-box; line-height:1.6;">${escapeHtml(prompt)}</textarea>
-          </div>
-          <div style="border:2px solid #bae6fd; border-radius:10px; padding:16px; background:#ffffff;">
-            <div style="margin-bottom:10px;">
-              <span style="font-size:12px; font-weight:800; color:var(--blue-mid); text-transform:uppercase; letter-spacing:0.06em;">Step 2</span>
-              <span style="font-size:12px; font-weight:600; color:var(--muted); margin-left:6px;">AI 분석 결과를 아래에 붙여넣고 저장하세요</span>
-            </div>
-            <textarea id="qual-result-input" style="width:100%; height:180px; font-size:13px; resize:vertical; border:1.5px solid #bae6fd; border-radius:8px; padding:10px 12px; box-sizing:border-box; line-height:1.7;" placeholder="AI가 돌려준 분석 결과를 여기에 붙여넣으세요. 저장하면 리포트 ④번 항목에 표시됩니다.">${escapeHtml(saved)}</textarea>
-          </div>
-          `}
-        </div>
-        <div class="modal-footer">
-          <button class="secondary" type="button" onclick="closeQualModal()">닫기</button>
-          ${hasQual ? `<button class="primary" type="button" onclick="saveQualAnalysisFromModal('${qualKey}')">결과 저장 → 리포트 반영</button>` : ''}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// ── Qualitative Analysis Helpers ─────────────────────────────────
-function buildQualPrompt(cohort, type, sessionId = "") {
-  const cohortNum = Number(cohort);
-  const sessionIds = new Set(sessionId
-    ? [sessionId]
-    : (state.sessions || []).filter(s => sameSessionType(s.type, type) && s.cohort === cohortNum).map(s => s.id)
-  );
-  const selectedSession = (state.sessions || []).find((session) => session.id === sessionId);
-
-  // Collect all surveys relevant to this cohort (by sessionId, or by sessionCohort + sessionType
-  // so a different session type sharing the same cohort number is never pulled in).
-  const relevantSurveys = (state.surveys || []).filter(s =>
-    sessionIds.has(s.sessionId) ||
-    (Number(s.sessionCohort) === cohortNum && sameSessionType(s.sessionType, type))
-  );
-
-  // 정성 문항 분류는 반드시 시점(phase)별 설문 기준으로 한다. 같은 q-id가 시점마다 주관식/객관식이
-  // 다를 수 있어(예: DT기획팀 q1~q3 — 중간 주관식, 사후 척도) 시점을 섞으면 척도 점수가 정성에 새어 나온다.
-  const qualIdsForPhase = (phase) => {
-    const phaseSurveys = relevantSurveys.filter(s => s.phase === phase);
-    if (phaseSurveys.some(s => (s.questions || []).length > 0)) {
-      return [...new Set(phaseSurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
-    }
-    return ['q9', 'q10', 'q11']; // legacy guess only when this 시점에 설정된 설문이 없을 때
-  };
-
-  // Question text lookup helper
-  const getQText = (qid, phase) => {
-    const survey = relevantSurveys.find(s => s.phase === phase) || relevantSurveys[0];
-    const q = survey?.questions?.find(q => q.id === qid);
-    if (q?.text) return q.text;
-    if (qid === 'q9')  return '세션 참여 전 기대하는 점';
-    if (qid === 'q10') return '세션 중 도움이 된 점';
-    if (qid === 'q11') return '운영진에게 전달하고 싶은 메시지';
-    return qid;
-  };
-
-  const promptYearLabel = yearForCohortType(cohort, type) ? `${yearForCohortType(cohort, type)}년 ` : '';
-  let prompt = `아래는 조직문화 세션 참가자들의 주관식 설문 응답입니다.\n세션: ${selectedSession ? sessionLabel(selectedSession) : `${sessionTypeLabel(type)} / ${promptYearLabel}${cohort}기`}\n세션 유형: ${sessionTypeLabel(type)} / 기수: ${promptYearLabel}${cohort}기\n\n`;
-  let totalQualRows = 0;
-
-  PHASES.forEach(phase => {
-    // Primary: match by cohort + phase + sessionId
-    let rows = (state.responses || []).filter(r =>
-      r.cohort === cohortNum && r.phase === phase && sessionIds.has(r.sessionId)
-    );
-    // Fallback for orphaned rows with a stale sessionId — only keep them if their linked survey
-    // confirms the same session type, so different types sharing a cohort number stay separate.
-    if (!rows.length && !sessionId) {
-      rows = (state.responses || []).filter(r => {
-        if (r.cohort !== cohortNum || r.phase !== phase) return false;
-        const survey = (state.surveys || []).find(s => s.id === r.surveyId);
-        return Boolean(survey && sameSessionType(survey.sessionType, type));
-      });
-    }
-
-    const phaseQualIds = qualIdsForPhase(phase);
-    const qualRows = rows.filter(r => {
-      const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
-      const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-        ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-        : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-      return rQualIds.some(id => isQualText(r[id]));
-    });
-    if (!qualRows.length) return;
-    totalQualRows += qualRows.length;
-
-    prompt += `【${phase} 설문 — ${qualRows.length}명 응답】\n`;
-    phaseQualIds.forEach(qid => {
-      const answers = qualRows.filter(r => {
-        const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
-        const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-          ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-          : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-        return rQualIds.includes(qid);
-      }).map(r => String(r[qid] || '')).filter(v => isQualText(v));
-      if (!answers.length) return;
-      prompt += `\n질문: ${getQText(qid, phase)}\n`;
-      answers.forEach((a, i) => { prompt += `  응답 ${i + 1}. ${a}\n`; });
-    });
-    prompt += '\n';
-  });
-
-  if (!totalQualRows) return prompt; // hasQual will be false
-
-  prompt += `---\n위 응답을 바탕으로 아래 형식에 정확히 맞춰 한국어로 분석해 주세요.\n각 섹션은 반드시 ## 제목으로 시작하세요.\n\n`;
-  prompt += `## 핵심 키워드\n(응답 전반에서 가장 자주 등장하는 감정·주제 키워드 5개를 · 로 구분하여 한 줄에)\n\n`;
-  prompt += `## 주요 테마\n(사전~사후에 걸쳐 반복되는 핵심 주제 3가지를 **굵은 제목**: 1~2문장 설명 형식으로)\n\n`;
-  prompt += `## 대표 발언\n(가장 인상적인 참가자 발언 2~3개를 각 줄에 "..." 형식으로 인용, 끝에 [사전/사후] 표기)\n\n`;
-  prompt += `## 조직문화 진단\n(Amy Edmondson 심리적 안전감, 팀 회복탄력성, 사일로 현상 등 조직심리 관점에서 이 집단의 특성과 주요 패턴을 3~4문장으로 서술)\n\n`;
-  prompt += `## 세션 운영 제언\n(다음 세션을 위한 구체적·실행 가능한 제언 2~3가지를 번호 목록으로)\n`;
-  return prompt;
-}
-
-window.openQualModal = function(qualKey) {
-  state.showQualModal = true;
-  state.activeQualKey = qualKey;
-  render();
-};
-
-window.closeQualModal = function() {
-  state.showQualModal = false;
-  state.activeQualKey = null;
-  render();
-};
-
-window.copyQualPrompt = function(qualKey) {
-  const el = document.getElementById(`qual-prompt-${qualKey}`);
-  if (!el) return;
-  el.select();
-  document.execCommand('copy');
-  alert('프롬프트가 복사되었습니다. Claude 또는 ChatGPT에 붙여넣으세요.');
-};
-
-window.saveQualAnalysisFromModal = function(qualKey) {
-  const el = document.getElementById('qual-result-input');
-  if (!el) return;
-  if (!state.qualAnalysis) state.qualAnalysis = {};
-  state.qualAnalysis[qualKey] = el.value.trim();
-  state.showQualModal = false;
-  state.activeQualKey = null;
-  saveState();
-  render();
-};
 
 window.openQualAnalysisModal = function(sessionId, phase) {
   const session = state.sessions.find(s => s.id === sessionId);
@@ -4659,15 +4537,73 @@ window.openQualAnalysisModal = function(sessionId, phase) {
 };
 
 
-window.updateAnalyticsFilter = function(field, val) {
-  state[field] = val;
+window.downloadReportXlsx = async function(event) {
+  const button = event.currentTarget || document.querySelector("#download-report-xlsx");
+  if (!button) return;
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.classList.add("is-loading");
+  button.innerHTML = `<span><b>엑셀 생성 중</b><small>잠시만 기다려 주세요</small></span>`;
+  try {
+    await downloadReportWorkbook(reportExportPayload());
+  } catch (error) {
+    console.error("엑셀 리포트 생성 실패:", error);
+    window.alert(error.message || "엑셀 파일을 만들지 못했습니다.");
+  } finally {
+    button.disabled = false;
+    button.classList.remove("is-loading");
+    button.innerHTML = original;
+  }
+};
+
+window.downloadReportPdf = async function(event) {
+  const button = event.currentTarget || document.querySelector("#download-report-pdf");
+  if (!button) return;
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.classList.add("is-loading");
+  button.innerHTML = `<span><b>PDF 생성 중</b><small>분석 화면을 정리하고 있어요</small></span>`;
+  try {
+    const payload = reportExportPayload();
+    await downloadReportPdf({
+      element: document.querySelector("#report-export-content"),
+      meta: payload.meta,
+    });
+  } catch (error) {
+    console.error("PDF 리포트 생성 실패:", error);
+    window.alert(error.message || "PDF 파일을 만들지 못했습니다.");
+  } finally {
+    button.disabled = false;
+    button.classList.remove("is-loading");
+    button.innerHTML = original;
+  }
+};
+
+window.applyAnalyticsFilter = function() {
+  const typeVal = document.querySelector("#analytics-type-select")?.value || "";
+  const cohort = document.querySelector("#analytics-cohort-select")?.value || "";
+  const sessionId = document.querySelector("#analytics-session-select")?.value || "";
+  if (sessionId !== state.selectedAnalyticsSessionId) state.selectedAnalyticsPhase = "";
+  if (typeVal) state.selectedAnalyticsType = normalizeSessionType(typeVal);
+  state.selectedAnalyticsCohort = cohort;
+  state.selectedAnalyticsSessionId = sessionId;
   saveState();
   render();
 };
 
-window.updateReportFilter = function(field, val) {
-  state[field] = val;
+window.applyReportFilter = function() {
+  const typeVal = document.querySelector("#report-type-select")?.value || "";
+  const cohort = document.querySelector("#report-cohort-select")?.value || "";
+  const sessionId = document.querySelector("#report-session-select")?.value || "";
+  if (typeVal) state.selectedReportType = normalizeSessionType(typeVal);
+  state.selectedReportCohort = cohort;
+  state.selectedReportSessionId = sessionId;
   saveState();
+  render();
+};
+
+window.setQualAnswersGroupBy = function(groupBy) {
+  state.qualAnswersGroupBy = groupBy;
   render();
 };
 
@@ -4687,6 +4623,69 @@ window.refreshScopedSessionSelect = function(kind) {
   const sessionEl = document.getElementById(`${kind}-session-select`);
   if (!cohortEl || !sessionEl) return;
   sessionEl.innerHTML = scopedSessionOptions(typeEl ? typeEl.value : "", cohortEl.value, "");
+};
+
+let responseUnsubscribes = [];
+
+window.updateResponsesSubscription = function() {
+  responseUnsubscribes.forEach(unsub => unsub());
+  responseUnsubscribes = [];
+
+  const sessionIds = (state.sessions || []).map(s => s.id).filter(Boolean);
+  if (sessionIds.length === 0) {
+    state.responses = [];
+    return;
+  }
+
+  // Chunk session IDs into arrays of max 30 items
+  const chunks = [];
+  for (let i = 0; i < sessionIds.length; i += 30) {
+    chunks.push(sessionIds.slice(i, i + 30));
+  }
+
+  const chunkResponses = {};
+
+  chunks.forEach((chunk, chunkIdx) => {
+    const q = query(collection(db, 'responses'), where('sessionId', 'in', chunk));
+    const unsub = onSnapshot(q, (snap) => {
+      const surveyMap = Object.fromEntries((state.surveys || []).map(s => [s.id, s]));
+      const sessionMap = Object.fromEntries((state.sessions || []).map(s => [s.id, s]));
+
+      chunkResponses[chunkIdx] = snap.docs.map(d => {
+        const data = d.data();
+        let cohort = Number(data.cohort) || 0;
+        const sess = data.sessionId ? sessionMap[data.sessionId] : null;
+        if (sess && Number(sess.cohort)) {
+          cohort = Number(sess.cohort);
+        } else if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
+          cohort = Number(surveyMap[data.surveyId].sessionCohort) || 0;
+        }
+        return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || "" };
+      });
+
+      // Merge all chunks
+      let allResponses = [];
+      Object.keys(chunkResponses).forEach(idx => {
+        allResponses.push(...chunkResponses[idx]);
+      });
+
+      allResponses.sort((a, b) => {
+        const aTime = Date.parse(a.createdAt) || 0;
+        const bTime = Date.parse(b.createdAt) || 0;
+        return bTime - aTime;
+      });
+
+      state.responses = allResponses;
+      
+      const shouldRender = ["dashboard", "sessions", "analytics", "report"].includes(state.activeView);
+      if (shouldRender) {
+        render();
+      }
+    }, (err) => {
+      console.error(`Firestore responses chunk ${chunkIdx} 실시간 리스너 오류:`, err);
+    });
+    responseUnsubscribes.push(unsub);
+  });
 };
 
 window.addEventListener('storage', (e) => {

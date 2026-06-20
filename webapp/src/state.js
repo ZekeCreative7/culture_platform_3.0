@@ -63,6 +63,7 @@ export const blankState = () => ({
   calendarDate: todayISO(),
   orgSearchQuery: "",
   draftSurveyTitle: "",
+  surveyCreatorStep: 1,
   draftSurveyPhase: "사전",
   draftSurveySessionId: "",
   draftSurveyQuestions: defaultQuestions("사전"),
@@ -88,9 +89,6 @@ export const blankState = () => ({
   draftCrossMemberIds: [],
   draftCrossRandomCount: 6,
   orgEditor: null,
-  qualAnalysis: {},
-  showQualModal: false,
-  activeQualKey: null,
   sidebarCollapsed: false,
   collapsedSurveyIds: [],
   pulseView: "overview",
@@ -150,13 +148,15 @@ export function loadState() {
 
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (saved && Array.isArray(saved.sessions) && Array.isArray(saved.responses)) {
+    if (saved && Array.isArray(saved.sessions)) {
       delete saved.orgUnits;
       delete saved.orgMembers;
       return normalizeAppState({ 
         ...blankState(), 
         ...saved, 
         ...initialOrg,
+        responses: [],
+        qualSignals: [],
         uploadRows: [], 
         uploadErrors: [] 
       });
@@ -180,9 +180,8 @@ export function saveStateQuiet() {
 }
 
 function persistState() {
-  normalizeAppState(state);
   const {
-    activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
+    activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
     surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
@@ -190,12 +189,12 @@ function persistState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
+    sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
-    activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
+    activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
     surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
@@ -203,7 +202,7 @@ function persistState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
+    sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
   }));
@@ -307,16 +306,6 @@ export async function saveResponsesToFirestore(rows) {
     await batch.commit();
   }
 }
-
-export async function saveSurveyToFirestore(survey) {
-  const { id, ...data } = survey;
-  const docRef = await addDoc(collection(db, 'surveys'), {
-    ...data,
-    createdAt: serverTimestamp()
-  });
-  return docRef.id;
-}
-
 export async function deleteSurveyFromFirestore(id) {
   await deleteDoc(doc(db, 'surveys', id));
 }
@@ -426,7 +415,6 @@ export async function uploadStateToDb() {
       surveys:     state.surveys     || [],
       orgUnits:    state.orgUnits    || [],
       orgMembers:  state.orgMembers  || [],
-      qualAnalysis: state.qualAnalysis || {},
       savedAt:     serverTimestamp(),
     });
     alert('현재 상태가 DB에 저장되었습니다.');
@@ -450,10 +438,10 @@ export async function downloadStateFromDb() {
     if (data.surveys)     state.surveys     = data.surveys;
     if (data.orgUnits)    state.orgUnits    = data.orgUnits;
     if (data.orgMembers)  state.orgMembers  = data.orgMembers;
-    if (data.qualAnalysis) state.qualAnalysis = data.qualAnalysis;
     normalizeAppState(state);
     saveOrgData();
     saveState();
+    window.updateResponsesSubscription?.();
     notify();
   } catch (e) {
     alert('DB 다운로드 실패: ' + e.message);

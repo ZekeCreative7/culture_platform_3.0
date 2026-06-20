@@ -1,5 +1,31 @@
 import { scoreOf } from "../utils.js";
 
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === 'true') {
+        resolve();
+      } else {
+        existing.addEventListener('load', () => resolve());
+        existing.addEventListener('error', (e) => reject(e));
+      }
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    };
+    script.onerror = (e) => {
+      script.remove();
+      reject(new Error(`스크립트를 로드하지 못했습니다: ${src}`));
+    };
+    document.body.appendChild(script);
+  });
+}
+
 const PHASE_ORDER = ["사전", "중간", "사후"];
 
 function safeFilePart(value) {
@@ -44,7 +70,10 @@ function reportBaseName(meta) {
   return ["Culture_Report", meta.typeLabel, meta.sessionLabel, date].map(safeFilePart).filter(Boolean).join("_");
 }
 
-export function downloadReportWorkbook(payload) {
+export async function downloadReportWorkbook(payload) {
+  if (!window.XLSX) {
+    await loadScriptOnce('./src/vendor/xlsx.full.min.js');
+  }
   const XLSX = window.XLSX;
   if (!XLSX?.utils?.book_new) throw new Error("엑셀 내보내기 모듈을 불러오지 못했습니다.");
 
@@ -162,6 +191,9 @@ export function downloadReportWorkbook(payload) {
 
 export async function downloadReportPdf({ element, meta }) {
   if (!element) throw new Error("PDF로 변환할 리포트 영역을 찾지 못했습니다.");
+  if (typeof window.html2pdf !== "function") {
+    await loadScriptOnce('./src/vendor/html2pdf.bundle.min.js');
+  }
   if (typeof window.html2pdf !== "function") throw new Error("PDF 내보내기 모듈을 불러오지 못했습니다.");
 
   const stage = document.createElement("div");

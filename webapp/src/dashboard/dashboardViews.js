@@ -8,7 +8,7 @@ import {
   dashboardSupportOrgs
 } from './dashboardEngine.js?v=20260620-operating-insights-v1';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
-import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260619-fix-syntax-error-v2';
+import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260620-mvp-optimize-v2';
 
 // Helper to count week sessions
 function displayWeekSessionsCount(state, today) {
@@ -25,6 +25,95 @@ function displayWeekSessionsCount(state, today) {
     });
   });
   return count;
+}
+
+// ── 5-Signal Radar Chart (5-axis SVG) ────────────────────────────
+function render5SignalRadarChart(pulseSignals) {
+  if (!pulseSignals || pulseSignals.length < 5) return "";
+  
+  const cx = 160, cy = 140, r = 85;
+  const angles = Array.from({ length: 5 }, (_, i) => -Math.PI / 2 + (i * 2 * Math.PI / 5));
+  const ptAt = (angle, factor) => [cx + r * factor * Math.cos(angle), cy + r * factor * Math.sin(angle)];
+  const pathOf = pts => `M${pts.map(p => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' L')} Z`;
+  const gridLevels = [0.2, 0.4, 0.6, 0.8, 1.0];
+  
+  const hasPrev = pulseSignals.some(s => s.previousScore !== null);
+  const prevYearLabel = pulseSignals[0].previousYear ? `${pulseSignals[0].previousYear}년` : "";
+  const currentYearLabel = `${pulseSignals[0].currentYear}년`;
+
+  const currentPts = pulseSignals.map((sig, i) => ptAt(angles[i], sig.score !== null ? sig.score / 100 : 0));
+  const prevPts = pulseSignals.map((sig, i) => ptAt(angles[i], sig.previousScore !== null ? sig.previousScore / 100 : 0));
+
+  const getLabelAttrs = (angle) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    let anchor = "middle";
+    let dy = 0;
+    
+    if (Math.abs(cos) < 0.1) {
+      anchor = "middle";
+      dy = sin < 0 ? -12 : 18;
+    } else {
+      anchor = cos > 0 ? "start" : "end";
+      dy = sin < 0 ? -4 : 12;
+    }
+    return { anchor, dy };
+  };
+
+  return `
+    <div class="radar-chart-container" style="display:flex; justify-content:center; align-items:center; margin-bottom:24px; padding:16px; background:rgba(248,250,252,0.6); border-radius:12px; border:1.5px solid #e2e8f0; flex-wrap:wrap; gap:16px;">
+      <svg class="dashboard-radar-chart" viewBox="0 0 320 280" width="280" height="245" style="overflow:visible; display:block;">
+        <!-- Grids -->
+        ${gridLevels.map(f => `<path d="${pathOf(angles.map(a => ptAt(a, f)))}" fill="none" stroke="#e2e8f0" stroke-width="${f === 1 ? 1.5 : 1}" stroke-dasharray="${f < 1 ? '3 3' : ''}"/>`).join('')}
+        
+        <!-- Axis lines -->
+        ${angles.map(a => { const p = ptAt(a, 1); return `<line x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="#cbd5e1" stroke-width="1.2"/>`; }).join('')}
+        
+        <!-- Previous Year Polygon -->
+        ${hasPrev ? `
+          <path d="${pathOf(prevPts)}" fill="rgba(148,163,184,0.06)" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 4" stroke-linejoin="round"/>
+          ${prevPts.map((p, i) => pulseSignals[i].previousScore !== null ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4.5" fill="#94a3b8" stroke="#fff" stroke-width="1.5"/>` : '').join('')}
+        ` : ''}
+
+        <!-- Current Year Polygon -->
+        <path d="${pathOf(currentPts)}" fill="rgba(14,165,233,0.12)" stroke="#0ea5e9" stroke-width="2.5" stroke-linejoin="round"/>
+        ${currentPts.map((p, i) => pulseSignals[i].score !== null ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5.5" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>` : '').join('')}
+        
+        <!-- Labels and Scores -->
+        ${pulseSignals.map((sig, i) => {
+          const angle = angles[i];
+          const lp = ptAt(angle, 1.12);
+          const { anchor, dy } = getLabelAttrs(angle);
+          return `
+            <text x="${lp[0].toFixed(1)}" y="${(lp[1] + dy).toFixed(1)}" text-anchor="${anchor}" font-size="11" font-weight="700" fill="#334155" font-family="'Plus Jakarta Sans',sans-serif">
+              ${escapeHtml(sig.label)}
+            </text>
+            <text x="${lp[0].toFixed(1)}" y="${(lp[1] + dy + 13).toFixed(1)}" text-anchor="${anchor}" font-size="10.5" font-weight="800" font-family="'Plus Jakarta Sans',sans-serif">
+              ${sig.score !== null ? `<tspan fill="#0ea5e9">${sig.score}%</tspan>` : ''}
+              ${hasPrev && sig.previousScore !== null ? `<tspan fill="#94a3b8" font-weight="600" font-size="9.5"> (전년:${sig.previousScore}%)</tspan>` : ''}
+            </text>
+          `;
+        }).join('')}
+
+        <!-- Tick values (20, 40, 60, 80, 100) -->
+        ${gridLevels.map(f => `<text x="${(cx + 4).toFixed(1)}" y="${(cy - (r * f) + 4).toFixed(1)}" font-size="9" fill="#94a3b8" font-family="sans-serif">${Math.round(f * 100)}%</text>`).join('')}
+      </svg>
+      
+      <!-- Legend -->
+      <div class="radar-legend" style="display:flex; flex-direction:column; gap:8px; font-size:11.5px; font-weight:700; min-width: 100px; justify-content: center;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="display:inline-block; width:12px; height:12px; background:rgba(14,165,233,0.12); border:2px solid #0ea5e9; border-radius:3px;"></span>
+          <span style="color:#0ea5e9;">${currentYearLabel} 진단</span>
+        </div>
+        ${hasPrev ? `
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="display:inline-block; width:12px; height:12px; background:rgba(148,163,184,0.06); border:2px dashed #94a3b8; border-radius:3px;"></span>
+          <span style="color:#64748b;">${prevYearLabel} 진단</span>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
 }
 
 export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
@@ -274,6 +363,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
                   <button class="primary compact margin-top" data-nav="upload">Pulse 업로드로 이동</button>
                 </div>
               ` : `
+                \${render5SignalRadarChart(pulseSignals)}
                 <div class="signals-rows">
                   ${pulseSignals.map(sig => {
                     let deltaHtml = "";

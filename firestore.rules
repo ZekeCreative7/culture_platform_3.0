@@ -57,12 +57,39 @@ service cloud.firestore {
       allow read, update, delete: if isMaster();
     }
 
-    // All operational collections and their nested documents are private.
-    // accessRequests is handled above and excluded here to prevent approved
-    // members from modifying another user's approval state.
+    // App state backup document is master-only
+    match /appState/{document=**} {
+      allow read, write: if isMaster();
+    }
+
+    // Secure operational collections to approved users
+    match /sessions/{document=**} {
+      allow read, write: if isApproved();
+    }
+
+    match /pulseResults/{document=**} {
+      allow read, write: if isApproved();
+    }
+
+    match /pulseCommitments/{document=**} {
+      allow read, write: if isApproved();
+    }
+
+    match /QualSignal/{document=**} {
+      allow read, write: if isApproved();
+    }
+
+    // Fallback for other collections (except accessRequests, mail, appState, responses, surveys, sessions, pulseResults, pulseCommitments, QualSignal)
     match /{collectionName}/{document=**} {
       allow read, write: if collectionName != 'accessRequests'
         && collectionName != 'mail'
+        && collectionName != 'appState'
+        && collectionName != 'responses'
+        && collectionName != 'surveys'
+        && collectionName != 'sessions'
+        && collectionName != 'pulseResults'
+        && collectionName != 'pulseCommitments'
+        && collectionName != 'QualSignal'
         && isApproved();
     }
   }

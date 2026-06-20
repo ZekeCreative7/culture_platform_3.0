@@ -27,7 +27,7 @@ function loadScriptOnce(src) {
 }
 
 const PHASE_ORDER = ["사전", "중간", "사후"];
-const A4_EXPORT_WIDTH_PX = 794;
+const DESKTOP_EXPORT_WIDTH_PX = 1840;
 
 function safeFilePart(value) {
   return String(value || "report")
@@ -202,16 +202,17 @@ export async function downloadReportPdf({ element, meta }) {
   const clone = element.cloneNode(true);
   clone.removeAttribute("id");
   clone.classList.add("report-pdf-document");
-  clone.style.width = `${A4_EXPORT_WIDTH_PX}px`;
-  clone.style.maxWidth = `${A4_EXPORT_WIDTH_PX}px`;
+  clone.style.width = `${DESKTOP_EXPORT_WIDTH_PX}px`;
+  clone.style.maxWidth = "none";
   clone.querySelectorAll("[data-html2canvas-ignore]").forEach((node) => node.remove());
   stage.appendChild(clone);
   document.body.appendChild(stage);
 
-  // html2pdf의 A4 캡처 viewport와 같은 폭으로 출력용 DOM을 먼저 레이아웃한다.
-  // 1120px 데스크톱 문서는 A4 viewport(약 794px) 밖이 잘릴 수 있다.
+  // 업로드된 PC 캡처와 같은 1840px 데스크톱 레이아웃을 먼저 만든 뒤,
+  // 전체 캡처를 A4 가로 페이지 폭에 비례 축소한다. PDF 폭에 먼저 맞추면
+  // 반응형 규칙이 모바일 배치를 적용하거나 오른쪽 콘텐츠를 잘라낸다.
   await document.fonts?.ready;
-  const docWidth = A4_EXPORT_WIDTH_PX;
+  const docWidth = DESKTOP_EXPORT_WIDTH_PX;
 
   try {
     await window.html2pdf()
@@ -231,13 +232,13 @@ export async function downloadReportPdf({ element, meta }) {
           onclone: (clonedDocument) => {
             const clonedReport = clonedDocument.querySelector(".report-pdf-document");
             if (!clonedReport) return;
-            clonedReport.style.width = `${A4_EXPORT_WIDTH_PX}px`;
-            clonedReport.style.maxWidth = `${A4_EXPORT_WIDTH_PX}px`;
+            clonedReport.style.width = `${DESKTOP_EXPORT_WIDTH_PX}px`;
+            clonedReport.style.maxWidth = "none";
             clonedReport.style.boxSizing = "border-box";
-            clonedReport.style.overflow = "hidden";
+            clonedReport.style.overflow = "visible";
           },
         },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "landscape", compress: true },
         pagebreak: { mode: ["css", "legacy"], avoid: [".report-radar-card", ".report-dimension-grid > div", ".report-recommendation-card", ".report-change-card"] },
       })
       .from(clone)

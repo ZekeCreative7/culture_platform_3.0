@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Culture Platform 3.0 session operations cockpit" />
+    <!-- 진입점(index.html)을 항상 재검증하도록 한다. 정적 서버가 ?v= 쿼리를 무시하기 때문에
+         index.html이 캐시되면 오래된 app.js를 최신 state.js와 섞어 import 오류가 난다. -->
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
     <title>Culture Platform 3.0</title>
     <link rel="icon" href="./assets/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">

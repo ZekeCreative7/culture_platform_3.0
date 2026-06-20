@@ -80,32 +80,36 @@ body.auth-locked .bg-glow-container { visibility: hidden; }
   z-index: 10000;
   display: grid;
   place-items: center;
-  padding: clamp(18px, 4vw, 48px);
+  padding: clamp(24px, 5vh, 64px) clamp(18px, 4vw, 56px);
   overflow: auto;
-  background: #101a36;
+  background: linear-gradient(135deg, #0b1733 0%, #16264f 46%, #274488 100%);
 }
 .auth-gate.is-hidden { display: none; }
 .auth-gate-backdrop {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(120deg, rgba(15, 25, 54, .96), rgba(27, 41, 82, .88)),
-    url('../assets/intro_img.png') center 58% / cover no-repeat;
+    radial-gradient(1200px 620px at 16% 10%, rgba(76, 142, 255, .30), transparent 60%),
+    radial-gradient(960px 540px at 88% 92%, rgba(138, 96, 255, .24), transparent 62%);
+  pointer-events: none;
 }
 .auth-shell {
   position: relative;
-  width: min(1180px, 94vw);
-  min-height: min(720px, 88vh);
+  width: min(1080px, 94vw);
+  min-height: min(540px, calc(100vh - 112px));
+  max-height: calc(100vh - 80px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(440px, .94fr);
+  grid-template-columns: minmax(0, 1fr) minmax(420px, .9fr);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, .32);
   border-radius: 28px;
   background: rgba(255, 255, 255, .98);
   box-shadow: 0 38px 100px rgba(3, 10, 31, .42);
 }
-.auth-visual { position: relative; min-height: 620px; overflow: hidden; background: #edf4ff; }
-.auth-visual > img { width: 100%; height: 100%; object-fit: cover; object-position: center 48%; display: block; }
+.auth-visual { position: relative; min-height: 0; overflow: hidden; background: #edf4ff; }
+/* 이미지를 흐름에서 빼서(absolute) 카드 높이는 오른쪽 패널 콘텐츠가 결정하도록 한다.
+   (흐름에 두면 세로형 이미지의 비율이 카드를 과하게 키워 위아래 여백이 사라진다.) */
+.auth-visual > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 48%; display: block; }
 .auth-visual::after {
   content: '';
   position: absolute;
@@ -117,13 +121,13 @@ body.auth-locked .bg-glow-container { visibility: hidden; }
 .auth-visual-caption { position: absolute; z-index: 1; left: 38px; right: 38px; bottom: 34px; display: grid; gap: 7px; color: #fff; }
 .auth-visual-caption span { font-size: 11px; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; opacity: .78; }
 .auth-visual-caption strong { font-size: clamp(20px, 2vw, 28px); letter-spacing: -.035em; }
-.auth-panel { align-self: center; padding: clamp(44px, 6vw, 76px); min-width: 0; }
-.auth-brand-row { display: flex; align-items: center; gap: 18px; margin-bottom: 48px; }
+.auth-panel { align-self: stretch; display: flex; flex-direction: column; justify-content: center; overflow-y: auto; padding: clamp(30px, 3.6vh, 52px) clamp(40px, 4.6vw, 62px); min-width: 0; }
+.auth-brand-row { display: flex; align-items: center; gap: 18px; margin-bottom: 30px; }
 .auth-brand-row img { width: 54px; height: auto; object-fit: contain; }
 .auth-brand-row span { color: #5e6a7e; font-size: 13px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
-.auth-copy { margin-bottom: 30px; }
+.auth-copy { margin-bottom: 24px; }
 .auth-eyebrow { display: block; margin-bottom: 7px; color: #5474df; font-size: 12px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
-.auth-copy h1 { margin: 0; color: #0c1830; font-size: clamp(32px, 3.1vw, 46px); line-height: 1.06; letter-spacing: -.055em; }
+.auth-copy h1 { margin: 0; color: #0c1830; font-size: clamp(30px, 2.8vw, 40px); line-height: 1.08; letter-spacing: -.05em; }
 .auth-copy p { margin: 14px 0 0; color: #748196; font-size: 13px; line-height: 1.75; }
 .auth-form { display: grid; gap: 10px; }
 .auth-form.is-hidden { display: none; }
@@ -3867,6 +3871,11 @@ tbody tr:hover td { background: rgba(235,245,253,.72) !important; }
 .dashboard-wrapper .signal-gauge-bar {
   background: linear-gradient(90deg, #268bd8 0%, #6f5fd2 100%) !important;
   box-shadow: 0 0 15px rgba(57,117,204,.25);
+}
+/* 전년도 막대는 올해(파랑→보라)와 구분되도록 차분한 회색 톤으로. */
+.dashboard-wrapper .signal-gauge-bar.previous {
+  background: linear-gradient(90deg, #9aa9bd 0%, #bcc7d6 100%) !important;
+  box-shadow: none !important;
 }
 
 .funnel-container { gap: 11px; }

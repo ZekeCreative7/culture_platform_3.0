@@ -2919,6 +2919,8 @@ function bindLayout() {
 function bindCanvasEvents() {
   if (state.activeView === "sessions") {
     bindSessions();
+  } else if (state.activeView === "survey") {
+    bindSurveyCreator();
   } else if (state.activeView === "org") {
     bindOrg();
   } else if (state.activeView === "upload") {
@@ -3088,6 +3090,88 @@ function bindOrg() {
   });
 }
 
+// 설문 설계 화면("survey" 뷰)의 버튼 바인딩. 이 화면은 bindSessions()가 아니라
+// 여기서 바인딩한다(과거에는 bindSessions 안에 있어 "survey" 뷰에서는 호출되지 않아
+// "배포 및 QR 생성" 버튼이 동작하지 않았다).
+function bindSurveyCreator() {
+  document.querySelector("#btn-create-survey-submit")?.addEventListener("click", () => {
+    const title = (state.draftSurveyTitle || "").trim();
+    const sessionId = state.draftSurveySessionId;
+    const phase = state.draftSurveyPhase;
+    const questions = state.draftSurveyQuestions || [];
+    const googleFormUrl = (state.draftGoogleFormUrl || "").trim();
+
+    if (!title) {
+      alert("설문 제목을 입력해 주세요.");
+      return;
+    }
+    if (!sessionId) {
+      alert("대상 세션을 선택해 주세요.");
+      return;
+    }
+    if (!googleFormUrl && questions.length === 0) {
+      alert("구글 폼 URL을 입력하거나 질문을 추가해 주세요.");
+      return;
+    }
+
+    if (!state.surveys) state.surveys = [];
+
+    const sess = (state.sessions || []).find(s => s.id === sessionId);
+    const surveyData = {
+      title,
+      sessionId,
+      phase,
+      sessionType: sess ? normalizeSessionType(sess.type) : '',
+      sessionCohort: sess ? (sess.cohort || '') : '',
+      googleFormUrl: googleFormUrl || null,
+      questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
+    };
+
+    if (state.editingSurveyId) {
+      const idx = state.surveys.findIndex(s => s.id === state.editingSurveyId);
+      const editedId = state.editingSurveyId;
+      if (idx >= 0) state.surveys[idx] = { ...state.surveys[idx], ...surveyData };
+      state.editingSurveyId = null;
+      state.draftSurveyTitle = "";
+      state.draftGoogleFormUrl = "";
+      state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+      saveState();
+      render();
+      updateSurveyInFirestore(editedId, surveyData).catch(e => {
+        alert('설문 수정 저장 실패: ' + e.message);
+      });
+      return;
+    }
+
+    // 로컬에서 먼저 생성하고 QR을 즉시 띄운다. Firestore 동기화는 백그라운드로 처리해
+    // 네트워크/App Check/권한 문제로 "배포 및 QR 생성"이 통째로 막히지 않도록 한다.
+    const newId = uid();
+    state.surveys.push({ ...surveyData, id: newId });
+    state.draftSurveyTitle = "";
+    state.draftGoogleFormUrl = "";
+    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+    saveState();
+    render();
+
+    updateSurveyInFirestore(newId, surveyData).catch(e => {
+      console.error('Firestore 설문 저장 실패:', e);
+      alert(
+        'QR은 생성됐지만 서버 동기화에 실패했습니다.\n' +
+        '구글 폼 URL로 만든 설문은 QR이 정상 동작합니다.\n' +
+        '자체 설계 설문은 다른 기기/모바일에서 열리지 않을 수 있습니다.\n\n오류: ' + e.message
+      );
+    });
+  });
+  document.querySelector("#cancel-edit-survey")?.addEventListener("click", () => {
+    state.editingSurveyId = null;
+    state.draftSurveyTitle = "";
+    state.draftGoogleFormUrl = "";
+    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+    saveState();
+    render();
+  });
+}
+
 function bindSessions() {
   document.querySelector("#btn-session-list")?.addEventListener("click", () => {
     state.activeSessionTab = "list";
@@ -3194,83 +3278,6 @@ function bindSessions() {
   });
   document.querySelector("#cal-view-day")?.addEventListener("click", () => {
     state.calendarView = "day";
-    saveState();
-    render();
-  });
-
-  document.querySelector("#btn-create-survey-submit")?.addEventListener("click", () => {
-    const title = (state.draftSurveyTitle || "").trim();
-    const sessionId = state.draftSurveySessionId;
-    const phase = state.draftSurveyPhase;
-    const questions = state.draftSurveyQuestions || [];
-    const googleFormUrl = (state.draftGoogleFormUrl || "").trim();
-
-    if (!title) {
-      alert("설문 제목을 입력해 주세요.");
-      return;
-    }
-    if (!sessionId) {
-      alert("대상 세션을 선택해 주세요.");
-      return;
-    }
-    if (!googleFormUrl && questions.length === 0) {
-      alert("구글 폼 URL을 입력하거나 질문을 추가해 주세요.");
-      return;
-    }
-
-    if (!state.surveys) state.surveys = [];
-
-    const sess = (state.sessions || []).find(s => s.id === sessionId);
-    const surveyData = {
-      title,
-      sessionId,
-      phase,
-      sessionType: sess ? normalizeSessionType(sess.type) : '',
-      sessionCohort: sess ? (sess.cohort || '') : '',
-      googleFormUrl: googleFormUrl || null,
-      questions: googleFormUrl ? [] : JSON.parse(JSON.stringify(questions))
-    };
-
-    if (state.editingSurveyId) {
-      const idx = state.surveys.findIndex(s => s.id === state.editingSurveyId);
-      const editedId = state.editingSurveyId;
-      if (idx >= 0) state.surveys[idx] = { ...state.surveys[idx], ...surveyData };
-      state.editingSurveyId = null;
-      state.draftSurveyTitle = "";
-      state.draftGoogleFormUrl = "";
-      state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
-      saveState();
-      render();
-      updateSurveyInFirestore(editedId, surveyData).catch(e => {
-        alert('설문 수정 저장 실패: ' + e.message);
-      });
-      return;
-    }
-
-    // 로컬에서 먼저 생성하고 QR을 즉시 띄운다. Firestore 동기화는 백그라운드로 처리해
-    // 네트워크/App Check/권한 문제로 "배포 및 QR 생성"이 통째로 막히지 않도록 한다.
-    const newId = uid();
-    state.surveys.push({ ...surveyData, id: newId });
-    state.draftSurveyTitle = "";
-    state.draftGoogleFormUrl = "";
-    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
-    saveState();
-    render();
-
-    updateSurveyInFirestore(newId, surveyData).catch(e => {
-      console.error('Firestore 설문 저장 실패:', e);
-      alert(
-        'QR은 생성됐지만 서버 동기화에 실패했습니다.\n' +
-        '구글 폼 URL로 만든 설문은 QR이 정상 동작합니다.\n' +
-        '자체 설계 설문은 다른 기기/모바일에서 열리지 않을 수 있습니다.\n\n오류: ' + e.message
-      );
-    });
-  });
-  document.querySelector("#cancel-edit-survey")?.addEventListener("click", () => {
-    state.editingSurveyId = null;
-    state.draftSurveyTitle = "";
-    state.draftGoogleFormUrl = "";
-    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
     saveState();
     render();
   });

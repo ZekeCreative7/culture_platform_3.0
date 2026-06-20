@@ -8,8 +8,8 @@ export const PULSE_DIV_MAP = {
   "채널전략본부": { orgUnitIds: ["CHANNEL_STRATEGY"], relation: "1:1", confidence: "high" },
   "인사관리부문": { orgUnitIds: ["HR"], relation: "division", confidence: "med" },
 
-  "고객솔루션본부UW": { orgUnitIds: ["CUSTOMER_SOLUTION"], relation: "split", confidence: "low" },
-  "고객솔루션본부상품/헬스": { orgUnitIds: ["CUSTOMER_SOLUTION"], relation: "split", confidence: "low" },
+  "고객솔루션본부UW": { orgUnitIds: ["CUSTOMER_SOLUTION_UW"], relation: "1:1", confidence: "high" },
+  "고객솔루션본부상품/헬스": { orgUnitIds: ["CUSTOMER_SOLUTION"], relation: "1:1", confidence: "high" },
   "고객혁신본부CE": { orgUnitIds: ["OPERATION"], relation: "split", confidence: "low" },
   "고객혁신본부본사": { orgUnitIds: ["OPERATION"], relation: "split", confidence: "low" },
 

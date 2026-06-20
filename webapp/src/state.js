@@ -52,6 +52,7 @@ export const blankState = () => ({
   uploadFileName: "",
   orgUnits: [],
   orgMembers: [],
+  orgDataVersion: 0,
   surveys: [],
   selectedCompany: "CEO",
   selectedDivision: "",
@@ -131,6 +132,7 @@ export function loadOrgData() {
 export function saveOrgData() {
   try {
     localStorage.setItem(ORG_STORE_KEY, JSON.stringify({
+      version: state.orgDataVersion || 0,
       units: state.orgUnits || [],
       members: state.orgMembers || []
     }));
@@ -143,7 +145,8 @@ export function loadState() {
   const orgData = loadOrgData();
   const initialOrg = {
     orgUnits: orgData ? orgData.units : [],
-    orgMembers: orgData ? orgData.members : []
+    orgMembers: orgData ? orgData.members : [],
+    orgDataVersion: orgData ? (orgData.version || 0) : 0
   };
 
   try {

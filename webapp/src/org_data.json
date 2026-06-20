@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "units": [
     {
       "recordType": "unit",
@@ -75,8 +76,8 @@
       "id": "CUSTOMER_SOLUTION",
       "level": "hq",
       "parentId": "STRATEGY",
-      "name": "고객솔루션본부",
-      "leader": "도기철",
+      "name": "고객솔루션본부상품/헬스",
+      "leader": "김권수",
       "leaderTitle": "이사",
       "leaderRole": "본부장"
     },
@@ -132,9 +133,19 @@
     },
     {
       "recordType": "unit",
+      "id": "CUSTOMER_SOLUTION_UW",
+      "level": "hq",
+      "parentId": "STRATEGY",
+      "name": "고객솔루션본부UW",
+      "leader": "도기철",
+      "leaderTitle": "이사",
+      "leaderRole": "본부장"
+    },
+    {
+      "recordType": "unit",
       "id": "UW",
       "level": "team",
-      "parentId": "CUSTOMER_SOLUTION",
+      "parentId": "CUSTOMER_SOLUTION_UW",
       "name": "UW팀",
       "leader": "오도순",
       "leaderTitle": "부장",
@@ -3054,7 +3065,7 @@
       "parentId": "CUSTOMER_SOLUTION",
       "level": "member",
       "position": "리더",
-      "role": "고객솔루션본부 본부장",
+      "role": "고객솔루션본부상품/헬스 본부장",
       "tags": "조직장;표시 리더",
       "generation": "40대"
     },
@@ -3062,10 +3073,10 @@
       "recordType": "person",
       "id": "person-CUSTOMER_SOLUTION-13",
       "name": "도기철",
-      "parentId": "CUSTOMER_SOLUTION",
+      "parentId": "CUSTOMER_SOLUTION_UW",
       "level": "member",
       "position": "리더",
-      "role": "고객솔루션본부 본부장",
+      "role": "고객솔루션본부UW 본부장",
       "tags": "조직장;표시 리더",
       "generation": "50대"
     },
@@ -3076,7 +3087,7 @@
       "parentId": "CUSTOMER_SOLUTION",
       "level": "member",
       "position": "리더",
-      "role": "고객솔루션본부 본부장",
+      "role": "고객솔루션본부상품/헬스 본부장",
       "tags": "조직장;표시 리더",
       "generation": "40대"
     },

@@ -7,7 +7,7 @@ import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-mvp-optimize-v2';
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260620-pdf-a4-fix-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
-import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-operating-insights-v1';
+import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-split-v1';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260620-auth-guidance-v1';
 
 import {
@@ -26,7 +26,7 @@ import {
   deleteSurveyFromFirestore, updateSurveyInFirestore, loadPulseYears,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260620-mvp-optimize-v2';
+} from './state.js?v=20260620-org-split-v1';
 
 const VIEWS = [
   ["dashboard", "Home", "홈"],
@@ -4396,12 +4396,19 @@ async function initApp() {
   state.mobileNavOpen = false;
   // Always recompute qrBaseUrl — stale localhost values from localStorage break mobile QR
   state.qrBaseUrl = computeQrBaseUrl();
-  if (!state.orgUnits || state.orgUnits.length < 10 || !state.orgMembers || state.orgMembers.length < 10) {
+  // org_data.json의 version과 캐시된 orgDataVersion이 다르면(조직 개편 반영) 다시 시드한다.
+  // 단순히 unit 개수만 보던 기존 게이트는 캐시된 사용자에게 개편이 반영되지 않는 문제가 있었다.
+  const ORG_DATA_VERSION = 2;
+  const orgNeedsSeed = !state.orgUnits || state.orgUnits.length < 10
+    || !state.orgMembers || state.orgMembers.length < 10
+    || (state.orgDataVersion || 0) < ORG_DATA_VERSION;
+  if (orgNeedsSeed) {
     try {
-      const response = await fetch('./src/org_data.json');
+      const response = await fetch(`./src/org_data.json?v=${ORG_DATA_VERSION}`);
       const data = await response.json();
       state.orgUnits = data.units;
       state.orgMembers = data.members;
+      state.orgDataVersion = data.version || ORG_DATA_VERSION;
       const ceo = state.orgUnits.find(u => u.level === 'company');
       if (ceo) {
         state.selectedCompany = ceo.id;

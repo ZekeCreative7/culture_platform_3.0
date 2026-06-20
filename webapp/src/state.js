@@ -102,6 +102,7 @@ export const blankState = () => ({
   pulseExpertSections: {},
   dashboardWeekOffset: 0,
   dashboardSelectedDate: "",
+  dashboardShowAllActions: false,
 });
 
 export const state = {};
@@ -179,7 +180,7 @@ export function saveState() {
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
-    dashboardWeekOffset, dashboardSelectedDate
+    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
@@ -192,7 +193,7 @@ export function saveState() {
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     qualAnalysis, sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
-    dashboardWeekOffset, dashboardSelectedDate
+    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
   }));
   notify();
 }
@@ -210,6 +211,7 @@ export function normalizeAppState(nextState) {
   if (!PHASES.includes(nextState.draftSurveyPhase)) nextState.draftSurveyPhase = "사전";
   if (nextState.selectedAnalyticsPhase && !PHASES.includes(nextState.selectedAnalyticsPhase)) nextState.selectedAnalyticsPhase = "";
   if (!nextState.draftYear) nextState.draftYear = new Date().getFullYear();
+  nextState.dashboardShowAllActions = Boolean(nextState.dashboardShowAllActions);
   if (!nextState.draftSchedule?.length) nextState.draftSchedule = makeSchedule(nextState.draftType);
   return nextState;
 }

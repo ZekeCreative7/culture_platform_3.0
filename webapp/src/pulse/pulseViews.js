@@ -6,7 +6,7 @@ import {
   dataConfidenceSummary, getCompanyN, companyFav, favFromItem, unfavFromItem, mean
 } from "./pulseEngine.js";
 import { parsePulseWorkbook } from "./pulseUpload.js";
-import { renderCommitmentsBoard, bindCommitmentsEvents, getStatusLabel } from "./pulseCommitments.js";
+import { renderCommitmentsBoard, bindCommitmentsEvents, getStatusLabel, createPulseCommitmentDraft } from "./pulseCommitments.js?v=20260620-operating-insights-v1";
 import { QUESTIONS } from "../config/questions.js";
 import { DOMAINS, THEMES } from "../config/domains.js";
 import { commitmentsCache, pulseCache } from "../state.js";
@@ -55,7 +55,7 @@ function sparkline(points, width = 280, height = 90) {
   const coords = points.map((point, index) => {
     const prev = points[index - 1]?.value;
     const delta = prev !== undefined ? point.value - prev : null;
-    return { ...point, delta, x: pad + xStep * index, y: yFor(point.value) };
+    return { ...point, delta, previousYear: points[index - 1]?.year || null, x: pad + xStep * index, y: yFor(point.value) };
   });
   const path = straightPath(coords);
   return `
@@ -72,7 +72,7 @@ function sparkline(points, width = 280, height = 90) {
         <g>
           <circle cx="${point.x}" cy="${point.y}" r="5" />
           <text class="value" x="${point.x}" y="${point.y - 22}" text-anchor="middle">${pct(point.value)}</text>
-          ${point.delta !== null ? `<text class="delta ${toneForDelta(point.delta)}" x="${point.x}" y="${point.y - 10}" text-anchor="middle">${deltaLabel(point.delta)}</text>` : ""}
+          ${point.delta !== null ? `<text class="delta ${toneForDelta(point.delta)}" x="${point.x}" y="${point.y - 10}" text-anchor="middle">${point.previousYear} 대비 ${deltaLabel(point.delta)}</text>` : ""}
           <text class="year" x="${point.x}" y="${height - 5}" text-anchor="middle">${point.year}</text>
         </g>
       `).join("")}
@@ -101,9 +101,9 @@ function renderPulseTabs(state) {
   const view = state.pulseView || "overview";
   return `
     <div class="pulse-tabs">
-      <button class="${view === "overview" ? "active" : ""}" data-pulse-view="overview">한눈에 보기</button>
-      <button class="${view === "listening" ? "active" : ""}" data-pulse-view="listening">조직별로 보기</button>
-      <button class="${view === "expert" ? "active" : ""}" data-pulse-view="expert">근거 자세히</button>
+      <button class="${view === "overview" ? "active" : ""}" aria-pressed="${view === "overview"}" data-pulse-view="overview"><strong>한눈에 보기</strong><small>전사 스크리닝</small></button>
+      <button class="${view === "listening" ? "active" : ""}" aria-pressed="${view === "listening"}" data-pulse-view="listening"><strong>조직별로 보기</strong><small>본부별 맥락</small></button>
+      <button class="${view === "expert" ? "active" : ""}" aria-pressed="${view === "expert"}" data-pulse-view="expert"><strong>근거 자세히</strong><small>문항·추세 확인</small></button>
     </div>
   `;
 }
@@ -198,7 +198,7 @@ function renderThemeTrendSection(yearDocs) {
           <article class="${toneForDelta(delta)}">
             <div class="pulse-theme-title">
               <strong>${theme.label}</strong>
-              <span class="delta-badge">${deltaLabel(delta)}</span>
+              <span class="delta-badge">${first.year}년 대비 ${deltaLabel(delta)}</span>
             </div>
             <div class="pulse-theme-bars">
               ${theme.values.map((item) => `
@@ -229,7 +229,7 @@ function renderMovementInfographicSection(yearDocs, prevYear, currentYear) {
           <article>
             <strong>Q${item.qNo}. ${escapeHtml(item.label)}</strong>
             <div class="bar-container"><b style="width:${Math.min(100, Math.abs(item.delta) * 420)}%"></b></div>
-            <span>${pct(item.before)} → ${pct(item.after)} (${deltaLabel(item.delta)})</span>
+            <span>${prevYear}년 ${pct(item.before)} → ${currentYear}년 ${pct(item.after)} (${deltaLabel(item.delta)})</span>
           </article>
         `).join("")}
       </div>
@@ -239,7 +239,7 @@ function renderMovementInfographicSection(yearDocs, prevYear, currentYear) {
           <article>
             <strong>Q${item.qNo}. ${escapeHtml(item.label)}</strong>
             <div class="bar-container"><b style="width:${Math.min(100, Math.abs(item.delta) * 420)}%"></b></div>
-            <span>${pct(item.before)} → ${pct(item.after)} (${deltaLabel(item.delta)})${item.unfav !== null ? ` · 적극 부정 ${pct(item.unfav)}` : ""}</span>
+            <span>${prevYear}년 ${pct(item.before)} → ${currentYear}년 ${pct(item.after)} (${deltaLabel(item.delta)})${item.unfav !== null ? ` · 적극 부정 ${pct(item.unfav)}` : ""}</span>
           </article>
         `).join("")}
       </div>
@@ -323,11 +323,11 @@ function renderOverviewView({ state, cache }) {
     <article class="story-scene scene-0 panel highlight-blue">
       <div class="scene-header">
         <span class="eyebrow">진단 목적</span>
-        <h2>Pulse Survey 분석의 본질</h2>
+        <h2>Pulse Survey 분석</h2>
       </div>
       <p class="scene-lead">
-        이 결과는 어느 조직이나 직원이 문제인지 찾아내 감점하는 평가표가 아닙니다.<br>
-        <strong>지금 구성원들이 무엇을 느끼고 있는지 이해하고, 어디의 이야기를 먼저 듣고 회사가 무엇에 응답해야 하는지 찾기 위한 기초체력 진단 도구</strong>입니다.
+        <strong>Pulse Survey는 조직의 상태를 1차 스크리닝하는 도구입니다.</strong><br>
+        조직이나 구성원을 서열화하고 감점하는 평가표가 아니라, 구성원 경험에서 나타나는 신뢰·에너지·소속의 변화 신호를 조기에 발견해 <strong>어디의 이야기를 먼저 듣고 어떤 운영 질문을 더 확인할지 정하는 출발점</strong>입니다. 이 결과는 결론이 아니라 경청 대화와 추가 확인을 위한 가설로 사용합니다.
       </p>
       ${renderUploadPanel(state)}
     </article>
@@ -355,7 +355,7 @@ function renderOverviewView({ state, cache }) {
           <span class="card-title">🌱 에너지와 돌봄 (웰빙)</span>
           <div class="card-value-row">
             <strong>${pct(currentWellbeing)}</strong>
-            ${prevYear ? `<span class="delta ${toneForDelta(wellbeingDelta)}">${deltaLabel(wellbeingDelta)}</span>` : ""}
+            ${prevYear ? `<span class="delta ${toneForDelta(wellbeingDelta)}">${prevYear}년 대비 ${deltaLabel(wellbeingDelta)}</span>` : ""}
           </div>
           <p class="card-desc">
             ${wellbeingDelta > 0.02 
@@ -369,7 +369,7 @@ function renderOverviewView({ state, cache }) {
           <span class="card-title">목소리와 실행 신뢰</span>
           <div class="card-value-row">
             <strong>Q19: ${pct(currentTrust)}</strong>
-            ${prevYear ? `<span class="delta ${toneForDelta(trustDelta)}">${deltaLabel(trustDelta)}</span>` : ""}
+            ${prevYear ? `<span class="delta ${toneForDelta(trustDelta)}">${prevYear}년 대비 ${deltaLabel(trustDelta)}</span>` : ""}
           </div>
           <p class="card-desc">
             설문 이후 실질적인 조치로 이어진다는 실행 신뢰 지표입니다.<br>
@@ -381,7 +381,7 @@ function renderOverviewView({ state, cache }) {
           <span class="card-title">소속과 연결 (포용·소속)</span>
           <div class="card-value-row">
             <strong>${pct(currentBelonging)}</strong>
-            ${prevYear ? `<span class="delta ${toneForDelta(belongingDelta)}">${deltaLabel(belongingDelta)}</span>` : ""}
+            ${prevYear ? `<span class="delta ${toneForDelta(belongingDelta)}">${prevYear}년 대비 ${deltaLabel(belongingDelta)}</span>` : ""}
           </div>
           <p class="card-desc">
             ${belongingDelta < -0.02 
@@ -408,7 +408,7 @@ function renderOverviewView({ state, cache }) {
             ${topImproved.map(item => `
               <li>
                 <strong>Q${item.qNo}. ${escapeHtml(item.label)}</strong>
-                <span class="delta up">${deltaLabel(item.totalDelta)}</span>
+                <span class="delta up">${item.history[0]?.year}년 대비 ${deltaLabel(item.totalDelta)}</span>
               </li>
             `).join("")}
           </ul>
@@ -419,7 +419,7 @@ function renderOverviewView({ state, cache }) {
             ${topWeakened.map(item => `
               <li>
                 <strong>Q${item.qNo}. ${escapeHtml(item.label)}</strong>
-                <span class="delta down">${deltaLabel(item.totalDelta)}</span>
+                <span class="delta down">${item.history[0]?.year}년 대비 ${deltaLabel(item.totalDelta)}</span>
               </li>
             `).join("")}
           </ul>
@@ -620,7 +620,9 @@ function renderListeningView({ state, cache }) {
   const doc = cache.years?.[year];
   if (!doc) return renderNoData(state, cache);
 
-  const prevDoc = cache.years?.[year - 1] || null;
+  const pair = comparisonPair(cache.years, year);
+  const prevYear = pair?.previousYear || null;
+  const prevDoc = prevYear ? cache.years?.[prevYear] : null;
   const diagnostics = pulseDiagnostics(doc, prevDoc);
   
   const divisions = Object.keys(doc.divisions || {}).sort();
@@ -684,35 +686,31 @@ function renderListeningView({ state, cache }) {
   const orgIssues = [];
 
   if (selectedDivRow.overall < 0.5) {
-    psychIssues.push("소외와 냉소 가능성: 전반적인 조직 에너지가 가라앉아 적극적 무력감이나 냉소가 나타날 수 있습니다.");
+    psychIssues.push("정서적 에너지와 효능감의 동반 저하: 낮은 전반 긍정률은 단순한 만족도 하락보다, 노력과 개선 사이의 연결을 체감하지 못하는 구성원이 늘었을 가능성을 시사합니다. 이 상태가 지속되면 제안이나 협업 시도 자체를 줄이는 방어적 냉소로 이어질 수 있으므로, 리더는 낙관을 설득하기보다 실제로 바뀐 작은 사례를 반복해서 보여줄 필요가 있습니다.");
   }
   if (favFromItem(divisionDoc.items?.Q17) < 0.45) {
-    psychIssues.push("낮은 심리적 안전감: 불이익이나 오해를 사지 않으려 입을 닫는 '침묵 유지'의 경향성이 관찰됩니다.");
+    psychIssues.push("발언 비용이 높아진 심리적 안전감: 구성원은 의견의 타당성만이 아니라, 말한 뒤 관계가 불편해지거나 평가에 불이익이 생길 가능성까지 계산하고 있을 수 있습니다. 이때 회의의 침묵은 동의가 아니라 자기보호 전략입니다. 익명 수렴만 늘리기보다 반대 의견을 받은 리더가 어떻게 답하고 후속 조치하는지 공개적으로 축적해야 안전감이 회복됩니다.");
   } else {
-    psychIssues.push("일상 안전감 유지: 업무에 대한 의견이나 대화는 비교적 편하게 나눌 수 있는 심리적 여건이 보장되어 있습니다.");
+    psychIssues.push("일상적 발언 기반은 유지: 업무 의견을 내고 질문할 수 있는 최소한의 심리적 여건은 비교적 작동하고 있습니다. 다만 발언 가능성과 실제 영향력은 다르므로, 제안이 의사결정에 반영되거나 반영되지 않은 이유를 설명하는 피드백 루프까지 확인해야 이 강점이 신뢰 자산으로 굳어집니다.");
   }
   if (careBelonging.belonging < 0.5) {
-    psychIssues.push("소속 연결의 단절: 제도적 지원이나 말로만 소속감을 외칠 뿐, 실제 직무 관계에서는 동료들과 겉도는 고독감이 큽니다.");
+    psychIssues.push("관계적 소속감의 약화: 제도적 지원의 존재와 별개로, 일상 업무에서 존중받고 연결되어 있다는 감각이 충분히 형성되지 않은 상태입니다. 이는 개인의 적응 문제라기보다 정보 공유, 도움 요청, 성과 인정이 특정 관계망에 편중된 결과일 수 있습니다. 세션에서는 '누가 소외됐는가'보다 '어떤 순간과 관행이 사람을 주변부로 밀어내는가'를 묻는 편이 생산적입니다.");
   }
 
   if (favFromItem(divisionDoc.items?.Q6) < 0.55) {
-    orgIssues.push("역할·책임의 모호성: 목표나 의사결정의 주체가 모호하여 실무선에서 업무 조율에 많은 정서적 리소스를 낭비 중입니다.");
+    orgIssues.push("역할·의사결정권의 불명확성: 목표, 우선순위, 최종 결정권자가 선명하지 않으면 구성원은 일을 수행하는 시간보다 승인과 조율에 더 많은 인지 자원을 사용합니다. 책임만 개인에게 남고 권한은 여러 결재선에 분산되는 구조인지 확인해야 하며, 리더는 R&R 문서보다 실제 반복 업무의 결정권과 예외 승인 기준부터 명료하게 만드는 것이 효과적입니다.");
   }
   if (selectedDivRow.manager !== null && selectedDivRow.manager < 0.55) {
-    orgIssues.push("리더십 병목: 리더가 멤버들의 일상을 챙기거나 경력을 존중해 준다는 감각이 부재하여 밀착 조율이 약해졌습니다.");
+    orgIssues.push("리더십 접점의 병목: 낮은 관리자 경험은 리더 개인의 태도만이 아니라 과도한 관리 범위, 잦은 우선순위 변경, 일대일 대화의 부재가 결합된 결과일 수 있습니다. 구성원이 필요로 하는 것은 더 많은 메시지가 아니라 판단 기준, 막힘을 제거하는 지원, 성장에 대한 구체적 피드백입니다. 리더의 의도와 구성원이 실제로 받은 경험 사이의 간극을 운영 리듬 차원에서 점검해야 합니다.");
   } else {
-    orgIssues.push("리더 노력 유지: 현장 리더는 나름대로 멤버들을 인정하고 지원하고 있으나, 회사 제도나 업무 한계에 막혀 피로감을 느낍니다.");
+    orgIssues.push("현장 리더십은 완충 장치로 작동: 관리자 관련 신호는 비교적 유지되고 있어 현장 리더가 인정과 지원의 접점을 제공하는 것으로 보입니다. 다만 개인 리더의 헌신이 불명확한 제도나 과도한 업무를 계속 보상하는 구조라면 지속 가능하지 않습니다. 좋은 리더십을 개인 역량으로 소비하지 말고 정기적 1:1, 우선순위 조정권, 상향 이슈 해결 경로로 제도화할 필요가 있습니다.");
   }
   if (favFromItem(divisionDoc.items?.Q9) < 0.5) {
-    orgIssues.push("협업 효율의 마비: 불필요한 결재선이나 타 조직과의 의사소통 장벽이 높아 일하는 효율이 크게 제한되어 있습니다.");
+    orgIssues.push("협업 비용과 사일로의 누적: 조직 간 협업 신호가 낮다면 관계 개선 캠페인보다 업무 인터페이스의 결함을 먼저 의심해야 합니다. 요청 창구, 응답 기한, 우선순위 충돌의 조정자, 공동 성과 기준이 불분명할수록 반복적인 재작업과 책임 공방이 발생합니다. 세션에서는 추상적인 '소통 강화' 대신 최근 막혔던 업무 한 건의 전달·승인·수정 경로를 복기해 구조적 병목을 찾아야 합니다.");
   }
 
   if (psychIssues.length === 0) psychIssues.push("심리적 에너지 양호: 구성원들이 안전하게 서로 지지하고 협업을 시도하는 기초적 동력이 있습니다.");
   if (orgIssues.length === 0) orgIssues.push("운영 구조 최적화: 업무 책임 범위 및 리더십 피드백 과정이 비교적 질서 있게 작동하고 있습니다.");
-
-  const pSections = state.pulseExpertSections || {};
-  const isPsychExpanded = pSections[`psych_${selectedDivId}`] || false;
-  const isOrgExpanded = pSections[`org_${selectedDivId}`] || false;
 
   // 3) 본부별 문항별 3개년 추세 계산
   const divisionTrends = Array.from({ length: 22 }, (_, i) => {
@@ -776,7 +774,7 @@ function renderListeningView({ state, cache }) {
       <h1>${escapeHtml(headline.title)}</h1>
       <p class="scene-desc">${escapeHtml(headline.description)}</p>
       <div class="metrics-summary-strip">
-        <span>전반 만족도: <strong>${pct(selectedDivRow.overall)}</strong> ${prevDivisionDoc ? `(${deltaLabel(selectedDivRow.delta)})` : ""}</span>
+        <span>전반 만족도: <strong>${pct(selectedDivRow.overall)}</strong> ${prevDivisionDoc ? `(${prevYear}년 대비 ${deltaLabel(selectedDivRow.delta)})` : ""}</span>
         <span>적극 부정 평균: <strong>${pct(selectedDivRow.unfavAvg)}</strong></span>
         <span>설문 신뢰(Q19): <strong>${pct(favFromItem(divisionDoc.items?.Q19))}</strong></span>
       </div>
@@ -865,41 +863,17 @@ function renderListeningView({ state, cache }) {
       <div class="dual-perspective-grid">
         <div class="perspective-column psych panel">
           <h3>심리학적 관점 (안전·에너지·소속)</h3>
-          <div class="perspective-content">
-            <div class="main-issue">
-              <strong>핵심 진단:</strong>
-              <p>${escapeHtml(psychIssues[0])}</p>
-            </div>
-            
-            <div class="extra-issues ${isPsychExpanded ? "" : "hidden"}">
-              ${psychIssues.slice(1).map(issue => `<p class="extra-issue-item">· ${escapeHtml(issue)}</p>`).join("")}
-            </div>
-            
-            ${psychIssues.length > 1 ? `
-              <button class="secondary compact btn-toggle-perspective" data-type="psych" data-id="${selectedDivId}">
-                ${isPsychExpanded ? "▲ 상세 진단 숨기기" : "▼ 상세 진단 더 보기"}
-              </button>
-            ` : ""}
+          <div class="perspective-content perspective-diagnosis-list">
+            ${psychIssues.map((issue, index) => `<article><span>관찰 ${String(index + 1).padStart(2, "0")}</span><p>${escapeHtml(issue)}</p></article>`).join("")}
+            <div class="perspective-guidance"><strong>해석 원칙</strong><p>이 신호를 개인의 회복탄력성 부족으로 환원하지 않습니다. 감정은 업무 구조와 관계 경험에 대한 데이터이므로, 안전한 대화에서 반복되는 상황과 순간을 확인한 뒤 개입 가설을 세웁니다.</p></div>
           </div>
         </div>
 
         <div class="perspective-column org panel">
           <h3>조직 운영 관점 (리더십·의사결정·협업)</h3>
-          <div class="perspective-content">
-            <div class="main-issue">
-              <strong>핵심 진단:</strong>
-              <p>${escapeHtml(orgIssues[0])}</p>
-            </div>
-            
-            <div class="extra-issues ${isOrgExpanded ? "" : "hidden"}">
-              ${orgIssues.slice(1).map(issue => `<p class="extra-issue-item">· ${escapeHtml(issue)}</p>`).join("")}
-            </div>
-            
-            ${orgIssues.length > 1 ? `
-              <button class="secondary compact btn-toggle-perspective" data-type="org" data-id="${selectedDivId}">
-                ${isOrgExpanded ? "▲ 상세 진단 숨기기" : "▼ 상세 진단 더 보기"}
-              </button>
-            ` : ""}
+          <div class="perspective-content perspective-diagnosis-list">
+            ${orgIssues.map((issue, index) => `<article><span>운영 신호 ${String(index + 1).padStart(2, "0")}</span><p>${escapeHtml(issue)}</p></article>`).join("")}
+            <div class="perspective-guidance"><strong>운영 원칙</strong><p>문화를 태도 개선 캠페인으로 다루기보다 의사결정권, 회의, 승인, 피드백, 조직 간 인계처럼 반복되는 운영 장치를 바꿉니다. 작게 실험하고 다음 Pulse와 경청 기록으로 효과를 검증합니다.</p></div>
           </div>
         </div>
       </div>
@@ -941,7 +915,9 @@ function renderExpertView({ state, cache }) {
   const doc = cache.years?.[year];
   if (!doc) return renderNoData(state, cache);
 
-  const prevDoc = cache.years?.[year - 1] || null;
+  const pair = comparisonPair(cache.years, year);
+  const prevYear = pair?.previousYear || null;
+  const prevDoc = prevYear ? cache.years?.[prevYear] : null;
   const diagnostics = pulseDiagnostics(doc, prevDoc);
 
   return `
@@ -964,9 +940,9 @@ function renderExpertView({ state, cache }) {
     <section class="panel">
       <div class="section-title">
         <h2>Divergence Map (좋아진 문항 vs 약해진 문항)</h2>
-        <span>${prevDoc ? `${prevDoc.year} → ${year}` : "이전 연도 → 현재 연도"} 전사 22개 문항 변동 상세</span>
+        <span>${prevDoc ? `${prevYear}년 → ${year}년` : "이전 연도 → 현재 연도"} 전사 22개 문항 변동 상세</span>
       </div>
-      ${prevDoc ? renderMovementInfographicSection(cache.years || {}, prevDoc.year, year) : "<div class='pulse-mini-empty'>비교할 직전 연도 문서가 존재하지 않습니다.</div>"}
+      ${prevDoc ? renderMovementInfographicSection(cache.years || {}, prevYear, year) : "<div class='pulse-mini-empty'>비교할 직전 연도 문서가 존재하지 않습니다.</div>"}
     </section>
 
     <!-- RAG 우선순위 작업 큐 테이블 -->
@@ -1024,7 +1000,7 @@ function renderExpertView({ state, cache }) {
     <section class="panel">
       <div class="section-title">
         <h2>📑 전체 22개 문항 상세 점수표 (${year}년 전사 기준)</h2>
-        <span>각 문항별 긍정(FAV), 중립(NEUTRAL), 적극 부정(UNFAV) 분포 및 전년 대비 변동 상세</span>
+        <span>각 문항별 긍정(FAV), 중립(NEUTRAL), 적극 부정(UNFAV) 분포 및 ${prevYear ? `${prevYear}년 대비` : "이전 측정 대비"} 변동 상세</span>
       </div>
       <div class="table-wrap pulse-items-detail-table">
         <table>
@@ -1036,7 +1012,7 @@ function renderExpertView({ state, cache }) {
               <th>중립</th>
               <th>적극 부정(UNFAV)</th>
               <th>우선순위 지수(Net)</th>
-              ${prevDoc ? `<th>전년 대비 변동</th>` : ""}
+              ${prevDoc ? `<th>${prevYear}년 대비 변동</th>` : ""}
             </tr>
           </thead>
           <tbody>
@@ -1269,5 +1245,12 @@ export function bindPulse({
       deletePulseCommitment,
       render
     });
+    if (state.pulseAutoOpenCommitmentForm) {
+      state.pulseAutoOpenCommitmentForm = false;
+      state.pulseCommitmentDraft = createPulseCommitmentDraft(state);
+      saveState();
+      render();
+      requestAnimationFrame(() => document.querySelector("#pulse-commitment-form")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
   }
 }

@@ -2,6 +2,24 @@ import { uid } from '../utils.js';
 
 const PII_PATTERN = /(이름|성명|사번|이메일|email|전화|phone|휴대폰|주민|주소)/i;
 
+export function createPulseCommitmentDraft(state) {
+  return {
+    id: "comm_" + uid(),
+    year: state.pulseYear,
+    scopeType: state.pulseScopeId === "company" ? "company" : "division",
+    scopeId: state.pulseScopeId || "company",
+    sourceQuestionIds: [19],
+    employeeVoice: "",
+    acknowledgement: "",
+    commitment: "",
+    ownerRole: "",
+    dueDate: "",
+    status: "draft",
+    evidence: "",
+    createdAt: new Date().toISOString()
+  };
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
@@ -42,7 +60,7 @@ export function renderCommitmentsBoard({ state, savePulseCommitment, deletePulse
       </div>
 
       <!-- 신규 등록 폼 -->
-      <div class="commitment-form-container panel">
+      <div class="commitment-form-container panel" id="pulse-commitment-form">
         ${draft 
           ? renderCommitmentForm(draft) 
           : `<button class="primary" id="btn-show-commitment-form">신규 약속 등록</button>`
@@ -222,23 +240,10 @@ ${commitments.map((c, i) => `
 export function bindCommitmentsEvents({ state, saveState, savePulseCommitment, deletePulseCommitment, render }) {
   // 신규 등록 폼 열기
   document.querySelector("#btn-show-commitment-form")?.addEventListener("click", () => {
-    state.pulseCommitmentDraft = {
-      id: "comm_" + uid(),
-      year: state.pulseYear,
-      scopeType: state.pulseScopeId === "company" ? "company" : "division",
-      scopeId: state.pulseScopeId || "company",
-      sourceQuestionIds: [19],
-      employeeVoice: "",
-      acknowledgement: "",
-      commitment: "",
-      ownerRole: "",
-      dueDate: "",
-      status: "draft",
-      evidence: "",
-      createdAt: new Date().toISOString()
-    };
+    state.pulseCommitmentDraft = createPulseCommitmentDraft(state);
     saveState();
     render();
+    requestAnimationFrame(() => document.querySelector("#pulse-commitment-form")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   });
 
   // 취소 버튼

@@ -1,11 +1,13 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch } from './firebase.js';
-import { bindPulse, renderPulse } from './pulse/pulseViews.js';
+import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260620-operating-insights-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
-import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-mobile-home-v3';
+import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-operating-insights-v1';
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js';
+import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
+import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-operating-insights-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -788,7 +790,46 @@ function renderOrgSelectRow(divisionList, hqList, teamList) {
         </select>
       </label>
     </div>
+    ${renderSessionPulseSummary()}
   `;
+}
+
+function renderSessionPulseSummary() {
+  if (!state.draftDivisionId && !state.draftHqId && !state.draftTeamId) return "";
+  if (!pulseCache.loaded) {
+    return `<div class="session-pulse-summary muted"><strong>Pulse Survey</strong><span>진단 정보를 불러오는 중입니다.</span></div>`;
+  }
+
+  const year = Number(state.pulseYear || Math.max(...Object.keys(pulseCache.years || {}).map(Number).filter(Number.isFinite)));
+  const pair = comparisonPair(pulseCache.years || {}, year) || { previousYear: null };
+  const currentDoc = pulseCache.years?.[year];
+  if (!currentDoc) return "";
+  const diagnostics = pulseDiagnostics(currentDoc, pair.previousYear ? pulseCache.years?.[pair.previousYear] : null);
+  const selectedIds = new Set([state.draftDivisionId, state.draftHqId, state.draftTeamId].filter(Boolean));
+  const selectedNames = [state.draftDivision, state.draftHq, state.draftTeam].filter(Boolean).map(value => String(value).replace(/\s+/g, ""));
+  const row = diagnostics.rows.find(item => {
+    const mappedIds = PULSE_DIV_MAP[item.id]?.orgUnitIds || [];
+    if (mappedIds.some(id => selectedIds.has(id))) return true;
+    const pulseName = String(item.id).replace(/\s+/g, "");
+    return selectedNames.some(name => name === pulseName || name.includes(pulseName) || pulseName.includes(name));
+  });
+
+  if (!row) {
+    return `<div class="session-pulse-summary muted"><strong>Pulse Survey</strong><span>선택 조직과 연결된 ${year}년 진단 데이터가 없습니다.</span></div>`;
+  }
+
+  const delta = row.delta;
+  const deltaText = pair.previousYear && delta !== null
+    ? `${pair.previousYear}년 대비 ${delta > 0 ? "+" : ""}${Math.round(delta * 100)}pp`
+    : "비교 데이터 없음";
+  return `
+    <div class="session-pulse-summary">
+      <div><strong>Pulse Survey · ${escapeHtml(row.id)}</strong><span>세션 설계 전 확인할 1차 스크리닝 정보</span></div>
+      <span class="session-pulse-tag">${year} 긍정 ${row.overall !== null ? `${Math.round(row.overall * 100)}%` : "—"}</span>
+      <span class="session-pulse-tag ${delta < 0 ? "risk" : ""}">${deltaText}</span>
+      <span class="session-pulse-tag ${row.rag?.key === "R" ? "risk" : ""}">${escapeHtml(row.rag?.label || "상태 확인")}</span>
+      <span class="session-pulse-tag focus">우선 대화 · ${escapeHtml(row.focusDomain || "경험 확인")}</span>
+    </div>`;
 }
 
 function renderTeamBuildingPanel(divisionList, hqList, teamList) {
@@ -4229,6 +4270,9 @@ function computeQrBaseUrl() {
 
 async function initApp() {
   reassignState(loadState());
+  // The product always opens on Home; internal navigation is still preserved during use.
+  state.activeView = "dashboard";
+  state.mobileNavOpen = false;
   // Always recompute qrBaseUrl — stale localhost values from localStorage break mobile QR
   state.qrBaseUrl = computeQrBaseUrl();
   if (!state.orgUnits || state.orgUnits.length < 10 || !state.orgMembers || state.orgMembers.length < 10) {

@@ -6,7 +6,7 @@ import {
   dashboardWeekSchedule,
   dashboardPulseSignals,
   dashboardSupportOrgs
-} from './dashboardEngine.js?v=20260620-mobile-home-v3';
+} from './dashboardEngine.js?v=20260620-operating-insights-v1';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
 import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260619-fix-syntax-error-v2';
 
@@ -32,7 +32,8 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
   const snapshot = dashboardSnapshot({ state, pulseCache, today });
   const allActions = dashboardActionQueue({ state, today });
 
-  const displayActions = allActions.slice(0, 5);
+  const showAllActions = Boolean(state.dashboardShowAllActions);
+  const displayActions = showAllActions ? allActions : allActions.slice(0, 5);
   const overflowActionsCount = allActions.length - displayActions.length;
 
   const funnel = dashboardTrustFunnel(state.pulseCommitments);
@@ -103,15 +104,15 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
         <div class="kpi-card highlight-red cursor-pointer" data-scroll-to="dashboard-action-queue">
           <div class="kpi-header">
             <span class="kpi-label">오늘 할 일</span>
-            <span class="tooltip-icon" title="기한 초과 약속, 오늘 세션, 오늘 설문 마감, 데이터 오류 등 즉시 확인이 필요한 총 작업 개수입니다.">?</span>
+            <button type="button" class="tooltip-icon" aria-label="오늘 할 일 설명" aria-expanded="false" data-help-text="기한 초과 약속, 오늘 세션, 오늘 설문 마감, 데이터 오류 등 즉시 확인이 필요한 총 작업 개수입니다.">?</button>
           </div>
           <div class="kpi-value">${allActions.length}</div>
           <div class="kpi-desc">즉시 조치 필요</div>
         </div>
-        <div class="kpi-card highlight-purple cursor-pointer" data-nav="pulse">
+        <div class="kpi-card highlight-purple cursor-pointer" data-nav="pulse" data-pulse-view="listening">
           <div class="kpi-header">
             <span class="kpi-label">응답 대기</span>
-            <span class="tooltip-icon" title="작성 중이거나 공감 피드백(We Heard) 작성이 진행되지 않은 약속 개수입니다.">?</span>
+            <button type="button" class="tooltip-icon" aria-label="응답 대기 설명" aria-expanded="false" data-help-text="작성 중이거나 공감 피드백(We Heard) 작성이 진행되지 않은 약속 개수입니다.">?</button>
           </div>
           <div class="kpi-value">${snapshot.responseWaiting}</div>
           <div class="kpi-desc">공감 피드백 미등록</div>
@@ -119,7 +120,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
         <div class="kpi-card highlight-amber cursor-pointer" data-scroll-to="dashboard-week-schedule">
           <div class="kpi-header">
             <span class="kpi-label">이번 주 세션</span>
-            <span class="tooltip-icon" title="오늘부터 향후 7일 이내에 예정된 세션 회차들의 개수입니다.">?</span>
+            <button type="button" class="tooltip-icon" aria-label="이번 주 세션 설명" aria-expanded="false" data-help-text="오늘부터 향후 7일 이내에 예정된 세션 회차들의 개수입니다.">?</button>
           </div>
           <div class="kpi-value">${displayWeekSessionsCount(state, today)}</div>
           <div class="kpi-desc">7일 이내 일정</div>
@@ -127,7 +128,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
         <div class="kpi-card highlight-green cursor-pointer" data-nav="report">
           <div class="kpi-header">
             <span class="kpi-label">보고 준비</span>
-            <span class="tooltip-icon" title="사전 및 사후 설문 적재가 완료되어 최종 경영진 보고서 조회가 가능한 세션 개수입니다.">?</span>
+            <button type="button" class="tooltip-icon" aria-label="보고 준비 설명" aria-expanded="false" data-help-text="사전 및 사후 설문 적재가 완료되어 최종 경영진 보고서 조회가 가능한 세션 개수입니다.">?</button>
           </div>
           <div class="kpi-value">${snapshot.reportReady}</div>
           <div class="kpi-desc">사전·사후 적재 완료</div>
@@ -244,8 +245,10 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
                     `;
                   }).join('')}
                 </div>
-                ${overflowActionsCount > 0 ? `
-                  <div class="queue-more-row text-muted font-sm">+ ${overflowActionsCount}개 항목 더 보기</div>
+                ${overflowActionsCount > 0 || showAllActions ? `
+                  <button type="button" class="queue-more-row text-muted font-sm" data-toggle-actions>
+                    ${showAllActions ? "할 일 접기" : `+ ${overflowActionsCount}개 항목 더 보기`}
+                  </button>
                 ` : ''}
               `}
             </div>
@@ -255,7 +258,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
           <section class="panel dashboard-section">
             <div class="section-header">
               <h3>조직 기초체력 5개 신호</h3>
-              <span class="section-subtitle">${pulseYear || '—'}년 Pulse 대진단 결과 요약</span>
+              <span class="section-subtitle">${pulseSignals?.[0]?.previousYear ? `${pulseSignals[0].previousYear}년 대비 ${pulseYear}년` : `${pulseYear || '—'}년`} Pulse 진단 비교</span>
             </div>
             <div class="pulse-signals-list">
               ${!pulseLoaded ? `
@@ -276,11 +279,11 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
                     let deltaHtml = "";
                     if (sig.delta !== null) {
                       if (sig.delta > 0) {
-                        deltaHtml = `<span class="delta-badge plus">↑${sig.delta}pp</span>`;
+                        deltaHtml = `<span class="delta-badge plus">${sig.previousYear}년 대비 ↑${sig.delta}pp</span>`;
                       } else if (sig.delta < 0) {
-                        deltaHtml = `<span class="delta-badge minus">↓${Math.abs(sig.delta)}pp</span>`;
+                        deltaHtml = `<span class="delta-badge minus">${sig.previousYear}년 대비 ↓${Math.abs(sig.delta)}pp</span>`;
                       } else {
-                        deltaHtml = `<span class="delta-badge zero">→0pp</span>`;
+                        deltaHtml = `<span class="delta-badge zero">${sig.previousYear}년 대비 →0pp</span>`;
                       }
                     } else {
                       deltaHtml = `<span class="delta-badge none">—</span>`;
@@ -296,9 +299,18 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
                           <span class="signal-label">${escapeHtml(sig.label)}</span>
                           <span class="signal-value">${sig.score !== null ? sig.score + '%' : '—'}</span>
                         </div>
-                        <div class="signal-gauge-container">
-                          <div class="signal-gauge-track">
-                            <div class="signal-gauge-bar" style="width: ${sig.score !== null ? sig.score : 0}%"></div>
+                        <div class="signal-comparison-bars">
+                          ${sig.previousYear ? `
+                            <div class="signal-year-row previous">
+                              <span>${sig.previousYear}</span>
+                              <div class="signal-gauge-track"><div class="signal-gauge-bar previous" style="width:${sig.previousScore ?? 0}%"></div></div>
+                              <strong>${sig.previousScore !== null ? `${sig.previousScore}%` : '—'}</strong>
+                            </div>
+                          ` : ''}
+                          <div class="signal-year-row current">
+                            <span>${sig.currentYear}</span>
+                            <div class="signal-gauge-track"><div class="signal-gauge-bar" style="width:${sig.score ?? 0}%"></div></div>
+                            <strong>${sig.score !== null ? `${sig.score}%` : '—'}</strong>
                           </div>
                           ${deltaHtml}
                         </div>
@@ -325,7 +337,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
               ${funnel.youSaid === 0 ? `
                 <div class="empty-state-card">
                   <p>등록된 약속(Commitment)이 아직 없습니다.</p>
-                  <button class="primary compact margin-top" data-nav="pulse">첫 약속 등록</button>
+                  <button class="primary compact margin-top" data-nav="pulse" data-pulse-view="listening" data-open-commitment-form="true">첫 약속 등록</button>
                 </div>
               ` : `
                 <div class="funnel-container">
@@ -484,9 +496,16 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
                           <span class="focus-label">집중 주제:</span>
                           <span class="focus-domain-tag">${escapeHtml(org.focusDomain)}</span>
                         </div>
-                        <div class="org-session-status">
-                          <span class="status-indicator-dot ${org.hasActiveSession ? 'active' : ''}"></span>
-                          <span class="status-text">${org.hasActiveSession ? '활성 세션 운영 중' : '세션 운영 없음'}</span>
+                        <div class="org-session-status ${org.sessionDetails.length ? 'has-session' : ''}">
+                          ${org.sessionDetails.length ? org.sessionDetails.slice(0, 2).map((session) => `
+                            <span class="support-session-line">
+                              <i class="status-indicator-dot ${session.status === '진행중' ? 'active' : session.status === '완료' ? 'done' : ''}"></i>
+                              ${escapeHtml(session.label)} <b>${escapeHtml(session.status)}</b>
+                            </span>
+                          `).join('') : `
+                            <span class="status-indicator-dot"></span>
+                            <span class="status-text">연결된 세션 없음</span>
+                          `}
                         </div>
                       </div>
                     `;
@@ -511,6 +530,7 @@ export function bindHomeDashboard({ state, saveState, render }) {
       const targetView = btn.dataset.nav;
       const sessionId = btn.dataset.sessionId;
       const scopeId = btn.dataset.scopeId;
+      const pulseView = btn.dataset.pulseView;
 
       if (sessionId) {
         state.selectedReportSessionId = sessionId;
@@ -525,6 +545,11 @@ export function bindHomeDashboard({ state, saveState, render }) {
       if (scopeId) {
         state.pulseScopeId = scopeId;
         state.pulseView = "overview";
+      }
+
+      if (pulseView) state.pulseView = pulseView;
+      if (btn.dataset.openCommitmentForm === "true") {
+        state.pulseAutoOpenCommitmentForm = true;
       }
 
       state.activeView = targetView;
@@ -574,6 +599,27 @@ export function bindHomeDashboard({ state, saveState, render }) {
       if (el) {
         el.scrollIntoView({ behavior: 'smooth' });
       }
+    });
+  });
+
+  document.querySelectorAll("[data-toggle-actions]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.dashboardShowAllActions = !state.dashboardShowAllActions;
+      saveState();
+    });
+  });
+
+  document.querySelectorAll(".tooltip-icon[data-help-text]").forEach(btn => {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const willOpen = !btn.classList.contains("help-open");
+      document.querySelectorAll(".tooltip-icon.help-open").forEach(open => {
+        open.classList.remove("help-open");
+        open.setAttribute("aria-expanded", "false");
+      });
+      btn.classList.toggle("help-open", willOpen);
+      btn.setAttribute("aria-expanded", String(willOpen));
     });
   });
 

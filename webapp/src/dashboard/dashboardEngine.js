@@ -14,6 +14,7 @@ import {
   normalizeSessionType
 } from '../utils.js';
 import { QUESTIONS } from '../config/questions.js';
+import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-operating-insights-v1';
 
 // Helper to calculate session status
 function getSessionStatus(session) {
@@ -346,7 +347,10 @@ export function dashboardPulseSignals(pulseCache, selectedYear) {
     return {
       key: cat.key,
       label: cat.label,
+      currentYear: Number(selectedYear),
+      previousYear: prevYear || null,
       score: currentAvg !== null ? Math.round(currentAvg * 100) : null,
+      previousScore: prevAvg !== null ? Math.round(prevAvg * 100) : null,
       delta: delta !== null ? Math.round(delta * 100) : null,
       breakdown
     };
@@ -365,17 +369,41 @@ export function dashboardSupportOrgs(pulseCache, selectedYear, sessions) {
   const diagnostics = pulseDiagnostics(doc, prevDoc);
   if (!diagnostics?.ranked) return [];
 
+  const clean = (value) => String(value || "").replace(/[\s&/·_-]+/g, "").toLowerCase();
+  const matchesOrg = (session, pulseOrgId) => {
+    const mapEntry = PULSE_DIV_MAP[pulseOrgId];
+    const mappedIds = new Set(mapEntry?.orgUnitIds || []);
+    const sessionIds = [session.divisionId, session.hqId, session.teamId].filter(Boolean);
+    if (sessionIds.some((id) => mappedIds.has(id))) return true;
+
+    const target = clean(pulseOrgId);
+    const names = [session.division, session.hq, session.team, session.participatingTeams].filter(Boolean);
+    return names.some((name) => {
+      const candidate = clean(name);
+      return candidate === target || candidate.includes(target) || target.includes(candidate);
+    });
+  };
+
   return diagnostics.ranked.slice(0, 3).map(row => {
-    const hasActiveSession = (sessions || []).some(s =>
-      (s.division === row.id || s.divisionId === row.id) && getSessionStatus(s) !== "완료"
-    );
+    const matchedSessions = (sessions || []).filter((session) => matchesOrg(session, row.id));
+    const sessionDetails = matchedSessions.map((session) => {
+      const status = getSessionStatus(session);
+      const type = normalizeSessionType(session.type);
+      const subject = session.team || session.participatingTeams || session.hq || session.division || `${type} ${session.cohort || ""}기`;
+      return {
+        id: session.id,
+        label: `${subject} ${type} 세션`,
+        status,
+      };
+    });
 
     return {
       id: row.id,
       overall: row.overall !== null ? Math.round(row.overall * 100) : null,
       priority: row.priority,
       focusDomain: row.focusDomain || "일반 지원",
-      hasActiveSession
+      hasActiveSession: sessionDetails.some((item) => item.status === "진행중"),
+      sessionDetails
     };
   });
 }

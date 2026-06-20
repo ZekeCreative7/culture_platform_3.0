@@ -27,6 +27,7 @@ function friendlyAuthError(error) {
   if (code.includes('weak-password')) return '비밀번호를 8자 이상으로 설정해 주세요.';
   if (code.includes('too-many-requests')) return '로그인 시도가 많아 잠시 보호 중입니다. 잠시 후 다시 시도해 주세요.';
   if (code.includes('network-request-failed')) return '네트워크 연결이 원활하지 않습니다. 연결을 확인한 뒤 다시 시도해 주세요.';
+  if (code.includes('configuration-not-found')) return 'Firebase Authentication 설정이 아직 완료되지 않았습니다. Firebase Console에서 Authentication을 시작하고 이메일/비밀번호 로그인을 활성화해 주세요.';
   if (code.includes('operation-not-allowed')) return 'Firebase에서 이메일 로그인이 아직 활성화되지 않았습니다.';
   if (code.includes('permission-denied')) return '승인 정보를 확인할 권한이 없습니다. Firestore 보안 규칙을 확인해 주세요.';
   return error?.message ? `접속 처리 중 오류가 발생했습니다. (${error.message})` : '접속 처리 중 오류가 발생했습니다.';

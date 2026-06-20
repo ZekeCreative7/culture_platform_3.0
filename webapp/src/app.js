@@ -8,7 +8,7 @@ import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardVie
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-operating-insights-v1';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260620-app-check-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260620-auth-guidance-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -20,13 +20,13 @@ import {
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
-  blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, normalizeAppState,
+  blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, saveStateQuiet, normalizeAppState,
   syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
   deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore,
   saveSurveyToFirestore, deleteSurveyFromFirestore, updateSurveyInFirestore, loadPulseYears,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260619-fix-syntax-error-v2';
+} from './state.js?v=20260620-survey-input-fix-v1';
 
 const VIEWS = [
   ["dashboard", "Home", "홈"],
@@ -3247,16 +3247,23 @@ function bindSessions() {
       return;
     }
 
-    // Save to Firestore, use returned doc ID
-    saveSurveyToFirestore(surveyData).then(firestoreId => {
-      state.surveys.push({ ...surveyData, id: firestoreId });
-      state.draftSurveyTitle = "";
-      state.draftGoogleFormUrl = "";
-      state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
-      saveState();
-      render();
-    }).catch(e => {
-      alert('설문 저장 실패: ' + e.message);
+    // 로컬에서 먼저 생성하고 QR을 즉시 띄운다. Firestore 동기화는 백그라운드로 처리해
+    // 네트워크/App Check/권한 문제로 "배포 및 QR 생성"이 통째로 막히지 않도록 한다.
+    const newId = uid();
+    state.surveys.push({ ...surveyData, id: newId });
+    state.draftSurveyTitle = "";
+    state.draftGoogleFormUrl = "";
+    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+    saveState();
+    render();
+
+    updateSurveyInFirestore(newId, surveyData).catch(e => {
+      console.error('Firestore 설문 저장 실패:', e);
+      alert(
+        'QR은 생성됐지만 서버 동기화에 실패했습니다.\n' +
+        '구글 폼 URL로 만든 설문은 QR이 정상 동작합니다.\n' +
+        '자체 설계 설문은 다른 기기/모바일에서 열리지 않을 수 있습니다.\n\n오류: ' + e.message
+      );
     });
   });
   document.querySelector("#cancel-edit-survey")?.addEventListener("click", () => {
@@ -3763,7 +3770,19 @@ function bindReport() {
 // ── Survey Builder Helpers ─────────────────────────────────────
 window.updateSurveyDraftField = function(field, val) {
   state[field] = val;
-  saveState();
+  // saveStateQuiet(): 입력 중 render()를 일으키지 않아 포커스를 유지한다.
+  // (saveState()는 notify→render로 입력 필드를 교체해 "한 글자만 입력되는" 버그를 만든다.)
+  saveStateQuiet();
+
+  // 구글 폼 URL이 입력되면 자체 질문 편집기를 비활성화 표시(전체 재렌더 없이 DOM만 토글).
+  if (field === 'draftGoogleFormUrl') {
+    const editor = document.querySelector('.survey-questions-preview');
+    if (editor) {
+      const disabled = Boolean((val || '').trim());
+      editor.style.opacity = disabled ? '0.45' : '';
+      editor.style.pointerEvents = disabled ? 'none' : '';
+    }
+  }
 };
 
 window.updateSurveyDraftPhase = function(val) {
@@ -3777,7 +3796,8 @@ window.updateSurveyDraftQuestionText = function(qid, text) {
   const q = state.draftSurveyQuestions.find(item => item.id === qid);
   if (q) {
     q.text = text;
-    saveState();
+    // 입력 중 포커스 유지를 위해 재렌더 없이 저장.
+    saveStateQuiet();
   }
 };
 
@@ -3785,8 +3805,9 @@ window.updateSurveyDraftQuestionType = function(qid, type) {
   const q = state.draftSurveyQuestions.find(item => item.id === qid);
   if (q) {
     q.type = type;
-    saveState();
-    
+    // 재렌더 없이 저장(아래에서 DOM만 정밀 수정하므로 render() 불필요).
+    saveStateQuiet();
+
     // 전체 페이지를 다시 그리지 않고(render() 미호출) 클릭된 문항 카드의 DOM 노드만 정밀 수정
     const radioInputs = document.querySelectorAll(`input[name="qtype-${qid}"]`);
     if (radioInputs.length) {

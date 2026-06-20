@@ -168,8 +168,20 @@ export function loadState() {
 }
 
 export function saveState() {
+  persistState();
+  notify();
+}
+
+// 입력 도중(설문 제목/질문 등) localStorage에는 저장하되 전체 화면을 다시 그리지 않는다.
+// notify()를 호출하면 render()가 예약되어 입력 중인 <input>이 교체되고 포커스를 잃어
+// "한 글자만 입력되는" 버그가 발생한다. 텍스트 입력 핸들러는 이 함수를 사용해야 한다.
+export function saveStateQuiet() {
+  persistState();
+}
+
+function persistState() {
   normalizeAppState(state);
-  const { 
+  const {
     activeView, sessions, responses, qualSignals, draftType, draftSchedule, draftCohort, draftYear,
     surveys,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
@@ -195,7 +207,6 @@ export function saveState() {
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
   }));
-  notify();
 }
 
 export function normalizeAppState(nextState) {

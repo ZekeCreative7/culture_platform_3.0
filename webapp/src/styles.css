@@ -3786,17 +3786,25 @@ tbody tr:hover td { background: rgba(235,245,253,.72) !important; }
   background: var(--kpi-accent, #2588df);
   pointer-events: none;
 }
+/* 카드 우상단 코너 글로우. 음수 오프셋으로 카드 밖으로 튀어나가던 원을
+   코너에 앵커(top:0,right:0)하고 둥근 모서리에 맞춰 클립해 프레임 안에 가둔다.
+   (카드에 overflow:hidden을 주면 ?툴팁 팝업까지 잘리므로 ::after 자체에서 클립) */
 .dashboard-wrapper .kpi-card::after {
   content: "";
   pointer-events: none;
   position: absolute;
-  width: 84px;
-  height: 84px;
-  right: -28px;
-  top: -34px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--kpi-accent, #2588df) 12%, transparent);
+  top: 0;
+  right: 0;
+  width: 116px;
+  height: 116px;
+  border-top-right-radius: 18px;
+  background: radial-gradient(56px 56px at 100% 0,
+    color-mix(in srgb, var(--kpi-accent, #2588df) 26%, transparent) 0%,
+    color-mix(in srgb, var(--kpi-accent, #2588df) 9%, transparent) 44%,
+    transparent 72%);
 }
+/* 글로우가 ?아이콘을 흐리지 않도록 아이콘을 위에 올린다. */
+.dashboard-wrapper .kpi-card .tooltip-icon { z-index: 1; }
 .dashboard-wrapper .kpi-card.highlight-red { --kpi-accent: #dc5263; }
 .dashboard-wrapper .kpi-card.highlight-purple { --kpi-accent: #7457d1; }
 .dashboard-wrapper .kpi-card.highlight-amber { --kpi-accent: #d89532; }
@@ -4067,10 +4075,14 @@ tbody tr:hover td { background: rgba(235,245,253,.72) !important; }
     padding: 16px 15px 14px !important;
   }
   .dashboard-wrapper .kpi-card::after {
-    width: 64px;
-    height: 64px;
-    right: -24px;
-    top: -26px;
+    width: 92px;
+    height: 92px;
+    right: 0;
+    top: 0;
+    background: radial-gradient(46px 46px at 100% 0,
+      color-mix(in srgb, var(--kpi-accent, #2588df) 26%, transparent) 0%,
+      color-mix(in srgb, var(--kpi-accent, #2588df) 9%, transparent) 44%,
+      transparent 72%);
   }
   .kpi-header { margin-bottom: 7px; }
   .kpi-label { font-size: 11.5px; }

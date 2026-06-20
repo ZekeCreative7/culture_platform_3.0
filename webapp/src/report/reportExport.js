@@ -173,13 +173,27 @@ export async function downloadReportPdf({ element, meta }) {
   stage.appendChild(clone);
   document.body.appendChild(stage);
 
+  // 문서의 고정 폭(.report-export-stage/.report-pdf-document = 1120px). html2canvas는 기본적으로
+  // 실제 브라우저 창 너비 기준으로 렌더링하므로, 창이 이 폭보다 좁으면 오른쪽이 잘린다.
+  // width/windowWidth를 문서 폭으로 고정해 전체 폭을 캡처한 뒤 A4 폭에 맞춰 축소한다.
+  const docWidth = clone.scrollWidth || clone.offsetWidth || 1120;
+
   try {
     await window.html2pdf()
       .set({
         margin: [8, 8, 10, 8],
         filename: `${reportBaseName(meta)}.pdf`,
         image: { type: "jpeg", quality: 0.96 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#edf4fb", logging: false },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#edf4fb",
+          logging: false,
+          width: docWidth,
+          windowWidth: docWidth,
+          scrollX: 0,
+          scrollY: 0,
+        },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
         pagebreak: { mode: ["css", "legacy"], avoid: [".report-radar-card", ".report-dimension-grid > div", ".report-recommendation-card", ".report-change-card"] },
       })

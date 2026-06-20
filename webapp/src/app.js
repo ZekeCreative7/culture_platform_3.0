@@ -5,7 +5,7 @@ import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-org-revert-v2';
-import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260620-pdf-a4-fix-v1';
+import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260620-pdf-a4-width-v2';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260620-auth-guidance-v1';

@@ -27,6 +27,7 @@ function loadScriptOnce(src) {
 }
 
 const PHASE_ORDER = ["사전", "중간", "사후"];
+const A4_EXPORT_WIDTH_PX = 794;
 
 function safeFilePart(value) {
   return String(value || "report")
@@ -201,14 +202,16 @@ export async function downloadReportPdf({ element, meta }) {
   const clone = element.cloneNode(true);
   clone.removeAttribute("id");
   clone.classList.add("report-pdf-document");
+  clone.style.width = `${A4_EXPORT_WIDTH_PX}px`;
+  clone.style.maxWidth = `${A4_EXPORT_WIDTH_PX}px`;
   clone.querySelectorAll("[data-html2canvas-ignore]").forEach((node) => node.remove());
   stage.appendChild(clone);
   document.body.appendChild(stage);
 
-  // 문서의 고정 폭(.report-export-stage/.report-pdf-document = 1120px). html2canvas는 기본적으로
-  // 실제 브라우저 창 너비 기준으로 렌더링하므로, 창이 이 폭보다 좁으면 오른쪽이 잘린다.
-  // width/windowWidth를 문서 폭으로 고정해 전체 폭을 캡처한 뒤 A4 폭에 맞춰 축소한다.
-  const docWidth = clone.scrollWidth || clone.offsetWidth || 1120;
+  // html2pdf의 A4 캡처 viewport와 같은 폭으로 출력용 DOM을 먼저 레이아웃한다.
+  // 1120px 데스크톱 문서는 A4 viewport(약 794px) 밖이 잘릴 수 있다.
+  await document.fonts?.ready;
+  const docWidth = A4_EXPORT_WIDTH_PX;
 
   try {
     await window.html2pdf()
@@ -225,6 +228,14 @@ export async function downloadReportPdf({ element, meta }) {
           windowWidth: docWidth,
           scrollX: 0,
           scrollY: 0,
+          onclone: (clonedDocument) => {
+            const clonedReport = clonedDocument.querySelector(".report-pdf-document");
+            if (!clonedReport) return;
+            clonedReport.style.width = `${A4_EXPORT_WIDTH_PX}px`;
+            clonedReport.style.maxWidth = `${A4_EXPORT_WIDTH_PX}px`;
+            clonedReport.style.boxSizing = "border-box";
+            clonedReport.style.overflow = "hidden";
+          },
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
         pagebreak: { mode: ["css", "legacy"], avoid: [".report-radar-card", ".report-dimension-grid > div", ".report-recommendation-card", ".report-change-card"] },

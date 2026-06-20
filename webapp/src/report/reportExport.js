@@ -238,7 +238,7 @@ export async function downloadReportPdf({ element, meta }) {
             clonedReport.style.overflow = "visible";
           },
         },
-        jsPDF: { unit: "mm", format: "a4", orientation: "landscape", compress: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
         pagebreak: { mode: ["css", "legacy"], avoid: [".report-radar-card", ".report-dimension-grid > div", ".report-recommendation-card", ".report-change-card"] },
       })
       .from(clone)

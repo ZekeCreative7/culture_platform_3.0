@@ -10,7 +10,8 @@ import {
   sessionStartDate,
   hasRoundPassed,
   todayISO,
-  isQualText
+  isQualText,
+  normalizeSessionType
 } from '../utils.js';
 import { QUESTIONS } from '../config/questions.js';
 
@@ -128,7 +129,10 @@ export function dashboardActionQueue({ state, today }) {
 
   // Sessions and schedules
   (state.sessions || []).forEach(session => {
-    const title = sessionLabel(session);
+    const normalizedType = normalizeSessionType(session.type);
+    const title = normalizedType === "팀빌딩"
+      ? sessionLabel(session)
+      : `${normalizedType} ${Number(session.cohort || 1)}기`;
 
     // 2 & 4. Confirmed schedule items
     (session.schedule || []).forEach(item => {

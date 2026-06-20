@@ -12,6 +12,19 @@ import {
   serverTimestamp,
   writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAD1setZ-VrrB5do3wl6iHuVcqY91se0tk",
@@ -23,6 +36,14 @@ const firebaseConfig = {
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
+const isLocalDevelopment = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+if (isLocalDevelopment) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+export const appCheck = initializeAppCheck(firebaseApp, {
+  provider: new ReCaptchaEnterpriseProvider('6LfuSSktAAAAANg8W3c0tVOUp6_aH99ZlZX8nbMg'),
+  isTokenAutoRefreshEnabled: true
+});
 export const db = getFirestore(firebaseApp);
+export const auth = getAuth(firebaseApp);
+setPersistence(auth, browserLocalPersistence).catch((error) => console.error('Firebase 로그인 유지 설정 실패:', error));
 export { collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch };
-
+export { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut };

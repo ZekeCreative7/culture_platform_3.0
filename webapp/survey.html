@@ -277,6 +277,8 @@
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
       import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp }
         from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+      import { initializeAppCheck, ReCaptchaEnterpriseProvider }
+        from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js';
 
       const firebaseConfig = {
         apiKey: "AIzaSyAD1setZ-VrrB5do3wl6iHuVcqY91se0tk",
@@ -287,6 +289,12 @@
         appId: "1:391783796041:web:7bdd71d7fb4be533e81e98"
       };
       const firebaseApp = initializeApp(firebaseConfig);
+      const isLocalDevelopment = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if (isLocalDevelopment) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+      initializeAppCheck(firebaseApp, {
+        provider: new ReCaptchaEnterpriseProvider('6LfuSSktAAAAANg8W3c0tVOUp6_aH99ZlZX8nbMg'),
+        isTokenAutoRefreshEnabled: true
+      });
       const db = getFirestore(firebaseApp);
 
       const SCORE_VALUES = {

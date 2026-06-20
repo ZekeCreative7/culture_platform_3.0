@@ -8,6 +8,7 @@ import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardVie
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-operating-insights-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260620-app-check-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -692,7 +693,7 @@ function render() {
       menuToggle.setAttribute("aria-expanded", state.mobileNavOpen ? "true" : "false");
       menuToggle.setAttribute("aria-label", state.mobileNavOpen ? "메뉴 닫기" : "메뉴 열기");
     }
-    const sessionCountSpan = app.querySelector(".topbar-actions span");
+    const sessionCountSpan = app.querySelector(".topbar-session-count");
     if (sessionCountSpan) {
       sessionCountSpan.textContent = `${state.sessions.length} sessions`;
     }
@@ -741,7 +742,12 @@ function render() {
           </button>
           <div class="searchbox">세션, 조직, 설문 검색</div>
           <div class="topbar-actions">
-            <span>${state.sessions.length} sessions</span>
+            <div class="auth-user-controls">
+              <button type="button" id="access-admin-button" class="auth-admin-button" hidden>회원 승인</button>
+              <span id="signed-in-email" class="signed-in-email"></span>
+              <button type="button" id="auth-logout-button" class="auth-logout-button">로그아웃</button>
+            </div>
+            <span class="topbar-session-count">${state.sessions.length} sessions</span>
             <button class="ghost" data-view="upload">데이터 가져오기</button>
             <button class="primary compact" data-view="sessions">새 세션</button>
           </div>
@@ -754,6 +760,7 @@ function render() {
     bindLayout();
   }
   bindCanvasEvents();
+  syncAuthControls();
 }
 
 function renderView() {
@@ -4661,4 +4668,4 @@ window.addEventListener('storage', (e) => {
   }
 });
 
-initApp();
+initializeAuthGate({ onAccessGranted: initApp });

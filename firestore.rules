@@ -1,0 +1,69 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMaster() {
+      return signedIn()
+        && request.auth.token.email == 'rhokoo7@naver.com';
+    }
+
+    function isApproved() {
+      return isMaster()
+        || (signedIn()
+          && exists(/databases/$(database)/documents/accessRequests/$(request.auth.uid))
+          && get(/databases/$(database)/documents/accessRequests/$(request.auth.uid)).data.status == 'approved');
+    }
+
+    match /accessRequests/{userId} {
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == 'pending';
+      allow get: if signedIn() && (request.auth.uid == userId || isMaster());
+      allow list, update, delete: if isMaster();
+    }
+
+    // Respondents use a public, anonymous survey link. They may read one
+    // configured survey and create a response tied to that exact survey,
+    // but cannot list surveys or read any submitted response.
+    match /surveys/{surveyId} {
+      allow get: if true;
+      allow list, create, update, delete: if isApproved();
+    }
+
+    match /responses/{responseId} {
+      allow create: if request.resource.data.surveyId is string
+        && exists(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId))
+        && request.resource.data.sessionId == get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data.sessionId
+        && request.resource.data.phase == get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data.phase;
+      allow read, update, delete: if isApproved();
+    }
+
+    // A new member may trigger exactly one fixed approval notification to the
+    // designated inbox. The email extension runs with server privileges.
+    match /mail/{userId} {
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.requestUid == userId
+        && request.resource.data.requesterEmail == request.auth.token.email
+        && request.resource.data.to.size() == 1
+        && request.resource.data.to[0] == 'zekedesign7@gmail.com'
+        && request.resource.data.message.subject == '[Lina Culture Platform] 새로운 회원 승인 요청';
+      allow read, update, delete: if isMaster();
+    }
+
+    // All operational collections and their nested documents are private.
+    // accessRequests is handled above and excluded here to prevent approved
+    // members from modifying another user's approval state.
+    match /{collectionName}/{document=**} {
+      allow read, write: if collectionName != 'accessRequests'
+        && collectionName != 'mail'
+        && isApproved();
+    }
+  }
+}

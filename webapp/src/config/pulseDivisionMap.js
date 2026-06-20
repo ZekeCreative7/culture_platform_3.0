@@ -9,9 +9,10 @@ export const PULSE_DIV_MAP = {
   "인사관리부문": { orgUnitIds: ["HR"], relation: "division", confidence: "med" },
 
   // 조직은 고객솔루션본부 하나(도기철 본부장). UW는 인원이 많아 Pulse Survey에서만 분리.
-  // 따라서 두 Pulse division 모두 단일 CUSTOMER_SOLUTION 본부에 매핑된다(1 org → 2 pulse = split).
-  "고객솔루션본부UW": { orgUnitIds: ["CUSTOMER_SOLUTION"], relation: "split", confidence: "high" },
-  "고객솔루션본부상품/헬스": { orgUnitIds: ["CUSTOMER_SOLUTION"], relation: "split", confidence: "high" },
+  // 본부(CUSTOMER_SOLUTION)로 매핑하면 두 division이 같은 본부의 모든 팀을 공유해 서로
+  // 오매칭되므로(예: UW 카드에 채널전략솔루션 세션이 붙음), 각 division을 실제 소속 팀 단위로 매핑한다.
+  "고객솔루션본부UW": { orgUnitIds: ["UW"], relation: "split", confidence: "high" },
+  "고객솔루션본부상품/헬스": { orgUnitIds: ["SYNERGY_SOLUTION", "NEW_GROWTH_SOLUTION", "CHANNEL_SOLUTION", "HEALTH_SOLUTION", "PRICING_OPTIMIZATION"], relation: "split", confidence: "high" },
   "고객혁신본부CE": { orgUnitIds: ["OPERATION"], relation: "split", confidence: "low" },
   "고객혁신본부본사": { orgUnitIds: ["OPERATION"], relation: "split", confidence: "low" },
 

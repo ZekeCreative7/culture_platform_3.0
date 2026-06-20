@@ -6,7 +6,7 @@ import {
   dashboardWeekSchedule,
   dashboardPulseSignals,
   dashboardSupportOrgs
-} from './dashboardEngine.js?v=20260620-operating-insights-v1';
+} from './dashboardEngine.js?v=20260620-org-revert-v2';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
 import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260620-mvp-optimize-v2';
 

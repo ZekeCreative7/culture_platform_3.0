@@ -14,7 +14,7 @@ import {
   normalizeSessionType
 } from '../utils.js';
 import { QUESTIONS } from '../config/questions.js';
-import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-operating-insights-v1';
+import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 
 // Helper to calculate session status
 function getSessionStatus(session) {
@@ -374,7 +374,9 @@ export function dashboardSupportOrgs(pulseCache, selectedYear, sessions) {
     const mapEntry = PULSE_DIV_MAP[pulseOrgId];
     const mappedIds = new Set(mapEntry?.orgUnitIds || []);
     const sessionIds = [session.divisionId, session.hqId, session.teamId].filter(Boolean);
-    if (sessionIds.some((id) => mappedIds.has(id))) return true;
+    // 매핑이 정의된 division은 정확한 org unit 매칭만 사용한다. 이름 기반 fuzzy 매칭을 함께 쓰면
+    // 같은 본부를 공유하는 split division끼리 오매칭된다(예: "고객솔루션본부" ⊂ "고객솔루션본부UW").
+    if (mappedIds.size > 0) return sessionIds.some((id) => mappedIds.has(id));
 
     const target = clean(pulseOrgId);
     const names = [session.division, session.hq, session.team, session.participatingTeams].filter(Boolean);

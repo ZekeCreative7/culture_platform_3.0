@@ -223,7 +223,7 @@ export async function downloadReportPdf({ element, meta }) {
         html2canvas: {
           scale: 2,
           useCORS: true,
-          backgroundColor: "#edf4fb",
+          backgroundColor: "#f7f7f7",
           logging: false,
           width: docWidth,
           windowWidth: docWidth,

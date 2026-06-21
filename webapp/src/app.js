@@ -5,7 +5,7 @@ import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-org-revert-v2';
-import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260620-pdf-desktop-portrait-v4';
+import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260621-vivid-report-palette-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260620-auth-guidance-v1';
@@ -2182,7 +2182,7 @@ function renderRadarChart(dimScores) {
     <svg class="report-radar-chart" viewBox="0 0 220 220" width="220" height="220" style="overflow:visible; display:block;">
       ${gridLevels.map(f => `<path d="${pathOf(angles.map(a => ptAt(a, f)))}" fill="none" stroke="#e2e8f0" stroke-width="${f === 1 ? 1.5 : 1}" stroke-dasharray="${f < 1 ? '3 3' : ''}"/>`).join('')}
       ${angles.map(a => { const p = ptAt(a, 1); return `<line x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="#cbd5e1" stroke-width="1.2"/>`; }).join('')}
-      <path d="${pathOf(scorePts)}" fill="rgba(14,165,233,0.15)" stroke="#0ea5e9" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="${pathOf(scorePts)}" fill="rgba(0,82,255,0.16)" stroke="#0052ff" stroke-width="2.5" stroke-linejoin="round"/>
       ${scorePts.map((p, i) => dimScores[i].score !== null ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5" fill="${dimScores[i].color}" stroke="#fff" stroke-width="2"/>` : '').join('')}
       ${dimScores.map((d, i) => `
         <text x="${labelOffset[i][0]}" y="${labelOffset[i][1]}" text-anchor="${labelOffset[i][2]}" font-size="11" font-weight="700" fill="#334155" font-family="'Plus Jakarta Sans',sans-serif">${d.label}</text>
@@ -2215,7 +2215,7 @@ function parseQualResult(text) {
 
 function renderQualSections(sections) {
   const ICONS = { '핵심 키워드': '01', '주요 테마': '02', '대표 발언': '03', '조직문화 진단': '04', '세션 운영 제언': '05' };
-  const COLOR = { '핵심 키워드': '#0ea5e9', '주요 테마': '#8b5cf6', '대표 발언': '#14b8a6', '조직문화 진단': '#f59e0b', '세션 운영 제언': '#10b981' };
+  const COLOR = { '핵심 키워드': '#0052ff', '주요 테마': '#7b2cff', '대표 발언': '#00a89d', '조직문화 진단': '#f4b000', '세션 운영 제언': '#00a866' };
 
   return Object.entries(sections).map(([k, v]) => {
     const icon = ICONS[k] || '•';
@@ -2251,10 +2251,10 @@ function renderQualSections(sections) {
 
 // ── Report Analysis Helpers ──────────────────────────────────────
 const REPORT_DIMS = [
-  { key: 'psych',      label: '심리적 안전감', qs: ['q1','q2','q3'], color: '#0ea5e9' },
-  { key: 'silo',       label: '사일로 해소',   qs: ['q4','q5','q6'], color: '#14b8a6' },
-  { key: 'resilience', label: '회복탄력성',    qs: ['q7'],           color: '#f59e0b' },
-  { key: 'mood',       label: '전반 분위기',   qs: ['q8'],           color: '#8b5cf6' },
+  { key: 'psych',      label: '심리적 안전감', qs: ['q1','q2','q3'], color: '#0052ff' },
+  { key: 'silo',       label: '사일로 해소',   qs: ['q4','q5','q6'], color: '#00a89d' },
+  { key: 'resilience', label: '회복탄력성',    qs: ['q7'],           color: '#f4b000' },
+  { key: 'mood',       label: '전반 분위기',   qs: ['q8'],           color: '#7b2cff' },
 ];
 
 function dimAvg(phaseStats, qs) {
@@ -2266,9 +2266,9 @@ function dimAvg(phaseStats, qs) {
 
 function ragInfo(score) {
   if (score === null) return { label:'데이터 없음', color:'#94a3b8', bg:'#f8fafc', bar:'#e2e8f0' };
-  if (score >= 4.0)   return { label:'양호',       color:'#059669', bg:'#f0fdf4', bar:'#10b981' };
-  if (score >= 3.0)   return { label:'주의',       color:'#d97706', bg:'#fffbeb', bar:'#f59e0b' };
-  return               { label:'위험',       color:'#dc2626', bg:'#fef2f2', bar:'#ef4444' };
+  if (score >= 4.0)   return { label:'양호',       color:'#008a54', bg:'rgba(0,168,102,0.08)', bar:'#00a866' };
+  if (score >= 3.0)   return { label:'주의',       color:'#a46900', bg:'rgba(244,176,0,0.10)', bar:'#f4b000' };
+  return               { label:'위험',       color:'#c00032', bg:'rgba(227,0,59,0.07)', bar:'#e3003b' };
 }
 
 function dimRecommendation(key, score) {
@@ -2410,7 +2410,7 @@ function renderReport() {
               </div>`;
           }).join("")}
           <!-- Summary callout -->
-          <div style="grid-column: 1 / -1; background:#f0f9ff; border:1.5px solid #bae6fd; border-radius:12px; padding:14px 18px;">
+          <div style="grid-column: 1 / -1; background:rgba(0,82,255,0.06); border:1.5px solid rgba(0,82,255,0.22); border-radius:12px; padding:14px 18px;">
             <p style="font-size:12.5px; line-height:1.8; color:#0c2340; margin:0;">
               ${(() => {
                 const scores = REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs) })).filter(d => d.score !== null).sort((a,b) => a.score - b.score);
@@ -2438,7 +2438,7 @@ function renderReport() {
           const score = dimAvg(diagnosis, dim.qs);
           const rag = ragInfo(score);
           const priority = score !== null && score < 3.5 ? '우선 집중' : score !== null && score < 4.0 ? '강화 권장' : '강점 유지';
-          const priorityColor = score !== null && score < 3.5 ? '#dc2626' : score !== null && score < 4.0 ? '#d97706' : '#059669';
+          const priorityColor = score !== null && score < 3.5 ? '#e3003b' : score !== null && score < 4.0 ? '#f4b000' : '#00a866';
           return `
             <div class="panel report-recommendation-card" style="padding:16px 20px; display:flex; gap:16px; align-items:flex-start;">
               <div style="min-width:32px; height:32px; border-radius:8px; background:${dim.color}18; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; color:${dim.color};">${idx+1}</div>
@@ -2471,7 +2471,7 @@ function renderReport() {
           const postScore = post && post.n >= 3 ? dimAvg(post, dim.qs) : null;
           const delta = preScore !== null && postScore !== null ? postScore - preScore : null;
           const midDelta = preScore !== null && midScore !== null ? midScore - preScore : null;
-          const deltaColor = delta === null ? '#94a3b8' : delta > 0.2 ? '#059669' : delta < -0.2 ? '#dc2626' : '#d97706';
+          const deltaColor = delta === null ? '#94a3b8' : delta > 0.2 ? '#00a866' : delta < -0.2 ? '#e3003b' : '#f4b000';
           
           const shortInterpretation = delta === null ? ''
             : delta > 0.5 ? '유의미 개선'
@@ -2534,7 +2534,7 @@ function renderReport() {
                   </div>
                   <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:11.5px;">
                     <span style="color:#64748b; font-weight:600;">사전: <strong style="color:#475569;">${preScore.toFixed(2)}</strong></span>
-                    ${midScore !== null ? `<span style="color:#d97706; font-weight:600;">중간: <strong>${midScore.toFixed(2)}</strong></span>` : ''}
+                    ${midScore !== null ? `<span style="color:#b47700; font-weight:600;">중간: <strong>${midScore.toFixed(2)}</strong></span>` : ''}
                     <span style="color:${dim.color}; font-weight:700;">사후: <strong>${postScore.toFixed(2)}</strong></span>
                   </div>
                 </div>

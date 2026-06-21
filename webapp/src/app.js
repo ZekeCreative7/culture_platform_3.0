@@ -27,7 +27,7 @@ import {
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260621-survey-templates-v1';
+} from './state.js?v=20260621-survey-session-cascade-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -1738,10 +1738,37 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
   `;
 }
 
+function surveySessionCohortKey(session) {
+  return `${sessionYear(session) || session.year || ''}:${Number(session.cohort) || ''}`;
+}
+
+function surveySessionTargetLabel(session) {
+  const type = normalizeSessionType(session.type);
+  if (type === '팀빌딩') return session.team || session.teamName || sessionLabel(session);
+  const teams = session.participatingTeams
+    || [...new Set((session.members || []).map((member) => member.teamName).filter(Boolean))].join(', ');
+  return teams || sessionLabel(session);
+}
+
 function renderSurveyCreator() {
   const activeSessions = state.sessions || [];
   const draftQuestions = state.draftSurveyQuestions || [];
   const currentStep = state.surveyCreatorStep || 1;
+  const selectedDraftSession = activeSessions.find((session) => session.id === state.draftSurveySessionId);
+  const requestedSessionType = state.draftSurveySessionType || selectedDraftSession?.type || '';
+  const draftSessionType = requestedSessionType ? normalizeSessionType(requestedSessionType) : '';
+  const sessionsForType = draftSessionType
+    ? activeSessions.filter((session) => sameSessionType(session.type, draftSessionType))
+    : [];
+  const cohortOptions = [...new Map(sessionsForType.map((session) => {
+    const key = surveySessionCohortKey(session);
+    return [key, { key, year: sessionYear(session) || session.year || '', cohort: Number(session.cohort) || '' }];
+  })).values()].sort((a, b) => Number(b.year || 0) - Number(a.year || 0) || Number(a.cohort || 0) - Number(b.cohort || 0));
+  const draftCohortKey = state.draftSurveyCohortKey || (selectedDraftSession ? surveySessionCohortKey(selectedDraftSession) : '');
+  const sessionsForCohort = draftCohortKey
+    ? sessionsForType.filter((session) => surveySessionCohortKey(session) === draftCohortKey)
+    : [];
+  const availableSessionTypes = Object.keys(SESSION_TYPES).filter((type) => activeSessions.some((session) => sameSessionType(session.type, type)));
 
   // Real-time validation checks for Step 3
   const hasTitle = Boolean((state.draftSurveyTitle || "").trim());
@@ -1782,12 +1809,26 @@ function renderSurveyCreator() {
       <label>설문 제목
         <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 리더십 세션 2026년 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
       </label>
-      <label>대상 세션
-        <select id="survey-session-select" onchange="updateSurveyDraftField('draftSurveySessionId', this.value)">
-          <option value="">-- 세션 선택 --</option>
-          ${activeSessions.map(s => `<option value="${s.id}" ${state.draftSurveySessionId === s.id ? "selected" : ""}>${escapeHtml(s.type)} · ${escapeHtml(sessionLabel(s))}</option>`).join("")}
-        </select>
-      </label>
+      <div class="survey-session-cascade">
+        <label>세션 종류
+          <select id="survey-session-type-select" onchange="updateSurveyDraftSessionType(this.value)">
+            <option value="">-- 종류 선택 --</option>
+            ${availableSessionTypes.map((type) => `<option value="${escapeHtml(type)}" ${draftSessionType === type ? 'selected' : ''}>${escapeHtml(sessionTypeLabel(type))}</option>`).join('')}
+          </select>
+        </label>
+        <label>기수
+          <select id="survey-session-cohort-select" onchange="updateSurveyDraftCohort(this.value)" ${draftSessionType ? '' : 'disabled'}>
+            <option value="">-- 기수 선택 --</option>
+            ${cohortOptions.map((item) => `<option value="${escapeHtml(item.key)}" ${draftCohortKey === item.key ? 'selected' : ''}>${item.year ? `${escapeHtml(item.year)}년 ` : ''}${escapeHtml(item.cohort)}기</option>`).join('')}
+          </select>
+        </label>
+        <label>팀 / 대상 세션
+          <select id="survey-session-select" onchange="updateSurveyDraftField('draftSurveySessionId', this.value)" ${draftCohortKey ? '' : 'disabled'}>
+            <option value="">-- 팀 선택 --</option>
+            ${sessionsForCohort.map((session) => `<option value="${escapeHtml(session.id)}" ${state.draftSurveySessionId === session.id ? 'selected' : ''}>${escapeHtml(surveySessionTargetLabel(session))}</option>`).join('')}
+          </select>
+        </label>
+      </div>
       <label>설문 시점
         <select id="survey-phase-select" onchange="updateSurveyDraftPhase(this.value)">
           <option value="사전" ${state.draftSurveyPhase === "사전" ? "selected" : ""}>사전</option>
@@ -3905,6 +3946,21 @@ window.updateSurveyDraftField = function(field, val) {
   }
 };
 
+window.updateSurveyDraftSessionType = function(value) {
+  state.draftSurveySessionType = value ? normalizeSessionType(value) : '';
+  state.draftSurveyCohortKey = '';
+  state.draftSurveySessionId = '';
+  saveState();
+  render();
+};
+
+window.updateSurveyDraftCohort = function(value) {
+  state.draftSurveyCohortKey = value || '';
+  state.draftSurveySessionId = '';
+  saveState();
+  render();
+};
+
 window.updateSurveyDraftPhase = function(val) {
   state.draftSurveyPhase = val;
   state.draftSurveyQuestions = defaultQuestions(val);
@@ -4376,6 +4432,9 @@ window.startEditSurvey = function(id) {
   state.editingSurveyId = id;
   state.draftSurveyTitle = survey.title || '';
   state.draftSurveySessionId = survey.sessionId || '';
+  const surveySession = (state.sessions || []).find((session) => session.id === survey.sessionId);
+  state.draftSurveySessionType = surveySession ? normalizeSessionType(surveySession.type) : '';
+  state.draftSurveyCohortKey = surveySession ? surveySessionCohortKey(surveySession) : '';
   state.draftSurveyPhase = survey.phase || '사전';
   state.draftGoogleFormUrl = survey.googleFormUrl || '';
   state.draftSurveyQuestions = survey.questions && survey.questions.length

@@ -5419,3 +5419,38 @@ nav button.active,
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
+
+/* Session actions: destructive controls stay compact and outlined. */
+.session-top { padding-right: 78px; }
+.session-card-actions .icon-btn.danger {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  color: #b4232f;
+  background: transparent;
+  border: 1px solid rgba(207,32,47,.38);
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 11px;
+  line-height: 1;
+}
+.session-card-actions .icon-btn.danger:hover {
+  color: #9f1c28;
+  background: rgba(207,32,47,.06);
+  border-color: rgba(207,32,47,.62);
+  box-shadow: none;
+}
+
+.survey-session-cascade {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, .7fr) minmax(0, 1.4fr);
+  gap: 12px;
+}
+.survey-session-cascade label { min-width: 0; }
+.survey-session-cascade select:disabled { color: #a8acb3 !important; background: #f7f7f7 !important; cursor: not-allowed; }
+
+@media (max-width: 767px) {
+  .survey-session-cascade { grid-template-columns: 1fr; }
+}

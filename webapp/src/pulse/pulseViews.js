@@ -1,6 +1,6 @@
 import { PULSE_DIVISIONS } from "../config/pulseDivisions.js";
 import { 
-  companyEngagement, itemMovements, percentLabel, pulseDiagnostics, themeTrend, trendMatched,
+  companyEngagement, engagementTrend, itemMovements, percentLabel, pulseDiagnostics, themeTrend, trendMatched,
   netFromItem, questionSnapshot, questionMovement, comparisonPair, voiceImpactProfile, 
   careBelongingProfile, trustRecoveryHeadline, relationshipInsights, supportSummary, 
   dataConfidenceSummary, getCompanyN, companyFav, favFromItem, unfavFromItem, mean
@@ -39,41 +39,138 @@ function clippedPct(value) {
   return Math.round(n * 100);
 }
 
-function straightPath(points) {
+function smoothPath(points) {
   if (!points || points.length === 0) return "";
-  return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(" ");
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const midX = (p0.x + p1.x) / 2;
+    d += ` C ${midX} ${p0.y}, ${midX} ${p1.y}, ${p1.x} ${p1.y}`;
+  }
+  return d;
 }
 
-function sparkline(points, width = 280, height = 90) {
+// 끝점 라벨이 차트 바깥으로 잘리지 않도록, 첫/끝 포인트는 안쪽 방향으로 정렬한다.
+function edgeSafeAnchor(index, total) {
+  if (index === 0) return "start";
+  if (index === total - 1) return "end";
+  return "middle";
+}
+
+function sparkline(points, { width = 340, height = 184, gradientId = "pulseTrendGradient" } = {}) {
   const values = points.map((point) => point.value).filter((value) => typeof value === "number");
   if (!values.length) return "";
   const min = Math.min(...values, 0.3);
   const max = Math.max(...values, 0.8);
-  const pad = 20;
-  const xStep = points.length > 1 ? (width - pad * 2) / (points.length - 1) : 0;
-  const yFor = (value) => height - pad - ((value - min) / (max - min || 1)) * (height - pad * 2);
+  const padX = 38;
+  const padTop = 46;
+  const padBottom = 28;
+  const xStep = points.length > 1 ? (width - padX * 2) / (points.length - 1) : 0;
+  const yFor = (value) => height - padBottom - ((value - min) / (max - min || 1)) * (height - padTop - padBottom);
   const coords = points.map((point, index) => {
     const prev = points[index - 1]?.value;
     const delta = prev !== undefined ? point.value - prev : null;
-    return { ...point, delta, previousYear: points[index - 1]?.year || null, x: pad + xStep * index, y: yFor(point.value) };
+    return {
+      ...point,
+      delta,
+      previousYear: points[index - 1]?.year || null,
+      x: padX + xStep * index,
+      y: yFor(point.value),
+      anchor: edgeSafeAnchor(index, points.length),
+    };
   });
-  const path = straightPath(coords);
+  const linePath = smoothPath(coords);
+  const areaPath = `${linePath} L ${coords[coords.length - 1].x} ${height - padBottom} L ${coords[0].x} ${height - padBottom} Z`;
   return `
-    <svg class="pulse-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="전사 추이 라인">
+    <svg class="pulse-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="전사 추이 라인" preserveAspectRatio="xMidYMid meet">
       <defs>
-        <linearGradient id="pulseTrendGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stop-color="var(--blue-mid)" />
           <stop offset="100%" stop-color="var(--neon-purple)" />
         </linearGradient>
+        <linearGradient id="${gradientId}Fill" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="var(--blue-mid)" stop-opacity="0.16" />
+          <stop offset="100%" stop-color="var(--blue-mid)" stop-opacity="0" />
+        </linearGradient>
       </defs>
-      <path class="grid" d="M${pad} ${height - pad} H${width - pad}" />
-      <path class="line" d="${path}" />
+      <path class="grid" d="M${padX} ${height - padBottom} H${width - padX}" />
+      <path class="area" d="${areaPath}" fill="url(#${gradientId}Fill)" stroke="none" />
+      <path class="line" d="${linePath}" stroke="url(#${gradientId})" />
       ${coords.map((point) => `
         <g>
-          <circle cx="${point.x}" cy="${point.y}" r="5" />
-          <text class="value" x="${point.x}" y="${point.y - 22}" text-anchor="middle">${pct(point.value)}</text>
-          ${point.delta !== null ? `<text class="delta ${toneForDelta(point.delta)}" x="${point.x}" y="${point.y - 10}" text-anchor="middle">${point.previousYear} 대비 ${deltaLabel(point.delta)}</text>` : ""}
-          <text class="year" x="${point.x}" y="${height - 5}" text-anchor="middle">${point.year}</text>
+          <circle cx="${point.x}" cy="${point.y}" r="5.5" />
+          <text class="value" x="${point.x}" y="${point.y - 24}" text-anchor="${point.anchor}">${pct(point.value)}</text>
+          ${point.delta !== null ? `<text class="delta ${toneForDelta(point.delta)}" x="${point.x}" y="${point.y - 11}" text-anchor="${point.anchor}">${point.previousYear} 대비 ${deltaLabel(point.delta)}</text>` : ""}
+          <text class="year" x="${point.x}" y="${height - 8}" text-anchor="${point.anchor}">${point.year}</text>
+        </g>
+      `).join("")}
+    </svg>
+  `;
+}
+
+// Engagement Score 전용: Normal(실선)과 Data 신뢰도 하락 본부 제외(점선)를 같은 척도로 겹쳐 그린다.
+function engagementSparkline(points, { width = 340, height = 184 } = {}) {
+  const primaryValues = points.map((p) => p.value).filter((v) => typeof v === "number");
+  if (!primaryValues.length) return "";
+  const secondaryValues = points.map((p) => p.exOutlier).filter((v) => typeof v === "number");
+  const allValues = [...primaryValues, ...secondaryValues];
+  const min = Math.min(...allValues, 0.3);
+  const max = Math.max(...allValues, 0.8);
+  const padX = 38;
+  const padTop = 46;
+  const padBottom = 28;
+  const xStep = points.length > 1 ? (width - padX * 2) / (points.length - 1) : 0;
+  const yFor = (value) => height - padBottom - ((value - min) / (max - min || 1)) * (height - padTop - padBottom);
+
+  const primaryCoords = points.map((point, index) => {
+    const prev = points[index - 1]?.value;
+    const delta = prev !== undefined ? point.value - prev : null;
+    return {
+      ...point,
+      delta,
+      previousYear: points[index - 1]?.year || null,
+      x: padX + xStep * index,
+      y: yFor(point.value),
+      anchor: edgeSafeAnchor(index, points.length),
+    };
+  });
+  const secondaryCoords = points
+    .map((point, index) => ({ ...point, x: padX + xStep * index, y: point.exOutlier !== null && point.exOutlier !== undefined ? yFor(point.exOutlier) : null, anchor: edgeSafeAnchor(index, points.length) }))
+    .filter((point) => point.y !== null);
+
+  const linePath = smoothPath(primaryCoords);
+  const areaPath = `${linePath} L ${primaryCoords[primaryCoords.length - 1].x} ${height - padBottom} L ${primaryCoords[0].x} ${height - padBottom} Z`;
+  const secondaryPath = secondaryCoords.length > 1 ? smoothPath(secondaryCoords) : "";
+
+  return `
+    <div class="pulse-sparkline-legend">
+      <span class="legend-item primary"><i></i>Normal</span>
+      <span class="legend-item secondary"><i></i>Data 신뢰도 하락 본부 제외</span>
+    </div>
+    <svg class="pulse-sparkline pulse-sparkline-dual" viewBox="0 0 ${width} ${height}" role="img" aria-label="Engagement Score 추이" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="pulseEngagementGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="var(--blue-mid)" />
+          <stop offset="100%" stop-color="var(--neon-purple)" />
+        </linearGradient>
+        <linearGradient id="pulseEngagementGradientFill" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="var(--blue-mid)" stop-opacity="0.16" />
+          <stop offset="100%" stop-color="var(--blue-mid)" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      <path class="grid" d="M${padX} ${height - padBottom} H${width - padX}" />
+      <path class="area" d="${areaPath}" fill="url(#pulseEngagementGradientFill)" stroke="none" />
+      ${secondaryPath ? `<path class="line secondary" d="${secondaryPath}" fill="none" />` : ""}
+      <path class="line" d="${linePath}" stroke="url(#pulseEngagementGradient)" />
+      ${secondaryCoords.map((point) => `<circle class="secondary" cx="${point.x}" cy="${point.y}" r="4.5" />`).join("")}
+      ${primaryCoords.map((point) => `
+        <g>
+          <circle cx="${point.x}" cy="${point.y}" r="5.5" />
+          <text class="value" x="${point.x}" y="${point.y - 24}" text-anchor="${point.anchor}">${pct(point.value)}</text>
+          ${point.delta !== null ? `<text class="delta ${toneForDelta(point.delta)}" x="${point.x}" y="${point.y - 11}" text-anchor="${point.anchor}">${point.previousYear} 대비 ${deltaLabel(point.delta)}</text>` : ""}
+          <text class="year" x="${point.x}" y="${height - 8}" text-anchor="${point.anchor}">${point.year}</text>
         </g>
       `).join("")}
     </svg>
@@ -185,6 +282,16 @@ function renderTrendSection(yearDocs) {
   `;
 }
 
+function renderEngagementTrendSection(yearDocs) {
+  const points = engagementTrend(yearDocs);
+  if (!points.length) return `<div class="pulse-mini-empty">Engagement Score 추이 데이터 없음</div>`;
+  return `
+    <div class="pulse-trend-visual">
+      ${engagementSparkline(points)}
+    </div>
+  `;
+}
+
 function renderThemeTrendSection(yearDocs) {
   const rows = themeTrend(yearDocs).filter((theme) => theme.values.length);
   if (!rows.length) return "";
@@ -271,6 +378,10 @@ function renderOverviewView({ state, cache }) {
 
   const diagnostics = pulseDiagnostics(doc, prevDoc);
   const engagement = companyEngagement(doc, year);
+  const prevEngagement = prevDoc ? companyEngagement(prevDoc, prevYear) : null;
+  const engagementDelta = (engagement.included !== null && prevEngagement?.included != null)
+    ? engagement.included - prevEngagement.included
+    : null;
   const headline = trustRecoveryHeadline(doc, prevDoc);
   const mismatchInsights = relationshipInsights(doc);
   const voiceImpact = voiceImpactProfile(doc);
@@ -330,6 +441,39 @@ function renderOverviewView({ state, cache }) {
         조직이나 구성원을 서열화하고 감점하는 평가표가 아니라, 구성원 경험에서 나타나는 신뢰·에너지·소속의 변화 신호를 조기에 발견해 <strong>어디의 이야기를 먼저 듣고 어떤 운영 질문을 더 확인할지 정하는 출발점</strong>입니다. 이 결과는 결론이 아니라 경청 대화와 추가 확인을 위한 가설로 사용합니다.
       </p>
       ${renderUploadPanel(state)}
+    </article>
+
+    <!-- 장면 0.5. 공식 보고 지표 (Engagement Score) -->
+    <article class="story-scene scene-0-5 panel highlight-blue">
+      <div class="scene-header">
+        <span class="eyebrow">글로벌 공식 지표 · 경영진 보고 기준</span>
+        <h2>Engagement Score</h2>
+        <p>본사 글로벌 시스템이 산출하는 공식 수치이며, 본 플랫폼은 이 값을 계산하지 않고 그대로 표시합니다.</p>
+      </div>
+      <div class="dual-perspective-grid">
+        <div class="movement-card">
+          <span class="card-title">Normal</span>
+          <div class="card-value-row">
+            <strong>${engagement.included !== null ? pct(engagement.included) : "데이터 없음"}</strong>
+            ${prevYear && engagementDelta !== null ? `<span class="delta ${toneForDelta(engagementDelta)}">${prevYear}년 대비 ${deltaLabel(engagementDelta)}</span>` : ""}
+          </div>
+          <p class="card-desc">전체 응답 기준 공식 Engagement Score입니다.</p>
+        </div>
+        <div class="movement-card">
+          <span class="card-title">Data 신뢰도 하락 본부 제외</span>
+          <div class="card-value-row">
+            <strong>${engagement.exOutlier !== null ? pct(engagement.exOutlier) : "데이터 없음"}</strong>
+          </div>
+          <p class="card-desc">
+            ${engagement.exOutlier !== null
+              ? `고객혁신본부CE, Data Control 등 데이터 신뢰도가 낮다고 판단된 본부를 제외하면 ${pct(engagement.exOutlier)} 수준으로 낮아집니다.`
+              : "해당 연도는 제외 산출값이 입력되지 않았습니다."}
+          </p>
+        </div>
+      </div>
+      <p class="card-desc" style="margin-top:14px;">
+        제외 기준 및 정확한 산출 근거는 본사 글로벌 시스템 내부 계산이며, 개인정보 보호 정책상 세부 데이터는 본 플랫폼에서 확인할 수 없습니다. ${escapeHtml(engagement.note)}
+      </p>
     </article>
 
     <!-- 장면 1. 올해의 한 문장 -->
@@ -923,10 +1067,21 @@ function renderExpertView({ state, cache }) {
   return `
     <section class="panel">
       <div class="section-title">
-        <h2>연도별 문항 추세 (최근 3개년 추이)</h2>
-        <span>세 해 모두 데이터가 존재하는 공통 문항 기준 전사 평균값</span>
+        <h2>📊 핵심 추세 지표 (최근 3개년)</h2>
+        <span>전사 문항 평균 추세와 Engagement Score를 함께 비교합니다.</span>
       </div>
-      ${renderTrendSection(cache.years || {})}
+      <div class="pulse-trend-comparison-grid">
+        <div class="pulse-trend-card">
+          <h3>연도별 문항 추세</h3>
+          <p class="pulse-trend-card-sub">세 해 모두 데이터가 존재하는 공통 문항 기준 전사 평균값</p>
+          ${renderTrendSection(cache.years || {})}
+        </div>
+        <div class="pulse-trend-card">
+          <h3>Engagement Score 추세</h3>
+          <p class="pulse-trend-card-sub">글로벌 공식 지표 · 경영진 보고 기준</p>
+          ${renderEngagementTrendSection(cache.years || {})}
+        </div>
+      </div>
     </section>
 
     <section class="panel">

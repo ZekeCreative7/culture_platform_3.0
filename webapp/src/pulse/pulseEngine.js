@@ -251,6 +251,16 @@ export function pulseDiagnostics(currentDoc, previousDoc) {
   };
 }
 
+export function engagementTrend(yearDocs) {
+  const years = Object.keys(yearDocs).filter((year) => yearDocs[year]).map(Number).sort((a, b) => a - b);
+  return years
+    .map((year) => {
+      const eng = companyEngagement(yearDocs[year], year);
+      return { year, value: eng.included, exOutlier: eng.exOutlier };
+    })
+    .filter((item) => item.value !== null);
+}
+
 export function trendMatched(yearDocs) {
   const years = Object.keys(yearDocs).filter((year) => yearDocs[year]);
   if (!years.length) return [];
@@ -287,7 +297,8 @@ export function companyEngagement(doc, year) {
   const exOutlierKey = `exOutlier${year}`;
   return {
     primary: company[exOutlierKey] ?? company[key],
-    included: company[key],
+    included: company[key] ?? null,
+    exOutlier: company[exOutlierKey] ?? null,
     source: doc?.engagementScore?.source || "HQ",
     note: doc?.engagementScore?.note || "본사 제공 공식값 · 플랫폼에서 계산하지 않음",
   };

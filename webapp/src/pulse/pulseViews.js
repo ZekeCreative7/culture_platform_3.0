@@ -197,7 +197,7 @@ function renderPulseTabs(state) {
     <div class="pulse-tabs">
       <button class="${view === "overview" ? "active" : ""}" aria-pressed="${view === "overview"}" data-pulse-view="overview"><strong>한눈에 보기</strong><small>전사 스크리닝</small></button>
       <button class="${view === "listening" ? "active" : ""}" aria-pressed="${view === "listening"}" data-pulse-view="listening"><strong>조직별로 보기</strong><small>본부별 맥락</small></button>
-      <button class="${view === "expert" ? "active" : ""}" aria-pressed="${view === "expert"}" data-pulse-view="expert"><strong>근거 자세히</strong><small>문항·추세 확인</small></button>
+      <button class="${view === "expert" ? "active" : ""}" aria-pressed="${view === "expert"}" data-pulse-view="expert"><strong>상세 데이터로 보기</strong><small>문항·추세 확인</small></button>
     </div>
   `;
 }

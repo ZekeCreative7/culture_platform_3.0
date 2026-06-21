@@ -5399,3 +5399,23 @@ nav button.active,
   background: var(--cb-blue-gradient-active);
   border-color: #003ecc;
 }
+
+/* Page-level headlines carry the visual hierarchy; supporting copy stays calm. */
+.dashboard-header-block h1,
+.page-head h1,
+.story-scene h1,
+.pulse-hero h1,
+.auth-copy h1 {
+  font-weight: 700;
+}
+
+/* Metric numerals use the same clean sans-serif voice as the Korean UI. */
+.kpi-value,
+.metric strong,
+.pulse-score strong,
+.pulse-domain-grid span,
+.report-summary strong {
+  font-family: var(--font-main);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}

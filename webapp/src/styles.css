@@ -5454,3 +5454,49 @@ nav button.active,
 @media (max-width: 767px) {
   .survey-session-cascade { grid-template-columns: 1fr; }
 }
+
+/* Pulse overview: keep the top question movers inside narrow mobile cards. */
+@media (max-width: 767px) {
+  .scene-2-5,
+  .scene-2-5 .scene-header,
+  .scene-2-5 .top-changes-summary,
+  .scene-2-5 .change-summary-column,
+  .scene-2-5 .change-summary-column li {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .scene-2-5 { overflow: hidden; }
+  .scene-2-5 .top-changes-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    margin-bottom: 0;
+  }
+  .scene-2-5 .change-summary-column { padding: 16px; }
+  .scene-2-5 .change-summary-column h4 {
+    align-items: flex-start;
+    line-height: 1.45;
+  }
+  .scene-2-5 .change-summary-column li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+  }
+  .scene-2-5 .change-summary-column li strong {
+    max-width: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+  .scene-2-5 .change-summary-column li .delta {
+    justify-self: end;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .scene-2-5 .change-summary-column li { grid-template-columns: minmax(0, 1fr); }
+  .scene-2-5 .change-summary-column li .delta { justify-self: start; }
+}

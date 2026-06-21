@@ -218,17 +218,22 @@ export async function parsePulseWorkbook(file) {
 
   const engagementScore = parseEngagementScore(workbook, pulseSheet.year, errors);
   const now = new Date().toISOString();
+  const meta = {
+    reorgBaselineYears: [2025],
+    uploadedAt: now,
+    sourceFile: file.name,
+    parser: "Pulse template xlsx v1",
+  };
+  // 전사 행이 N 시트에 있으면 권위 있는 전체 응답 표본수로 사용한다 (본부별 N 합과 다를 수 있음).
+  if (Number.isFinite(nByDivision["전사"])) {
+    meta.companyN = nByDivision["전사"];
+  }
   const payload = {
     year: pulseSheet.year,
     companywide,
     divisions,
     engagementScore,
-    meta: {
-      reorgBaselineYears: [2025],
-      uploadedAt: now,
-      sourceFile: file.name,
-      parser: "Pulse template xlsx v1",
-    },
+    meta,
   };
 
   return {

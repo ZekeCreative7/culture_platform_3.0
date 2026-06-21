@@ -1,6 +1,7 @@
 import { CORE, DOMAINS, MANAGER_CLUSTER, THEMES } from "../config/domains.js";
 import { QUESTIONS } from "../config/questions.js";
 import { PULSE_RELATIONS } from "../config/pulseRelations.js";
+import { PULSE_COMPANY_N } from "../config/pulseDivisions.js";
 
 const OUTLIER = { share5Max: 0.65, zMax: 2.0, unfavFloor: 0.05 };
 const W = { level: 0.5, unfav: 0.35, decline: 0.15 };
@@ -302,6 +303,8 @@ export function netFromItem(item) {
 export function getCompanyN(doc) {
   if (doc?.companywide?.N) return doc.companywide.N;
   if (doc?.meta?.companyN) return doc.meta.companyN;
+  const seeded = PULSE_COMPANY_N[doc?.year];
+  if (typeof seeded === "number" && Number.isFinite(seeded)) return seeded;
   if (doc?.divisions) {
     const validNs = Object.values(doc.divisions)
       .map((d) => d.n)
@@ -626,6 +629,9 @@ export function dataConfidenceSummary(docOrDivision, previousDoc = null) {
 export function normalizePulseDoc(doc, year) {
   if (!doc) return null;
   const normalized = { ...doc };
+  if (normalized.year === undefined && year !== undefined) {
+    normalized.year = Number(year);
+  }
   if (normalized.divisions) {
     const updatedDivisions = {};
     Object.entries(normalized.divisions).forEach(([key, value]) => {

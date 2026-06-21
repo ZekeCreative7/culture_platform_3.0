@@ -83,7 +83,7 @@ function makePulseSheet(year) {
 
 function makeNSheet() {
   const XLSX = sheetjs();
-  const rows = [["부문", "응답자수(N)"], ...PULSE_DIVISIONS.map((item) => [item.id, ""])];
+  const rows = [["부문", "응답자수(N)"], ["전사", ""], ...PULSE_DIVISIONS.map((item) => [item.id, ""])];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   setWidths(ws, [32, 16]);
   return ws;

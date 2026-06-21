@@ -54,6 +54,7 @@ export const blankState = () => ({
   orgMembers: [],
   orgDataVersion: 0,
   surveys: [],
+  surveyTemplates: [],
   selectedCompany: "CEO",
   selectedDivision: "",
   selectedHq: "",
@@ -185,7 +186,7 @@ export function saveStateQuiet() {
 function persistState() {
   const {
     activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
-    surveys,
+    surveys, surveyTemplates,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
@@ -198,7 +199,7 @@ function persistState() {
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
-    surveys,
+    surveys, surveyTemplates,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
     activeSessionTab, calendarView, calendarDate, orgSearchQuery,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveyQuestions, qrBaseUrl,
@@ -221,6 +222,7 @@ export function normalizeAppState(nextState) {
   nextState.selectedAnalyticsType = normalizeSessionType(nextState.selectedAnalyticsType);
   nextState.selectedReportType = normalizeSessionType(nextState.selectedReportType);
   nextState.qualSignals = nextState.qualSignals || [];
+  nextState.surveyTemplates = nextState.surveyTemplates || [];
   if (!PHASES.includes(nextState.draftSurveyPhase)) nextState.draftSurveyPhase = "사전";
   if (nextState.selectedAnalyticsPhase && !PHASES.includes(nextState.selectedAnalyticsPhase)) nextState.selectedAnalyticsPhase = "";
   if (!nextState.draftYear) nextState.draftYear = new Date().getFullYear();
@@ -311,6 +313,25 @@ export async function saveResponsesToFirestore(rows) {
 }
 export async function deleteSurveyFromFirestore(id) {
   await deleteDoc(doc(db, 'surveys', id));
+}
+
+// 설문을 지워도 다음 세션 만들 때 불러올 예시 질문이 남도록, 배포 설문과는 별도 컬렉션에 저장한다.
+export async function loadSurveyTemplatesFromFirestore() {
+  try {
+    const snap = await getDocs(collection(db, 'surveyTemplates'));
+    state.surveyTemplates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    saveState();
+  } catch (e) {
+    console.error('Firestore 설문 템플릿 로드 실패:', e);
+  }
+}
+
+export async function saveSurveyTemplateToFirestore(id, data) {
+  await setDoc(doc(db, 'surveyTemplates', id), { ...data, updatedAt: serverTimestamp() });
+}
+
+export async function deleteSurveyTemplateFromFirestore(id) {
+  await deleteDoc(doc(db, 'surveyTemplates', id));
 }
 
 export async function updateSurveyInFirestore(id, data) {

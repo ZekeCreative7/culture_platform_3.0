@@ -24,9 +24,10 @@ import {
   syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
   deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore,
   deleteSurveyFromFirestore, updateSurveyInFirestore, loadPulseYears,
+  loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260620-org-revert-v1';
+} from './state.js?v=20260621-survey-templates-v1';
 
 const VIEWS = [
   ["dashboard", "Home", "홈"],
@@ -1813,12 +1814,13 @@ function renderSurveyCreator() {
       </div>
 
       <!-- Template loader -->
-      ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length > 0 ? `
+      ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length > 0 || (state.surveyTemplates || []).length > 0 ? `
       <div style="display:flex; gap:8px; align-items:flex-end;">
-        <label style="flex:1; font-size:12px; font-weight:700; color:var(--ink-2);">기존 설문에서 질문 불러오기
+        <label style="flex:1; font-size:12px; font-weight:700; color:var(--ink-2);">기존 설문/템플릿에서 질문 불러오기
           <select id="survey-template-select" style="margin-top:4px;">
             <option value="">-- 템플릿 선택 --</option>
-            ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).map(s => `<option value="${s.id}">${escapeHtml(s.title)} (${s.questions.length}문항 · ${s.phase})</option>`).join('')}
+            ${(state.surveyTemplates || []).length ? `<optgroup label="템플릿">${state.surveyTemplates.map(t => `<option value="tpl:${t.id}">${escapeHtml(t.title)} (${(t.questions || []).length}문항${t.phase ? ` · ${t.phase}` : ''})</option>`).join('')}</optgroup>` : ''}
+            ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length ? `<optgroup label="배포 중인 설문">${state.surveys.filter(s => s.questions && s.questions.length > 0).map(s => `<option value="${s.id}">${escapeHtml(s.title)} (${s.questions.length}문항 · ${s.phase})</option>`).join('')}</optgroup>` : ''}
           </select>
         </label>
         <button class="secondary compact" style="white-space:nowrap; flex-shrink:0;" onclick="loadSurveyTemplate()">불러오기</button>
@@ -2003,6 +2005,7 @@ function renderSurveyCreator() {
                   <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
                   <button class="ghost compact" onclick="copySurveyLink('${surveyLink}')">링크 복사</button>
                   ${!s.googleFormUrl ? `<button class="ghost compact" style="font-size:11px;" onclick="downloadSurveyTemplate('${s.id}')">CSV 템플릿 ↓</button>` : ''}
+                  ${!s.googleFormUrl && s.questions && s.questions.length ? `<button class="ghost compact" style="font-size:11px;" onclick="saveSurveyAsTemplate('${s.id}')">질문 템플릿으로 저장</button>` : ''}
                 </div>
                 <div style="display:flex; gap:14px; align-items:flex-start;">
                   <div style="flex:1;">
@@ -2019,6 +2022,22 @@ function renderSurveyCreator() {
               </div>
             `;
           }).join("") : emptyCard("생성된 설문지가 없습니다.")}
+        </div>
+
+        <div style="margin-top:28px;">
+          ${sectionTitle("템플릿", `${(state.surveyTemplates || []).length}건`)}
+          <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">설문을 삭제해도 남는 질문 보관함입니다. 위 설문 카드를 펼친 뒤 "질문 템플릿으로 저장"을 누르면 여기 추가됩니다.</p>
+          <div class="surveys-grid">
+            ${(state.surveyTemplates || []).length ? state.surveyTemplates.map(t => `
+              <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
+                <div style="flex:1; min-width:0;">
+                  <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(t.title)}</strong>
+                  <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${[t.sessionType, t.phase].filter(Boolean).map(escapeHtml).join(" · ")}${t.sessionType || t.phase ? " · " : ""}${(t.questions || []).length}문항</span>
+                </div>
+                <button class="delete-survey-btn" onclick="deleteSurveyTemplate('${t.id}')" style="position:static; margin-left:0;">&times;</button>
+              </div>
+            `).join("") : emptyCard("저장된 템플릿이 없습니다.")}
+          </div>
         </div>
       </div>
     </div>
@@ -4013,12 +4032,15 @@ window.uploadSurveyResults = function(surveyId) {
 
 window.loadSurveyTemplate = function() {
   const select = document.querySelector('#survey-template-select');
-  const surveyId = select ? select.value : '';
-  if (!surveyId) { alert('불러올 템플릿을 선택해 주세요.'); return; }
-  const survey = (state.surveys || []).find(s => s.id === surveyId);
-  if (!survey || !survey.questions || !survey.questions.length) { alert('해당 설문에 질문이 없습니다.'); return; }
-  if (!confirm(`"${survey.title}"의 질문 ${survey.questions.length}개를 현재 초안에 덮어씌울까요?`)) return;
-  state.draftSurveyQuestions = JSON.parse(JSON.stringify(survey.questions));
+  const value = select ? select.value : '';
+  if (!value) { alert('불러올 템플릿을 선택해 주세요.'); return; }
+  const isTemplate = value.startsWith('tpl:');
+  const source = isTemplate
+    ? (state.surveyTemplates || []).find(t => t.id === value.slice(4))
+    : (state.surveys || []).find(s => s.id === value);
+  if (!source || !source.questions || !source.questions.length) { alert('해당 항목에 질문이 없습니다.'); return; }
+  if (!confirm(`"${source.title}"의 질문 ${source.questions.length}개를 현재 초안에 덮어씌울까요?`)) return;
+  state.draftSurveyQuestions = JSON.parse(JSON.stringify(source.questions));
   saveState();
   render();
 };
@@ -4309,6 +4331,35 @@ window.deleteSurvey = function(id) {
   deleteSurveyFromFirestore(id).catch(e => console.error('Firestore 삭제 실패:', e));
 };
 
+window.saveSurveyAsTemplate = function(surveyId) {
+  const survey = (state.surveys || []).find(s => s.id === surveyId);
+  if (!survey || !survey.questions || !survey.questions.length) { alert('해당 설문에 질문이 없습니다.'); return; }
+  if (!state.surveyTemplates) state.surveyTemplates = [];
+  const templateData = {
+    title: survey.title,
+    sessionType: survey.sessionType || '',
+    phase: survey.phase || '',
+    questions: JSON.parse(JSON.stringify(survey.questions))
+  };
+  const newId = uid();
+  state.surveyTemplates.push({ ...templateData, id: newId });
+  saveState();
+  render();
+  saveSurveyTemplateToFirestore(newId, templateData).catch(e => {
+    console.error('Firestore 템플릿 저장 실패:', e);
+    alert('템플릿이 저장됐지만 서버 동기화에 실패했습니다: ' + e.message);
+  });
+  alert(`"${survey.title}"을(를) 템플릿으로 저장했습니다. 이제 이 설문을 지워도 템플릿은 남습니다.`);
+};
+
+window.deleteSurveyTemplate = function(id) {
+  if (!confirm("이 템플릿을 삭제하시겠습니까?")) return;
+  state.surveyTemplates = (state.surveyTemplates || []).filter(t => t.id !== id);
+  saveState();
+  render();
+  deleteSurveyTemplateFromFirestore(id).catch(e => console.error('Firestore 템플릿 삭제 실패:', e));
+};
+
 window.startEditSurvey = function(id) {
   const survey = (state.surveys || []).find(s => s.id === id);
   if (!survey) return;
@@ -4444,7 +4495,7 @@ async function initApp() {
 
   // Load sessions and surveys BEFORE wiring the response listener: the session is the source of
   // truth for each response's 기수, so the map below needs sessions in place to resolve it.
-  await Promise.all([loadSessionsFromFirestore(), loadSurveysFromFirestore()]);
+  await Promise.all([loadSessionsFromFirestore(), loadSurveysFromFirestore(), loadSurveyTemplatesFromFirestore()]);
   syncSurveysToSessions();
   render();
   if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
@@ -4464,6 +4515,16 @@ async function initApp() {
     }
   }, (err) => {
     console.error('Firestore 설문 실시간 갱신 오류:', err);
+  });
+
+  onSnapshot(collection(db, 'surveyTemplates'), (snap) => {
+    state.surveyTemplates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    if (state.activeView === "survey") {
+      saveState();
+      render();
+    }
+  }, (err) => {
+    console.error('Firestore 설문 템플릿 실시간 갱신 오류:', err);
   });
 
   // Real-time listener for responses — scoped to active sessions

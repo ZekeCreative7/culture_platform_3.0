@@ -29,6 +29,9 @@ import {
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
 } from './state.js?v=20260621-survey-templates-v1';
 
+const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  && new URLSearchParams(window.location.search).get('preview') === '1';
+
 const VIEWS = [
   ["dashboard", "Home", "홈"],
   ["sessions", "Sessions", "세션"],
@@ -639,6 +642,7 @@ function parseCSV(text, sessionId, phase) {
 
 function appShellClasses() {
   const classes = [];
+  if (state.activeView === "dashboard") classes.push("view-dashboard");
   if (state.mobileNavOpen) classes.push("mobile-nav-open");
   if (state.sidebarCollapsed && window.innerWidth > 767) classes.push("sidebar-collapsed");
   return classes.join(" ");
@@ -744,11 +748,17 @@ function render() {
           </button>
           <div class="searchbox">세션, 조직, 설문 검색</div>
           <div class="topbar-actions">
-            <div class="auth-user-controls">
-              <button type="button" id="access-admin-button" class="auth-admin-button" hidden>회원 승인</button>
-              <span id="signed-in-email" class="signed-in-email"></span>
-              <button type="button" id="auth-logout-button" class="auth-logout-button">로그아웃</button>
-            </div>
+            ${LOCAL_PREVIEW ? `
+              <div class="local-preview-badge" title="Firebase 로그인과 원격 저장을 사용하지 않는 로컬 확인 모드입니다.">
+                <span class="local-preview-dot"></span>로컬 미리보기
+              </div>
+            ` : `
+              <div class="auth-user-controls">
+                <button type="button" id="access-admin-button" class="auth-admin-button" hidden>회원 승인</button>
+                <span id="signed-in-email" class="signed-in-email"></span>
+                <button type="button" id="auth-logout-button" class="auth-logout-button">로그아웃</button>
+              </div>
+            `}
             <span class="topbar-session-count">${state.sessions.length} sessions</span>
             <button class="ghost" data-view="upload">데이터 가져오기</button>
             <button class="primary compact" data-view="sessions">새 세션</button>
@@ -4440,7 +4450,7 @@ function computeQrBaseUrl() {
   return new URL('.', window.location.href).href.replace(/\/$/, '');
 }
 
-async function initApp() {
+async function initApp({ localPreview = false } = {}) {
   reassignState(loadState());
   // The product always opens on Home; internal navigation is still preserved during use.
   state.activeView = "dashboard";
@@ -4492,6 +4502,13 @@ async function initApp() {
   ensureDraftOrgSelection();
 
   render();
+
+  // Local preview is intentionally read-mostly: use the cached/local seed data and
+  // do not require Firebase Auth, App Check debug tokens, or Firestore listeners.
+  if (localPreview) {
+    setDbStatus('connected');
+    return;
+  }
 
   // Load sessions and surveys BEFORE wiring the response listener: the session is the source of
   // truth for each response's 기수, so the map below needs sessions in place to resolve it.
@@ -4763,4 +4780,13 @@ window.addEventListener('storage', (e) => {
   }
 });
 
-initializeAuthGate({ onAccessGranted: initApp });
+if (LOCAL_PREVIEW) {
+  document.body.classList.add('local-preview');
+  document.body.classList.remove('auth-locked');
+  document.querySelector('#auth-gate')?.classList.add('is-hidden');
+  initApp({ localPreview: true }).catch((error) => {
+    console.error('로컬 미리보기 시작 실패:', error);
+  });
+} else {
+  initializeAuthGate({ onAccessGranted: initApp });
+}

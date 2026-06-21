@@ -39,17 +39,10 @@ function clippedPct(value) {
   return Math.round(n * 100);
 }
 
-function smoothPath(points) {
+function straightPath(points) {
   if (!points || points.length === 0) return "";
   if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const p0 = points[i];
-    const p1 = points[i + 1];
-    const midX = (p0.x + p1.x) / 2;
-    d += ` C ${midX} ${p0.y}, ${midX} ${p1.y}, ${p1.x} ${p1.y}`;
-  }
-  return d;
+  return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
 }
 
 // 끝점 라벨이 차트 바깥으로 잘리지 않도록, 첫/끝 포인트는 안쪽 방향으로 정렬한다.
@@ -81,7 +74,7 @@ function sparkline(points, { width = 340, height = 184, gradientId = "pulseTrend
       anchor: edgeSafeAnchor(index, points.length),
     };
   });
-  const linePath = smoothPath(coords);
+  const linePath = straightPath(coords);
   const areaPath = `${linePath} L ${coords[coords.length - 1].x} ${height - padBottom} L ${coords[0].x} ${height - padBottom} Z`;
   return `
     <svg class="pulse-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="전사 추이 라인" preserveAspectRatio="xMidYMid meet">
@@ -116,8 +109,12 @@ function engagementSparkline(points, { width = 340, height = 184 } = {}) {
   if (!primaryValues.length) return "";
   const secondaryValues = points.map((p) => p.exOutlier).filter((v) => typeof v === "number");
   const allValues = [...primaryValues, ...secondaryValues];
-  const min = Math.min(...allValues, 0.3);
-  const max = Math.max(...allValues, 0.8);
+  const rawMin = Math.min(...allValues);
+  const rawMax = Math.max(...allValues);
+  const range = rawMax - rawMin || 0.05;
+  const pad = Math.max(range * 0.35, 0.02);
+  const min = rawMin - pad;
+  const max = rawMax + pad;
   const padX = 38;
   const padTop = 46;
   const padBottom = 28;
@@ -140,14 +137,14 @@ function engagementSparkline(points, { width = 340, height = 184 } = {}) {
     .map((point, index) => ({ ...point, x: padX + xStep * index, y: point.exOutlier !== null && point.exOutlier !== undefined ? yFor(point.exOutlier) : null, anchor: edgeSafeAnchor(index, points.length) }))
     .filter((point) => point.y !== null);
 
-  const linePath = smoothPath(primaryCoords);
+  const linePath = straightPath(primaryCoords);
   const areaPath = `${linePath} L ${primaryCoords[primaryCoords.length - 1].x} ${height - padBottom} L ${primaryCoords[0].x} ${height - padBottom} Z`;
-  const secondaryPath = secondaryCoords.length > 1 ? smoothPath(secondaryCoords) : "";
+  const secondaryPath = secondaryCoords.length > 1 ? straightPath(secondaryCoords) : "";
 
   return `
     <div class="pulse-sparkline-legend">
-      <span class="legend-item primary"><i></i>Normal</span>
-      <span class="legend-item secondary"><i></i>Data 신뢰도 하락 본부 제외</span>
+      <span class="legend-dot is-primary"><i></i>Normal</span>
+      <span class="legend-dot is-secondary"><i></i>신뢰도 하락 본부 제외</span>
     </div>
     <svg class="pulse-sparkline pulse-sparkline-dual" viewBox="0 0 ${width} ${height}" role="img" aria-label="Engagement Score 추이" preserveAspectRatio="xMidYMid meet">
       <defs>
@@ -1072,14 +1069,14 @@ function renderExpertView({ state, cache }) {
       </div>
       <div class="pulse-trend-comparison-grid">
         <div class="pulse-trend-card">
-          <h3>연도별 문항 추세</h3>
-          <p class="pulse-trend-card-sub">세 해 모두 데이터가 존재하는 공통 문항 기준 전사 평균값</p>
-          ${renderTrendSection(cache.years || {})}
-        </div>
-        <div class="pulse-trend-card">
           <h3>Engagement Score 추세</h3>
           <p class="pulse-trend-card-sub">글로벌 공식 지표 · 경영진 보고 기준</p>
           ${renderEngagementTrendSection(cache.years || {})}
+        </div>
+        <div class="pulse-trend-card">
+          <h3>연도별 문항 추세</h3>
+          <p class="pulse-trend-card-sub">세 해 모두 데이터가 존재하는 공통 문항 기준 전사 평균값</p>
+          ${renderTrendSection(cache.years || {})}
         </div>
       </div>
     </section>

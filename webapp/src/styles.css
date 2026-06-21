@@ -766,11 +766,11 @@ button:disabled { cursor: not-allowed; opacity: 0.42; transform: none !important
 .pulse-sparkline-dual .line:not(.secondary) { stroke: url(#pulseEngagementGradient); }
 .pulse-sparkline-dual .line.secondary { fill: none; stroke: var(--amber); stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; }
 .pulse-sparkline-dual circle.secondary { fill: #ffffff; stroke: var(--amber); stroke-width: 2; r: 4.5; }
-.pulse-sparkline-legend { display: flex; gap: 16px; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--muted); }
-.pulse-sparkline-legend .legend-item { display: inline-flex; align-items: center; gap: 6px; }
-.pulse-sparkline-legend .legend-item i { width: 16px; height: 0; border-top: 2.5px solid; display: inline-block; }
-.pulse-sparkline-legend .legend-item.primary i { border-color: var(--blue-mid); border-style: solid; }
-.pulse-sparkline-legend .legend-item.secondary i { border-color: var(--amber); border-style: dashed; }
+.pulse-sparkline-legend { display: flex; justify-content: flex-end; gap: 12px; margin-bottom: 4px; }
+.pulse-sparkline-legend .legend-dot { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--muted); }
+.pulse-sparkline-legend .legend-dot i { width: 12px; height: 0; border-top: 2px solid; display: inline-block; }
+.pulse-sparkline-legend .legend-dot.is-primary i { border-color: var(--blue-mid); border-style: solid; }
+.pulse-sparkline-legend .legend-dot.is-secondary i { border-color: var(--amber); border-style: dashed; }
 .pulse-trend-comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 16px; }
 .pulse-trend-card { padding: 18px; border-radius: var(--radius-md); background: #ffffff; border: 1px solid #e2e8f0; box-shadow: var(--shadow-low); }
 .pulse-trend-card h3 { margin: 0 0 4px; font-size: 14px; font-weight: 800; color: var(--ink); }

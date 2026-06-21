@@ -1011,6 +1011,12 @@ button:disabled { cursor: not-allowed; opacity: 0.42; transform: none !important
   color: var(--muted);
   margin: 0;
 }
+.engagement-footnote {
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--faint);
+  margin: 14px 0 0;
+}
 
 /* TOP 개선/약화 요약 카드 */
 .top-changes-summary {

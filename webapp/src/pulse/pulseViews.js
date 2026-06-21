@@ -458,7 +458,6 @@ function renderOverviewView({ state, cache }) {
       <div class="scene-header">
         <span class="eyebrow">글로벌 공식 지표 · 경영진 보고 기준</span>
         <h2>Engagement Score</h2>
-        <p>본사 글로벌 시스템이 산출하는 공식 수치이며, 본 플랫폼은 이 값을 계산하지 않고 그대로 표시합니다.</p>
       </div>
       <div class="dual-perspective-grid">
         <div class="movement-card">
@@ -481,7 +480,7 @@ function renderOverviewView({ state, cache }) {
           </p>
         </div>
       </div>
-      <p class="card-desc" style="margin-top:14px;">
+      <p class="engagement-footnote">
         제외 기준 및 정확한 산출 근거는 본사 글로벌 시스템 내부 계산이며, 개인정보 보호 정책상 세부 데이터는 본 플랫폼에서 확인할 수 없습니다. ${escapeHtml(engagement.note)}
       </p>
     </article>

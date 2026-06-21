@@ -133,13 +133,26 @@ function engagementSparkline(points, { width = 340, height = 184 } = {}) {
       anchor: edgeSafeAnchor(index, points.length),
     };
   });
-  const secondaryCoords = points
-    .map((point, index) => ({ ...point, x: padX + xStep * index, y: point.exOutlier !== null && point.exOutlier !== undefined ? yFor(point.exOutlier) : null, anchor: edgeSafeAnchor(index, points.length) }))
-    .filter((point) => point.y !== null);
+  const secondaryCoordsAll = points.map((point, index) => ({
+    ...point,
+    index,
+    x: padX + xStep * index,
+    y: point.exOutlier !== null && point.exOutlier !== undefined ? yFor(point.exOutlier) : null,
+    anchor: edgeSafeAnchor(index, points.length),
+  }));
+  const secondaryCoords = secondaryCoordsAll.filter((point) => point.y !== null);
 
   const linePath = straightPath(primaryCoords);
   const areaPath = `${linePath} L ${primaryCoords[primaryCoords.length - 1].x} ${height - padBottom} L ${primaryCoords[0].x} ${height - padBottom} Z`;
-  const secondaryPath = secondaryCoords.length > 1 ? straightPath(secondaryCoords) : "";
+  // exOutlier 구간이 끊겨 있어도(예: 마지막 해만 존재) 직전 해의 점과 점선으로 이어서
+  // "여기서 갈라졌다"는 관계가 드러나도록, 연속 path 대신 점별 구간을 만든다.
+  const secondarySegments = secondaryCoords
+    .map((point) => {
+      const anchor = secondaryCoordsAll.find((p) => p.index === point.index - 1 && p.y !== null) || primaryCoords[point.index - 1];
+      return anchor ? `M ${anchor.x} ${anchor.y} L ${point.x} ${point.y}` : null;
+    })
+    .filter(Boolean);
+  const secondaryPath = secondarySegments.join(" ");
 
   return `
     <div class="pulse-sparkline-legend">

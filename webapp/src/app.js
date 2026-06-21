@@ -1,5 +1,5 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js';
-import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-tabs-connected-v1';
+import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-tabs-folder-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';

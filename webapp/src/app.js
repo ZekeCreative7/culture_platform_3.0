@@ -220,7 +220,7 @@ function ensureScopedSelection(kind) {
 
   // 3) 세션: 그 유형+기수에 속한 세션으로 보정
   const sessions = sessionsForTypeCohort(type, cohort);
-  if (!sessions.some((session) => session.id === state[sessionField])) {
+  if (state[sessionField] !== "all" && !sessions.some((session) => session.id === state[sessionField])) {
     state[sessionField] = sessions[0]?.id || "";
   }
   return { type, cohort, cohorts, sessions, session: sessions.find((item) => item.id === state[sessionField]) || null };
@@ -228,9 +228,14 @@ function ensureScopedSelection(kind) {
 
 function scopedSessionOptions(type, cohort, selectedSessionId = "") {
   const sessions = sessionsForTypeCohort(type, cohort);
-  return sessions.length
-    ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(sessionLabel(session))}</option>`).join("")
-    : `<option value="">선택 가능한 세션 없음</option>`;
+  if (!sessions.length) {
+    return `<option value="">선택 가능한 세션 없음</option>`;
+  }
+  const compareAllOption = `<option value="all" ${selectedSessionId === "all" ? "selected" : ""}>전체 비교 분석</option>`;
+  const sessionOptions = sessions.map((session) => 
+    `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(sessionLabel(session))}</option>`
+  ).join("");
+  return compareAllOption + sessionOptions;
 }
 
 function cohortOptionsHtml(type, selectedCohort) {
@@ -2609,12 +2614,383 @@ function dimRecommendation(key, score) {
   return match ? match[1] : (list[list.length-1]?.[1] || '');
 }
 
+function renderCompareReport(type, cohort) {
+  const sessions = sessionsForTypeCohort(type, cohort);
+  const types = availableSessionTypes();
+  
+  // 데이터 수집
+  const sessionScores = sessions.map(session => {
+    const stats = statsForSession(cohort, session.id);
+    const pre = stats.find(s => s.phase === '사전') || null;
+    const mid = stats.find(s => s.phase === '중간') || null;
+    const post = stats.find(s => s.phase === '사후') || null;
+    
+    // 최신 시점 우선순위: 사후 -> 중간 -> 사전
+    const diagnosis = (post && post.n >= 1) ? post : ((mid && mid.n >= 1) ? mid : ((pre && pre.n >= 1) ? pre : null));
+    
+    if (!diagnosis) {
+      return { session, hasData: false, overall: null };
+    }
+    
+    const psych = dimAvg(diagnosis, ['q1', 'q2', 'q3']);
+    const silo = dimAvg(diagnosis, ['q4', 'q5', 'q6']);
+    const resilience = dimAvg(diagnosis, ['q7']);
+    const mood = dimAvg(diagnosis, ['q8']);
+    
+    const validScores = [psych, silo, resilience, mood].filter(v => v !== null);
+    const overall = validScores.length ? validScores.reduce((a, b) => a + b, 0) / validScores.length : null;
+    
+    return {
+      session,
+      hasData: true,
+      phase: diagnosis.phase,
+      n: diagnosis.n,
+      scores: { psych, silo, resilience, mood },
+      overall
+    };
+  });
+  
+  // 유효 데이터가 있는 세션만 랭킹 산정 및 정렬
+  const rankedSessions = sessionScores
+    .filter(s => s.hasData && s.overall !== null)
+    .sort((a, b) => b.overall - a.overall);
+    
+  // 공동 순위 계산
+  let currentRank = 1;
+  let prevScore = null;
+  rankedSessions.forEach((s, idx) => {
+    if (prevScore !== null && s.overall < prevScore) {
+      currentRank = idx + 1;
+    }
+    s.rank = currentRank;
+    prevScore = s.overall;
+  });
+  
+  // 데이터가 없는 세션들
+  const noDataSessions = sessionScores.filter(s => !s.hasData);
+  
+  // 평균 종합 정보
+  const validOverallScores = rankedSessions.map(s => s.overall).filter(v => v !== null);
+  const avgOverall = validOverallScores.length 
+    ? (validOverallScores.reduce((a, b) => a + b, 0) / validOverallScores.length).toFixed(2) 
+    : '—';
+  
+  return `
+    <div id="report-export-content" class="report-export-content">
+    <section class="page-head report-export-header">
+      <div>
+        <span class="eyebrow">Cohort Compare Analysis</span>
+        <h1>전체 팀별 결과 비교 분석</h1>
+        <p>${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 전체 팀의 조직문화 진단 결과를 통합 비교합니다.</p>
+      </div>
+      <div class="report-export-actions" data-html2canvas-ignore="true">
+        <button class="report-export-button pdf" id="download-report-pdf" type="button" onclick="window.downloadReportPdf(event)">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 11h6M7 14h4"/></svg>
+          <span><b>PDF 리포트</b><small>전체 비교 화면 디자인</small></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel filters-panel" style="margin-bottom:18px;" data-html2canvas-ignore="true">
+      <div class="form-grid compact scoped-filter-grid">
+        <label>세션 유형
+          <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
+            ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
+          </select>
+        </label>
+        <label>대상 기수
+          <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
+            ${cohortOptionsHtml(type, cohort)}
+          </select>
+        </label>
+        <label>세션 선택
+          <select id="report-session-select">
+            ${scopedSessionOptions(type, cohort, "all")}
+          </select>
+        </label>
+        <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
+      </div>
+      <div class="filter-current">현재 적용: ${escapeHtml(sessionTypeLabel(type))} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 전체 비교 분석</div>
+    </section>
+
+    <div class="report-summary" style="margin-bottom:28px;">
+      <div>
+        <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">총 세션(팀) 수</span>
+        <strong style="font-size:28px; font-weight:800; color:var(--cb-ink);">${sessions.length}개</strong>
+      </div>
+      <div>
+        <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">진단 완료 팀 수</span>
+        <strong style="font-size:28px; font-weight:800; color:#00a866;">${rankedSessions.length}개</strong>
+      </div>
+      <div>
+        <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">기수 평균 종합점수</span>
+        <strong style="font-size:28px; font-weight:800; color:var(--cb-blue);">${avgOverall}<span style="font-size:14px; color:var(--cb-muted); font-weight:500;"> / 5</span></strong>
+      </div>
+    </div>
+
+    <section class="report-export-section" style="margin-bottom:28px;">
+      <div class="section-title" style="margin-bottom:12px;">
+        <h2>① 종합 점수 및 순위</h2>
+        <span>종합점수 기준 정렬 · 동점 시 공동 순위 부여</span>
+      </div>
+      
+      ${!rankedSessions.length && !noDataSessions.length ? `<div class="empty">비교할 세션이 없습니다.</div>` : `
+        <div style="overflow-x:auto;">
+          <table class="compare-ranking-table">
+            <thead>
+              <tr>
+                <th style="text-align:center;">순위</th>
+                <th>세션(팀)명</th>
+                <th style="text-align:center;">진단 시점</th>
+                <th style="text-align:center;">참여 인원</th>
+                <th style="text-align:center;">종합 점수</th>
+                <th style="text-align:center;">심리적 안전감</th>
+                <th style="text-align:center;">전반 분위기</th>
+                <th style="text-align:center;">사일로 해소</th>
+                <th style="text-align:center;">회복탄력성</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rankedSessions.map(s => {
+                const rag = ragInfo(s.overall);
+                const scoreSpan = (val) => {
+                  if (val === null || val === undefined) return '<span style="color:#cbd5e1;">—</span>';
+                  const r = ragInfo(val);
+                  return `<span style="font-weight:700; color:${r.color};">${val.toFixed(2)}</span>`;
+                };
+                return `
+                  <tr>
+                    <td class="rank-cell">${s.rank}위</td>
+                    <td class="team-cell">${escapeHtml(sessionLabel(s.session))}</td>
+                    <td style="text-align:center; color:var(--cb-muted);">${s.phase}</td>
+                    <td style="text-align:center; font-weight:600;">N=${s.n}</td>
+                    <td class="overall-cell" style="text-align:center;">
+                      <span style="font-size:14px; font-weight:800; color:${rag.color}; background:${rag.color}14; padding:3px 10px; border-radius:12px;">
+                        ${s.overall.toFixed(2)}
+                      </span>
+                    </td>
+                    <td style="text-align:center;">${scoreSpan(s.scores.psych)}</td>
+                    <td style="text-align:center;">${scoreSpan(s.scores.mood)}</td>
+                    <td style="text-align:center;">${scoreSpan(s.scores.silo)}</td>
+                    <td style="text-align:center;">${scoreSpan(s.scores.resilience)}</td>
+                  </tr>
+                `;
+              }).join("")}
+              ${noDataSessions.map(s => `
+                <tr style="opacity:0.6; background:#fafafa;">
+                  <td style="text-align:center; color:#cbd5e1;">—</td>
+                  <td class="team-cell" style="color:var(--cb-muted);">${escapeHtml(sessionLabel(s.session))}</td>
+                  <td style="text-align:center; color:#cbd5e1;">—</td>
+                  <td style="text-align:center; color:#cbd5e1;">N=0</td>
+                  <td style="text-align:center; color:#cbd5e1;">—</td>
+                  <td style="text-align:center; color:#cbd5e1;">—</td>
+                  <td style="text-align:center; color:#cbd5e1;">—</td>
+                  <td style="text-align:center; color:#cbd5e1;">—</td>
+                  <td style="text-align:center; color:#cbd5e1;">—</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `}
+    </section>
+
+    <section class="report-export-section" style="margin-bottom:28px;">
+      <div class="section-title" style="margin-bottom:16px;">
+        <h2>② 핵심 지표별 팀 비교</h2>
+        <span>4대 핵심 조직문화 지표별 팀 점수 대조</span>
+      </div>
+      
+      ${!rankedSessions.length ? `<div class="empty">시각화할 진단 데이터가 없습니다.</div>` : `
+        <div class="compare-charts-grid">
+          ${REPORT_DIMS.map(dim => {
+            const dimRanked = [...rankedSessions]
+              .map(s => ({ teamName: sessionLabel(s.session), val: s.scores[dim.key] }))
+              .filter(s => s.val !== null)
+              .sort((a, b) => b.val - a.val);
+            
+            return `
+              <div class="compare-chart-card">
+                <h3>
+                  <span>${dim.label}</span>
+                  <span style="color:${dim.color};">${dim.key.toUpperCase()}</span>
+                </h3>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                  ${dimRanked.map(item => {
+                    const pct = Math.round((item.val / 5) * 100);
+                    const rag = ragInfo(item.val);
+                    return `
+                      <div class="compare-bar-row">
+                        <div class="compare-bar-label" title="${escapeHtml(item.teamName)}">${escapeHtml(item.teamName)}</div>
+                        <div class="compare-bar-container">
+                          <div class="compare-bar-fill" style="width:${pct}%; background:${dim.color};"></div>
+                        </div>
+                        <div class="compare-bar-value" style="color:${rag.color};">${item.val.toFixed(2)}</div>
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `}
+    </section>
+
+    <section class="report-export-section" style="margin-bottom:28px;">
+      <div class="section-title" style="margin-bottom:16px;">
+        <h2>③ 팀별 정성 신호 비교</h2>
+        <span>AI 정성 분석 기반 톤 분포 · 주요 신호 및 주의 플래그 대조</span>
+      </div>
+      
+      ${!rankedSessions.length ? `<div class="empty">정성 비교를 진행할 진단 완료 팀이 없습니다.</div>` : `
+        <div class="compare-qual-grid">
+          ${rankedSessions.map(s => {
+            const dbPhase = s.phase === '사전' ? 'pre' : (s.phase === '사후' ? 'post' : 'mid');
+            const qualSignal = (state.qualSignals || []).find(q => q.session_id === s.session.id && q.phase === dbPhase && q.review?.status === 'confirmed');
+            const teamName = sessionLabel(s.session);
+            
+            let toneBarHtml = '<div style="font-size:12px; color:var(--cb-muted);">확정된 정성 분석 결과 없음</div>';
+            let axisBadgesHtml = '';
+            let themesHtml = '<div style="font-size:12px; color:var(--cb-muted);">테마 정보 없음</div>';
+            let flagsHtml = '';
+            
+            if (qualSignal) {
+              const tone = qualSignal.tone_distribution || { positive: 0, neutral: 0, negative: 0 };
+              const toneTotal = Math.max(1, tone.positive + tone.neutral + tone.negative);
+              const posPct = ((tone.positive / toneTotal) * 100).toFixed(1);
+              const neuPct = ((tone.neutral / toneTotal) * 100).toFixed(1);
+              const negPct = ((tone.negative / toneTotal) * 100).toFixed(1);
+              
+              toneBarHtml = `
+                <div>
+                  <div class="compare-tone-bar">
+                    <div class="compare-tone-seg" style="width:${posPct}%; background:#1d9e75;" title="긍정 ${tone.positive}명"></div>
+                    <div class="compare-tone-seg" style="width:${neuPct}%; background:#bbb;" title="중립 ${tone.neutral}명"></div>
+                    <div class="compare-tone-seg" style="width:${negPct}%; background:#d85a30;" title="부정 ${tone.negative}명"></div>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--cb-muted); margin-top:4px;">
+                    <span>긍정 ${posPct}%</span>
+                    <span>중립 ${neuPct}%</span>
+                    <span>부정 ${negPct}%</span>
+                  </div>
+                </div>
+              `;
+              
+              const AXIS_KEYS = ['team_climate', 'wellness', 'psych_safety', 'dialogue_safety', 'change_adaptability', 'collaboration'];
+              const AXIS_LABEL = {
+                team_climate: '분위기', wellness: '웰니스', psych_safety: '안전감',
+                dialogue_safety: '대화', change_adaptability: '변화', collaboration: '협업'
+              };
+              
+              const activeAxes = AXIS_KEYS.map(k => {
+                const a = qualSignal.axis_signals?.[k] || { mentioned: false };
+                return { key: k, label: AXIS_LABEL[k], ...a };
+              }).filter(a => a.mentioned);
+              
+              if (activeAxes.length) {
+                axisBadgesHtml = `
+                  <div class="compare-axis-grid">
+                    ${activeAxes.slice(0, 3).map(a => `
+                      <div class="compare-axis-badge ${a.direction}" title="${escapeHtml(a.evidence_quote || '')}">
+                        ${escapeHtml(a.label)}: ${a.strength === 'strong' ? '강' : (a.strength === 'moderate' ? '중' : '약')}
+                      </div>
+                    `).join("")}
+                    ${activeAxes.length > 3 ? `<div class="compare-axis-badge none">+${activeAxes.length - 3}개 더보기</div>` : ''}
+                  </div>
+                `;
+              } else {
+                axisBadgesHtml = '<div style="font-size:11px; color:var(--cb-muted); text-align:center; padding:6px; background:var(--cb-soft); border-radius:6px;">언급된 정성 축 없음</div>';
+              }
+              
+              if (qualSignal.themes && qualSignal.themes.length) {
+                themesHtml = `
+                  <div class="compare-theme-list">
+                    ${qualSignal.themes.slice(0, 2).map(t => {
+                      const dotColor = t.direction === 'positive' ? '#1d9e75' : (t.direction === 'negative' ? '#d85a30' : '#ba7517');
+                      return `
+                        <div class="compare-theme-item" title="${escapeHtml(t.quotes?.[0] || '')}">
+                          <span class="compare-theme-dot" style="background:${dotColor};"></span>
+                          <span style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${escapeHtml(t.label)}</span>
+                          <span style="font-size:11px; color:var(--cb-muted); flex-shrink:0;">(${t.mention_count}회)</span>
+                        </div>
+                      `;
+                    }).join("")}
+                  </div>
+                `;
+              }
+              
+              if (qualSignal.flags && qualSignal.flags.length) {
+                flagsHtml = `
+                  <div style="margin-top:auto; padding-top:10px; border-top:1px dashed var(--cb-line-soft);">
+                    ${qualSignal.flags.map(f => `
+                      <span class="compare-flag-badge ${f.severity}" title="${escapeHtml(f.quote || '')}">
+                        ⚠ ${escapeHtml(f.label)}
+                      </span>
+                    `).join("")}
+                  </div>
+                `;
+              }
+            } else {
+              toneBarHtml = `
+                <div style="font-size:11.5px; color:var(--cb-muted); text-align:center; padding:12px; background:var(--cb-soft); border-radius:8px; border:1px dashed var(--cb-line-soft);">
+                  AI 분석 결과가 없습니다.<br>
+                  <span style="font-size:10.5px;">설문 결과 보기에서 AI 분석을 완료해 주세요.</span>
+                </div>
+              `;
+            }
+            
+            return `
+              <div class="compare-qual-card">
+                <div class="compare-qual-card-header">
+                  <div>
+                    <h3>${escapeHtml(teamName)}</h3>
+                    <span style="font-weight:600; color:var(--cb-blue);">${s.phase} 진단</span>
+                  </div>
+                  <span>N=${s.n}</span>
+                </div>
+                
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:var(--cb-muted); margin-bottom:4px;">답변 톤 분할</div>
+                    ${toneBarHtml}
+                  </div>
+                  
+                  ${qualSignal ? `
+                    <div>
+                      <div style="font-size:11px; font-weight:700; color:var(--cb-muted); margin-bottom:6px;">주요 정성 신호 (최대 3개)</div>
+                      ${axisBadgesHtml}
+                    </div>
+                    
+                    <div>
+                      <div style="font-size:11px; font-weight:700; color:var(--cb-muted); margin-bottom:6px;">핵심 테마</div>
+                      ${themesHtml}
+                    </div>
+                  ` : ''}
+                </div>
+                
+                ${flagsHtml}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `}
+    </section>
+    </div>
+  `;
+}
+
 function renderReport() {
   const scope = ensureScopedSelection("report");
   const type = scope.type;
   const cohort = scope.cohort;
   const cohorts = scope.cohorts;
   const session = scope.session;
+
+  if (state.selectedReportSessionId === "all" && cohort) {
+    return renderCompareReport(type, cohort);
+  }
+
   const sessionId = session?.id || "";
   const types = availableSessionTypes();
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
@@ -5363,6 +5739,10 @@ window.openQualAnalysisModal = function(sessionId, phase) {
 window.downloadReportXlsx = async function(event) {
   const button = event.currentTarget || document.querySelector("#download-report-xlsx");
   if (!button) return;
+  if (state.selectedReportSessionId === "all") {
+    window.alert("전체 비교 분석의 엑셀 다운로드는 지원하지 않습니다. 개별 팀 결과를 선택해 주세요.");
+    return;
+  }
   const original = button.innerHTML;
   button.disabled = true;
   button.classList.add("is-loading");
@@ -5387,10 +5767,22 @@ window.downloadReportPdf = async function(event) {
   button.classList.add("is-loading");
   button.innerHTML = `<span><b>PDF 생성 중</b><small>분석 화면을 정리하고 있어요</small></span>`;
   try {
-    const payload = reportExportPayload();
+    const scope = ensureScopedSelection("report");
+    let meta;
+    if (state.selectedReportSessionId === "all") {
+      meta = {
+        typeLabel: sessionTypeLabel(scope.type),
+        sessionLabel: "전체 비교 분석",
+        cohort: scope.cohort,
+        year: yearForCohortType(scope.cohort, scope.type) || new Date().getFullYear(),
+      };
+    } else {
+      const payload = reportExportPayload();
+      meta = payload.meta;
+    }
     await downloadReportPdf({
       element: document.querySelector("#report-export-content"),
-      meta: payload.meta,
+      meta: meta,
     });
   } catch (error) {
     console.error("PDF 리포트 생성 실패:", error);

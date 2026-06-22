@@ -49,12 +49,6 @@ export const POSITION_ALIASES = {
   CEO: "사장",
   대표: "사장",
   대표이사: "사장",
-  구성원: "Specialist",
-  팀원: "Specialist",
-  리더: "Specialist",
-  팀장: "Specialist",
-  본부장: "Specialist",
-  부문장: "Specialist",
 };
 
 export const UNIT_LABELS = {

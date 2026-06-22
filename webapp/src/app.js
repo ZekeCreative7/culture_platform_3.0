@@ -16,7 +16,7 @@ import {
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
-} from './utils.js?v=20260622-closed-surveys-collapse-v1';
+} from './utils.js?v=20260622-org-backup-restore-v2';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -27,7 +27,7 @@ import {
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260622-closed-surveys-collapse-v1';
+} from './state.js?v=20260622-org-backup-restore-v2';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -5587,7 +5587,7 @@ async function initApp({ localPreview = false } = {}) {
   state.qrBaseUrl = computeQrBaseUrl();
   // org_data.json의 version과 캐시된 orgDataVersion이 다르면(조직 개편 반영) 다시 시드한다.
   // 단순히 unit 개수만 보던 기존 게이트는 캐시된 사용자에게 개편이 반영되지 않는 문제가 있었다.
-  const ORG_DATA_VERSION = 3;
+  const ORG_DATA_VERSION = 4;
   const orgNeedsSeed = !state.orgUnits || state.orgUnits.length < 10
     || !state.orgMembers || state.orgMembers.length < 10
     || (state.orgDataVersion || 0) < ORG_DATA_VERSION;

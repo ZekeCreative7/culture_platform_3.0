@@ -144,6 +144,11 @@ function cohortsForType(type) {
 }
 
 function sessionsForTypeCohort(type, cohort) {
+  if (cohort === "all") {
+    return (state.sessions || [])
+      .filter((s) => sameSessionType(s.type, type))
+      .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
+  }
   const cohortNum = Number(cohort);
   return (state.sessions || [])
     .filter((s) => sameSessionType(s.type, type) && Number(s.cohort) === cohortNum)

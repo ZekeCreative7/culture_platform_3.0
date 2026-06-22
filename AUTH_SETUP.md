@@ -1,11 +1,11 @@
 # 로그인 시스템 활성화
 
-코드에는 마스터 비밀번호를 저장하지 않습니다. 아래 설정은 Firebase Console에서 한 번만 진행합니다.
+코드에는 관리자 비밀번호를 저장하지 않습니다. 아래 설정은 Firebase Console에서 한 번만 진행합니다.
 
 1. Firebase Console의 **Authentication → Sign-in method**에서 **Email/Password**를 활성화합니다.
-2. Authentication의 사용자 추가에서 `rhokoo7@naver.com` 마스터 계정을 생성하고 별도의 안전한 비밀번호를 설정합니다.
+2. Authentication의 사용자 추가에서 `rhokoo7@naver.com` 관리자 계정을 생성하고 별도의 안전한 비밀번호를 설정합니다.
 3. 프로젝트 루트에서 `firebase deploy --only firestore:rules`를 실행해 `firestore.rules`를 배포합니다.
-4. 마스터 계정으로 로그인한 뒤 상단의 **회원 승인**에서 가입 요청을 승인합니다.
+4. 관리자 계정으로 로그인한 뒤 상단의 **회원 승인**에서 가입 요청을 승인합니다.
 
 보안을 위해 대화에서 공유된 초기 비밀번호는 첫 로그인 후 변경하는 것을 권장합니다.
 

@@ -6,8 +6,9 @@ import {
   makeSchedule, 
   todayISO, 
   uid, 
-  defaultQuestions 
-} from './utils.js';
+  defaultQuestions,
+  normalizePosition
+} from './utils.js?v=20260622-org-survey-integrity-v1';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
@@ -64,6 +65,8 @@ export const blankState = () => ({
   calendarView: "month",
   calendarDate: todayISO(),
   orgSearchQuery: "",
+  orgMemberSort: "rank-desc",
+  orgDirectUnitId: "",
   draftSurveyTitle: "",
   surveyCreatorStep: 1,
   draftSurveyPhase: "사전",
@@ -190,7 +193,7 @@ function persistState() {
     activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
     surveys, surveyTemplates,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
-    activeSessionTab, calendarView, calendarDate, orgSearchQuery,
+    activeSessionTab, calendarView, calendarDate, orgSearchQuery, orgMemberSort, orgDirectUnitId,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveySessionType, draftSurveyCohortKey, draftSurveyQuestions, qrBaseUrl,
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
@@ -203,7 +206,7 @@ function persistState() {
     activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
     surveys, surveyTemplates,
     selectedCompany, selectedDivision, selectedHq, selectedTeam,
-    activeSessionTab, calendarView, calendarDate, orgSearchQuery,
+    activeSessionTab, calendarView, calendarDate, orgSearchQuery, orgMemberSort, orgDirectUnitId,
     draftSurveyTitle, draftSurveyPhase, draftSurveySessionId, draftSurveySessionType, draftSurveyCohortKey, draftSurveyQuestions, qrBaseUrl,
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
@@ -216,10 +219,17 @@ function persistState() {
 
 export function normalizeAppState(nextState) {
   nextState.sessions = (nextState.sessions || []).map(normalizeSessionRecord);
-  nextState.surveys = (nextState.surveys || []).map((survey) => ({
-    ...survey,
-    sessionType: survey.sessionType ? normalizeSessionType(survey.sessionType) : survey.sessionType,
-  }));
+  nextState.surveys = (nextState.surveys || []).map(normalizeSurveyRecord);
+  nextState.orgMembers = (nextState.orgMembers || []).map((member) => {
+    const jobGrade = normalizePosition(member.jobGrade || member.position);
+    return {
+      ...member,
+      jobGrade,
+      position: jobGrade,
+      jobTitle: member.jobTitle || "",
+      employmentStatus: member.employmentStatus || "재직",
+    };
+  });
   nextState.draftType = normalizeSessionType(nextState.draftType);
   nextState.selectedAnalyticsType = normalizeSessionType(nextState.selectedAnalyticsType);
   nextState.selectedReportType = normalizeSessionType(nextState.selectedReportType);
@@ -229,8 +239,28 @@ export function normalizeAppState(nextState) {
   if (nextState.selectedAnalyticsPhase && !PHASES.includes(nextState.selectedAnalyticsPhase)) nextState.selectedAnalyticsPhase = "";
   if (!nextState.draftYear) nextState.draftYear = new Date().getFullYear();
   nextState.dashboardShowAllActions = Boolean(nextState.dashboardShowAllActions);
+  if (!["default", "rank-desc", "rank-asc", "name"].includes(nextState.orgMemberSort)) nextState.orgMemberSort = "rank-desc";
   if (!nextState.draftSchedule?.length) nextState.draftSchedule = makeSchedule(nextState.draftType);
   return nextState;
+}
+
+export function normalizeSurveyRecord(survey) {
+  const legacyActive = survey?.status !== "closed" && survey?.status !== "inactive" && !survey?.deletedAt;
+  const active = survey?.distribution?.active ?? survey?.distributionActive ?? legacyActive;
+  const distributionStatus = active ? "active" : "closed";
+  return {
+    ...survey,
+    sessionType: survey.sessionType ? normalizeSessionType(survey.sessionType) : survey.sessionType,
+    status: survey.status || distributionStatus,
+    distribution: {
+      id: survey.distribution?.id || (survey.id ? `distribution-${survey.id}` : ""),
+      active,
+      status: survey.distribution?.status || distributionStatus,
+      publishedAt: survey.distribution?.publishedAt || survey.publishedAt || survey.createdAt || "",
+      closedAt: survey.distribution?.closedAt || survey.closedAt || "",
+      deletedAt: survey.distribution?.deletedAt || survey.deletedAt || "",
+    },
+  };
 }
 
 // ── Firestore Sync Functions ───────────────────────────────────
@@ -248,7 +278,7 @@ export function syncSurveysToSessions() {
 export async function loadSurveysFromFirestore() {
   try {
     const snap = await getDocs(collection(db, 'surveys'));
-    state.surveys = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
     syncSurveysToSessions();
     saveState();
   } catch (e) {
@@ -313,8 +343,19 @@ export async function saveResponsesToFirestore(rows) {
     await batch.commit();
   }
 }
-export async function deleteSurveyFromFirestore(id) {
-  await deleteDoc(doc(db, 'surveys', id));
+export async function setSurveyDistributionActiveInFirestore(id, active) {
+  const now = new Date().toISOString();
+  await setDoc(doc(db, 'surveys', id), {
+    status: active ? 'active' : 'closed',
+    distributionActive: active,
+    distribution: {
+      id: `distribution-${id}`,
+      active,
+      status: active ? 'active' : 'closed',
+      ...(active ? { publishedAt: now, closedAt: '', deletedAt: '' } : { closedAt: now, deletedAt: now })
+    },
+    updatedAt: serverTimestamp()
+  }, { merge: true });
 }
 
 // 설문을 지워도 다음 세션 만들 때 불러올 예시 질문이 남도록, 배포 설문과는 별도 컬렉션에 저장한다.
@@ -337,7 +378,7 @@ export async function deleteSurveyTemplateFromFirestore(id) {
 }
 
 export async function updateSurveyInFirestore(id, data) {
-  await setDoc(doc(db, 'surveys', id), { ...data, updatedAt: serverTimestamp() });
+  await setDoc(doc(db, 'surveys', id), { ...data, updatedAt: serverTimestamp() }, { merge: true });
 }
 
 export async function loadPulseYears() {
@@ -449,6 +490,14 @@ export async function uploadStateToDb() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'DB 전송'; }
   }
+}
+
+export async function saveOrganizationToFirestore() {
+  await setDoc(doc(db, 'appState', 'main'), {
+    orgUnits: state.orgUnits || [],
+    orgMembers: state.orgMembers || [],
+    savedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 export async function downloadStateFromDb() {

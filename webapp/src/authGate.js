@@ -85,7 +85,7 @@ async function ensurePendingRequest(user) {
       to: ['zekedesign7@gmail.com'],
       message: {
         subject: '[Lina Culture Platform] 새로운 회원 승인 요청',
-        text: `새로운 회원 승인 요청이 도착했습니다.\n\n요청 이메일: ${user.email || '확인 불가'}\n\n마스터 계정으로 Lina Culture Platform에 로그인한 뒤 '회원 승인'에서 확인해 주세요.`
+        text: `새로운 회원 승인 요청이 도착했습니다.\n\n요청 이메일: ${user.email || '확인 불가'}\n\n관리자 계정으로 Lina Culture Platform에 로그인한 뒤 '회원 승인'에서 확인해 주세요.`
       },
       createdAt: serverTimestamp()
     });
@@ -134,7 +134,7 @@ async function checkAccess(user) {
   setGateMode('pending');
   setStatus({
     tone: 'pending',
-    title: '마스터 승인 대기 중입니다.',
+    title: '관리자 승인 대기 중입니다.',
     detail: `${user.email || '가입 계정'}으로 신청되었습니다. 승인되면 이 화면에서 자동으로 접속됩니다.`
   });
   clearPendingListener();
@@ -270,7 +270,7 @@ export async function openAccessAdmin() {
   root.innerHTML = `
     <div class="access-admin-overlay" role="dialog" aria-modal="true" aria-label="회원 승인 관리">
       <section class="access-admin-panel">
-        <header><div><span>Master console</span><h2>회원 접속 승인</h2><p>가입 요청을 확인하고 승인하면 해당 계정이 즉시 플랫폼에 접속합니다.</p></div><button type="button" id="access-admin-close" aria-label="닫기">×</button></header>
+        <header><div><span>관리자 콘솔</span><h2>회원 접속 승인</h2><p>가입 요청을 확인하고 승인하면 해당 계정이 즉시 플랫폼에 접속합니다.</p></div><button type="button" id="access-admin-close" aria-label="닫기">×</button></header>
         <div id="access-request-list"></div>
       </section>
     </div>`;
@@ -295,7 +295,7 @@ export function initializeAuthGate({ onAccessGranted }) {
       clearPendingListener();
       showGate();
       setGateMode('login');
-      setStatus({ tone: 'ready', title: '로그인하거나 새 계정을 만들어 주세요.', detail: '회원가입 후 마스터 승인이 완료되면 접속할 수 있습니다.' });
+      setStatus({ tone: 'ready', title: '로그인하거나 새 계정을 만들어 주세요.', detail: '회원가입 후 관리자 승인이 완료되면 접속할 수 있습니다.' });
       return;
     }
     try {

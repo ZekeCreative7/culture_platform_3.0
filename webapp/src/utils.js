@@ -43,16 +43,18 @@ export const SESSION_TYPE_ALIASES = {
   크로스펑셔널: "협업",
 };
 
-export const POSITION_OPTIONS = ["사장", "부사장", "부문장", "본부장", "이사", "부장", "차장", "과장", "대리", "사원"];
+export const POSITION_OPTIONS = ["사장", "부사장", "전무", "상무", "이사", "부장", "차장", "과장", "대리", "사원", "Specialist"];
 
 export const POSITION_ALIASES = {
   CEO: "사장",
   대표: "사장",
   대표이사: "사장",
-  전무: "부사장",
-  상무: "이사",
-  구성원: "사원",
-  팀원: "사원",
+  구성원: "Specialist",
+  팀원: "Specialist",
+  리더: "Specialist",
+  팀장: "Specialist",
+  본부장: "Specialist",
+  부문장: "Specialist",
 };
 
 export const UNIT_LABELS = {
@@ -144,14 +146,14 @@ export const sessionTypeDef = (value) => SESSION_TYPES[normalizeSessionType(valu
 
 export const sameSessionType = (a, b) => normalizeSessionType(a) === normalizeSessionType(b);
 
-export const normalizePosition = (value, fallback = "사원") => {
+export const normalizePosition = (value, fallback = "Specialist") => {
   const clean = String(value || "").trim();
   if (!clean) return fallback;
   if (POSITION_OPTIONS.includes(clean)) return clean;
   return POSITION_ALIASES[clean] || clean;
 };
 
-export const rankOptions = (selected = "사원") => {
+export const rankOptions = (selected = "Specialist") => {
   const current = normalizePosition(selected);
   const options = POSITION_OPTIONS.includes(current) ? POSITION_OPTIONS : [current, ...POSITION_OPTIONS];
   return options.map((position) => `<option value="${escapeHtml(position)}" ${position === current ? "selected" : ""}>${escapeHtml(position)}</option>`).join("");

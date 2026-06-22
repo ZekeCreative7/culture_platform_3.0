@@ -200,7 +200,7 @@ async function ensureXlsx() {
 
 ### 4.3 [P1] 보안 규칙 점검 (`firestore.rules`)
 - `accessRequests` 승인 흐름·App Check가 있으나, 규칙 파일이 리포에 있는지 확인 후
-  컬렉션별 read/write 권한(특히 `responses` 익명 제출 경로, `appState` 마스터 전용)을 명시.
+  컬렉션별 read/write 권한(특히 `responses` 익명 제출 경로, `appState` 관리자 전용)을 명시.
 - 익명 폰 제출(`survey.html`) 경로의 write 범위를 `responses`에만 최소 권한으로 제한.
 
 ### 4.4 [P2] 집계/리포트 분리

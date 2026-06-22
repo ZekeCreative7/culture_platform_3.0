@@ -319,6 +319,11 @@
             return;
           }
           const survey = { id: snap.id, ...snap.data() };
+          const distributionActive = survey.distribution?.active ?? survey.distributionActive ?? (survey.status !== 'closed' && !survey.deletedAt);
+          if (!distributionActive) {
+            showError("이 설문은 배포가 종료되었습니다.<br/>기존 응답은 안전하게 보관되어 있습니다.");
+            return;
+          }
           renderSurveyForm(survey, db, addDoc, collection, serverTimestamp);
         } catch (e) {
           console.error(e);
@@ -386,9 +391,11 @@
           const formData = new FormData(e.target);
           const responseData = {
             surveyId: survey.id,
+            distributionId: survey.distribution?.id || `distribution-${survey.id}`,
             sessionId: survey.sessionId,
             phase: survey.phase,
             cohort: Number(survey.sessionCohort) || 0,
+            sourceType: '링크 응답',
             createdAt: serverTimestamp()
           };
           (survey.questions || []).forEach(q => {

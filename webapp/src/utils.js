@@ -202,7 +202,7 @@ export function cohortPrefix(session) {
 export function sessionLabel(session) {
   if (!session) return "";
   const type = normalizeSessionType(session.type);
-  if (type === "팀빌딩") return `${cohortPrefix(session)} · ${session.team || "팀 미지정"}`;
+  if (type === "팀빌딩") return `${session.team || "팀 미지정"}(${sessionYear(session)})`;
   return cohortPrefix(session);
 }
 

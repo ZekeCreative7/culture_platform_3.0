@@ -213,10 +213,10 @@ function ensureScopedSelection(kind) {
 
   // 2) 기수: 그 유형에 존재하는 기수로 보정
   const cohorts = cohortsForType(type);
-  if (!cohorts.includes(Number(state[cohortField]))) {
+  if (state[cohortField] !== "all" && !cohorts.includes(Number(state[cohortField]))) {
     state[cohortField] = cohorts.length ? String(cohorts[0]) : "";
   }
-  const cohort = Number(state[cohortField] || 0);
+  const cohort = state[cohortField] === "all" ? "all" : Number(state[cohortField] || 0);
 
   // 3) 세션: 그 유형+기수에 속한 세션으로 보정
   const sessions = sessionsForTypeCohort(type, cohort);
@@ -241,11 +241,13 @@ function scopedSessionOptions(type, cohort, selectedSessionId = "") {
 function cohortOptionsHtml(type, selectedCohort) {
   const cohorts = cohortsForType(type);
   if (!cohorts.length) return `<option value="">응답 없음</option>`;
-  return cohorts.map((c) => {
+  const allOption = `<option value="all" ${selectedCohort === "all" ? "selected" : ""}>전체 기수</option>`;
+  const cohortOptions = cohorts.map((c) => {
     const yl = yearForCohortType(c, type) ? `${yearForCohortType(c, type)}년 ` : "";
     const count = sessionsForTypeCohort(type, c).length;
-    return `<option value="${c}" ${Number(selectedCohort) === c ? "selected" : ""}>${yl}${c}기${count ? ` · ${count}개 세션` : ""}</option>`;
+    return `<option value="${c}" ${selectedCohort !== "all" && Number(selectedCohort) === c ? "selected" : ""}>${yl}${c}기${count ? ` · ${count}개 세션` : ""}</option>`;
   }).join("");
+  return allOption + cohortOptions;
 }
 
 function rowMatchesSurvey(row, survey) {
@@ -2617,10 +2619,15 @@ function dimRecommendation(key, score) {
 function renderCompareReport(type, cohort) {
   const sessions = sessionsForTypeCohort(type, cohort);
   const types = availableSessionTypes();
+  const isAllCohorts = cohort === "all";
+  const cohortText = isAllCohorts ? "전체 기수" : `${cohort}기`;
+  const yearPrefix = (!isAllCohorts && yearForCohortType(cohort, type)) ? `${yearForCohortType(cohort, type)}년 ` : "";
+  const subtitle = `${sessionTypeLabel(type)} · ${yearPrefix}${cohortText} 전체 팀의 조직문화 진단 결과를 통합 비교합니다.`;
+  const currentFilterLabel = `현재 적용: ${escapeHtml(sessionTypeLabel(type))} · ${yearPrefix}${cohortText} 전체 비교 분석`;
   
   // 데이터 수집
   const sessionScores = sessions.map(session => {
-    const stats = statsForSession(cohort, session.id);
+    const stats = statsForSession(session.cohort, session.id);
     const pre = stats.find(s => s.phase === '사전') || null;
     const mid = stats.find(s => s.phase === '중간') || null;
     const post = stats.find(s => s.phase === '사후') || null;
@@ -2681,7 +2688,7 @@ function renderCompareReport(type, cohort) {
       <div>
         <span class="eyebrow">Cohort Compare Analysis</span>
         <h1>전체 팀별 결과 비교 분석</h1>
-        <p>${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 전체 팀의 조직문화 진단 결과를 통합 비교합니다.</p>
+        <p>${subtitle}</p>
       </div>
       <div class="report-export-actions" data-html2canvas-ignore="true">
         <button class="report-export-button pdf" id="download-report-pdf" type="button" onclick="window.downloadReportPdf(event)">
@@ -2710,7 +2717,7 @@ function renderCompareReport(type, cohort) {
         </label>
         <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
       </div>
-      <div class="filter-current">현재 적용: ${escapeHtml(sessionTypeLabel(type))} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 전체 비교 분석</div>
+      <div class="filter-current">${currentFilterLabel}</div>
     </section>
 
     <div class="report-summary" style="margin-bottom:28px;">
@@ -2723,7 +2730,7 @@ function renderCompareReport(type, cohort) {
         <strong style="font-size:28px; font-weight:800; color:#00a866;">${rankedSessions.length}개</strong>
       </div>
       <div>
-        <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">기수 평균 종합점수</span>
+        <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">${isAllCohorts ? "전체 평균 종합점수" : "기수 평균 종합점수"}</span>
         <strong style="font-size:28px; font-weight:800; color:var(--cb-blue);">${avgOverall}<span style="font-size:14px; color:var(--cb-muted); font-weight:500;"> / 5</span></strong>
       </div>
     </div>
@@ -2762,7 +2769,7 @@ function renderCompareReport(type, cohort) {
                   <tr>
                     <td class="rank-cell">${s.rank}위</td>
                     <td class="team-cell">${escapeHtml(sessionLabel(s.session))}</td>
-                    <td style="text-align:center; color:var(--cb-muted);">${s.phase}</td>
+                    <td style="text-align:center; color:var(--cb-muted);">${isAllCohorts ? `${s.session.cohort}기 ${s.phase}` : s.phase}</td>
                     <td style="text-align:center; font-weight:600;">N=${s.n}</td>
                     <td class="overall-cell" style="text-align:center;">
                       <span style="font-size:14px; font-weight:800; color:${rag.color}; background:${rag.color}14; padding:3px 10px; border-radius:12px;">
@@ -2780,7 +2787,7 @@ function renderCompareReport(type, cohort) {
                 <tr style="opacity:0.6; background:#fafafa;">
                   <td style="text-align:center; color:#cbd5e1;">—</td>
                   <td class="team-cell" style="color:var(--cb-muted);">${escapeHtml(sessionLabel(s.session))}</td>
-                  <td style="text-align:center; color:#cbd5e1;">—</td>
+                  <td style="text-align:center; color:var(--cb-muted);">${isAllCohorts ? `${s.session.cohort}기` : '—'}</td>
                   <td style="text-align:center; color:#cbd5e1;">N=0</td>
                   <td style="text-align:center; color:#cbd5e1;">—</td>
                   <td style="text-align:center; color:#cbd5e1;">—</td>
@@ -5773,8 +5780,8 @@ window.downloadReportPdf = async function(event) {
       meta = {
         typeLabel: sessionTypeLabel(scope.type),
         sessionLabel: "전체 비교 분석",
-        cohort: scope.cohort,
-        year: yearForCohortType(scope.cohort, scope.type) || new Date().getFullYear(),
+        cohort: scope.cohort === "all" ? "전체 기수" : `${scope.cohort}기`,
+        year: scope.cohort === "all" ? "전체" : (yearForCohortType(scope.cohort, scope.type) || new Date().getFullYear()),
       };
     } else {
       const payload = reportExportPayload();

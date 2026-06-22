@@ -27,7 +27,10 @@ function loadScriptOnce(src) {
 }
 
 const PHASE_ORDER = ["사전", "중간", "사후"];
-const DESKTOP_EXPORT_WIDTH_PX = 1840;
+// Keep the export close to the app's real desktop content width. Capturing an
+// artificially wide (1840px) document made an A4 portrait page shrink too far
+// and let the right padding fall outside html2canvas' capture box.
+const DESKTOP_EXPORT_WIDTH_PX = 1440;
 
 function safeFilePart(value) {
   return String(value || "report")
@@ -212,11 +215,12 @@ export async function downloadReportPdf({ element, meta }) {
   stage.appendChild(clone);
   document.body.appendChild(stage);
 
-  // 업로드된 PC 캡처와 같은 1840px 데스크톱 레이아웃을 먼저 만든 뒤,
-  // 전체 캡처를 A4 가로 페이지 폭에 비례 축소한다. PDF 폭에 먼저 맞추면
-  // 반응형 규칙이 모바일 배치를 적용하거나 오른쪽 콘텐츠를 잘라낸다.
+  // Render the actual desktop report width and measure the clone after fonts
+  // settle. Using the same measured width for layout and capture keeps both PDF
+  // gutters equal and prevents wide charts/tables from being cropped.
   await document.fonts?.ready;
-  const docWidth = DESKTOP_EXPORT_WIDTH_PX;
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const docWidth = Math.ceil(clone.getBoundingClientRect().width);
 
   try {
     await window.html2pdf()
@@ -240,10 +244,20 @@ export async function downloadReportPdf({ element, meta }) {
             clonedReport.style.maxWidth = "none";
             clonedReport.style.boxSizing = "border-box";
             clonedReport.style.overflow = "visible";
+            clonedReport.style.margin = "0";
           },
         },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
-        pagebreak: { mode: ["css", "legacy"], avoid: [".report-radar-card", ".report-dimension-grid > div", ".report-recommendation-card", ".report-change-card"] },
+        jsPDF: { unit: "mm", format: "a4", orientation: "landscape", compress: true },
+        pagebreak: {
+          mode: ["css", "legacy"],
+          avoid: [
+            ".report-radar-card",
+            ".report-dimension-grid > div",
+            ".report-recommendation-card",
+            ".report-change-card",
+            ".section-title",
+          ],
+        },
       })
       .from(clone)
       .save();

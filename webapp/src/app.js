@@ -22,7 +22,7 @@ import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
   blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, saveStateQuiet, normalizeAppState,
   syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
-  deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore, fetchAllResponsesFromFirestore, fetchResponsesBySessionId, fetchResponsesBySurveyId, fetchResponseDocById,
+  deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore, fetchAllResponsesFromFirestore,
   setSurveyDistributionActiveInFirestore, updateSurveyInFirestore, deleteSurveyDocFromFirestore, normalizeSurveyRecord, loadPulseYears,
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
@@ -1905,9 +1905,6 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
   const resetBtn = showReset
     ? `<button class="ghost compact" style="font-size:11px; color:#ef4444; border-color:#fecaca;" onclick="resetSurveyResponses('${survey.id}')" ${answered ? "" : "disabled"}>응답 완전 삭제</button>`
     : "";
-  const debugBtn = `<button class="ghost compact" style="font-size:11px;" onclick="debugSurveyDbLookup('${survey.id}')">DB 직접 조회</button>
-    <button class="ghost compact" style="font-size:11px;" onclick="debugFetchResponseById()">문서ID로 조회</button>`;
-
   // A survey that is explicitly configured with no 객관식(척도) 문항 — e.g. a 중간 설문 that is
   // open-ended only — must NOT borrow the default q1~q8 quant questions and show a misleading
   // distribution against a large response count. Say "객관식 없음" and point to the 정성 영역.
@@ -1921,7 +1918,7 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
             <strong>${answered}건 응답 · 객관식 없음</strong>
             <span>링크/QR ${linkedCount}건 · 파일 업로드 ${uploadedCount}건 · 응답 내용은 정성 응답 영역에서 확인하세요.</span>
           </div>
-          <div style="display:flex; align-items:center; gap:10px;">${resetBtn}${debugBtn}</div>
+          <div style="display:flex; align-items:center; gap:10px;">${resetBtn}</div>
         </div>
         <div class="empty" style="margin-top:12px;">집계할 객관식(척도) 문항이 없습니다.</div>
       </div>
@@ -1949,7 +1946,6 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
         <div style="display:flex; align-items:center; gap:10px;">
           <b>${answered}</b>
           ${resetBtn}
-          ${debugBtn}
         </div>
       </div>
       ${target ? `
@@ -2279,7 +2275,7 @@ function renderSurveyCreator() {
                   </div>
                   <button onclick="startEditSurvey('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--blue-mid); cursor:pointer; white-space:nowrap; flex-shrink:0;">수정</button>
                   <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; flex-shrink:0;">펼치기 ▾</button>
-                  <button class="ghost compact" onclick="deleteSurvey('${s.id}')" style="color:#b45309; border-color:#fcd34d;">배포 종료</button>
+                  <button class="ghost compact" onclick="deleteSurvey('${s.id}')" title="배포 종료" style="color:#b45309; border-color:#fcd34d; font-weight:800; padding:6px 10px;">✕</button>
                 </div>
               `;
             }
@@ -2294,7 +2290,7 @@ function renderSurveyCreator() {
                   <div style="display:flex; gap:6px; flex-shrink:0;">
                     <button onclick="startEditSurvey('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--blue-mid); cursor:pointer;">수정</button>
                     <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--muted); cursor:pointer;">접기 ▴</button>
-                    <button class="ghost compact" onclick="deleteSurvey('${s.id}')" style="color:#b45309; border-color:#fcd34d;">배포 종료</button>
+                    <button class="ghost compact" onclick="deleteSurvey('${s.id}')" title="배포 종료" style="color:#b45309; border-color:#fcd34d; font-weight:800; padding:6px 10px;">✕</button>
                   </div>
                 </div>
                 <input class="input-text compact-url" readonly value="${surveyLink}" onclick="this.select(); document.execCommand('copy'); alert('링크가 복사되었습니다!');" title="클릭 시 주소 복사" />
@@ -2360,11 +2356,6 @@ function renderSurveyCreator() {
             <button class="primary compact" style="font-size:11.5px;" onclick="recoverAllOrphanSurveys()">전체 복구 (같은 세션·단계 중복은 최신 기준으로 합침)</button>
           ` : ""}
           ${state.orphanScanError ? `<p style="color:#dc2626; font-size:12px; margin-top:8px;">스캔 실패: ${escapeHtml(state.orphanScanError)}</p>` : ""}
-          <div style="margin-top:16px; padding:12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;">
-            <strong style="font-size:12px; color:#b91c1c;">고위험: 보호 설문 제외 전체 응답 리셋</strong>
-            <p style="font-size:11px; color:#7f1d1d; margin:4px 0 8px; line-height:1.5;">리더십 1기·2기, 리스크관리팀(사전·사후)을 제외한 모든 설문의 응답을 DB에서 완전히 삭제합니다. 설문 카드와 템플릿은 남습니다. 직접 재업로드할 준비가 됐을 때만 사용하세요.</p>
-            <button class="ghost compact" style="font-size:11px; color:#b91c1c; border-color:#fca5a5;" onclick="resetAllResponsesExceptProtected()">보호 설문 제외 전체 리셋</button>
-          </div>
           ${state.orphanScanResult ? (
             state.orphanScanResult.length ? `
               <div class="surveys-grid" style="margin-top:12px;">
@@ -5455,108 +5446,6 @@ window.toggleClosedSurveysSection = function() {
   state.closedSurveysCollapsed = !state.closedSurveysCollapsed;
   saveState();
   render();
-};
-
-function isProtectedFromBulkReset(survey) {
-  const session = (state.sessions || []).find((s) => s.id === survey.sessionId);
-  if (session) {
-    if (normalizeSessionType(session.type) === "리더십" && [1, 2].includes(Number(session.cohort))) return true;
-    if (session.team === "리스크관리팀" && ["사전", "사후"].includes(survey.phase)) return true;
-  }
-  // Fallback for recovered cards whose original session no longer exists — judge from title text.
-  const title = survey.title || "";
-  if (title.includes("리더십") && (title.includes("1기") || title.includes("2기"))) return true;
-  if (title.includes("리스크관리팀") && (survey.phase === "사전" || survey.phase === "사후")) return true;
-  return false;
-}
-
-window.resetAllResponsesExceptProtected = async function() {
-  const surveys = state.surveys || [];
-  const protectedSurveys = surveys.filter(isProtectedFromBulkReset);
-  const targetSurveys = surveys.filter((s) => !isProtectedFromBulkReset(s));
-  const protectedNames = protectedSurveys.map((s) => `· ${s.title} [${s.phase}]`).join("\n") || "(없음)";
-  const targetNames = targetSurveys.map((s) => `· ${s.title} [${s.phase}]`).join("\n") || "(없음)";
-  if (!confirm(`[고위험] 응답을 남길 보호 설문 (${protectedSurveys.length}개):\n${protectedNames}\n\n응답을 전부 삭제할 설문 (${targetSurveys.length}개, 설문 카드와 템플릿은 그대로 둡니다):\n${targetNames}\n\n정말 진행할까요? 되돌릴 수 없습니다.`)) return;
-  if (!confirm(`다시 확인합니다. 위 ${targetSurveys.length}개 설문의 응답을 DB에서 완전히 삭제합니다. 계속할까요?`)) return;
-
-  let totalDeleted = 0;
-  const failures = [];
-  for (const survey of targetSurveys) {
-    try {
-      const [bySession, bySurvey] = await Promise.all([
-        fetchResponsesBySessionId(survey.sessionId),
-        fetchResponsesBySurveyId(survey.id),
-      ]);
-      const merged = new Map();
-      [...bySession, ...bySurvey].forEach((row) => merged.set(row.id, row));
-      const rows = Array.from(merged.values());
-      await Promise.all(rows.map((row) => deleteResponseFromFirestore(row.id)));
-      totalDeleted += rows.length;
-    } catch (e) {
-      console.error(`설문 "${survey.title}" 응답 삭제 실패:`, e);
-      failures.push(survey.title);
-    }
-  }
-  state.responses = (state.responses || []).filter((row) => !targetSurveys.some((survey) => rowMatchesSurvey(row, survey)));
-  saveState();
-  render();
-  window.updateResponsesSubscription();
-  alert(`총 ${totalDeleted}건의 응답을 삭제했습니다.${failures.length ? `\n\n실패한 설문: ${failures.join(", ")}` : ""}`);
-};
-
-window.debugSurveyDbLookup = async function(surveyId) {
-  const survey = (state.surveys || []).find((s) => s.id === surveyId);
-  if (!survey) return;
-  try {
-    const [bySessionRows, bySurveyRows] = await Promise.all([
-      fetchResponsesBySessionId(survey.sessionId),
-      fetchResponsesBySurveyId(survey.id),
-    ]);
-    const merged = new Map();
-    [...bySessionRows, ...bySurveyRows].forEach((row) => merged.set(row.id, row));
-    const rows = Array.from(merged.values());
-
-    const summary = `지금 보는 설문 정보:\nsurvey.id = ${survey.id}\nsurvey.sessionId = ${survey.sessionId || "(없음)"}\nsurvey.phase = ${survey.phase || "(없음)"}\nsurvey.sessionCohort = ${survey.sessionCohort ?? "(없음)"}`;
-
-    if (!rows.length) {
-      alert(`${summary}\n\nsessionId로 조회: ${bySessionRows.length}건, surveyId로 조회: ${bySurveyRows.length}건 — 둘 다 0건입니다.\n\nFirebase 콘솔에서 본 응답 문서를 하나 열어서 그 문서의 sessionId / surveyId / phase 값을 알려주시면, 왜 이 두 값으로 못 찾는지 바로 비교할 수 있습니다.`);
-      return;
-    }
-
-    const bySurveyIdGroup = new Map();
-    rows.forEach((row) => {
-      const key = row.surveyId || "(surveyId 없음)";
-      if (!bySurveyIdGroup.has(key)) bySurveyIdGroup.set(key, { count: 0, phases: new Set(), sessionIds: new Set() });
-      const entry = bySurveyIdGroup.get(key);
-      entry.count += 1;
-      entry.phases.add(row.phase || "(단계 없음)");
-      entry.sessionIds.add(row.sessionId || "(sessionId 없음)");
-    });
-    const lines = Array.from(bySurveyIdGroup.entries()).map(([surveyIdKey, info]) => {
-      const tag = surveyIdKey === survey.id ? " ← 지금 보는 이 설문" : "";
-      return `surveyId ${surveyIdKey}: ${info.count}건 · sessionId [${Array.from(info.sessionIds).join(", ")}] · 단계 [${Array.from(info.phases).join(", ")}]${tag}`;
-    });
-    alert(`${summary}\n\n매칭된 응답 총 ${rows.length}건 (sessionId 조회 ${bySessionRows.length}건 + surveyId 조회 ${bySurveyRows.length}건, 중복 제거):\n\n${lines.join("\n")}`);
-  } catch (e) {
-    console.error('설문 DB 직접 조회 실패:', e);
-    alert('DB 조회 실패: ' + e.message);
-  }
-};
-
-window.debugFetchResponseById = async function() {
-  const id = prompt('Firebase 콘솔에서 본 응답 문서의 ID(문서 키)를 붙여넣어 주세요.');
-  if (!id) return;
-  try {
-    const row = await fetchResponseDocById(id.trim());
-    if (!row) {
-      alert(`문서 ID "${id.trim()}"를 찾을 수 없습니다 (존재하지 않거나 읽기 권한이 없습니다).`);
-      return;
-    }
-    alert(`문서 ID ${id.trim()} 조회 성공:\n\n${JSON.stringify(row, null, 2)}`);
-  } catch (e) {
-    console.error('문서 ID 직접 조회 실패:', e);
-    alert('조회 실패: ' + e.message);
-  }
 };
 
 window.toggleAnalyticsSection = function(key) {

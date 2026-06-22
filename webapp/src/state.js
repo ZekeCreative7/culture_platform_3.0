@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-csv-upload-xlsx-load-fix-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-bulk-reset-protected-v1';
 import { 
   PHASES, 
   normalizeSessionType, 
@@ -8,7 +8,7 @@ import {
   uid, 
   defaultQuestions,
   normalizePosition
-} from './utils.js?v=20260622-csv-upload-xlsx-load-fix-v1';
+} from './utils.js?v=20260622-bulk-reset-protected-v1';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";

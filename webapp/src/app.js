@@ -1,14 +1,14 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-csv-upload-xlsx-load-fix-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-bulk-reset-protected-v1';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-engagement-footnote-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-org-revert-v2';
-import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260622-csv-upload-xlsx-load-fix-v1';
+import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260622-bulk-reset-protected-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-csv-upload-xlsx-load-fix-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-bulk-reset-protected-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -16,7 +16,7 @@ import {
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
-} from './utils.js?v=20260622-csv-upload-xlsx-load-fix-v1';
+} from './utils.js?v=20260622-bulk-reset-protected-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -27,7 +27,7 @@ import {
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260622-csv-upload-xlsx-load-fix-v1';
+} from './state.js?v=20260622-bulk-reset-protected-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -2314,6 +2314,11 @@ function renderSurveyCreator() {
             <button class="primary compact" style="font-size:11.5px;" onclick="recoverAllOrphanSurveys()">전체 복구 (같은 세션·단계 중복은 최신 기준으로 합침)</button>
           ` : ""}
           ${state.orphanScanError ? `<p style="color:#dc2626; font-size:12px; margin-top:8px;">스캔 실패: ${escapeHtml(state.orphanScanError)}</p>` : ""}
+          <div style="margin-top:16px; padding:12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;">
+            <strong style="font-size:12px; color:#b91c1c;">고위험: 보호 설문 제외 전체 응답 리셋</strong>
+            <p style="font-size:11px; color:#7f1d1d; margin:4px 0 8px; line-height:1.5;">리더십 1기·2기, 리스크관리팀(사전·사후)을 제외한 모든 설문의 응답을 DB에서 완전히 삭제합니다. 설문 카드와 템플릿은 남습니다. 직접 재업로드할 준비가 됐을 때만 사용하세요.</p>
+            <button class="ghost compact" style="font-size:11px; color:#b91c1c; border-color:#fca5a5;" onclick="resetAllResponsesExceptProtected()">보호 설문 제외 전체 리셋</button>
+          </div>
           ${state.orphanScanResult ? (
             state.orphanScanResult.length ? `
               <div class="surveys-grid" style="margin-top:12px;">
@@ -5018,6 +5023,53 @@ window.deleteRecoveredSurveyCard = function(id) {
     console.error('Firestore 복구 카드 삭제 실패:', e);
     alert('화면에는 지워졌지만 서버 삭제에 실패했습니다: ' + e.message);
   });
+};
+
+function isProtectedFromBulkReset(survey) {
+  const session = (state.sessions || []).find((s) => s.id === survey.sessionId);
+  if (session) {
+    if (normalizeSessionType(session.type) === "리더십" && [1, 2].includes(Number(session.cohort))) return true;
+    if (session.team === "리스크관리팀" && ["사전", "사후"].includes(survey.phase)) return true;
+  }
+  // Fallback for recovered cards whose original session no longer exists — judge from title text.
+  const title = survey.title || "";
+  if (title.includes("리더십") && (title.includes("1기") || title.includes("2기"))) return true;
+  if (title.includes("리스크관리팀") && (survey.phase === "사전" || survey.phase === "사후")) return true;
+  return false;
+}
+
+window.resetAllResponsesExceptProtected = async function() {
+  const surveys = state.surveys || [];
+  const protectedSurveys = surveys.filter(isProtectedFromBulkReset);
+  const targetSurveys = surveys.filter((s) => !isProtectedFromBulkReset(s));
+  const protectedNames = protectedSurveys.map((s) => `· ${s.title} [${s.phase}]`).join("\n") || "(없음)";
+  const targetNames = targetSurveys.map((s) => `· ${s.title} [${s.phase}]`).join("\n") || "(없음)";
+  if (!confirm(`[고위험] 응답을 남길 보호 설문 (${protectedSurveys.length}개):\n${protectedNames}\n\n응답을 전부 삭제할 설문 (${targetSurveys.length}개, 설문 카드와 템플릿은 그대로 둡니다):\n${targetNames}\n\n정말 진행할까요? 되돌릴 수 없습니다.`)) return;
+  if (!confirm(`다시 확인합니다. 위 ${targetSurveys.length}개 설문의 응답을 DB에서 완전히 삭제합니다. 계속할까요?`)) return;
+
+  let totalDeleted = 0;
+  const failures = [];
+  for (const survey of targetSurveys) {
+    try {
+      const [bySession, bySurvey] = await Promise.all([
+        fetchResponsesBySessionId(survey.sessionId),
+        fetchResponsesBySurveyId(survey.id),
+      ]);
+      const merged = new Map();
+      [...bySession, ...bySurvey].forEach((row) => merged.set(row.id, row));
+      const rows = Array.from(merged.values());
+      await Promise.all(rows.map((row) => deleteResponseFromFirestore(row.id)));
+      totalDeleted += rows.length;
+    } catch (e) {
+      console.error(`설문 "${survey.title}" 응답 삭제 실패:`, e);
+      failures.push(survey.title);
+    }
+  }
+  state.responses = (state.responses || []).filter((row) => !targetSurveys.some((survey) => rowMatchesSurvey(row, survey)));
+  saveState();
+  render();
+  window.updateResponsesSubscription();
+  alert(`총 ${totalDeleted}건의 응답을 삭제했습니다.${failures.length ? `\n\n실패한 설문: ${failures.join(", ")}` : ""}`);
 };
 
 window.debugSurveyDbLookup = async function(surveyId) {

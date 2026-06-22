@@ -32,6 +32,8 @@ import {
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
 
+const TEAMBUILDING_OUTCOME_DESCRIPTION = "팀빌딩 사후 설문을 바탕으로 참여자의 세션 경험, 프로그램 도움 인식, 실천·활용 의향을 종합한 체감 성과입니다. 장기적인 조직문화 변화는 후속 측정이 필요합니다.";
+
 const VIEWS = [
   ["dashboard", "Home", "홈"],
   ["sessions", "Sessions", "세션"],
@@ -2699,8 +2701,8 @@ function renderCompareReport(type, cohort) {
     <section class="page-head report-export-header">
       <div>
         <span class="eyebrow">Cohort Compare Analysis</span>
-        <h1>전체 팀별 결과 비교 분석</h1>
-        <p>${subtitle}</p>
+        <h1>${sameSessionType(type, "팀빌딩") ? "팀빌딩 체감 성과" : "전체 팀별 결과 비교 분석"}</h1>
+        <p>${sameSessionType(type, "팀빌딩") ? TEAMBUILDING_OUTCOME_DESCRIPTION : subtitle}</p>
       </div>
       <div class="report-export-actions" data-html2canvas-ignore="true">
         <button class="report-export-button pdf" id="download-report-pdf" type="button" onclick="window.downloadReportPdf(event)">
@@ -3030,8 +3032,8 @@ function renderReport() {
     <section class="page-head report-export-header">
       <div>
         <span class="eyebrow">Analysis Report</span>
-        <h1>분석 결과</h1>
-        <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
+        <h1>${sameSessionType(type, "팀빌딩") ? "팀빌딩 체감 성과" : "분석 결과"}</h1>
+        <p>${sameSessionType(type, "팀빌딩") ? TEAMBUILDING_OUTCOME_DESCRIPTION : "현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다."}</p>
       </div>
       ${cohort && session ? `
         <div class="report-export-actions" data-html2canvas-ignore="true">

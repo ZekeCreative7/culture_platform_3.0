@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch } from './firebase.js';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-recover-survey-undefined-fix-v1';
 import { 
   PHASES, 
   normalizeSessionType, 
@@ -8,7 +8,7 @@ import {
   uid, 
   defaultQuestions,
   normalizePosition
-} from './utils.js?v=20260622-org-survey-integrity-v1';
+} from './utils.js?v=20260622-recover-survey-undefined-fix-v1';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
@@ -250,7 +250,10 @@ export function normalizeSurveyRecord(survey) {
   const distributionStatus = active ? "active" : "closed";
   return {
     ...survey,
-    sessionType: survey.sessionType ? normalizeSessionType(survey.sessionType) : survey.sessionType,
+    // Only set sessionType when we actually have one — writing an explicit `undefined`
+    // here (e.g. for a freshly recovered survey that never had one) makes Firestore's
+    // setDoc() reject the whole write with "Unsupported field value: undefined".
+    ...(survey.sessionType ? { sessionType: normalizeSessionType(survey.sessionType) } : {}),
     status: survey.status || distributionStatus,
     distribution: {
       id: survey.distribution?.id || (survey.id ? `distribution-${survey.id}` : ""),
@@ -320,6 +323,39 @@ export async function deleteSessionFromFirestore(id) {
   } catch (e) {
     console.error('Firestore 세션 삭제 실패:', e);
   }
+}
+
+export async function fetchResponseDocById(responseId) {
+  const snap = await getDoc(doc(db, 'responses', responseId));
+  if (!snap.exists()) return null;
+  const data = snap.data();
+  return { ...data, id: snap.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
+}
+
+export async function fetchResponsesBySessionId(sessionId) {
+  if (!sessionId) return [];
+  const snap = await getDocs(query(collection(db, 'responses'), where('sessionId', '==', sessionId)));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
+  });
+}
+
+export async function fetchResponsesBySurveyId(surveyId) {
+  if (!surveyId) return [];
+  const snap = await getDocs(query(collection(db, 'responses'), where('surveyId', '==', surveyId)));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
+  });
+}
+
+export async function fetchAllResponsesFromFirestore() {
+  const snap = await getDocs(collection(db, 'responses'));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
+  });
 }
 
 export async function deleteResponseFromFirestore(id) {

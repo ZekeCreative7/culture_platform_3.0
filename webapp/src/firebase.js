@@ -39,7 +39,20 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const isLocalDevelopment = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-if (isLocalDevelopment) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+if (isLocalDevelopment) {
+  // A literal `true` here makes the SDK mint a brand-new random debug token on every
+  // page load, which then 403s against App Check until that exact token is registered
+  // in the Firebase console — so every hard refresh silently breaks Firestore again.
+  // Persist one token per browser instead, so it only needs registering once.
+  const STORAGE_KEY = 'FIREBASE_APPCHECK_DEBUG_TOKEN';
+  let debugToken = localStorage.getItem(STORAGE_KEY);
+  if (!debugToken) {
+    debugToken = crypto.randomUUID();
+    localStorage.setItem(STORAGE_KEY, debugToken);
+  }
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+  console.info('[App Check] local debug token (등록 필요 시 1회만):', debugToken);
+}
 export const appCheck = initializeAppCheck(firebaseApp, {
   provider: new ReCaptchaEnterpriseProvider('6LfuSSktAAAAANg8W3c0tVOUp6_aH99ZlZX8nbMg'),
   isTokenAutoRefreshEnabled: true

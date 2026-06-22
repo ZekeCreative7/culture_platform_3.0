@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-recover-survey-undefined-fix-v1';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-engagement-footnote-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
@@ -8,7 +8,7 @@ import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardVie
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260621-vivid-report-palette-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260621-admin-copy-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-recover-survey-undefined-fix-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -16,18 +16,18 @@ import {
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
-} from './utils.js?v=20260622-org-survey-integrity-v1';
+} from './utils.js?v=20260622-recover-survey-undefined-fix-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
   blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, saveStateQuiet, normalizeAppState,
   syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
-  deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore,
-  setSurveyDistributionActiveInFirestore, updateSurveyInFirestore, loadPulseYears,
+  deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore, fetchAllResponsesFromFirestore, fetchResponsesBySessionId, fetchResponsesBySurveyId, fetchResponseDocById,
+  setSurveyDistributionActiveInFirestore, updateSurveyInFirestore, normalizeSurveyRecord, loadPulseYears,
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260622-org-survey-integrity-v1';
+} from './state.js?v=20260622-recover-survey-undefined-fix-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -1857,6 +1857,8 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
   const resetBtn = showReset
     ? `<button class="ghost compact" style="font-size:11px; color:#ef4444; border-color:#fecaca;" onclick="resetSurveyResponses('${survey.id}')" ${answered ? "" : "disabled"}>응답 완전 삭제</button>`
     : "";
+  const debugBtn = `<button class="ghost compact" style="font-size:11px;" onclick="debugSurveyDbLookup('${survey.id}')">DB 직접 조회</button>
+    <button class="ghost compact" style="font-size:11px;" onclick="debugFetchResponseById()">문서ID로 조회</button>`;
 
   // A survey that is explicitly configured with no 객관식(척도) 문항 — e.g. a 중간 설문 that is
   // open-ended only — must NOT borrow the default q1~q8 quant questions and show a misleading
@@ -1871,7 +1873,7 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
             <strong>${answered}건 응답 · 객관식 없음</strong>
             <span>링크/QR ${linkedCount}건 · 파일 업로드 ${uploadedCount}건 · 응답 내용은 정성 응답 영역에서 확인하세요.</span>
           </div>
-          ${resetBtn ? `<div style="display:flex; align-items:center; gap:10px;">${resetBtn}</div>` : ""}
+          <div style="display:flex; align-items:center; gap:10px;">${resetBtn}${debugBtn}</div>
         </div>
         <div class="empty" style="margin-top:12px;">집계할 객관식(척도) 문항이 없습니다.</div>
       </div>
@@ -1899,6 +1901,7 @@ function renderSurveyResponsePanel(survey, session, showReset = true) {
         <div style="display:flex; align-items:center; gap:10px;">
           <b>${answered}</b>
           ${resetBtn}
+          ${debugBtn}
         </div>
       </div>
       ${target ? `
@@ -2297,6 +2300,33 @@ function renderSurveyCreator() {
             </div>
           </div>
         ` : ""}
+
+        <div style="margin-top:28px;">
+          ${sectionTitle("지난 데이터 점검", "")}
+          <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">예전에 삭제된 설문에 연결돼 있던 응답이 DB에 남아있는지 확인합니다. 응답 자체는 보존돼 있을 가능성이 높고, 이 스캔은 그것을 다시 화면에 연결만 해 줍니다.</p>
+          <button class="ghost compact" style="font-size:11.5px;" onclick="scanForOrphanResponses()" ${state.orphanScanLoading ? "disabled" : ""}>
+            ${state.orphanScanLoading ? "스캔 중..." : "DB에서 연결 끊긴 응답 찾기"}
+          </button>
+          ${state.orphanScanError ? `<p style="color:#dc2626; font-size:12px; margin-top:8px;">스캔 실패: ${escapeHtml(state.orphanScanError)}</p>` : ""}
+          ${state.orphanScanResult ? (
+            state.orphanScanResult.length ? `
+              <div class="surveys-grid" style="margin-top:12px;">
+                ${state.orphanScanResult.map((g) => `
+                  <div class="survey-deploy-card">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                      <div class="survey-deploy-info" style="flex:1; min-width:0;">
+                        <strong>연결 끊긴 응답 ${g.count}건</strong>
+                        <span>${escapeHtml(g.sessionLabel)} [${escapeHtml(g.phase || "단계 미상")}]${g.cohort ? ` · ${g.cohort}기` : ""}</span>
+                      </div>
+                      <button class="primary compact" onclick="recoverOrphanSurvey('${g.key}')">설문으로 복구</button>
+                    </div>
+                    <span style="font-size:11.5px; color:var(--muted);">링크/QR ${g.linkedCount}건 · 파일 업로드 ${g.uploadedCount}건${g.firstAt ? ` · ${g.firstAt.slice(0, 10)} ~ ${g.lastAt.slice(0, 10)}` : ""}</span>
+                  </div>
+                `).join("")}
+              </div>
+            ` : `<p style="font-size:12px; color:var(--muted); margin-top:8px;">연결 끊긴 응답을 찾지 못했습니다. 현재 보이는 설문 목록이 전부입니다.</p>`
+          ) : ""}
+        </div>
 
         <div style="margin-top:28px;">
           ${sectionTitle("템플릿", `${(state.surveyTemplates || []).length}건`)}
@@ -4842,6 +4872,136 @@ window.resetSurveyResponses = function(id) {
   Promise.all(rows.map(r => deleteResponseFromFirestore(r.id))).catch(e => console.error('Firestore 응답 삭제 실패:', e));
 };
 
+function orphanGroupKey(row) {
+  return row.surveyId || `legacy:${row.sessionId || ""}|${row.phase || ""}|${Number(row.cohort) || 0}`;
+}
+
+window.scanForOrphanResponses = async function() {
+  state.orphanScanLoading = true;
+  state.orphanScanError = "";
+  notify();
+  try {
+    const allRows = await fetchAllResponsesFromFirestore();
+    const knownSurveyIds = new Set((state.surveys || []).map((s) => s.id));
+    const groups = new Map();
+    allRows.forEach((row) => {
+      if (row.surveyId && knownSurveyIds.has(row.surveyId)) return; // already visible in normal survey list
+      const key = orphanGroupKey(row);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    });
+
+    state.orphanScanResult = Array.from(groups.entries()).map(([key, rows]) => {
+      const sample = rows[0];
+      const session = state.sessions.find((s) => s.id === sample.sessionId);
+      const dates = rows.map((r) => r.createdAt).filter(Boolean).sort();
+      const uploaded = rows.filter((r) => String(r.sourceType || "").includes("업로드")).length;
+      return {
+        key,
+        surveyId: sample.surveyId || "",
+        sessionId: sample.sessionId || "",
+        phase: sample.phase || "",
+        cohort: Number(sample.cohort) || 0,
+        sessionLabel: session ? `${session.type} · ${sessionLabel(session)}` : (sample.sessionId ? "삭제된 세션" : "세션 정보 없음"),
+        count: rows.length,
+        uploadedCount: uploaded,
+        linkedCount: rows.length - uploaded,
+        firstAt: dates[0] || "",
+        lastAt: dates[dates.length - 1] || "",
+      };
+    }).sort((a, b) => b.count - a.count);
+  } catch (e) {
+    console.error('고아 응답 스캔 실패:', e);
+    state.orphanScanError = e.message || String(e);
+  } finally {
+    state.orphanScanLoading = false;
+    render();
+  }
+};
+
+window.recoverOrphanSurvey = function(key) {
+  const group = (state.orphanScanResult || []).find((g) => g.key === key);
+  if (!group) return;
+  if (!confirm(`이 데이터(${group.count}건)를 "배포 종료 · 응답 보관" 목록에 설문으로 복구할까요?\n\n응답 자체는 이미 안전하게 보관되어 있었고, 이 작업은 그 응답을 다시 볼 수 있도록 설문 카드만 새로 만듭니다.`)) return;
+  const now = new Date().toISOString();
+  const id = group.surveyId || uid();
+  const survey = normalizeSurveyRecord({
+    id,
+    title: `복구된 설문 (${group.phase || "단계 미상"} · ${group.sessionLabel})`,
+    sessionId: group.sessionId,
+    sessionCohort: group.cohort,
+    phase: group.phase,
+    questions: defaultQuestions(group.phase || "사후"),
+    status: "closed",
+    recoveredAt: now,
+    distribution: { id: `distribution-${id}`, active: false, status: "closed", publishedAt: "", closedAt: now, deletedAt: now },
+  });
+  state.surveys = [...(state.surveys || []), survey];
+  state.orphanScanResult = (state.orphanScanResult || []).filter((g) => g.key !== key);
+  saveState();
+  render();
+  window.updateResponsesSubscription();
+  updateSurveyInFirestore(id, survey).catch((e) => {
+    console.error('Firestore 복구 설문 저장 실패:', e);
+    alert('화면에는 복구됐지만 서버 저장에 실패했습니다: ' + e.message);
+  });
+};
+
+window.debugSurveyDbLookup = async function(surveyId) {
+  const survey = (state.surveys || []).find((s) => s.id === surveyId);
+  if (!survey) return;
+  try {
+    const [bySessionRows, bySurveyRows] = await Promise.all([
+      fetchResponsesBySessionId(survey.sessionId),
+      fetchResponsesBySurveyId(survey.id),
+    ]);
+    const merged = new Map();
+    [...bySessionRows, ...bySurveyRows].forEach((row) => merged.set(row.id, row));
+    const rows = Array.from(merged.values());
+
+    const summary = `지금 보는 설문 정보:\nsurvey.id = ${survey.id}\nsurvey.sessionId = ${survey.sessionId || "(없음)"}\nsurvey.phase = ${survey.phase || "(없음)"}\nsurvey.sessionCohort = ${survey.sessionCohort ?? "(없음)"}`;
+
+    if (!rows.length) {
+      alert(`${summary}\n\nsessionId로 조회: ${bySessionRows.length}건, surveyId로 조회: ${bySurveyRows.length}건 — 둘 다 0건입니다.\n\nFirebase 콘솔에서 본 응답 문서를 하나 열어서 그 문서의 sessionId / surveyId / phase 값을 알려주시면, 왜 이 두 값으로 못 찾는지 바로 비교할 수 있습니다.`);
+      return;
+    }
+
+    const bySurveyIdGroup = new Map();
+    rows.forEach((row) => {
+      const key = row.surveyId || "(surveyId 없음)";
+      if (!bySurveyIdGroup.has(key)) bySurveyIdGroup.set(key, { count: 0, phases: new Set(), sessionIds: new Set() });
+      const entry = bySurveyIdGroup.get(key);
+      entry.count += 1;
+      entry.phases.add(row.phase || "(단계 없음)");
+      entry.sessionIds.add(row.sessionId || "(sessionId 없음)");
+    });
+    const lines = Array.from(bySurveyIdGroup.entries()).map(([surveyIdKey, info]) => {
+      const tag = surveyIdKey === survey.id ? " ← 지금 보는 이 설문" : "";
+      return `surveyId ${surveyIdKey}: ${info.count}건 · sessionId [${Array.from(info.sessionIds).join(", ")}] · 단계 [${Array.from(info.phases).join(", ")}]${tag}`;
+    });
+    alert(`${summary}\n\n매칭된 응답 총 ${rows.length}건 (sessionId 조회 ${bySessionRows.length}건 + surveyId 조회 ${bySurveyRows.length}건, 중복 제거):\n\n${lines.join("\n")}`);
+  } catch (e) {
+    console.error('설문 DB 직접 조회 실패:', e);
+    alert('DB 조회 실패: ' + e.message);
+  }
+};
+
+window.debugFetchResponseById = async function() {
+  const id = prompt('Firebase 콘솔에서 본 응답 문서의 ID(문서 키)를 붙여넣어 주세요.');
+  if (!id) return;
+  try {
+    const row = await fetchResponseDocById(id.trim());
+    if (!row) {
+      alert(`문서 ID "${id.trim()}"를 찾을 수 없습니다 (존재하지 않거나 읽기 권한이 없습니다).`);
+      return;
+    }
+    alert(`문서 ID ${id.trim()} 조회 성공:\n\n${JSON.stringify(row, null, 2)}`);
+  } catch (e) {
+    console.error('문서 ID 직접 조회 실패:', e);
+    alert('조회 실패: ' + e.message);
+  }
+};
+
 window.toggleAnalyticsSection = function(key) {
   state.collapsedAnalyticsSections = state.collapsedAnalyticsSections || [];
   const idx = state.collapsedAnalyticsSections.indexOf(key);
@@ -5163,7 +5323,13 @@ window.updateResponsesSubscription = function() {
   responseUnsubscribes.forEach(unsub => unsub());
   responseUnsubscribes = [];
 
-  const sessionIds = (state.sessions || []).map(s => s.id).filter(Boolean);
+  // A survey's responses must stay reachable even if the session it was created
+  // under was later deleted (e.g. a recovered orphan survey) — union both id sets
+  // instead of trusting only currently-existing sessions.
+  const sessionIds = Array.from(new Set([
+    ...(state.sessions || []).map(s => s.id),
+    ...(state.surveys || []).map(s => s.sessionId),
+  ].filter(Boolean)));
   if (sessionIds.length === 0) {
     state.responses = [];
     return;
@@ -5179,7 +5345,7 @@ window.updateResponsesSubscription = function() {
 
   chunks.forEach((chunk, chunkIdx) => {
     const q = query(collection(db, 'responses'), where('sessionId', 'in', chunk));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, async (snap) => {
       const surveyMap = Object.fromEntries((state.surveys || []).map(s => [s.id, s]));
       const sessionMap = Object.fromEntries((state.sessions || []).map(s => [s.id, s]));
 
@@ -5201,6 +5367,29 @@ window.updateResponsesSubscription = function() {
         allResponses.push(...chunkResponses[idx]);
       });
 
+      // Recovered surveys can point at responses whose sessionId/cohort no longer
+      // lines up cleanly with the chunk query above (e.g. malformed or missing
+      // sessionId on very old rows) — backstop with a direct fetch+match so a
+      // recovered survey's results don't silently stay empty.
+      const recoveredSurveys = (state.surveys || []).filter((s) => s.recoveredAt);
+      if (recoveredSurveys.length) {
+        try {
+          const everything = await fetchAllResponsesFromFirestore();
+          const seen = new Set(allResponses.map((r) => r.id));
+          everything.forEach((row) => {
+            if (seen.has(row.id)) return;
+            const matches = recoveredSurveys.some((survey) =>
+              row.surveyId === survey.id
+              || (row.sessionId === survey.sessionId && row.phase === survey.phase
+                && (Number(row.cohort) || 0) === (Number(survey.sessionCohort) || 0))
+            );
+            if (matches) { allResponses.push(row); seen.add(row.id); }
+          });
+        } catch (e) {
+          console.error('복구된 설문 응답 보강 조회 실패:', e);
+        }
+      }
+
       allResponses.sort((a, b) => {
         const aTime = Date.parse(a.createdAt) || 0;
         const bTime = Date.parse(b.createdAt) || 0;
@@ -5208,8 +5397,8 @@ window.updateResponsesSubscription = function() {
       });
 
       state.responses = allResponses;
-      
-      const shouldRender = ["dashboard", "sessions", "analytics", "report"].includes(state.activeView);
+
+      const shouldRender = ["dashboard", "sessions", "survey", "analytics", "report"].includes(state.activeView);
       if (shouldRender) {
         render();
       }

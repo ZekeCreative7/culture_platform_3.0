@@ -2525,9 +2525,9 @@ function renderRadarChart(dimScores) {
       ${gridLevels.map(f => `<path d="${pathOf(angles.map(a => ptAt(a, f)))}" fill="none" stroke="#e2e8f0" stroke-width="${f === 1 ? 1.5 : 1}" stroke-dasharray="${f < 1 ? '3 3' : ''}"/>`).join('')}
       ${angles.map(a => { const p = ptAt(a, 1); return `<line x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="#cbd5e1" stroke-width="1.2"/>`; }).join('')}
       <path d="${pathOf(scorePts)}" fill="rgba(0,82,255,0.16)" stroke="#0052ff" stroke-width="2.5" stroke-linejoin="round"/>
-      ${scorePts.map((p, i) => dimScores[i].score !== null ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5" fill="${dimScores[i].color}" stroke="#fff" stroke-width="2"/>` : '').join('')}
+      ${scorePts.map((p, i) => dimScores[i].score !== null ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5" fill="${dimScores[i].color}" stroke="#fff" stroke-width="2" stroke-dasharray="${dimScores[i].singleItem ? '2 1.5' : ''}"/>` : '').join('')}
       ${dimScores.map((d, i) => `
-        <text x="${labelOffset[i][0]}" y="${labelOffset[i][1]}" text-anchor="${labelOffset[i][2]}" font-size="11" font-weight="700" fill="#334155" font-family="'Plus Jakarta Sans',sans-serif">${d.label}</text>
+        <text x="${labelOffset[i][0]}" y="${labelOffset[i][1]}" text-anchor="${labelOffset[i][2]}" font-size="11" font-weight="700" fill="#334155" font-family="'Plus Jakarta Sans',sans-serif">${d.label}${d.singleItem ? '＊' : ''}</text>
         ${d.score !== null ? `<text x="${labelOffset[i][0]}" y="${Number(labelOffset[i][1]) + 14}" text-anchor="${labelOffset[i][2]}" font-size="11.5" font-weight="800" fill="${d.color}" font-family="'Plus Jakarta Sans',sans-serif">${d.score.toFixed(2)}</text>` : ''}
       `).join('')}
       ${[1,2,3,4,5].map(n => `<text x="${(cx + 3).toFixed(1)}" y="${(cy - (r * n / 5) + 4).toFixed(1)}" font-size="9" fill="#b0bec5" font-family="sans-serif">${n}</text>`).join('')}
@@ -2606,6 +2606,21 @@ function dimAvg(phaseStats, qs) {
   return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
 }
 
+// 응답자별(개인별) 차원 점수의 최소·최대를 구한다. 평균만 보면 팀이 양극화돼 있어도
+// (예: 절반은 매우 긍정, 절반은 매우 부정) 보통 수준처럼 보일 수 있어 별도로 둔다.
+// 익명 보장을 위해 N<3인 경우는 호출 측에서 노출하지 않는다.
+function dimSpread(sessionId, phase, qs) {
+  const rows = (state.responses || []).filter(row => row.sessionId === sessionId && row.phase === phase);
+  const perRespondent = rows
+    .map(row => {
+      const vals = qs.map(q => scoreOf(row[q])).filter(v => typeof v === 'number');
+      return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    })
+    .filter(v => v !== null);
+  if (perRespondent.length < 3) return null;
+  return { min: Math.min(...perRespondent), max: Math.max(...perRespondent), n: perRespondent.length };
+}
+
 function ragInfo(score) {
   if (score === null) return { label:'데이터 없음', color:'#94a3b8', bg:'#f8fafc', bar:'#e2e8f0' };
   if (score >= 4.0)   return { label:'양호',       color:'#008a54', bg:'rgba(0,168,102,0.08)', bar:'#00a866' };
@@ -2673,15 +2688,25 @@ function renderCompareReport(type, cohort) {
     const silo = dimAvg(diagnosis, ['q4', 'q5', 'q6']);
     const resilience = dimAvg(diagnosis, ['q7']);
     const mood = dimAvg(diagnosis, ['q8']);
-    
-    const validScores = [psych, silo, resilience, mood].filter(v => v !== null);
-    const overall = validScores.length ? validScores.reduce((a, b) => a + b, 0) / validScores.length : null;
-    
+
+    // 문항 수 가중평균: 단일 문항 지표(회복탄력성·전반 분위기)가 3문항 지표(심리적 안전감·
+    // 사일로 해소)와 동일한 비중을 갖지 않도록 REPORT_DIMS의 문항 수를 가중치로 사용한다.
+    const weighted = REPORT_DIMS
+      .map(dim => ({ score: dimAvg(diagnosis, dim.qs), weight: dim.qs.length }))
+      .filter(d => d.score !== null);
+    const overall = weighted.length
+      ? weighted.reduce((sum, d) => sum + d.score * d.weight, 0) / weighted.reduce((sum, d) => sum + d.weight, 0)
+      : null;
+
+    const target = targetCountForSession(session);
+    const responseRate = target ? Math.round((diagnosis.n / target) * 100) : null;
+
     return {
       session,
       hasData: true,
       phase: diagnosis.phase,
       n: diagnosis.n,
+      responseRate,
       scores: { psych, silo, resilience, mood },
       overall
     };
@@ -2705,7 +2730,12 @@ function renderCompareReport(type, cohort) {
   
   // 데이터가 없는 세션들
   const noDataSessions = sessionScores.filter(s => !s.hasData);
-  
+
+  // 팀마다 진단에 쓴 시점(사전/중간/사후)이 다를 수 있다 — 다른 시점 점수를 같은 순위표에서
+  // 비교하고 있다는 것을 운영자가 알 수 있도록 표시한다.
+  const phaseBadgeColor = (phase) => ({ '사전': '#94a3b8', '중간': '#b47700', '사후': '#0052ff' }[phase] || '#94a3b8');
+  const hasMixedPhases = new Set(rankedSessions.map(s => s.phase)).size > 1;
+
   // 평균 종합 정보
   const validOverallScores = rankedSessions.map(s => s.overall).filter(v => v !== null);
   const avgOverall = validOverallScores.length 
@@ -2772,7 +2802,7 @@ function renderCompareReport(type, cohort) {
         <h2>① 종합 점수 및 순위</h2>
         <span>종합점수 기준 정렬 · 동점 시 공동 순위 부여</span>
       </div>
-      
+      ${hasMixedPhases ? `<p style="font-size:11.5px; color:#a46900; background:rgba(244,176,0,0.10); border:1px solid rgba(244,176,0,0.3); border-radius:8px; padding:8px 12px; margin:0 0 12px;">팀마다 진단에 쓴 설문 시점(사전/중간/사후)이 다릅니다. 시점이 다른 팀끼리의 순위·점수 차이는 세션 진행도 차이를 반영할 수 있어 그대로 비교하지 않도록 주의하세요.</p>` : ''}
       ${!rankedSessions.length && !noDataSessions.length ? `<div class="empty">비교할 세션이 없습니다.</div>` : `
         <div style="overflow-x:auto;">
           <table class="compare-ranking-table">
@@ -2801,8 +2831,11 @@ function renderCompareReport(type, cohort) {
                   <tr>
                     <td class="rank-cell">${s.rank}위</td>
                     <td class="team-cell">${escapeHtml(sessionLabel(s.session))}</td>
-                    <td style="text-align:center; color:var(--cb-muted);">${isAllCohorts ? `${s.session.cohort}기 ${s.phase}` : s.phase}</td>
-                    <td style="text-align:center; font-weight:600;">N=${s.n}</td>
+                    <td style="text-align:center;">
+                      ${isAllCohorts ? `<span style="color:var(--cb-muted); margin-right:4px;">${s.session.cohort}기</span>` : ''}
+                      <span style="font-weight:700; color:${phaseBadgeColor(s.phase)}; background:${phaseBadgeColor(s.phase)}14; padding:2px 8px; border-radius:99px; font-size:11.5px;">${s.phase}</span>
+                    </td>
+                    <td style="text-align:center; font-weight:600;">N=${s.n}${s.responseRate !== null ? `<span style="font-weight:500; color:var(--cb-muted); font-size:11px;"> (${s.responseRate}%)</span>` : ''}</td>
                     <td class="overall-cell" style="text-align:center;">
                       <span style="font-size:14px; font-weight:800; color:${rag.color}; background:${rag.color}14; padding:3px 10px; border-radius:12px;">
                         ${s.overall.toFixed(2)}
@@ -3044,6 +3077,8 @@ function renderReport() {
   const diagnosis = hasPostData ? post : (mid?.n >= 1 ? mid : (hasPreData ? pre : null));
   const diagnosisPhase = diagnosis?.phase || '사전';
   const hasDiagnosisData = Boolean(diagnosis?.n >= 1);
+  const diagnosisTarget = session ? targetCountForSession(session) : 0;
+  const diagnosisResponseRate = diagnosis && diagnosisTarget ? Math.round((diagnosis.n / diagnosisTarget) * 100) : null;
 
   return `
     <div id="report-export-content" class="report-export-content">
@@ -3096,15 +3131,15 @@ function renderReport() {
     <section class="report-export-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>① 현 상황 진단</h2>
-        <span>${diagnosisPhase} 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${diagnosis ? diagnosis.n : 0}</span>
+        <span>${diagnosisPhase} 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${diagnosis ? diagnosis.n : 0}${diagnosisResponseRate !== null ? ` (응답률 ${diagnosisResponseRate}%)` : ''}</span>
       </div>
       ${!hasDiagnosisData ? `<div class="empty">진단에 사용할 설문 응답이 없습니다.</div>` : `
       <div class="report-diagnosis-grid">
         <!-- Radar Chart -->
         <div class="report-radar-card">
           <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em;">영역별 현황</div>
-          ${renderRadarChart(REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs), color: d.color })))}
-          <div style="font-size:11px; color:#94a3b8; text-align:center; line-height:1.5;">${diagnosisPhase} 설문 · N=${diagnosis.n}</div>
+          ${renderRadarChart(REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs), color: d.color, singleItem: d.qs.length === 1 })))}
+          <div style="font-size:11px; color:#94a3b8; text-align:center; line-height:1.5;">${diagnosisPhase} 설문 · N=${diagnosis.n}${REPORT_DIMS.some(d => d.qs.length === 1) ? ' · ＊단일 문항 지표' : ''}</div>
         </div>
         <!-- Dimension Score Cards -->
         <div class="report-dimension-grid">
@@ -3113,6 +3148,9 @@ function renderReport() {
             const rag = ragInfo(score);
             const pct = score ? Math.round((score/5)*100) : 0;
             const subLabel = { psych: 'Psychological Safety', silo: 'Silo Reduction', resilience: 'Resilience', mood: 'Team Climate' }[dim.key] || '';
+            const isSingleItem = dim.qs.length === 1;
+            const spread = sessionId ? dimSpread(sessionId, diagnosisPhase, dim.qs) : null;
+            const isPolarized = spread && (spread.max - spread.min) >= 2.0;
             return `
               <div style="background:${rag.bg}; border:1.5px solid ${rag.bar}33; border-radius:12px; padding:16px 18px; position:relative; overflow:hidden;">
                 <div style="position:absolute; left:0; top:0; bottom:0; width:3px; background:${dim.color};"></div>
@@ -3120,7 +3158,7 @@ function renderReport() {
                   <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
                     <div>
                       <div style="font-size:13px; font-weight:800; color:#0c2340;">${dim.label}</div>
-                      <div style="font-size:10.5px; color:#94a3b8; font-weight:600; margin-top:1px;">${subLabel}</div>
+                      <div style="font-size:10.5px; color:#94a3b8; font-weight:600; margin-top:1px;">${subLabel}${isSingleItem ? ' · 단일 문항' : ''}</div>
                     </div>
                     <span style="font-size:10.5px; font-weight:800; color:${rag.color}; background:${rag.color}18; padding:2px 9px; border-radius:99px; white-space:nowrap; margin-left:6px; flex-shrink:0;">${rag.label}</span>
                   </div>
@@ -3128,6 +3166,10 @@ function renderReport() {
                   <div style="background:#e2e8f0; border-radius:99px; height:5px; overflow:hidden;">
                     <div style="width:${pct}%; height:100%; background:${rag.bar}; border-radius:99px;"></div>
                   </div>
+                  ${spread ? `
+                    <div style="margin-top:8px; font-size:10.5px; color:${isPolarized ? '#c00032' : '#94a3b8'}; font-weight:${isPolarized ? '700' : '500'};">
+                      응답 범위 ${spread.min.toFixed(1)}–${spread.max.toFixed(1)}${isPolarized ? ' · 양극화 주의' : ''}
+                    </div>` : ''}
                 </div>
               </div>`;
           }).join("")}
@@ -3196,16 +3238,16 @@ function renderReport() {
           const deltaColor = delta === null ? '#94a3b8' : delta > 0.2 ? '#00a866' : delta < -0.2 ? '#e3003b' : '#f4b000';
           
           const shortInterpretation = delta === null ? ''
-            : delta > 0.5 ? '유의미 개선'
-            : delta > 0.2 ? '긍정 변화'
+            : delta > 0.5 ? '큰 변화'
+            : delta > 0.2 ? '소폭 개선'
             : delta > -0.2 ? '변화 미미'
             : '주의';
 
           const interpretation = delta === null ? ''
-            : delta > 0.5 ? '뚜렷한 긍정 변화 — 세션 효과 확인'
-            : delta > 0.2 ? '긍정적 변화 — 방향성 적절'
-            : delta > -0.2 ? '변화 미미 — 추가 개입 필요'
-            : '점수 하락 — 환경 요인 점검 필요';
+            : delta > 0.5 ? '평균 차이가 큽니다 — 사전·사후 응답자 구성이 달랐을 가능성도 함께 점검하세요.'
+            : delta > 0.2 ? '평균이 개선 방향입니다 — 표본 수가 적다면 참고용으로 해석하세요.'
+            : delta > -0.2 ? '평균 차이가 미미합니다 — 추가 개입 필요 여부를 정성 신호와 함께 확인하세요.'
+            : '평균이 하락했습니다 — 환경 요인과 응답자 구성 변화를 함께 점검하세요.';
             
           const prePct = preScore !== null ? (preScore - 1) * 25 : 0;
           const postPct = postScore !== null ? (postScore - 1) * 25 : 0;
@@ -3255,9 +3297,9 @@ function renderReport() {
                     </div>
                   </div>
                   <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:11.5px;">
-                    <span style="color:#64748b; font-weight:600;">사전: <strong style="color:#475569;">${preScore.toFixed(2)}</strong></span>
-                    ${midScore !== null ? `<span style="color:#b47700; font-weight:600;">중간: <strong>${midScore.toFixed(2)}</strong></span>` : ''}
-                    <span style="color:${dim.color}; font-weight:700;">사후: <strong>${postScore.toFixed(2)}</strong></span>
+                    <span style="color:#64748b; font-weight:600;">사전: <strong style="color:#475569;">${preScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${pre.n})</span></span>
+                    ${midScore !== null ? `<span style="color:#b47700; font-weight:600;">중간: <strong>${midScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${mid.n})</span></span>` : ''}
+                    <span style="color:${dim.color}; font-weight:700;">사후: <strong>${postScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${post.n})</span></span>
                   </div>
                 </div>
               ` : `
@@ -3270,7 +3312,7 @@ function renderReport() {
             </div>`;
         }).join("")}
       </div>
-      <p style="font-size:11.5px; color:#94a3b8; margin:10px 0 0; line-height:1.6;">N이 3 미만인 데이터는 익명 보장을 위해 마스킹 처리됩니다. 수치는 통계적 유의성이 아닌 운영 방향 지표입니다.</p>
+      <p style="font-size:11.5px; color:#94a3b8; margin:10px 0 0; line-height:1.6;">N이 3 미만인 데이터는 익명 보장을 위해 마스킹 처리됩니다. 응답은 개인 추적 없이 익명으로 수집되어 사전·사후가 동일인 비교가 아니며, 수치는 통계적 유의성이 아닌 운영 방향 참고 지표입니다.</p>
       `}
     </section>
 

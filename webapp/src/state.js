@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-bulk-reset-protected-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-closed-surveys-collapse-v1';
 import { 
   PHASES, 
   normalizeSessionType, 
@@ -8,7 +8,7 @@ import {
   uid, 
   defaultQuestions,
   normalizePosition
-} from './utils.js?v=20260622-bulk-reset-protected-v1';
+} from './utils.js?v=20260622-closed-surveys-collapse-v1';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
@@ -98,6 +98,7 @@ export const blankState = () => ({
   orgEditor: null,
   sidebarCollapsed: false,
   collapsedSurveyIds: [],
+  closedSurveysCollapsed: false,
   pulseView: "overview",
   pulseScopeId: "company",
   pulseLayer: "easy",
@@ -198,7 +199,7 @@ function persistState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
+    sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
   } = state;
@@ -211,7 +212,7 @@ function persistState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
-    sidebarCollapsed, collapsedSurveyIds, collapsedSessionTypeGroups, collapsedAnalyticsSections,
+    sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
   }));

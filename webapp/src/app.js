@@ -1,14 +1,14 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-bulk-reset-protected-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-closed-surveys-collapse-v1';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-engagement-footnote-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-org-revert-v2';
-import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260622-bulk-reset-protected-v1';
+import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260622-closed-surveys-collapse-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-bulk-reset-protected-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-closed-surveys-collapse-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -16,7 +16,7 @@ import {
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
-} from './utils.js?v=20260622-bulk-reset-protected-v1';
+} from './utils.js?v=20260622-closed-surveys-collapse-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -27,7 +27,7 @@ import {
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260622-bulk-reset-protected-v1';
+} from './state.js?v=20260622-closed-surveys-collapse-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -2277,30 +2277,30 @@ function renderSurveyCreator() {
 
         ${closedSurveys.length ? `
           <div style="margin-top:28px;">
-            ${sectionTitle("배포 종료 · 응답 보관", `${closedSurveys.length}건`)}
-            <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">링크와 QR만 비활성화된 상태입니다. 기존 응답과 업로드 결과는 계속 보관됩니다.</p>
+            <button type="button" class="section-title section-title-toggle" style="width:100%; text-align:left;" onclick="toggleClosedSurveysSection()">
+              <h2><span class="section-title-chevron">${state.closedSurveysCollapsed ? "▸" : "▾"}</span>배포 종료 · 응답 보관</h2>
+              <span>${closedSurveys.length}건</span>
+            </button>
+            ${state.closedSurveysCollapsed ? "" : `
+            <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">링크와 QR만 비활성화된 상태입니다. 응답 결과는 Change(변화 분석) 화면에서 세션·단계로 그대로 조회됩니다.</p>
             <div class="surveys-grid">
               ${closedSurveys.map((survey) => {
                 const session = state.sessions.find((item) => item.id === survey.sessionId);
                 const sessionText = session ? `${session.type} · ${sessionLabel(session)}` : "만료된 세션";
                 return `
-                  <div class="survey-deploy-card">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                      <div class="survey-deploy-info" style="flex:1; min-width:0;">
-                        <strong>${escapeHtml(survey.title)}</strong>
-                        <span>${escapeHtml(sessionText)} [${escapeHtml(survey.phase)}] · <b style="color:var(--muted);">배포 종료</b></span>
-                      </div>
-                      <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-                        <button class="ghost compact" onclick="startEditSurvey('${survey.id}')">설문 정의 수정</button>
-                        <button class="primary compact" onclick="reopenSurveyDistribution('${survey.id}')">배포 재개</button>
-                        ${survey.recoveredAt ? `<button class="ghost compact" style="color:#b45309; border-color:#fcd34d;" onclick="deleteRecoveredSurveyCard('${survey.id}')">복구 카드만 삭제</button>` : ""}
-                      </div>
+                  <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
+                    <div style="flex:1; min-width:0;">
+                      <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(survey.title)}</strong>
+                      <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${escapeHtml(sessionText)} [${escapeHtml(survey.phase)}] · 배포 종료</span>
                     </div>
-                    <button onclick="uploadSurveyResults('${survey.id}')" style="width:100%; padding:9px; background:#eff6ff; border:1.5px dashed #93c5fd; border-radius:8px; color:#1d4ed8; font-size:12px; font-weight:700; cursor:pointer;">↑ 결과 CSV 업로드</button>
-                    ${renderSurveyResponsePanel(survey, session)}
+                    <button onclick="startEditSurvey('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--blue-mid); cursor:pointer; white-space:nowrap; flex-shrink:0;">정의 수정</button>
+                    <button onclick="reopenSurveyDistribution('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; flex-shrink:0;">배포 재개</button>
+                    <button onclick="uploadSurveyResults('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:#1d4ed8; cursor:pointer; white-space:nowrap; flex-shrink:0;">CSV 업로드</button>
+                    <button onclick="deleteRecoveredSurveyCard('${survey.id}')" style="background:none; border:1.5px solid #fcd34d; border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:#b45309; cursor:pointer; white-space:nowrap; flex-shrink:0;">카드 삭제</button>
                   </div>`;
               }).join("")}
             </div>
+            `}
           </div>
         ` : ""}
 
@@ -5014,15 +5014,21 @@ window.recoverAllOrphanSurveys = function() {
 window.deleteRecoveredSurveyCard = function(id) {
   const survey = (state.surveys || []).find((s) => s.id === id);
   if (!survey) return;
-  if (!confirm(`"${survey.title}" 복구 카드만 지울까요?\n\n이 카드는 복구 과정에서 만들어진 것이라 지워도 원본 응답 데이터는 전혀 삭제되지 않습니다. 같은 세션·단계 응답이 이미 다른 설문 카드에 보이고 있다면 중복 정리용으로 안전하게 지우셔도 됩니다.`)) return;
+  if (!confirm(`"${survey.title}" 카드를 목록에서 지울까요?\n\n카드만 지워지고 원본 응답 데이터는 전혀 삭제되지 않습니다. 결과는 Change(변화 분석) 화면에서 세션·단계로 계속 조회할 수 있습니다.`)) return;
   state.surveys = (state.surveys || []).filter((s) => s.id !== id);
   saveState();
   render();
   window.updateResponsesSubscription();
   deleteSurveyDocFromFirestore(id).catch((e) => {
-    console.error('Firestore 복구 카드 삭제 실패:', e);
+    console.error('Firestore 설문 카드 삭제 실패:', e);
     alert('화면에는 지워졌지만 서버 삭제에 실패했습니다: ' + e.message);
   });
+};
+
+window.toggleClosedSurveysSection = function() {
+  state.closedSurveysCollapsed = !state.closedSurveysCollapsed;
+  saveState();
+  render();
 };
 
 function isProtectedFromBulkReset(survey) {

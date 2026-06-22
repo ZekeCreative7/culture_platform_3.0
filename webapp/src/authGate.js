@@ -1,7 +1,7 @@
 import {
   auth, db, collection, doc, getDoc, getDocs, setDoc, onSnapshot, serverTimestamp, writeBatch,
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
-} from './firebase.js?v=20260622-recover-survey-undefined-fix-v1';
+} from './firebase.js?v=20260622-recover-all-dedupe-v1';
 
 export const MASTER_EMAIL = 'rhokoo7@naver.com';
 

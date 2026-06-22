@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-recover-survey-undefined-fix-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-recover-all-dedupe-v1';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-engagement-footnote-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
@@ -8,7 +8,7 @@ import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardVie
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260621-vivid-report-palette-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-recover-survey-undefined-fix-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-recover-all-dedupe-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -16,7 +16,7 @@ import {
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
-} from './utils.js?v=20260622-recover-survey-undefined-fix-v1';
+} from './utils.js?v=20260622-recover-all-dedupe-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -27,7 +27,7 @@ import {
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260622-recover-survey-undefined-fix-v1';
+} from './state.js?v=20260622-recover-all-dedupe-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -2307,6 +2307,9 @@ function renderSurveyCreator() {
           <button class="ghost compact" style="font-size:11.5px;" onclick="scanForOrphanResponses()" ${state.orphanScanLoading ? "disabled" : ""}>
             ${state.orphanScanLoading ? "스캔 중..." : "DB에서 연결 끊긴 응답 찾기"}
           </button>
+          ${state.orphanScanResult && state.orphanScanResult.length ? `
+            <button class="primary compact" style="font-size:11.5px;" onclick="recoverAllOrphanSurveys()">전체 복구 (같은 세션·단계 중복은 최신 기준으로 합침)</button>
+          ` : ""}
           ${state.orphanScanError ? `<p style="color:#dc2626; font-size:12px; margin-top:8px;">스캔 실패: ${escapeHtml(state.orphanScanError)}</p>` : ""}
           ${state.orphanScanResult ? (
             state.orphanScanResult.length ? `
@@ -4919,13 +4922,32 @@ window.scanForOrphanResponses = async function() {
   }
 };
 
-window.recoverOrphanSurvey = function(key) {
-  const group = (state.orphanScanResult || []).find((g) => g.key === key);
-  if (!group) return;
-  if (!confirm(`이 데이터(${group.count}건)를 "배포 종료 · 응답 보관" 목록에 설문으로 복구할까요?\n\n응답 자체는 이미 안전하게 보관되어 있었고, 이 작업은 그 응답을 다시 볼 수 있도록 설문 카드만 새로 만듭니다.`)) return;
+function dedupeKeyForGroup(group) {
+  return `${group.sessionId}|${group.phase}|${group.cohort}`;
+}
+
+// Multiple orphan groups can share the same session+phase+cohort (e.g. a survey was
+// deleted and recreated more than once, leaving several old surveyIds behind for the
+// same logical survey slot). surveyRows()'s sessionId/phase/cohort fallback already
+// pulls every matching row into whichever single survey we recover for that slot, so
+// recovering more than one card per slot would just split the same responses across
+// duplicate cards. Keep only the group with the most recent activity per slot.
+function dedupeOrphanGroups(groups) {
+  const bySlot = new Map();
+  groups.forEach((group) => {
+    const slotKey = dedupeKeyForGroup(group);
+    const existing = bySlot.get(slotKey);
+    if (!existing || (group.lastAt || "") > (existing.lastAt || "")) {
+      bySlot.set(slotKey, group);
+    }
+  });
+  return Array.from(bySlot.values());
+}
+
+function buildRecoveredSurveyFromGroup(group) {
   const now = new Date().toISOString();
   const id = group.surveyId || uid();
-  const survey = normalizeSurveyRecord({
+  return normalizeSurveyRecord({
     id,
     title: `복구된 설문 (${group.phase || "단계 미상"} · ${group.sessionLabel})`,
     sessionId: group.sessionId,
@@ -4936,14 +4958,42 @@ window.recoverOrphanSurvey = function(key) {
     recoveredAt: now,
     distribution: { id: `distribution-${id}`, active: false, status: "closed", publishedAt: "", closedAt: now, deletedAt: now },
   });
+}
+
+window.recoverOrphanSurvey = function(key) {
+  const group = (state.orphanScanResult || []).find((g) => g.key === key);
+  if (!group) return;
+  if (!confirm(`이 데이터(${group.count}건)를 "배포 종료 · 응답 보관" 목록에 설문으로 복구할까요?\n\n응답 자체는 이미 안전하게 보관되어 있었고, 이 작업은 그 응답을 다시 볼 수 있도록 설문 카드만 새로 만듭니다.`)) return;
+  const survey = buildRecoveredSurveyFromGroup(group);
+  const slotKey = dedupeKeyForGroup(group);
   state.surveys = [...(state.surveys || []), survey];
-  state.orphanScanResult = (state.orphanScanResult || []).filter((g) => g.key !== key);
+  // Drop every orphan group for this same session+phase+cohort, not just the one clicked —
+  // they'll all show up under this one recovered card via the legacy fallback match.
+  state.orphanScanResult = (state.orphanScanResult || []).filter((g) => dedupeKeyForGroup(g) !== slotKey);
   saveState();
   render();
   window.updateResponsesSubscription();
-  updateSurveyInFirestore(id, survey).catch((e) => {
+  updateSurveyInFirestore(survey.id, survey).catch((e) => {
     console.error('Firestore 복구 설문 저장 실패:', e);
     alert('화면에는 복구됐지만 서버 저장에 실패했습니다: ' + e.message);
+  });
+};
+
+window.recoverAllOrphanSurveys = function() {
+  const groups = state.orphanScanResult || [];
+  if (!groups.length) return;
+  const deduped = dedupeOrphanGroups(groups);
+  const skipped = groups.length - deduped.length;
+  if (!confirm(`연결 끊긴 응답 그룹 ${groups.length}개 중, 같은 세션·단계로 중복된 ${skipped}개는 가장 최근 응답 기준으로 합쳐서 총 ${deduped.length}개의 설문으로 복구합니다.\n\n전체 복구할까요?`)) return;
+  const newSurveys = deduped.map(buildRecoveredSurveyFromGroup);
+  state.surveys = [...(state.surveys || []), ...newSurveys];
+  state.orphanScanResult = [];
+  saveState();
+  render();
+  window.updateResponsesSubscription();
+  Promise.all(newSurveys.map((survey) => updateSurveyInFirestore(survey.id, survey))).catch((e) => {
+    console.error('Firestore 전체 복구 저장 실패:', e);
+    alert('화면에는 복구됐지만 일부 서버 저장에 실패했습니다: ' + e.message);
   });
 };
 

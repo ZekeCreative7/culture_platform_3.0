@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-recover-survey-undefined-fix-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-recover-all-dedupe-v1';
 import { 
   PHASES, 
   normalizeSessionType, 
@@ -8,7 +8,7 @@ import {
   uid, 
   defaultQuestions,
   normalizePosition
-} from './utils.js?v=20260622-recover-survey-undefined-fix-v1';
+} from './utils.js?v=20260622-recover-all-dedupe-v1';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";

@@ -208,6 +208,7 @@ function ensureScopedSelection(kind) {
   const typeField    = kind === "analytics" ? "selectedAnalyticsType"     : "selectedReportType";
   const cohortField  = kind === "analytics" ? "selectedAnalyticsCohort"   : "selectedReportCohort";
   const sessionField = kind === "analytics" ? "selectedAnalyticsSessionId": "selectedReportSessionId";
+  const isReport = kind === "report";
 
   // 1) 유형: 세션이 존재하는 유형으로 보정
   const types = availableSessionTypes();
@@ -218,6 +219,9 @@ function ensureScopedSelection(kind) {
 
   // 2) 기수: 그 유형에 존재하는 기수로 보정
   const cohorts = cohortsForType(type);
+  if (!isReport && state[cohortField] === "all") {
+    state[cohortField] = cohorts.length ? String(cohorts[0]) : "";
+  }
   if (state[cohortField] !== "all" && !cohorts.includes(Number(state[cohortField]))) {
     state[cohortField] = cohorts.length ? String(cohorts[0]) : "";
   }
@@ -225,6 +229,9 @@ function ensureScopedSelection(kind) {
 
   // 3) 세션: 그 유형+기수에 속한 세션으로 보정
   const sessions = sessionsForTypeCohort(type, cohort);
+  if (!isReport && state[sessionField] === "all") {
+    state[sessionField] = sessions[0]?.id || "";
+  }
   if (state[sessionField] !== "all" && !sessions.some((session) => session.id === state[sessionField])) {
     state[sessionField] = sessions[0]?.id || "";
   }

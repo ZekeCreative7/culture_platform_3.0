@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-recover-all-dedupe-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-orphan-dup-guard-v1';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-engagement-footnote-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
@@ -8,7 +8,7 @@ import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardVie
 import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260621-vivid-report-palette-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-recover-all-dedupe-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-orphan-dup-guard-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -16,18 +16,18 @@ import {
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
-} from './utils.js?v=20260622-recover-all-dedupe-v1';
+} from './utils.js?v=20260622-orphan-dup-guard-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
   blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, saveStateQuiet, normalizeAppState,
   syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
   deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore, fetchAllResponsesFromFirestore, fetchResponsesBySessionId, fetchResponsesBySurveyId, fetchResponseDocById,
-  setSurveyDistributionActiveInFirestore, updateSurveyInFirestore, normalizeSurveyRecord, loadPulseYears,
+  setSurveyDistributionActiveInFirestore, updateSurveyInFirestore, deleteSurveyDocFromFirestore, normalizeSurveyRecord, loadPulseYears,
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260622-recover-all-dedupe-v1';
+} from './state.js?v=20260622-orphan-dup-guard-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -243,14 +243,16 @@ function cohortOptionsHtml(type, selectedCohort) {
   }).join("");
 }
 
-function surveyRows(survey) {
+function rowMatchesSurvey(row, survey) {
+  if (row.surveyId === survey.id) return true;
   const cohort = Number(survey.sessionCohort) || 0;
-  return (state.responses || []).filter((row) => {
-    if (row.surveyId === survey.id) return true;
-    return row.sessionId === survey.sessionId
-      && row.phase === survey.phase
-      && (!cohort || Number(row.cohort) === cohort);
-  });
+  return row.sessionId === survey.sessionId
+    && row.phase === survey.phase
+    && (!cohort || Number(row.cohort) === cohort);
+}
+
+function surveyRows(survey) {
+  return (state.responses || []).filter((row) => rowMatchesSurvey(row, survey));
 }
 
 function surveyDistributionActive(survey) {
@@ -2291,6 +2293,7 @@ function renderSurveyCreator() {
                       <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
                         <button class="ghost compact" onclick="startEditSurvey('${survey.id}')">설문 정의 수정</button>
                         <button class="primary compact" onclick="reopenSurveyDistribution('${survey.id}')">배포 재개</button>
+                        ${survey.recoveredAt ? `<button class="ghost compact" style="color:#b45309; border-color:#fcd34d;" onclick="deleteRecoveredSurveyCard('${survey.id}')">복구 카드만 삭제</button>` : ""}
                       </div>
                     </div>
                     <button onclick="uploadSurveyResults('${survey.id}')" style="width:100%; padding:9px; background:#eff6ff; border:1.5px dashed #93c5fd; border-radius:8px; color:#1d4ed8; font-size:12px; font-weight:700; cursor:pointer;">↑ 결과 CSV 업로드</button>
@@ -4885,10 +4888,14 @@ window.scanForOrphanResponses = async function() {
   notify();
   try {
     const allRows = await fetchAllResponsesFromFirestore();
-    const knownSurveyIds = new Set((state.surveys || []).map((s) => s.id));
+    const currentSurveys = state.surveys || [];
     const groups = new Map();
     allRows.forEach((row) => {
-      if (row.surveyId && knownSurveyIds.has(row.surveyId)) return; // already visible in normal survey list
+      // A row is only truly orphaned if no current survey would already surface it —
+      // checking surveyId alone misses legacy rows with no surveyId tag that still
+      // match a live survey via the sessionId/phase/cohort fallback, which would
+      // otherwise get duplicated into a second "recovered" card for the same slot.
+      if (currentSurveys.some((survey) => rowMatchesSurvey(row, survey))) return;
       const key = orphanGroupKey(row);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(row);
@@ -4994,6 +5001,20 @@ window.recoverAllOrphanSurveys = function() {
   Promise.all(newSurveys.map((survey) => updateSurveyInFirestore(survey.id, survey))).catch((e) => {
     console.error('Firestore 전체 복구 저장 실패:', e);
     alert('화면에는 복구됐지만 일부 서버 저장에 실패했습니다: ' + e.message);
+  });
+};
+
+window.deleteRecoveredSurveyCard = function(id) {
+  const survey = (state.surveys || []).find((s) => s.id === id);
+  if (!survey) return;
+  if (!confirm(`"${survey.title}" 복구 카드만 지울까요?\n\n이 카드는 복구 과정에서 만들어진 것이라 지워도 원본 응답 데이터는 전혀 삭제되지 않습니다. 같은 세션·단계 응답이 이미 다른 설문 카드에 보이고 있다면 중복 정리용으로 안전하게 지우셔도 됩니다.`)) return;
+  state.surveys = (state.surveys || []).filter((s) => s.id !== id);
+  saveState();
+  render();
+  window.updateResponsesSubscription();
+  deleteSurveyDocFromFirestore(id).catch((e) => {
+    console.error('Firestore 복구 카드 삭제 실패:', e);
+    alert('화면에는 지워졌지만 서버 삭제에 실패했습니다: ' + e.message);
   });
 };
 

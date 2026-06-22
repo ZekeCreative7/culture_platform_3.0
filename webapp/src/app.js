@@ -5,7 +5,7 @@ import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-org-revert-v2';
-import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260623-report-pdf-layout-v1';
+import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260623-report-pdf-portrait-v3';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-closed-surveys-collapse-v1';
@@ -3128,7 +3128,7 @@ function renderReport() {
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
 
     <!-- ① 현 상황 진단 -->
-    <section class="report-export-section" style="margin-bottom:28px;">
+    <section class="report-export-section report-diagnosis-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>① 현 상황 진단</h2>
         <span>${diagnosisPhase} 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${diagnosis ? diagnosis.n : 0}${diagnosisResponseRate !== null ? ` (응답률 ${diagnosisResponseRate}%)` : ''}</span>
@@ -3228,7 +3228,7 @@ function renderReport() {
         <span>사전 → 사후 · N<3 마스킹 적용</span>
       </div>
       ${!hasPreData && !hasPostData ? `<div class="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>` : `
-      <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px;">
+      <div class="report-change-grid" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px;">
         ${REPORT_DIMS.map(dim => {
           const preScore  = pre  && pre.n  >= 3 ? dimAvg(pre,  dim.qs) : null;
           const midScore  = mid  && mid.n  >= 3 ? dimAvg(mid,  dim.qs) : null;

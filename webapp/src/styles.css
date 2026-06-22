@@ -1815,12 +1815,12 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 
 /* Off-screen desktop document used by html2pdf. */
 .report-export-stage {
-  position: fixed;
+  position: absolute;
   z-index: -2147483647;
   left: 0;
   top: 0;
-  width: 1440px;
-  height: 1px;
+  width: 1280px;
+  height: auto;
   margin: 0;
   padding: 0;
   overflow: visible;
@@ -1829,7 +1829,10 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 }
 .report-pdf-document {
   box-sizing: border-box;
-  width: 1440px;
+  position: relative;
+  left: 0;
+  top: 0;
+  width: 1280px;
   max-width: none;
   overflow: visible;
   margin: 0;
@@ -1839,8 +1842,9 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
     linear-gradient(145deg, #eef6fc 0%, #f5f8fc 50%, #eef0fb 100%);
   color: var(--ink);
 }
-.report-pdf-document .report-export-header { margin-bottom: 24px; }
-.report-pdf-document .report-diagnosis-grid { grid-template-columns: minmax(520px, 1.15fr) minmax(0, .85fr); gap: 24px; }
+.report-pdf-document .page-head { padding: 24px; }
+.report-pdf-document .report-export-header { margin-bottom: 18px; }
+.report-pdf-document .report-diagnosis-grid { grid-template-columns: minmax(470px, 1.15fr) minmax(0, .85fr); gap: 24px; }
 .report-pdf-document .report-radar-card { padding-inline: 36px; }
 .report-pdf-document .report-dimension-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .report-pdf-document .report-export-section { break-inside: auto; page-break-inside: auto; }
@@ -1848,6 +1852,7 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 .report-pdf-document .report-radar-card,
 .report-pdf-document .report-dimension-grid > div,
 .report-pdf-document .report-recommendation-card,
+.report-pdf-document .report-change-grid,
 .report-pdf-document .report-change-card {
   break-inside: avoid;
   page-break-inside: avoid;

@@ -30,7 +30,7 @@ const PHASE_ORDER = ["사전", "중간", "사후"];
 // Keep the export close to the app's real desktop content width. Capturing an
 // artificially wide (1840px) document made an A4 portrait page shrink too far
 // and let the right padding fall outside html2canvas' capture box.
-const DESKTOP_EXPORT_WIDTH_PX = 1440;
+const DESKTOP_EXPORT_WIDTH_PX = 1280;
 
 function safeFilePart(value) {
   return String(value || "report")
@@ -211,6 +211,10 @@ export async function downloadReportPdf({ element, meta }) {
   clone.classList.add("report-pdf-document");
   clone.style.width = `${DESKTOP_EXPORT_WIDTH_PX}px`;
   clone.style.maxWidth = "none";
+  clone.style.position = "relative";
+  clone.style.left = "0";
+  clone.style.top = "0";
+  clone.style.transform = "none";
   clone.querySelectorAll("[data-html2canvas-ignore]").forEach((node) => node.remove());
   stage.appendChild(clone);
   document.body.appendChild(stage);
@@ -238,22 +242,36 @@ export async function downloadReportPdf({ element, meta }) {
           scrollX: 0,
           scrollY: 0,
           onclone: (clonedDocument) => {
+            const clonedStage = clonedDocument.querySelector(".report-export-stage");
             const clonedReport = clonedDocument.querySelector(".report-pdf-document");
             if (!clonedReport) return;
+            if (clonedStage) {
+              clonedStage.style.position = "absolute";
+              clonedStage.style.left = "0";
+              clonedStage.style.top = "0";
+              clonedStage.style.width = `${docWidth}px`;
+              clonedStage.style.height = "auto";
+              clonedStage.style.overflow = "visible";
+            }
             clonedReport.style.width = `${DESKTOP_EXPORT_WIDTH_PX}px`;
             clonedReport.style.maxWidth = "none";
             clonedReport.style.boxSizing = "border-box";
             clonedReport.style.overflow = "visible";
             clonedReport.style.margin = "0";
+            clonedReport.style.position = "relative";
+            clonedReport.style.left = "0";
+            clonedReport.style.top = "0";
+            clonedReport.style.transform = "none";
           },
         },
-        jsPDF: { unit: "mm", format: "a4", orientation: "landscape", compress: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
         pagebreak: {
           mode: ["css", "legacy"],
           avoid: [
             ".report-radar-card",
             ".report-dimension-grid > div",
             ".report-recommendation-card",
+            ".report-change-grid",
             ".report-change-card",
             ".section-title",
           ],

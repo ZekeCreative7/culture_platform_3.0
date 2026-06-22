@@ -32,7 +32,32 @@ import {
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
 
-const TEAMBUILDING_OUTCOME_DESCRIPTION = "팀빌딩 사후 설문을 바탕으로 참여자의 세션 경험, 프로그램 도움 인식, 실천·활용 의향을 종합한 체감 성과입니다. 장기적인 조직문화 변화는 후속 측정이 필요합니다.";
+const SESSION_OUTCOME_COPY = {
+  팀빌딩: {
+    title: "팀빌딩 체감 성과",
+    description: "팀빌딩 사후 설문을 바탕으로 참여자의 세션 경험, 프로그램 도움 인식, 실천·활용 의향을 종합한 체감 성과입니다. 장기적인 조직문화 변화는 후속 측정이 필요합니다.",
+  },
+  리더십: {
+    title: "팀장 리더십 행동 전환 성과",
+    description: "팀장 세션의 사전·사후 설문을 바탕으로 리더의 팀 영향 자기인식, 심리적 안전 행동 준비도, 경청·질문과 변화 대화, 팀장 간 연결·조율, 리더 행동 실행 준비도를 종합한 성과입니다. 웰니스 자기조절은 별도 지표로 확인하며, 실제 팀 분위기와 조직문화의 변화는 팀원 대상 후속 진단이 필요합니다.",
+  },
+  협업: {
+    title: "크로스펑션 협업 변화 성과",
+    description: "협업·크로스펑션 세션의 사전·사후 설문을 바탕으로 협업 관계 안전감, 목표 정렬, 정보·역할 명확성, 이슈 조율 신뢰, 사일로 완화와 공동 실행 가능성의 변화를 종합한 성과입니다. 웰니스 자기조절은 별도 지표로 확인하며, 실제 협업 변화는 세션 후 7~14일의 경험을 기준으로 해석합니다.",
+  },
+};
+
+function renderSessionOutcomeIntro(type) {
+  const normalizedType = normalizeSessionType(type);
+  const copy = SESSION_OUTCOME_COPY[normalizedType];
+  if (!copy) return "";
+  return `
+    <section class="panel session-outcome-intro" style="margin-bottom:18px;">
+      <span class="eyebrow">${escapeHtml(sessionTypeLabel(normalizedType))} Outcome</span>
+      <h2 style="margin:4px 0 8px;">${escapeHtml(copy.title)}</h2>
+      <p style="margin:0; color:var(--muted); line-height:1.75;">${escapeHtml(copy.description)}</p>
+    </section>`;
+}
 
 const VIEWS = [
   ["dashboard", "Home", "홈"],
@@ -2701,8 +2726,8 @@ function renderCompareReport(type, cohort) {
     <section class="page-head report-export-header">
       <div>
         <span class="eyebrow">Cohort Compare Analysis</span>
-        <h1>${sameSessionType(type, "팀빌딩") ? "팀빌딩 체감 성과" : "전체 팀별 결과 비교 분석"}</h1>
-        <p>${sameSessionType(type, "팀빌딩") ? TEAMBUILDING_OUTCOME_DESCRIPTION : subtitle}</p>
+        <h1>전체 팀별 결과 비교 분석</h1>
+        <p>${subtitle}</p>
       </div>
       <div class="report-export-actions" data-html2canvas-ignore="true">
         <button class="report-export-button pdf" id="download-report-pdf" type="button" onclick="window.downloadReportPdf(event)">
@@ -2733,6 +2758,8 @@ function renderCompareReport(type, cohort) {
       </div>
       <div class="filter-current">${currentFilterLabel}</div>
     </section>
+
+    ${renderSessionOutcomeIntro(type)}
 
     <div class="report-summary" style="margin-bottom:28px;">
       <div>
@@ -3032,8 +3059,8 @@ function renderReport() {
     <section class="page-head report-export-header">
       <div>
         <span class="eyebrow">Analysis Report</span>
-        <h1>${sameSessionType(type, "팀빌딩") ? "팀빌딩 체감 성과" : "분석 결과"}</h1>
-        <p>${sameSessionType(type, "팀빌딩") ? TEAMBUILDING_OUTCOME_DESCRIPTION : "현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다."}</p>
+        <h1>분석 결과</h1>
+        <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
       </div>
       ${cohort && session ? `
         <div class="report-export-actions" data-html2canvas-ignore="true">
@@ -3069,6 +3096,8 @@ function renderReport() {
       </div>
       <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
     </section>
+
+    ${renderSessionOutcomeIntro(type)}
 
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
 

@@ -226,22 +226,22 @@ function ensureScopedSelection(kind) {
   return { type, cohort, cohorts, sessions, session: sessions.find((item) => item.id === state[sessionField]) || null };
 }
 
-function scopedSessionOptions(type, cohort, selectedSessionId = "") {
+function scopedSessionOptions(type, cohort, selectedSessionId = "", isReport = false) {
   const sessions = sessionsForTypeCohort(type, cohort);
   if (!sessions.length) {
     return `<option value="">선택 가능한 세션 없음</option>`;
   }
-  const compareAllOption = `<option value="all" ${selectedSessionId === "all" ? "selected" : ""}>전체 비교 분석</option>`;
+  const compareAllOption = isReport ? `<option value="all" ${selectedSessionId === "all" ? "selected" : ""}>전체 비교 분석</option>` : "";
   const sessionOptions = sessions.map((session) => 
     `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(sessionLabel(session))}</option>`
   ).join("");
   return compareAllOption + sessionOptions;
 }
 
-function cohortOptionsHtml(type, selectedCohort) {
+function cohortOptionsHtml(type, selectedCohort, isReport = false) {
   const cohorts = cohortsForType(type);
   if (!cohorts.length) return `<option value="">응답 없음</option>`;
-  const allOption = `<option value="all" ${selectedCohort === "all" ? "selected" : ""}>전체 기수</option>`;
+  const allOption = isReport ? `<option value="all" ${selectedCohort === "all" ? "selected" : ""}>전체 기수</option>` : "";
   const cohortOptions = cohorts.map((c) => {
     const yl = yearForCohortType(c, type) ? `${yearForCohortType(c, type)}년 ` : "";
     const count = sessionsForTypeCohort(type, c).length;
@@ -2429,12 +2429,12 @@ function renderAnalytics() {
         </label>
         <label>대상 기수
           <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics')">
-            ${cohortOptionsHtml(type, cohort)}
+            ${cohortOptionsHtml(type, cohort, false)}
           </select>
         </label>
         <label>세션 선택
           <select id="analytics-session-select">
-            ${scopedSessionOptions(type, cohort, sessionId)}
+            ${scopedSessionOptions(type, cohort, sessionId, false)}
           </select>
         </label>
         <button class="primary" id="apply-analytics-filter" type="button" onclick="window.applyAnalyticsFilter()">적용</button>
@@ -2707,12 +2707,12 @@ function renderCompareReport(type, cohort) {
         </label>
         <label>대상 기수
           <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
-            ${cohortOptionsHtml(type, cohort)}
+            ${cohortOptionsHtml(type, cohort, true)}
           </select>
         </label>
         <label>세션 선택
           <select id="report-session-select">
-            ${scopedSessionOptions(type, cohort, "all")}
+            ${scopedSessionOptions(type, cohort, "all", true)}
           </select>
         </label>
         <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
@@ -3043,12 +3043,12 @@ function renderReport() {
         </label>
         <label>대상 기수
           <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
-            ${cohortOptionsHtml(type, cohort)}
+            ${cohortOptionsHtml(type, cohort, true)}
           </select>
         </label>
         <label>세션 선택
           <select id="report-session-select">
-            ${scopedSessionOptions(type, cohort, sessionId)}
+            ${scopedSessionOptions(type, cohort, sessionId, true)}
           </select>
         </label>
         <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
@@ -5835,8 +5835,9 @@ window.refreshScopedTypeSelect = function(kind) {
   const sessionEl = document.getElementById(`${kind}-session-select`);
   if (!typeEl || !cohortEl || !sessionEl) return;
   const type = typeEl.value;
-  cohortEl.innerHTML = cohortOptionsHtml(type, "");
-  sessionEl.innerHTML = scopedSessionOptions(type, cohortEl.value, "");
+  const isReport = kind === "report";
+  cohortEl.innerHTML = cohortOptionsHtml(type, "", isReport);
+  sessionEl.innerHTML = scopedSessionOptions(type, cohortEl.value, "", isReport);
 };
 
 window.refreshScopedSessionSelect = function(kind) {
@@ -5844,7 +5845,8 @@ window.refreshScopedSessionSelect = function(kind) {
   const cohortEl = document.getElementById(`${kind}-cohort-select`);
   const sessionEl = document.getElementById(`${kind}-session-select`);
   if (!cohortEl || !sessionEl) return;
-  sessionEl.innerHTML = scopedSessionOptions(typeEl ? typeEl.value : "", cohortEl.value, "");
+  const isReport = kind === "report";
+  sessionEl.innerHTML = scopedSessionOptions(typeEl ? typeEl.value : "", cohortEl.value, "", isReport);
 };
 
 let responseUnsubscribes = [];

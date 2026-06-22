@@ -1,14 +1,14 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-orphan-dup-guard-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-csv-upload-xlsx-load-fix-v1';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-engagement-footnote-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260620-org-revert-v2';
-import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js?v=20260621-vivid-report-palette-v1';
+import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260622-csv-upload-xlsx-load-fix-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-orphan-dup-guard-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-csv-upload-xlsx-load-fix-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -16,7 +16,7 @@ import {
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
-} from './utils.js?v=20260622-orphan-dup-guard-v1';
+} from './utils.js?v=20260622-csv-upload-xlsx-load-fix-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -27,7 +27,7 @@ import {
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260622-orphan-dup-guard-v1';
+} from './state.js?v=20260622-csv-upload-xlsx-load-fix-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -4118,6 +4118,7 @@ function bindUpload() {
     const sessionId = document.querySelector("#upload-session").value;
     const phase = document.querySelector("#upload-phase").value;
     const text = await selected.text();
+    await ensureXlsxLoaded();
     const { parsed, errors } = parseCSV(text, sessionId, phase);
     const linkedSurvey = (state.surveys || []).find((survey) => survey.sessionId === sessionId && survey.phase === phase);
     const uploadedAt = new Date().toISOString();
@@ -4408,6 +4409,7 @@ window.uploadSurveyResults = function(surveyId) {
     const file = input.files[0];
     if (!file) return;
     const text = await file.text();
+    await ensureXlsxLoaded();
     const { parsed, errors } = parseCSV(text, survey.sessionId, survey.phase);
     if (errors.length) {
       alert('CSV 오류:\n' + errors.join('\n'));

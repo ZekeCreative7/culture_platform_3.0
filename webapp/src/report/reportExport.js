@@ -71,11 +71,15 @@ function reportBaseName(meta) {
   return ["Culture_Report", meta.typeLabel, meta.sessionLabel, date].map(safeFilePart).filter(Boolean).join("_");
 }
 
-export async function downloadReportWorkbook(payload) {
+export async function ensureXlsxLoaded() {
   if (!window.XLSX) {
     await loadScriptOnce('./src/vendor/xlsx.full.min.js');
   }
-  const XLSX = window.XLSX;
+  return window.XLSX;
+}
+
+export async function downloadReportWorkbook(payload) {
+  const XLSX = await ensureXlsxLoaded();
   if (!XLSX?.utils?.book_new) throw new Error("엑셀 내보내기 모듈을 불러오지 못했습니다.");
 
   const { meta, questions, responses, analysis } = payload;

@@ -1362,7 +1362,25 @@ function renderOrgPopup() {
   `;
 }
 
+function renderOrgActionMenu(actionsHtml, label = "조직 옵션") {
+  return `
+    <details class="org-card-menu" onclick="event.stopPropagation();">
+      <summary class="org-card-menu-trigger" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
+        <span></span><span></span><span></span>
+      </summary>
+      <div class="org-card-actions">
+        ${actionsHtml}
+      </div>
+    </details>
+  `;
+}
+
 function renderOrgUnitCard(unit, activeId, matches, displayLevel = unit.level) {
+  const actionsHtml = `
+    ${["division", "hq"].includes(unit.level) ? `<button data-org-direct-members="${escapeHtml(unit.id)}" title="직속 구성원">직속</button>` : ""}
+    <button data-org-edit-unit="${escapeHtml(unit.id)}" title="설정">설정</button>
+    <button class="delete-btn-red" onclick="event.stopPropagation(); deleteOrgNode('${unit.id}')" title="삭제">삭제</button>
+  `;
   return `
     <div class="org-card ${activeId === unit.id ? "active" : ""} ${matches(unit.name) ? "searched-match" : ""}" onclick="selectOrgNode('${displayLevel}', '${unit.id}')"
          ${displayLevel === "hq" || displayLevel === "team" ? `draggable="true" ondragstart="handleDragStart(event, '${unit.id}', '${displayLevel}')" ondragend="handleDragEnd(event)"` : ""}
@@ -1372,11 +1390,7 @@ function renderOrgUnitCard(unit, activeId, matches, displayLevel = unit.level) {
         ${leaderMeta(unit)}
         <span class="org-card-meta">고유 인원 · <small>${distinctPeopleCount(unit)}명</small></span>
       </div>
-      <div class="org-card-actions">
-        ${["division", "hq"].includes(unit.level) ? `<button data-org-direct-members="${escapeHtml(unit.id)}" title="직속 구성원">직속</button>` : ""}
-        <button data-org-edit-unit="${escapeHtml(unit.id)}" title="설정">설정</button>
-        <button class="delete-btn-red" onclick="event.stopPropagation(); deleteOrgNode('${unit.id}')" title="삭제">삭제</button>
-      </div>
+      ${renderOrgActionMenu(actionsHtml)}
     </div>
   `;
 }
@@ -1384,16 +1398,17 @@ function renderOrgUnitCard(unit, activeId, matches, displayLevel = unit.level) {
 function renderMemberCard(member, matches) {
   const position = memberGrade(member);
   const jobTitle = memberJobTitle(member);
+  const actionsHtml = `
+    <button data-org-edit-member="${escapeHtml(member.id)}" title="수정">수정</button>
+    <button class="delete-btn-red" onclick="event.stopPropagation(); deleteMember('${member.id}')" title="삭제">삭제</button>
+  `;
   return `
     <div class="org-card member-card ${matches(member.name) ? "searched-match" : ""}" draggable="true" ondragstart="handleDragStart(event, '${member.id}', 'member')" ondragend="handleDragEnd(event)">
       <div class="org-card-main">
         <span class="org-card-title">${escapeHtml(member.name)}</span>
         <span class="org-card-meta">직급 · <small>${escapeHtml(position)}</small>${jobTitle ? ` · 직책 ${escapeHtml(jobTitle)}` : ""}</span>
       </div>
-      <div class="org-card-actions">
-        <button data-org-edit-member="${escapeHtml(member.id)}" title="수정">수정</button>
-        <button class="delete-btn-red" onclick="deleteMember('${member.id}')" title="삭제">삭제</button>
-      </div>
+      ${renderOrgActionMenu(actionsHtml, "구성원 옵션")}
     </div>
   `;
 }
@@ -1595,10 +1610,10 @@ function renderOrg() {
                 <span class="org-card-title"><strong>${escapeHtml(activeUnitLeader.name)}</strong></span>
                 <span class="org-card-meta">${escapeHtml(activeUnitLeader.grade)} / ${escapeHtml(activeUnitRole)}${activeUnitLeader.jobTitle && activeUnitLeader.jobTitle !== activeUnitRole ? ` · ${escapeHtml(activeUnitLeader.jobTitle)}` : ""}</span>
               </div>
-              <div class="org-card-actions">
+              ${renderOrgActionMenu(`
                 <button data-org-edit-unit="${escapeHtml(activeMemberUnit.id)}" title="수정">수정</button>
                 <button class="delete-btn-red" onclick="event.stopPropagation(); deleteTeamLeader('${activeMemberUnit.id}')" title="삭제">삭제</button>
-              </div>
+              `, "리더 옵션")}
             </div>
           ` : ""}
           

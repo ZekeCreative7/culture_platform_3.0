@@ -5783,3 +5783,95 @@ nav button.active,
   color: #d97706;
   border: 1px solid #fde68a;
 }
+
+/* Survey Creator mobile containment: prevent form panels and stepper from overflowing iOS viewports. */
+@media (max-width: 767px) {
+  #app,
+  main,
+  .canvas {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .canvas > .page-head,
+  .canvas > .workspace-grid {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px;
+    overflow: hidden;
+  }
+
+  .workspace-grid > *,
+  .panel,
+  .form-grid,
+  .form-grid.compact,
+  .survey-session-cascade,
+  .survey-questions-preview,
+  .draft-questions-list,
+  .draft-q-row,
+  .surveys-grid,
+  .survey-deploy-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .stepper-bar {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    overflow: hidden;
+  }
+
+  .stepper-bar > div[style*="position:absolute"] {
+    left: 18px !important;
+    right: 18px !important;
+  }
+
+  .stepper-bar span {
+    max-width: 82px;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.25;
+    word-break: keep-all;
+  }
+
+  .survey-session-cascade,
+  .surveys-grid,
+  .draft-questions-list {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .survey-questions-preview,
+  .draft-q-row {
+    overflow: hidden;
+  }
+
+  .draft-q-row div[style*="display:inline-flex; gap:4px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    justify-content: stretch !important;
+  }
+
+  .draft-q-row div[style*="display:inline-flex; gap:4px"] label {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  input,
+  select,
+  textarea {
+    max-width: 100%;
+  }
+}

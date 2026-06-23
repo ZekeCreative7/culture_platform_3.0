@@ -132,20 +132,26 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
     if (act.priority === 7) return "dot-green";
     return "dot-blue";
   };
+  const actionCtaLabel = (act) => {
+    if (act.targetView === "sessions" && act.sessionId) return "수정하기 →";
+    if (act.targetView === "report") return "보고서 보기 →";
+    if (act.targetView === "upload") return "업로드 →";
+    return "바로가기 →";
+  };
   const renderActionRows = (actions) => actions.map(act => `
-    <div class="queue-row cursor-pointer" data-action-view="${act.targetView}" data-session-id="${act.sessionId || ''}" data-commitment-id="${act.id || ''}">
+    <div class="queue-row cursor-pointer" data-action-view="${act.targetView}" data-action-type="${act.type || ''}" data-session-id="${act.sessionId || ''}" data-commitment-id="${act.id || ''}">
       <div class="queue-title-block">
         <span class="status-dot ${actionDotClass(act)}"></span>
         <span class="queue-title">${escapeHtml(act.title)}</span>
       </div>
       <div class="queue-meta-block">
         <span class="queue-date">${act.date || '—'}</span>
-        <span class="queue-go-arrow">바로가기 →</span>
+        <span class="queue-go-arrow">${actionCtaLabel(act)}</span>
       </div>
     </div>
   `).join('');
-  const renderActionGroup = ({ key, label, countClass, actions, limit, emptyText }) => {
-    const visibleRows = visibleActionRows(key, actions, limit);
+  const renderActionGroup = ({ key, label, countClass, actions, limit, emptyText, allowExpand = true, overflowNav = "", overflowText = "" }) => {
+    const visibleRows = allowExpand ? visibleActionRows(key, actions, limit) : actions.slice(0, limit);
     const overflowCount = actions.length - visibleRows.length;
     return `
       <div class="action-queue-group action-queue-${key}">
@@ -161,9 +167,13 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
           <div class="queue-rows">
             ${renderActionRows(visibleRows)}
           </div>
-          ${overflowCount > 0 || expandedActionGroups[key] ? `
+          ${allowExpand && (overflowCount > 0 || expandedActionGroups[key]) ? `
             <button type="button" class="queue-more-row text-muted font-sm" data-toggle-action-group="${key}">
               ${expandedActionGroups[key] ? `${label} 접기` : `+ ${overflowCount}개 더 보기`}
+            </button>
+          ` : !allowExpand && overflowCount > 0 ? `
+            <button type="button" class="queue-more-row text-muted font-sm" data-nav="${overflowNav}">
+              ${overflowText || `외 ${overflowCount}개는 전체 화면에서 확인`}
             </button>
           ` : ''}
         `}
@@ -370,11 +380,14 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
               })}
               ${renderActionGroup({
                 key: "ready",
-                label: "준비 완료",
+                label: "최근 준비 완료",
                 countClass: "green",
                 actions: readyActions,
                 limit: 3,
-                emptyText: "보고 준비 완료 알림이 없습니다."
+                emptyText: "보고 준비 완료 알림이 없습니다.",
+                allowExpand: false,
+                overflowNav: "report",
+                overflowText: readyActions.length > 3 ? `외 ${readyActions.length - 3}개는 보고서 화면에서 확인` : ""
               })}
             </div>
           </section>
@@ -707,6 +720,12 @@ export function bindHomeDashboard({ state, saveState, render }) {
       if (commitmentId) {
         state.editingCommitmentId = commitmentId;
         state.pulseView = "listening"; // Go to commitments list tab
+      }
+
+      if (targetView === "sessions" && sessionId && typeof window.startEditSession === "function") {
+        state.activeView = "sessions";
+        window.startEditSession(sessionId);
+        return;
       }
 
       state.activeView = targetView;

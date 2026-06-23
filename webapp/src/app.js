@@ -861,8 +861,45 @@ function syncMobileNavShell() {
   }
 }
 
+function captureOrgScrollState() {
+  if (state.activeView !== "org") return null;
+  const workspace = document.querySelector(".org-workspace");
+  if (!workspace) return null;
+  return {
+    workspaceLeft: workspace.scrollLeft,
+    workspaceTop: workspace.scrollTop,
+    columns: Array.from(document.querySelectorAll(".org-column")).map((column) => {
+      const body = column.querySelector(".org-column-body");
+      return {
+        id: column.id,
+        bodyLeft: body?.scrollLeft || 0,
+        bodyTop: body?.scrollTop || 0
+      };
+    })
+  };
+}
+
+function restoreOrgScrollState(scrollState) {
+  if (!scrollState || state.activeView !== "org") return;
+  const applyScroll = () => {
+    const workspace = document.querySelector(".org-workspace");
+    if (!workspace) return;
+    workspace.scrollLeft = scrollState.workspaceLeft;
+    workspace.scrollTop = scrollState.workspaceTop;
+    scrollState.columns.forEach((item) => {
+      const body = document.querySelector(`#${item.id} .org-column-body`);
+      if (!body) return;
+      body.scrollLeft = item.bodyLeft;
+      body.scrollTop = item.bodyTop;
+    });
+  };
+  applyScroll();
+  window.requestAnimationFrame(applyScroll);
+}
+
 function render() {
   const app = document.querySelector("#app");
+  const orgScrollState = captureOrgScrollState();
   app.className = appShellClasses();
 
   const toggleIcon = state.sidebarCollapsed
@@ -976,6 +1013,7 @@ function render() {
   }
   bindCanvasEvents();
   syncAuthControls();
+  restoreOrgScrollState(orgScrollState);
 }
 
 function renderView() {

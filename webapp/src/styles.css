@@ -3104,6 +3104,24 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
   font-weight: 800;
 }
 
+.badge.amber {
+  background: #ffedd5;
+  color: #d97706;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.badge.green {
+  background: #dcfce7;
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 /* 5.3 Operating Loop */
 .operating-loop-container {
   padding: 10px 0;
@@ -3206,7 +3224,27 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 /* 5.5 Action Queue */
 .action-queue-list {
   display: grid;
-  gap: 12px;
+  gap: 16px;
+}
+
+.action-queue-group {
+  display: grid;
+  gap: 10px;
+}
+
+.action-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 22px;
+}
+
+.action-group-head strong {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .queue-rows {
@@ -3739,6 +3777,14 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
   margin: 0;
   font-size: 13px;
   color: var(--muted);
+}
+
+.empty-state-card.compact {
+  padding: 12px 14px;
+}
+
+.empty-state-card.compact p {
+  font-size: 12.5px;
 }
 
 .thin-empty-state {
@@ -5782,6 +5828,25 @@ nav button.active,
   background: #fef3c7;
   color: #d97706;
   border: 1px solid #fde68a;
+}
+
+/* Home dashboard mobile flow: keep calendar directly next to today's action queue. */
+@media (max-width: 767px) {
+  .dashboard-body-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dashboard-body-left,
+  .dashboard-body-right {
+    display: contents;
+  }
+
+  .dashboard-body-left > :nth-child(1) { order: 1; }
+  #dashboard-action-queue { order: 2; }
+  #dashboard-week-schedule { order: 3; }
+  .dashboard-body-left > :nth-child(3) { order: 4; }
+  .dashboard-body-right > :nth-child(1) { order: 5; }
+  .dashboard-body-right > :nth-child(3) { order: 6; }
 }
 
 /* Survey Creator mobile containment: prevent form panels and stepper from overflowing iOS viewports. */

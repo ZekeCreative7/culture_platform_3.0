@@ -109,6 +109,7 @@ export const blankState = () => ({
   dashboardWeekOffset: 0,
   dashboardSelectedDate: "",
   dashboardShowAllActions: false,
+  dashboardExpandedActionGroups: {},
 });
 
 export const state = {};
@@ -201,7 +202,7 @@ function persistState() {
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
-    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
+    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
@@ -214,7 +215,7 @@ function persistState() {
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
-    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions
+    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups
   }));
 }
 
@@ -240,6 +241,9 @@ export function normalizeAppState(nextState) {
   if (nextState.selectedAnalyticsPhase && !PHASES.includes(nextState.selectedAnalyticsPhase)) nextState.selectedAnalyticsPhase = "";
   if (!nextState.draftYear) nextState.draftYear = new Date().getFullYear();
   nextState.dashboardShowAllActions = Boolean(nextState.dashboardShowAllActions);
+  nextState.dashboardExpandedActionGroups = nextState.dashboardExpandedActionGroups && typeof nextState.dashboardExpandedActionGroups === "object"
+    ? nextState.dashboardExpandedActionGroups
+    : {};
   if (!["default", "rank-desc", "rank-asc", "name"].includes(nextState.orgMemberSort)) nextState.orgMemberSort = "rank-desc";
   if (!nextState.draftSchedule?.length) nextState.draftSchedule = makeSchedule(nextState.draftType);
   return nextState;

@@ -109,6 +109,7 @@ export function dashboardActionQueue({ state, today }) {
       if (c.dueDate < today) {
         actions.push({
           type: "overdue_commitment",
+          group: "today",
           priority: 1,
           date: c.dueDate,
           title: `[기한초과 약속] ${c.commitment} (담당: ${c.ownerRole || '미정'})`,
@@ -118,6 +119,7 @@ export function dashboardActionQueue({ state, today }) {
       } else if (c.dueDate >= today && c.dueDate <= todayPlus7) {
         actions.push({
           type: "upcoming_commitment",
+          group: "upcoming",
           priority: 3,
           date: c.dueDate,
           title: `[약속 마감] ${c.commitment} (기한: ${c.dueDate})`,
@@ -142,6 +144,7 @@ export function dashboardActionQueue({ state, today }) {
         if (item.date === today) {
           actions.push({
             type: "today_session",
+            group: "today",
             priority: 2,
             date: item.date,
             title: `[오늘 세션] ${title} - ${scheduleLabel}`,
@@ -152,6 +155,7 @@ export function dashboardActionQueue({ state, today }) {
         } else if (item.date > today && item.date <= todayPlus7) {
           actions.push({
             type: "upcoming_session",
+            group: "upcoming",
             priority: 4,
             date: item.date,
             title: `[예정 세션] ${title} - ${scheduleLabel} (${item.date})`,
@@ -171,6 +175,7 @@ export function dashboardActionQueue({ state, today }) {
     if (sessStatus !== "시작전" && hasPre && !hasPost) {
       actions.push({
         type: "post_survey_pending",
+        group: "today",
         priority: 5,
         date: "",
         title: `[사후설문 대기] ${title} 사후 설문 적재 필요`,
@@ -184,6 +189,7 @@ export function dashboardActionQueue({ state, today }) {
     if (hasUnscheduled) {
       actions.push({
         type: "unscheduled_round",
+        group: "today",
         priority: 6,
         date: "",
         title: `[미정 회차] ${title} 일정을 확정해 주세요.`,
@@ -196,6 +202,7 @@ export function dashboardActionQueue({ state, today }) {
     if (hasPre && hasPost) {
       actions.push({
         type: "report_ready",
+        group: "ready",
         priority: 7,
         date: "",
         title: `[보고 준비 완료] ${title} 사전/사후 변화 분석 가능`,

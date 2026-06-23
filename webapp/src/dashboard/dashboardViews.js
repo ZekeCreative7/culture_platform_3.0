@@ -6,9 +6,9 @@ import {
   dashboardWeekSchedule,
   dashboardPulseSignals,
   dashboardSupportOrgs
-} from './dashboardEngine.js?v=20260620-org-revert-v2';
+} from './dashboardEngine.js?v=20260623-dashboard-actions-v1';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
-import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260620-mvp-optimize-v2';
+import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260623-dashboard-actions-v1';
 
 // Helper to count week sessions
 function displayWeekSessionsCount(state, today) {
@@ -120,10 +120,56 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
   const today = todayISO();
   const snapshot = dashboardSnapshot({ state, pulseCache, today });
   const allActions = dashboardActionQueue({ state, today });
-
-  const showAllActions = Boolean(state.dashboardShowAllActions);
-  const displayActions = showAllActions ? allActions : allActions.slice(0, 5);
-  const overflowActionsCount = allActions.length - displayActions.length;
+  const todayActions = allActions.filter((act) => act.group === "today");
+  const upcomingActions = allActions.filter((act) => act.group === "upcoming");
+  const readyActions = allActions.filter((act) => act.group === "ready");
+  const expandedActionGroups = state.dashboardExpandedActionGroups || {};
+  const visibleActionRows = (key, actions, limit) => expandedActionGroups[key] ? actions : actions.slice(0, limit);
+  const actionDotClass = (act) => {
+    if (act.priority === 1) return "dot-red";
+    if (act.priority === 2 || act.priority === 4) return "dot-amber";
+    if (act.priority === 3) return "dot-purple";
+    if (act.priority === 7) return "dot-green";
+    return "dot-blue";
+  };
+  const renderActionRows = (actions) => actions.map(act => `
+    <div class="queue-row cursor-pointer" data-action-view="${act.targetView}" data-session-id="${act.sessionId || ''}" data-commitment-id="${act.id || ''}">
+      <div class="queue-title-block">
+        <span class="status-dot ${actionDotClass(act)}"></span>
+        <span class="queue-title">${escapeHtml(act.title)}</span>
+      </div>
+      <div class="queue-meta-block">
+        <span class="queue-date">${act.date || '—'}</span>
+        <span class="queue-go-arrow">바로가기 →</span>
+      </div>
+    </div>
+  `).join('');
+  const renderActionGroup = ({ key, label, countClass, actions, limit, emptyText }) => {
+    const visibleRows = visibleActionRows(key, actions, limit);
+    const overflowCount = actions.length - visibleRows.length;
+    return `
+      <div class="action-queue-group action-queue-${key}">
+        <div class="action-group-head">
+          <strong>${label}</strong>
+          <span class="badge ${countClass}">${actions.length}</span>
+        </div>
+        ${actions.length === 0 ? `
+          <div class="empty-state-card compact">
+            <p>${emptyText}</p>
+          </div>
+        ` : `
+          <div class="queue-rows">
+            ${renderActionRows(visibleRows)}
+          </div>
+          ${overflowCount > 0 || expandedActionGroups[key] ? `
+            <button type="button" class="queue-more-row text-muted font-sm" data-toggle-action-group="${key}">
+              ${expandedActionGroups[key] ? `${label} 접기` : `+ ${overflowCount}개 더 보기`}
+            </button>
+          ` : ''}
+        `}
+      </div>
+    `;
+  };
 
   const funnel = dashboardTrustFunnel(state.pulseCommitments);
   const loop = dashboardOperatingLoop({ state, pulseCache });
@@ -193,9 +239,9 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
         <div class="kpi-card highlight-red cursor-pointer" data-scroll-to="dashboard-action-queue">
           <div class="kpi-header">
             <span class="kpi-label">오늘 할 일</span>
-            <button type="button" class="tooltip-icon" aria-label="오늘 할 일 설명" aria-expanded="false" data-help-text="기한 초과 약속, 오늘 세션, 오늘 설문 마감, 데이터 오류 등 즉시 확인이 필요한 총 작업 개수입니다.">?</button>
+            <button type="button" class="tooltip-icon" aria-label="오늘 할 일 설명" aria-expanded="false" data-help-text="기한 초과 약속, 오늘 세션, 사후설문 대기, 미정 회차처럼 오늘 직접 처리해야 하는 작업 개수입니다. 예정 알림과 보고 준비 완료는 제외합니다.">?</button>
           </div>
-          <div class="kpi-value">${allActions.length}</div>
+          <div class="kpi-value">${todayActions.length}</div>
           <div class="kpi-desc">즉시 조치 필요</div>
         </div>
         <div class="kpi-card highlight-purple cursor-pointer" data-nav="pulse" data-pulse-view="listening">
@@ -302,44 +348,34 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
             <div class="section-header">
               <div class="title-with-badge">
                 <h3>지금 할 일</h3>
-                <span class="badge red">${allActions.length}</span>
+                <span class="badge red">${todayActions.length}</span>
               </div>
             </div>
             <div class="action-queue-list">
-              ${allActions.length === 0 ? `
-                <div class="empty-state-card">
-                  <span class="empty-state-symbol" aria-hidden="true"></span>
-                  <p>오늘 처리해야 할 긴급한 할 일이 없습니다.</p>
-                </div>
-              ` : `
-                <div class="queue-rows">
-                  ${displayActions.map(act => {
-                    let dotClass = "dot-blue";
-                    if (act.priority === 1) dotClass = "dot-red";
-                    else if (act.priority === 3) dotClass = "dot-purple";
-                    else if (act.priority === 2 || act.priority === 4) dotClass = "dot-amber";
-                    else if (act.priority === 7) dotClass = "dot-green";
-
-                    return `
-                      <div class="queue-row cursor-pointer" data-action-view="${act.targetView}" data-session-id="${act.sessionId || ''}" data-commitment-id="${act.id || ''}">
-                        <div class="queue-title-block">
-                          <span class="status-dot ${dotClass}"></span>
-                          <span class="queue-title">${escapeHtml(act.title)}</span>
-                        </div>
-                        <div class="queue-meta-block">
-                          <span class="queue-date">${act.date || '—'}</span>
-                          <span class="queue-go-arrow">바로가기 →</span>
-                        </div>
-                      </div>
-                    `;
-                  }).join('')}
-                </div>
-                ${overflowActionsCount > 0 || showAllActions ? `
-                  <button type="button" class="queue-more-row text-muted font-sm" data-toggle-actions>
-                    ${showAllActions ? "할 일 접기" : `+ ${overflowActionsCount}개 항목 더 보기`}
-                  </button>
-                ` : ''}
-              `}
+              ${renderActionGroup({
+                key: "today",
+                label: "지금 처리",
+                countClass: "red",
+                actions: todayActions,
+                limit: 5,
+                emptyText: "오늘 직접 처리해야 할 할 일이 없습니다."
+              })}
+              ${renderActionGroup({
+                key: "upcoming",
+                label: "곧 예정",
+                countClass: "amber",
+                actions: upcomingActions,
+                limit: 3,
+                emptyText: "7일 이내 예정 알림이 없습니다."
+              })}
+              ${renderActionGroup({
+                key: "ready",
+                label: "준비 완료",
+                countClass: "green",
+                actions: readyActions,
+                limit: 3,
+                emptyText: "보고 준비 완료 알림이 없습니다."
+              })}
             </div>
           </section>
 
@@ -692,9 +728,13 @@ export function bindHomeDashboard({ state, saveState, render }) {
     });
   });
 
-  document.querySelectorAll("[data-toggle-actions]").forEach(btn => {
+  document.querySelectorAll("[data-toggle-action-group]").forEach(btn => {
     btn.addEventListener("click", () => {
-      state.dashboardShowAllActions = !state.dashboardShowAllActions;
+      const group = btn.dataset.toggleActionGroup;
+      state.dashboardExpandedActionGroups = {
+        ...(state.dashboardExpandedActionGroups || {}),
+        [group]: !(state.dashboardExpandedActionGroups || {})[group]
+      };
       saveState();
     });
   });

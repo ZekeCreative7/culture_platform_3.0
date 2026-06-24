@@ -22,12 +22,13 @@ import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
   blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, saveStateQuiet, normalizeAppState,
   syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
+  subscribeSessionsFromFirestore, subscribeOrganizationFromFirestore, subscribePulseYearsFromFirestore, subscribePulseCommitmentsFromFirestore,
   deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore, fetchAllResponsesFromFirestore,
   setSurveyDistributionActiveInFirestore, updateSurveyInFirestore, deleteSurveyDocFromFirestore, normalizeSurveyRecord, loadPulseYears,
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260623-dashboard-actions-v1';
+} from './state.js?v=20260624-realtime-sync-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -604,6 +605,29 @@ function ensureDraftOrgSelection() {
 
   syncDraftOrgFromTeam(state.draftTeamId);
   return { divisionList, hqList, teamList };
+}
+
+function ensureActiveOrgSelection() {
+  if (!state.orgUnits || !state.orgUnits.length) return;
+
+  const company = state.orgUnits.find((unit) => unit.id === state.selectedCompany && unit.level === "company")
+    || state.orgUnits.find((unit) => unit.level === "company");
+  if (company) state.selectedCompany = company.id;
+
+  const divisions = topLevelOrgUnits(state.selectedCompany);
+  if (!divisions.some((unit) => unit.id === state.selectedDivision)) {
+    state.selectedDivision = divisions[0]?.id || "";
+  }
+
+  const hqs = hqUnitsForDivision(state.selectedDivision);
+  if (!hqs.some((unit) => unit.id === state.selectedHq)) {
+    state.selectedHq = hqs[0]?.id || "";
+  }
+
+  const teams = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
+  if (!teams.some((unit) => unit.id === state.selectedTeam)) {
+    state.selectedTeam = teams[0]?.id || "";
+  }
 }
 
 function teamPath(teamId) {
@@ -3869,6 +3893,27 @@ function fmt(value) {
   return typeof value === "number" ? value.toFixed(2) : "-";
 }
 
+function renderIfActive(views) {
+  if (views.includes(state.activeView)) render();
+}
+
+function handleRealtimeSessionChange() {
+  syncSurveysToSessions();
+  window.updateResponsesSubscription?.();
+  renderIfActive(["dashboard", "sessions", "survey", "analytics", "report"]);
+}
+
+function handleRealtimeOrganizationChange() {
+  repairOrgPersonReferences();
+  ensureActiveOrgSelection();
+  ensureDraftOrgSelection();
+  renderIfActive(["dashboard", "sessions", "org", "pulse", "analytics", "report"]);
+}
+
+function handleRealtimePulseChange() {
+  renderIfActive(["dashboard", "pulse"]);
+}
+
 function bindLayout() {
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -5629,24 +5674,7 @@ async function initApp({ localPreview = false } = {}) {
   repairOrgPersonReferences();
   saveOrgData();
   
-  if (state.orgUnits && state.orgUnits.length > 0) {
-    if (!state.selectedCompany) {
-      const ceo = state.orgUnits.find(u => u.level === 'company');
-      if (ceo) state.selectedCompany = ceo.id;
-    }
-    const divisions = topLevelOrgUnits(state.selectedCompany);
-    if (divisions.length > 0 && !state.selectedDivision) {
-      state.selectedDivision = divisions[0].id;
-    }
-    const hqs = hqUnitsForDivision(state.selectedDivision);
-    if (hqs.length > 0 && !state.selectedHq) {
-      state.selectedHq = hqs[0].id;
-    }
-    const teams = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
-    if (teams.length > 0 && !state.selectedTeam) {
-      state.selectedTeam = teams[0].id;
-    }
-  }
+  ensureActiveOrgSelection();
   ensureDraftOrgSelection();
 
   render();
@@ -5667,15 +5695,21 @@ async function initApp({ localPreview = false } = {}) {
     Promise.all([loadPulseYears(), loadPulseCommitments()]).then(() => render());
   }
 
+  subscribeSessionsFromFirestore(handleRealtimeSessionChange);
+  subscribeOrganizationFromFirestore(handleRealtimeOrganizationChange);
+  subscribePulseYearsFromFirestore(handleRealtimePulseChange);
+  subscribePulseCommitmentsFromFirestore(handleRealtimePulseChange);
+
   // Survey configuration can be repaired or reassigned while another operator tab is already open.
   // Keep it live just like responses so newly linked qualitative question IDs become visible without
   // requiring a hard refresh (otherwise the tab keeps falling back to the legacy q9~q11 set).
   onSnapshot(collection(db, 'surveys'), (snap) => {
-    state.surveys = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
     syncSurveysToSessions();
-    const shouldRender = ["sessions", "survey", "analytics", "report"].includes(state.activeView);
+    window.updateResponsesSubscription?.();
+    saveState();
+    const shouldRender = ["dashboard", "sessions", "survey", "analytics", "report"].includes(state.activeView);
     if (shouldRender) {
-      saveState();
       render();
     }
   }, (err) => {
@@ -5684,8 +5718,8 @@ async function initApp({ localPreview = false } = {}) {
 
   onSnapshot(collection(db, 'surveyTemplates'), (snap) => {
     state.surveyTemplates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    saveState();
     if (state.activeView === "survey") {
-      saveState();
       render();
     }
   }, (err) => {

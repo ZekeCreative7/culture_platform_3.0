@@ -311,6 +311,19 @@ export async function loadSessionsFromFirestore() {
   }
 }
 
+export function subscribeSessionsFromFirestore(onChange = () => {}) {
+  return onSnapshot(collection(db, 'sessions'), (snap) => {
+    state.sessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
+    syncSurveysToSessions();
+    saveState();
+    setDbStatus('connected');
+    onChange();
+  }, (e) => {
+    console.error('Firestore 세션 실시간 갱신 오류:', e);
+    setDbStatus('error');
+  });
+}
+
 export async function saveSessionToFirestore(session) {
   try {
     const { id, ...data } = session;
@@ -463,6 +476,38 @@ export async function loadPulseYears() {
   return pulseCache.years;
 }
 
+export function subscribePulseYearsFromFirestore(onChange = () => {}) {
+  return onSnapshot(collection(db, 'pulseResults'), (snap) => {
+    const yearsData = {};
+    snap.docs.forEach((d) => {
+      const year = Number(d.id);
+      if (Number.isFinite(year)) {
+        yearsData[year] = normalizePulseDoc(d.data(), year);
+      }
+    });
+    pulseCache.years = yearsData;
+    pulseCache.loaded = true;
+    pulseCache.loading = false;
+    pulseCache.error = "";
+
+    const availableYears = Object.keys(yearsData).map(Number).filter(Number.isFinite);
+    if (availableYears.length > 0) {
+      const maxYear = Math.max(...availableYears);
+      if (!state.pulseYear || !availableYears.includes(state.pulseYear)) {
+        state.pulseYear = maxYear;
+      }
+    }
+    saveState();
+    setDbStatus('connected');
+    onChange();
+  }, (e) => {
+    pulseCache.error = e.message || "알 수 없는 오류";
+    pulseCache.loading = false;
+    console.error('Firestore Pulse 실시간 갱신 오류:', e);
+    setDbStatus('error');
+  });
+}
+
 export async function savePulseResultToFirestore(payload) {
   if (!payload?.year) throw new Error("저장할 Pulse 연도가 없습니다.");
   const normalized = normalizePulseDoc(payload, payload.year);
@@ -488,6 +533,21 @@ export async function loadPulseCommitments() {
   } finally {
     commitmentsCache.loading = false;
   }
+}
+
+export function subscribePulseCommitmentsFromFirestore(onChange = () => {}) {
+  return onSnapshot(collection(db, 'pulseCommitments'), (snap) => {
+    state.pulseCommitments = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    commitmentsCache.loaded = true;
+    commitmentsCache.loading = false;
+    saveState();
+    setDbStatus('connected');
+    onChange();
+  }, (e) => {
+    commitmentsCache.loading = false;
+    console.error('Firestore 약속 실시간 갱신 오류:', e);
+    setDbStatus('error');
+  });
 }
 
 export async function savePulseCommitmentToFirestore(commitment) {
@@ -543,6 +603,31 @@ export async function saveOrganizationToFirestore() {
     orgMembers: state.orgMembers || [],
     savedAt: serverTimestamp(),
   }, { merge: true });
+}
+
+export function subscribeOrganizationFromFirestore(onChange = () => {}) {
+  return onSnapshot(doc(db, 'appState', 'main'), (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    let changed = false;
+    if (Array.isArray(data.orgUnits)) {
+      state.orgUnits = data.orgUnits;
+      changed = true;
+    }
+    if (Array.isArray(data.orgMembers)) {
+      state.orgMembers = data.orgMembers;
+      changed = true;
+    }
+    if (!changed) return;
+    normalizeAppState(state);
+    saveOrgData();
+    saveState();
+    setDbStatus('connected');
+    onChange();
+  }, (e) => {
+    console.error('Firestore 조직도 실시간 갱신 오류:', e);
+    setDbStatus('error');
+  });
 }
 
 export async function downloadStateFromDb() {

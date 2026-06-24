@@ -5602,7 +5602,7 @@ async function initApp({ localPreview = false } = {}) {
   state.qrBaseUrl = computeQrBaseUrl();
   // org_data.json의 version과 캐시된 orgDataVersion이 다르면(조직 개편 반영) 다시 시드한다.
   // 단순히 unit 개수만 보던 기존 게이트는 캐시된 사용자에게 개편이 반영되지 않는 문제가 있었다.
-  const ORG_DATA_VERSION = 4;
+  const ORG_DATA_VERSION = 5;
   const orgNeedsSeed = !state.orgUnits || state.orgUnits.length < 10
     || !state.orgMembers || state.orgMembers.length < 10
     || (state.orgDataVersion || 0) < ORG_DATA_VERSION;

@@ -7,11 +7,12 @@ import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260627-pipeline-v2';
 import { renderComm, bindComm } from './views/comm.js?v=20260627-comm-v1';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js?v=20260627-pipeline-v2';
-import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260623-report-pdf-portrait-v3';
+import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260627-report-pdf-a4-fit-v1';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-multitenant-v1';
 import { parseCSV } from './views/upload.js?v=20260627-session-redesign-v1';
+import { exportBackupJson, importBackupJson } from './backup.js';
 import {
   renderSessions,
   renderOrgSelectRow,
@@ -2227,12 +2228,14 @@ function renderReport() {
   const sessionId = session?.id || "";
   const types = availableSessionTypes();
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
-  const pre  = stats.find(s => s.phase === '사전') || null;
-  const mid  = stats.find(s => s.phase === '중간') || null;
-  const post = stats.find(s => s.phase === '사후') || null;
+  const pre      = stats.find(s => s.phase === '사전')    || null;
+  const mid      = stats.find(s => s.phase === '중간')    || null;
+  const post     = stats.find(s => s.phase === '사후')    || null;
+  const followup = stats.find(s => s.phase === '팔로우업') || null;
 
-  const hasPreData  = pre  && pre.n  >= 1;
-  const hasPostData = post && post.n >= 1;
+  const hasPreData      = pre      && pre.n      >= 1;
+  const hasPostData     = post     && post.n     >= 1;
+  const hasFollowupData = followup && followup.n >= 1;
   // "현 상황"은 가장 최근에 확보된 설문을 보여준다. DT기획팀처럼 사후 설문만 있는
   // 세션도 진단 카드와 운영 제안이 비어 보이지 않도록 사후 → 중간 → 사전 순으로 선택한다.
   const diagnosis = hasPostData ? post : (mid?.n >= 1 ? mid : (hasPreData ? pre : null));
@@ -2386,18 +2389,22 @@ function renderReport() {
     <section class="report-export-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>③ 변화 분석</h2>
-        <span>사전 → 사후 · N<3 마스킹 적용</span>
+        <span>사전 → 사후${hasFollowupData ? ' → 팔로우업' : ''} · N<3 마스킹 적용</span>
       </div>
       ${!hasPreData && !hasPostData ? `<div class="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>` : `
       <div class="report-change-grid" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px;">
         ${REPORT_DIMS.map(dim => {
-          const preScore  = pre  && pre.n  >= 3 ? dimAvg(pre,  dim.qs) : null;
-          const midScore  = mid  && mid.n  >= 3 ? dimAvg(mid,  dim.qs) : null;
-          const postScore = post && post.n >= 3 ? dimAvg(post, dim.qs) : null;
-          const delta = preScore !== null && postScore !== null ? postScore - preScore : null;
-          const midDelta = preScore !== null && midScore !== null ? midScore - preScore : null;
-          const deltaColor = delta === null ? '#94a3b8' : delta > 0.2 ? '#00a866' : delta < -0.2 ? '#e3003b' : '#f4b000';
-          
+          const preScore      = pre      && pre.n      >= 3 ? dimAvg(pre,      dim.qs) : null;
+          const midScore      = mid      && mid.n      >= 3 ? dimAvg(mid,      dim.qs) : null;
+          const postScore     = post     && post.n     >= 3 ? dimAvg(post,     dim.qs) : null;
+          const followupScore = followup && followup.n >= 3 ? dimAvg(followup, dim.qs) : null;
+
+          // 핵심 델타는 사전→사후, 팔로우업 있으면 사후→팔로우업도 표시
+          const delta         = preScore !== null && postScore     !== null ? postScore     - preScore  : null;
+          const followupDelta = postScore !== null && followupScore !== null ? followupScore - postScore : null;
+          const deltaColor    = delta === null ? '#94a3b8' : delta > 0.2 ? '#00a866' : delta < -0.2 ? '#e3003b' : '#f4b000';
+          const fuDeltaColor  = followupDelta === null ? '#94a3b8' : followupDelta > 0.2 ? '#00a866' : followupDelta < -0.2 ? '#e3003b' : '#f4b000';
+
           const shortInterpretation = delta === null ? ''
             : delta > 0.5 ? '큰 변화'
             : delta > 0.2 ? '소폭 개선'
@@ -2409,58 +2416,63 @@ function renderReport() {
             : delta > 0.2 ? '평균이 개선 방향입니다 — 표본 수가 적다면 참고용으로 해석하세요.'
             : delta > -0.2 ? '평균 차이가 미미합니다 — 추가 개입 필요 여부를 정성 신호와 함께 확인하세요.'
             : '평균이 하락했습니다 — 환경 요인과 응답자 구성 변화를 함께 점검하세요.';
-            
-          const prePct = preScore !== null ? (preScore - 1) * 25 : 0;
-          const postPct = postScore !== null ? (postScore - 1) * 25 : 0;
-          const minPct = Math.min(prePct, postPct);
-          const widthPct = Math.abs(postPct - prePct);
-          
+
+          const prePct      = preScore      !== null ? (preScore      - 1) * 25 : 0;
+          const postPct     = postScore     !== null ? (postScore     - 1) * 25 : 0;
+          const followupPct = followupScore !== null ? (followupScore - 1) * 25 : 0;
+          const minPct      = Math.min(prePct, postPct);
+          const widthPct    = Math.abs(postPct - prePct);
+          const fuMinPct    = followupScore !== null ? Math.min(postPct, followupPct) : 0;
+          const fuWidthPct  = followupScore !== null ? Math.abs(followupPct - postPct) : 0;
+
           return `
             <div class="report-change-card" style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
               <div style="position:absolute; top:0; left:0; right:0; height:3px; background:${dim.color};"></div>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:6px;">
                 <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
-                ${delta !== null 
-                  ? `<span style="font-size:12px; font-weight:800; color:${deltaColor}; background:${deltaColor}14; padding:3px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:4px;">
-                      ${delta > 0 ? '+' : ''}${delta.toFixed(2)} ${delta > 0.2 ? '↑' : delta < -0.2 ? '↓' : '→'}
-                      <span style="font-size:10px; opacity:0.85; font-weight:700; border-left:1px solid ${deltaColor}40; padding-left:4px; margin-left:2px;">${shortInterpretation}</span>
-                     </span>` 
-                  : `<span class="masked-badge" style="border:none; padding:3px 10px; border-radius:99px; background:rgba(148, 163, 184, 0.1); color:#64748b; font-size:11px; display:inline-flex; align-items:center; gap:4px;">${lockSvg} N&lt;3 보호</span>`}
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  ${delta !== null
+                    ? `<span style="font-size:12px; font-weight:800; color:${deltaColor}; background:${deltaColor}14; padding:3px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:4px;">
+                        사전→사후 ${delta > 0 ? '+' : ''}${delta.toFixed(2)} ${delta > 0.2 ? '↑' : delta < -0.2 ? '↓' : '→'}
+                        <span style="font-size:10px; opacity:0.85; font-weight:700; border-left:1px solid ${deltaColor}40; padding-left:4px; margin-left:2px;">${shortInterpretation}</span>
+                       </span>`
+                    : `<span class="masked-badge" style="border:none; padding:3px 10px; border-radius:99px; background:rgba(148,163,184,0.1); color:#64748b; font-size:11px; display:inline-flex; align-items:center; gap:4px;">${lockSvg} N&lt;3 보호</span>`}
+                  ${followupDelta !== null
+                    ? `<span style="font-size:12px; font-weight:800; color:${fuDeltaColor}; background:${fuDeltaColor}14; padding:3px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:4px;">
+                        팔로우업 ${followupDelta > 0 ? '+' : ''}${followupDelta.toFixed(2)} ${followupDelta > 0.2 ? '↑' : followupDelta < -0.2 ? '↓' : '→'}
+                       </span>`
+                    : followupScore === null && hasFollowupData
+                      ? `<span class="masked-badge" style="border:none; padding:3px 10px; border-radius:99px; background:rgba(148,163,184,0.1); color:#64748b; font-size:11px; display:inline-flex; align-items:center; gap:4px;">${lockSvg} 팔로우업 N&lt;3</span>`
+                      : ''}
+                </div>
               </div>
-              
+
               ${preScore !== null && postScore !== null ? `
-                <!-- Dumbbell Chart (Slope Line) -->
+                <!-- Dumbbell Chart -->
                 <div class="dumbbell-chart-container" style="margin: 16px 0; padding: 0 6px;">
                   <div style="display:flex; justify-content:space-between; margin-bottom: 6px; font-size:10.5px; font-weight:700; color:#94a3b8; letter-spacing:0.02em;">
-                    <span>1.0</span>
-                    <span>2.0</span>
-                    <span>3.0</span>
-                    <span>4.0</span>
-                    <span>5.0</span>
+                    <span>1.0</span><span>2.0</span><span>3.0</span><span>4.0</span><span>5.0</span>
                   </div>
                   <div class="dumbbell-track" style="position:relative; height:10px; background:#f1f5f9; border-radius:5px; display:flex; align-items:center;">
-                    <!-- scale ticks -->
                     <div style="position:absolute; left:25%; width:1px; height:10px; background:#e2e8f0;"></div>
                     <div style="position:absolute; left:50%; width:1px; height:10px; background:#e2e8f0;"></div>
                     <div style="position:absolute; left:75%; width:1px; height:10px; background:#e2e8f0;"></div>
-                    
-                    <!-- connecting line -->
+                    <!-- pre→post line -->
                     <div style="position:absolute; left:${minPct}%; width:${widthPct}%; height:4px; background:${deltaColor}; border-radius:2px; opacity:0.85; z-index:1;"></div>
-                    
+                    ${followupScore !== null ? `<!-- post→followup line --><div style="position:absolute; left:${fuMinPct}%; width:${fuWidthPct}%; height:4px; background:${fuDeltaColor}; border-radius:2px; opacity:0.6; z-index:1;"></div>` : ''}
                     <!-- pre dot -->
                     <div style="position:absolute; left:${prePct}%; transform:translateX(-50%); width:12px; height:12px; border-radius:50%; background:#94a3b8; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); z-index:2;" title="사전: ${preScore.toFixed(2)}"></div>
-                    
                     <!-- post dot -->
                     <div style="position:absolute; left:${postPct}%; transform:translateX(-50%); width:14px; height:14px; border-radius:50%; background:${dim.color}; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.2); z-index:3;" title="사후: ${postScore.toFixed(2)}">
-                      <span style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#fff; font-size:8px; font-weight:900; pointer-events:none;">
-                        ${delta > 0.05 ? '▶' : delta < -0.05 ? '◀' : ''}
-                      </span>
+                      <span style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#fff; font-size:8px; font-weight:900; pointer-events:none;">${delta > 0.05 ? '▶' : delta < -0.05 ? '◀' : ''}</span>
                     </div>
+                    ${followupScore !== null ? `<!-- followup dot --><div style="position:absolute; left:${followupPct}%; transform:translateX(-50%); width:13px; height:13px; border-radius:50%; background:#34c759; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.2); z-index:4;" title="팔로우업: ${followupScore.toFixed(2)}"></div>` : ''}
                   </div>
-                  <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:11.5px;">
+                  <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:11.5px; flex-wrap:wrap; gap:4px;">
                     <span style="color:#64748b; font-weight:600;">사전: <strong style="color:#475569;">${preScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${pre.n})</span></span>
                     ${midScore !== null ? `<span style="color:#b47700; font-weight:600;">중간: <strong>${midScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${mid.n})</span></span>` : ''}
                     <span style="color:${dim.color}; font-weight:700;">사후: <strong>${postScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${post.n})</span></span>
+                    ${followupScore !== null ? `<span style="color:#34c759; font-weight:700;">팔로우업: <strong>${followupScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${followup.n})</span></span>` : ''}
                   </div>
                 </div>
               ` : `
@@ -3836,6 +3848,20 @@ function bindSessions() {
     document.getElementById("session-more-dropdown").style.display = "none";
     downloadStateFromDb();
   });
+  document.querySelector("#btn-backup-export")?.addEventListener("click", () => {
+    document.getElementById("session-more-dropdown").style.display = "none";
+    exportBackupJson().catch(e => alert('내보내기 실패: ' + e.message));
+  });
+  document.querySelector("#btn-backup-import")?.addEventListener("click", () => {
+    document.getElementById("session-more-dropdown").style.display = "none";
+    document.getElementById("backup-import-file")?.click();
+  });
+  document.querySelector("#backup-import-file")?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await importBackupJson(file).catch(err => alert('복원 실패: ' + err.message));
+    e.target.value = "";
+  });
   document.getElementById("btn-session-more")?.addEventListener("click", (e) => {
     e.stopPropagation();
     const dd = document.getElementById("session-more-dropdown");
@@ -3955,20 +3981,24 @@ function reportExportPayload() {
   }).filter((question, index, list) => list.findIndex((item) => item.phase === question.phase && item.id === question.id) === index);
 
   const stats = statsForSession(scope.cohort, session.id);
-  const pre = stats.find((item) => item.phase === "사전") || null;
-  const mid = stats.find((item) => item.phase === "중간") || null;
-  const post = stats.find((item) => item.phase === "사후") || null;
-  const current = post?.n ? post : (mid?.n ? mid : pre);
+  const pre      = stats.find((item) => item.phase === "사전")    || null;
+  const mid      = stats.find((item) => item.phase === "중간")    || null;
+  const post     = stats.find((item) => item.phase === "사후")    || null;
+  const followup = stats.find((item) => item.phase === "팔로우업") || null;
+  const current  = post?.n ? post : (mid?.n ? mid : pre);
   const analysis = REPORT_DIMS.map((dimension) => {
-    const currentScore = current ? dimAvg(current, dimension.qs) : null;
-    const preScore = pre?.n >= 3 ? dimAvg(pre, dimension.qs) : null;
-    const postScore = post?.n >= 3 ? dimAvg(post, dimension.qs) : null;
+    const currentScore  = current  ? dimAvg(current,  dimension.qs) : null;
+    const preScore      = pre?.n      >= 3 ? dimAvg(pre,      dimension.qs) : null;
+    const postScore     = post?.n     >= 3 ? dimAvg(post,     dimension.qs) : null;
+    const followupScore = followup?.n >= 3 ? dimAvg(followup, dimension.qs) : null;
     return {
       label: dimension.label,
-      current: currentScore === null ? "-" : Number(currentScore.toFixed(2)),
-      pre: preScore === null ? "N<3" : Number(preScore.toFixed(2)),
-      post: postScore === null ? "N<3" : Number(postScore.toFixed(2)),
-      delta: preScore === null || postScore === null ? "-" : Number((postScore - preScore).toFixed(2)),
+      current:  currentScore  === null ? "-"    : Number(currentScore.toFixed(2)),
+      pre:      preScore      === null ? "N<3"  : Number(preScore.toFixed(2)),
+      post:     postScore     === null ? "N<3"  : Number(postScore.toFixed(2)),
+      delta:    preScore      === null || postScore     === null ? "-" : Number((postScore     - preScore).toFixed(2)),
+      followup: followupScore === null ? (followup ? "N<3" : "-") : Number(followupScore.toFixed(2)),
+      fuDelta:  postScore     === null || followupScore === null ? "-" : Number((followupScore - postScore).toFixed(2)),
       recommendation: dimRecommendation(dimension.key, currentScore),
     };
   });

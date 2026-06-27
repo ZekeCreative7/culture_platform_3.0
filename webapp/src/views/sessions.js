@@ -544,6 +544,10 @@ export function renderSessions() {
           <div class="session-more-dropdown" id="session-more-dropdown" style="display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.10); min-width:140px; z-index:200; overflow:hidden;">
             <button class="session-more-item" id="btn-db-download">DB 다운로드</button>
             <button class="session-more-item" id="btn-db-upload">DB 전송</button>
+            <div style="border-top:1px solid #e2e8f0; margin:4px 0;"></div>
+            <button class="session-more-item" id="btn-backup-export">JSON 백업 내보내기</button>
+            <button class="session-more-item" id="btn-backup-import">JSON 백업 복원...</button>
+            <input type="file" id="backup-import-file" accept=".json" style="display:none;"  />
           </div>
         </div>
         <button class="primary" id="btn-open-session-drawer">+ 새 세션</button>

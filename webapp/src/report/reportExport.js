@@ -26,11 +26,10 @@ function loadScriptOnce(src) {
   });
 }
 
-const PHASE_ORDER = ["사전", "중간", "사후"];
-// Keep the export close to the app's real desktop content width. Capturing an
-// artificially wide (1840px) document made an A4 portrait page shrink too far
-// and let the right padding fall outside html2canvas' capture box.
-const DESKTOP_EXPORT_WIDTH_PX = 1280;
+const PHASE_ORDER = ["사전", "중간", "사후", "팔로우업"];
+// A4 portrait has much less horizontal room than the desktop canvas. Keep the
+// cloned export document narrow enough that html2pdf does not shrink or crop it.
+const PDF_EXPORT_WIDTH_PX = 940;
 
 function safeFilePart(value) {
   return String(value || "report")
@@ -168,31 +167,53 @@ export async function downloadReportWorkbook(payload) {
   });
   XLSX.utils.book_append_sheet(workbook, sheetFromRows(XLSX, aggregateRows, [12, 14, 58, 12, 12, 9, 9, 9, 9, 9, 18]), "문항별 집계");
 
-  const comparisonRows = [["문항 ID", "질문", "사전 N", "사전 평균", "사후 N", "사후 평균", "변화량", "보호 처리"]];
+  const followupResponses = responses.filter((row) => row.phase === "팔로우업");
+  const hasFollowup = followupResponses.length > 0;
+  const comparisonHeader = ["문항 ID", "질문", "사전 N", "사전 평균", "사후 N", "사후 평균", "사전→사후 변화량",
+    ...(hasFollowup ? ["팔로우업 N", "팔로우업 평균", "사후→팔로우업 변화량"] : []),
+    "보호 처리"];
+  const comparisonRows = [comparisonHeader];
   [...uniqueQuestions.values()].filter((question) => question.type !== "qual").forEach((question) => {
-    const preValues = responses.filter((row) => row.phase === "사전").map((row) => scoreOf(row[question.id])).filter((value) => typeof value === "number");
-    const postValues = responses.filter((row) => row.phase === "사후").map((row) => scoreOf(row[question.id])).filter((value) => typeof value === "number");
-    const masked = preValues.length < 3 || postValues.length < 3;
-    const preAverage = average(preValues);
-    const postAverage = average(postValues);
+    const preValues      = responses.filter((row) => row.phase === "사전").map((row) => scoreOf(row[question.id])).filter((v) => typeof v === "number");
+    const postValues     = responses.filter((row) => row.phase === "사후").map((row) => scoreOf(row[question.id])).filter((v) => typeof v === "number");
+    const followupValues = followupResponses.map((row) => scoreOf(row[question.id])).filter((v) => typeof v === "number");
+    const preMasked      = preValues.length < 3 || postValues.length < 3;
+    const fuMasked       = hasFollowup && (postValues.length < 3 || followupValues.length < 3);
+    const preAvg         = average(preValues);
+    const postAvg        = average(postValues);
+    const fuAvg          = average(followupValues);
     comparisonRows.push([
       question.id,
       question.text,
       preValues.length,
-      masked ? "N<3" : Number(preAverage.toFixed(2)),
+      preMasked ? "N<3" : Number(preAvg.toFixed(2)),
       postValues.length,
-      masked ? "N<3" : Number(postAverage.toFixed(2)),
-      masked ? "-" : Number((postAverage - preAverage).toFixed(2)),
-      masked ? "N<3 마스킹" : "",
+      preMasked ? "N<3" : Number(postAvg.toFixed(2)),
+      preMasked ? "-" : Number((postAvg - preAvg).toFixed(2)),
+      ...(hasFollowup ? [
+        followupValues.length,
+        fuMasked ? "N<3" : Number(fuAvg.toFixed(2)),
+        fuMasked ? "-" : Number((fuAvg - postAvg).toFixed(2)),
+      ] : []),
+      preMasked ? "N<3 마스킹" : "",
     ]);
   });
-  XLSX.utils.book_append_sheet(workbook, sheetFromRows(XLSX, comparisonRows, [14, 60, 10, 12, 10, 12, 12, 16]), "사전-사후 비교");
+  const compColWidths = [14, 60, 10, 12, 10, 12, 16, ...(hasFollowup ? [14, 16, 20] : []), 16];
+  XLSX.utils.book_append_sheet(workbook, sheetFromRows(XLSX, comparisonRows, compColWidths), "사전-사후 비교");
 
+  const hasFollowupAnalysis = analysis.some((item) => item.followup !== "-");
   const analysisRows = [
-    ["진단 영역", "현재 점수", "사전 점수", "사후 점수", "변화량", "운영 제안"],
-    ...analysis.map((item) => [item.label, item.current, item.pre, item.post, item.delta, item.recommendation]),
+    ["진단 영역", "현재 점수", "사전 점수", "사후 점수", "사전→사후 변화량",
+      ...(hasFollowupAnalysis ? ["팔로우업 점수", "사후→팔로우업 변화량"] : []),
+      "운영 제안"],
+    ...analysis.map((item) => [
+      item.label, item.current, item.pre, item.post, item.delta,
+      ...(hasFollowupAnalysis ? [item.followup, item.fuDelta] : []),
+      item.recommendation,
+    ]),
   ];
-  XLSX.utils.book_append_sheet(workbook, sheetFromRows(XLSX, analysisRows, [22, 12, 12, 12, 12, 72]), "분석 요약");
+  const analysisColWidths = [22, 12, 12, 12, 18, ...(hasFollowupAnalysis ? [16, 22] : []), 72];
+  XLSX.utils.book_append_sheet(workbook, sheetFromRows(XLSX, analysisRows, analysisColWidths), "분석 요약");
 
   XLSX.writeFile(workbook, `${reportBaseName(meta)}.xlsx`, { compression: true });
 }
@@ -209,7 +230,7 @@ export async function downloadReportPdf({ element, meta }) {
   const clone = element.cloneNode(true);
   clone.removeAttribute("id");
   clone.classList.add("report-pdf-document");
-  clone.style.width = `${DESKTOP_EXPORT_WIDTH_PX}px`;
+  clone.style.width = `${PDF_EXPORT_WIDTH_PX}px`;
   clone.style.maxWidth = "none";
   clone.style.position = "relative";
   clone.style.left = "0";
@@ -219,12 +240,15 @@ export async function downloadReportPdf({ element, meta }) {
   stage.appendChild(clone);
   document.body.appendChild(stage);
 
-  // Render the actual desktop report width and measure the clone after fonts
-  // settle. Using the same measured width for layout and capture keeps both PDF
-  // gutters equal and prevents wide charts/tables from being cropped.
+  // Measure the clone after fonts/layout settle. Use scrollWidth as the capture
+  // width so a wide chart/table cannot fall outside html2canvas' crop box.
   await document.fonts?.ready;
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  const docWidth = Math.ceil(clone.getBoundingClientRect().width);
+  const docWidth = Math.ceil(Math.max(
+    PDF_EXPORT_WIDTH_PX,
+    clone.scrollWidth,
+    clone.getBoundingClientRect().width,
+  ));
 
   try {
     await window.html2pdf()
@@ -253,7 +277,7 @@ export async function downloadReportPdf({ element, meta }) {
               clonedStage.style.height = "auto";
               clonedStage.style.overflow = "visible";
             }
-            clonedReport.style.width = `${DESKTOP_EXPORT_WIDTH_PX}px`;
+            clonedReport.style.width = `${PDF_EXPORT_WIDTH_PX}px`;
             clonedReport.style.maxWidth = "none";
             clonedReport.style.boxSizing = "border-box";
             clonedReport.style.overflow = "visible";

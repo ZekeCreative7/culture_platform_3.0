@@ -1,22 +1,76 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-closed-surveys-collapse-v1';
-import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260621-pulse-engagement-footnote-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260627-audit-log-v1';
+import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260627-audit-log-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260623-dashboard-actions-v2';
+import { dashboardActionQueue } from './dashboard/dashboardEngine.js?v=20260623-dashboard-actions-v1';
 import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260623-report-pdf-portrait-v3';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260622-closed-surveys-collapse-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-audit-log-v1';
+import { parseCSV } from './views/upload.js?v=20260627-module-split-v1';
+import {
+  renderSessions,
+  renderOrgSelectRow,
+  renderSessionPulseSummary,
+  renderTeamBuildingPanel,
+  renderLeaderSessionPanel,
+  renderCrossFunctionalPanel,
+  renderCrossMemberSelector,
+  renderSelectedCrossMembers,
+  renderSessionConfigPanel,
+  renderSessionOutcomeIntro,
+  canCreateDraftSession,
+  leaderSessions,
+  selectedLeaderSession,
+  crossSourceTeams,
+  crossMemberPool,
+  selectedCrossMembers,
+  resetCrossDraft,
+  getStatus,
+  sessionsByTypeGrouped
+} from './views/sessions.js?v=20260627-session-fix-v2';
+import {
+  validateAndRepairSelectedOrg,
+  childUnits,
+  topLevelOrgUnits,
+  hqUnitsForDivision,
+  teamUnitsForSelection,
+  descendantTeamIds,
+  descendantUnitIds,
+  memberGrade,
+  memberJobTitle,
+  orgPathLabel,
+  unitLeaderDetails,
+  syncLeaderSnapshotsForPerson,
+  syncPersonSnapshotsEverywhere,
+  repairOrgPersonReferences,
+  sortedOrgMembers,
+  distinctPeopleCount,
+  distinctDirectPeopleCount,
+  orgMemberOptionsForUnit,
+  optionHtml,
+  syncDraftOrgFromTeam,
+  ensureDraftOrgSelection,
+  ensureActiveOrgSelection,
+  teamPath,
+  leaderCandidateForTeam,
+  orgMemberCandidate,
+  teamMemberCandidates,
+  allMemberCandidates,
+  positionRank
+} from './views/org.js?v=20260627-module-split-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
   UNIT_LABELS, UNIT_LEADER_LABELS, SCORE_MAP, SCALE_LABELS, scoreOf, isQualText, todayISO,
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
-  sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule
-} from './utils.js?v=20260622-org-backup-restore-v2';
+  sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule,
+  targetCountForSession
+} from './utils.js?v=20260627-module-split-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -27,48 +81,28 @@ import {
   setSurveyDistributionActiveInFirestore, updateSurveyInFirestore, deleteSurveyDocFromFirestore, normalizeSurveyRecord, loadPulseYears,
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
-  loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore
-} from './state.js?v=20260624-realtime-sync-v1';
+  loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore, fetchRecentAuditLogs,
+  
+  sessionsSortedByStart, phasesForSession, getQuestionsForCohort, sessionsForCohort,
+  availableSessionTypes,
+  cohortsForType, sessionsForTypeCohort, yearForCohortType,
+  questionSetForSession, phaseHasQuantQuestions, statsForSession, ensureScopedSelection,
+  rowMatchesSurvey, surveyRows,
+  surveyDistributionActive, surveyQuestionsForDistribution
+} from './state.js?v=20260627-audit-log-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
 
-const SESSION_OUTCOME_COPY = {
-  팀빌딩: {
-    title: "팀빌딩 체감 성과",
-    description: "팀빌딩 사후 설문을 바탕으로 참여자의 세션 경험, 프로그램 도움 인식, 실천·활용 의향을 종합한 체감 성과입니다. 장기적인 조직문화 변화는 후속 측정이 필요합니다.",
-  },
-  리더십: {
-    title: "팀장 리더십 행동 전환 성과",
-    description: "팀장 세션의 사전·사후 설문을 바탕으로 리더의 팀 영향 자기인식, 심리적 안전 행동 준비도, 경청·질문과 변화 대화, 팀장 간 연결·조율, 리더 행동 실행 준비도를 종합한 성과입니다. 웰니스 자기조절은 별도 지표로 확인하며, 실제 팀 분위기와 조직문화의 변화는 팀원 대상 후속 진단이 필요합니다.",
-  },
-  협업: {
-    title: "크로스펑션 협업 변화 성과",
-    description: "협업·크로스펑션 세션의 사전·사후 설문을 바탕으로 협업 관계 안전감, 목표 정렬, 정보·역할 명확성, 이슈 조율 신뢰, 사일로 완화와 공동 실행 가능성의 변화를 종합한 성과입니다. 웰니스 자기조절은 별도 지표로 확인하며, 실제 협업 변화는 세션 후 7~14일의 경험을 기준으로 해석합니다.",
-  },
-};
-
-function renderSessionOutcomeIntro(type) {
-  const normalizedType = normalizeSessionType(type);
-  const copy = SESSION_OUTCOME_COPY[normalizedType];
-  if (!copy) return "";
-  return `
-    <section class="panel session-outcome-intro" style="margin-bottom:18px;">
-      <span class="eyebrow">${escapeHtml(sessionTypeLabel(normalizedType))} Outcome</span>
-      <h2 style="margin:4px 0 8px;">${escapeHtml(copy.title)}</h2>
-      <p style="margin:0; color:var(--muted); line-height:1.75;">${escapeHtml(copy.description)}</p>
-    </section>`;
-}
-
 const VIEWS = [
-  ["dashboard", "Home", "홈"],
-  ["sessions", "Sessions", "세션"],
-  ["org", "Organization", "조직"],
-  ["survey", "Survey Creator", "설문지"],
-  ["analytics", "Survey Result Viewer", "설문 결과 보기"],
-  ["report", "Analysis Report", "분석 결과"],
-  ["pulse", "Pulse Insights", "조직 진단"],
-  ["upload", "Upload", "데이터 업로드"],
+  ["dashboard", "홈", "홈"],
+  ["sessions", "세션", "세션"],
+  ["org", "조직", "조직"],
+  ["survey", "설문지", "설문지"],
+  ["upload", "CSV 업로드", "CSV 업로드"],
+  ["analytics", "문항별 응답", "문항별 응답"],
+  ["report", "변화 분석 리포트", "변화 분석 리포트"],
+  ["pulse", "조직 진단", "조직 진단"],
 ];
 const NAV_ICONS = {
   dashboard: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M2 10a8 8 0 1 1 16 0A8 8 0 0 1 2 10Zm8-5a1 1 0 0 1 1 1v4.586l2.707 2.707a1 1 0 0 1-1.414 1.414l-3-3A1 1 0 0 1 9 11V6a1 1 0 0 1 1-1Z"/></svg>`,
@@ -82,6 +116,27 @@ const NAV_ICONS = {
 };
 const lockSvg = `<svg viewBox="0 0 24 24" width="11" height="11" style="fill:currentColor; display:inline-block; vertical-align:middle; margin-right:2px;"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>`;
 
+function applyLeaderSelection(unit, value) {
+  if (!unit) return;
+  unit.leaderRole = UNIT_LEADER_LABELS[unit.level] || unit.leaderRole || "리더";
+  if (!value) {
+    unit.leader = "";
+    unit.leaderTitle = "";
+    unit.leaderMemberId = "";
+    return;
+  }
+  if (value.startsWith("member:")) {
+    const memberId = value.slice("member:".length);
+    const member = state.orgMembers.find((item) => item.id === memberId);
+    if (!member) return;
+    unit.leader = member.name;
+    unit.leaderTitle = memberGrade(member);
+    unit.leaderMemberId = member.id;
+    return;
+  }
+  unit.leaderMemberId = "";
+}
+
 // Coalesce rapid state notifications into one paint. Firestore and local persistence can
 // notify during the same frame; rendering each notification made the Home canvas flash.
 let scheduledRenderFrame = 0;
@@ -92,780 +147,6 @@ subscribe(() => {
     render();
   });
 });
-
-
-function sessionsSortedByStart() {
-  return [...state.sessions].sort((a, b) => {
-    const da = sessionStartDate(a);
-    const db = sessionStartDate(b);
-    if (!da && !db) return 0;
-    if (!da) return 1;
-    if (!db) return -1;
-    return da.localeCompare(db);
-  });
-}
-
-function sessionsByTypeGrouped() {
-  const sorted = sessionsSortedByStart();
-  return Object.keys(SESSION_TYPES).map((type) => {
-    const group = sorted.filter((s) => sameSessionType(s.type, type));
-    if (!group.length) return "";
-    const collapsed = (state.collapsedSessionTypeGroups || []).includes(type);
-    return `
-      <div class="session-type-group">
-        <button type="button" class="session-type-group-head" style="--accent:${SESSION_TYPES[type].accent}" onclick="toggleSessionTypeGroup('${type}')">
-          <span class="session-type-group-chevron">${collapsed ? "▸" : "▾"}</span>
-          <strong>${escapeHtml(sessionTypeLabel(type))}</strong>
-          <span>${group.length}개</span>
-        </button>
-        ${collapsed ? "" : `<div class="session-card-grid">${group.map(sessionCard).join("")}</div>`}
-      </div>
-    `;
-  }).join("");
-}
-
-function getStatus(session) {
-  const schedule = session.schedule || [];
-  const confirmed = schedule.filter((item) => item.confirmed && item.date);
-  if (!confirmed.length) return ["시작전", "muted"];
-  const past = confirmed.filter((item) => hasRoundPassed(item));
-  const future = confirmed.filter((item) => !hasRoundPassed(item));
-  const pending = schedule.filter((item) => !item.confirmed || !item.date);
-  if (!past.length) return ["시작전", "amber"];
-  if (future.length || pending.length) return ["진행중", "blue"];
-  return ["완료", "green"];
-}
-
-function phasesForSession(sessionId) {
-  return PHASES.filter((phase) => state.responses.some((row) => row.sessionId === sessionId && row.phase === phase));
-}
-
-function getQuestionsForCohort(cohort, type) {
-  const sessionIds = state.sessions.filter(s => sameSessionType(s.type, type) && s.cohort === Number(cohort)).map(s => s.id);
-  const survey = state.surveys.find(s => sessionIds.includes(s.sessionId));
-  if (survey && survey.questions && survey.questions.length > 0) {
-    return survey.questions.filter(q => q.type === "quant");
-  }
-  return defaultQuestions("사후").filter(q => q.type === "quant");
-}
-
-function sessionsForCohort(cohort) {
-  const cohortNum = Number(cohort);
-  return (state.sessions || [])
-    .filter((session) => Number(session.cohort) === cohortNum)
-    .sort((a, b) => `${a.type} ${sessionLabel(a)}`.localeCompare(`${b.type} ${sessionLabel(b)}`, "ko"));
-}
-
-// 기수(cohort)는 세션 유형별로 따로 매겨진다 — 팀빌딩 1·2기, 리더십 1·2기, 협업 1·2기는 서로 다른
-// 기수다. 분석/리포트 필터는 "유형 → 기수 → 세션" 순으로 좁혀야 하므로 유형 기준 헬퍼를 둔다.
-function availableSessionTypes() {
-  const present = new Set((state.sessions || []).map((s) => normalizeSessionType(s.type)));
-  return Object.keys(SESSION_TYPES).filter((t) => present.has(t));
-}
-
-function cohortsForType(type) {
-  const cohorts = (state.sessions || [])
-    .filter((s) => sameSessionType(s.type, type))
-    .map((s) => Number(s.cohort))
-    .filter(Boolean);
-  return [...new Set(cohorts)].sort((a, b) => a - b);
-}
-
-function sessionsForTypeCohort(type, cohort) {
-  if (cohort === "all") {
-    return (state.sessions || [])
-      .filter((s) => sameSessionType(s.type, type))
-      .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
-  }
-  const cohortNum = Number(cohort);
-  return (state.sessions || [])
-    .filter((s) => sameSessionType(s.type, type) && Number(s.cohort) === cohortNum)
-    .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
-}
-
-function yearForCohortType(cohort, type) {
-  const cohortNum = Number(cohort);
-  const match = (state.sessions || []).find((s) => sameSessionType(s.type, type) && Number(s.cohort) === cohortNum);
-  return match ? sessionYear(match) : "";
-}
-
-function targetCountForSession(session) {
-  if (!session) return 0;
-  if (Array.isArray(session.members) && session.members.length) return session.members.length;
-  if (Array.isArray(session.leaderGroup) && session.leaderGroup.length) return session.leaderGroup.length;
-  return 0;
-}
-
-function questionSetForSession(sessionId, phase = "사후") {
-  const surveys = (state.surveys || []).filter((survey) => survey.sessionId === sessionId && Array.isArray(survey.questions) && survey.questions.length);
-  const survey = surveys.find((item) => item.phase === phase) || surveys[0];
-  return (survey?.questions || defaultQuestions(phase)).filter((q) => q.type === "quant");
-}
-
-// True when this session's 시점(phase) has a survey that is explicitly configured with at least one
-// 객관식(척도) 문항. A survey with no config at all is treated as "has quant" (legacy default set).
-function phaseHasQuantQuestions(sessionId, phase) {
-  const survey = (state.surveys || []).find((s) => s.sessionId === sessionId && s.phase === phase);
-  if (!survey) return true;
-  if (!(survey.questions || []).length) return true;
-  return (survey.questions || []).some((q) => q.type === "quant");
-}
-
-function statsForSession(cohort, sessionId) {
-  (state.responses || []).forEach(assertNotQuantInput);
-  // A sessionId uniquely identifies a session (and therefore its cohort), so we match purely by
-  // sessionId + phase. The cohort field on a response is only a snapshot and can drift away from
-  // its session (e.g. a survey created while the session was a different 기수) — gating on it here
-  // used to make a session's quant chart go blank even though the responses clearly belong to it.
-  const questions = questionSetForSession(sessionId);
-  return PHASES.map((phase) => {
-    const rows = (state.responses || []).filter((row) =>
-      row.sessionId === sessionId && row.phase === phase
-    );
-    const stats = { phase, n: rows.length };
-    questions.forEach((q) => {
-      const key = q.id;
-      const values = rows.map((row) => scoreOf(row[key])).filter((v) => typeof v === "number");
-      stats[`${key}_avg`] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-    });
-    return stats;
-  });
-}
-
-function ensureScopedSelection(kind) {
-  const typeField    = kind === "analytics" ? "selectedAnalyticsType"     : "selectedReportType";
-  const cohortField  = kind === "analytics" ? "selectedAnalyticsCohort"   : "selectedReportCohort";
-  const sessionField = kind === "analytics" ? "selectedAnalyticsSessionId": "selectedReportSessionId";
-  const isReport = kind === "report";
-
-  // 1) 유형: 세션이 존재하는 유형으로 보정
-  const types = availableSessionTypes();
-  if (!types.includes(normalizeSessionType(state[typeField]))) {
-    state[typeField] = types[0] || normalizeSessionType(state[typeField] || "팀빌딩");
-  }
-  const type = normalizeSessionType(state[typeField]);
-
-  // 2) 기수: 그 유형에 존재하는 기수로 보정
-  const cohorts = cohortsForType(type);
-  if (!isReport && state[cohortField] === "all") {
-    state[cohortField] = cohorts.length ? String(cohorts[0]) : "";
-  }
-  if (state[cohortField] !== "all" && !cohorts.includes(Number(state[cohortField]))) {
-    state[cohortField] = cohorts.length ? String(cohorts[0]) : "";
-  }
-  const cohort = state[cohortField] === "all" ? "all" : Number(state[cohortField] || 0);
-
-  // 3) 세션: 그 유형+기수에 속한 세션으로 보정
-  const sessions = sessionsForTypeCohort(type, cohort);
-  if (!isReport && state[sessionField] === "all") {
-    state[sessionField] = sessions[0]?.id || "";
-  }
-  if (state[sessionField] !== "all" && !sessions.some((session) => session.id === state[sessionField])) {
-    state[sessionField] = sessions[0]?.id || "";
-  }
-  return { type, cohort, cohorts, sessions, session: sessions.find((item) => item.id === state[sessionField]) || null };
-}
-
-function scopedSessionOptions(type, cohort, selectedSessionId = "", isReport = false) {
-  const sessions = sessionsForTypeCohort(type, cohort);
-  if (!sessions.length) {
-    return `<option value="">선택 가능한 세션 없음</option>`;
-  }
-  const compareAllOption = isReport ? `<option value="all" ${selectedSessionId === "all" ? "selected" : ""}>전체 비교 분석</option>` : "";
-  const sessionOptions = sessions.map((session) => 
-    `<option value="${escapeHtml(session.id)}" ${session.id === selectedSessionId ? "selected" : ""}>${escapeHtml(sessionLabel(session))}</option>`
-  ).join("");
-  return compareAllOption + sessionOptions;
-}
-
-function cohortOptionsHtml(type, selectedCohort, isReport = false) {
-  const cohorts = cohortsForType(type);
-  if (!cohorts.length) return `<option value="">응답 없음</option>`;
-  const allOption = isReport ? `<option value="all" ${selectedCohort === "all" ? "selected" : ""}>전체 기수</option>` : "";
-  const cohortOptions = cohorts.map((c) => {
-    const yl = yearForCohortType(c, type) ? `${yearForCohortType(c, type)}년 ` : "";
-    const count = sessionsForTypeCohort(type, c).length;
-    return `<option value="${c}" ${selectedCohort !== "all" && Number(selectedCohort) === c ? "selected" : ""}>${yl}${c}기${count ? ` · ${count}개 세션` : ""}</option>`;
-  }).join("");
-  return allOption + cohortOptions;
-}
-
-function rowMatchesSurvey(row, survey) {
-  if (row.surveyId === survey.id) return true;
-  const cohort = Number(survey.sessionCohort) || 0;
-  return row.sessionId === survey.sessionId
-    && row.phase === survey.phase
-    && (!cohort || Number(row.cohort) === cohort);
-}
-
-function surveyRows(survey) {
-  return (state.responses || []).filter((row) => rowMatchesSurvey(row, survey));
-}
-
-function surveyDistributionActive(survey) {
-  return survey?.distribution?.active ?? survey?.distributionActive ?? (survey?.status !== "closed" && !survey?.deletedAt);
-}
-
-function surveyQuestionsForDistribution(survey) {
-  const configured = (survey.questions || []).filter((q) => q.type === "quant");
-  return configured.length ? configured : defaultQuestions(survey.phase || "사후").filter((q) => q.type === "quant");
-}
-
-function validateAndRepairSelectedOrg() {
-  if (!state.orgUnits || state.orgUnits.length === 0) return;
-  
-  // 1. Company
-  let comp = state.orgUnits.find(u => u.id === state.selectedCompany && u.level === "company");
-  if (!comp) {
-    comp = state.orgUnits.find(u => u.level === "company");
-    state.selectedCompany = comp ? comp.id : "";
-  }
-  
-  // 2. Division
-  let div = state.orgUnits.find(u => u.id === state.selectedDivision && u.parentId === state.selectedCompany);
-  if (!div) {
-    const divs = topLevelOrgUnits(state.selectedCompany);
-    state.selectedDivision = divs.length > 0 ? divs[0].id : "";
-  }
-  
-  // 3. HQ
-  let hq = state.orgUnits.find(u => u.id === state.selectedHq && u.level === "hq" && u.parentId === state.selectedDivision);
-  if (!hq) {
-    const hqs = hqUnitsForDivision(state.selectedDivision);
-    state.selectedHq = hqs.length > 0 ? hqs[0].id : "";
-  }
-  
-  // 4. Team
-  let team = teamUnitsForSelection(state.selectedDivision, state.selectedHq).find(u => u.id === state.selectedTeam);
-  if (!team) {
-    const teams = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
-    state.selectedTeam = teams.length > 0 ? teams[0].id : "";
-  }
-}
-
-function childUnits(parentId, level) {
-  return state.orgUnits.filter((unit) => unit.parentId === parentId && (!level || unit.level === level));
-}
-
-function topLevelOrgUnits(companyId = state.selectedCompany) {
-  return state.orgUnits.filter((unit) => unit.parentId === companyId);
-}
-
-function hqUnitsForDivision(divisionId) {
-  return childUnits(divisionId, "hq");
-}
-
-function teamUnitsForSelection(divisionId, hqId) {
-  if (hqId) return childUnits(hqId, "team");
-  return childUnits(divisionId, "team");
-}
-
-function descendantTeamIds(unitId) {
-  const unit = state.orgUnits.find((item) => item.id === unitId);
-  if (!unit) return [];
-  if (unit.level === "team") return [unit.id];
-  return childUnits(unit.id).flatMap((child) => descendantTeamIds(child.id));
-}
-
-function descendantUnitIds(unitId) {
-  return childUnits(unitId).flatMap((child) => [child.id, ...descendantUnitIds(child.id)]);
-}
-
-const positionRank = (value) => {
-  const index = POSITION_OPTIONS.indexOf(normalizePosition(value));
-  return index < 0 ? POSITION_OPTIONS.length : index;
-};
-
-function memberGrade(member) {
-  return normalizePosition(member?.jobGrade || member?.position);
-}
-
-function memberJobTitle(member) {
-  return String(member?.jobTitle || "").trim();
-}
-
-function orgPathLabel(unitId) {
-  const labels = [];
-  const visited = new Set();
-  let unit = state.orgUnits.find((item) => item.id === unitId);
-  while (unit && !visited.has(unit.id)) {
-    visited.add(unit.id);
-    if (unit.level !== "company") labels.unshift(unit.name);
-    unit = state.orgUnits.find((item) => item.id === unit.parentId);
-  }
-  return labels.join(" · ");
-}
-
-function unitLeaderDetails(unit) {
-  if (!unit) return null;
-  const person = unit.leaderMemberId
-    ? state.orgMembers.find((item) => item.id === unit.leaderMemberId)
-    : null;
-  if (person) {
-    return {
-      personId: person.id,
-      name: person.name,
-      grade: memberGrade(person),
-      jobTitle: memberJobTitle(person),
-      role: UNIT_LEADER_LABELS[unit.level] || "리더",
-    };
-  }
-  if (!unit.leader) return null;
-  return {
-    personId: "",
-    name: unit.leader,
-    grade: normalizePosition(unit.leaderTitle),
-    jobTitle: "",
-    role: UNIT_LEADER_LABELS[unit.level] || "리더",
-  };
-}
-
-function syncLeaderSnapshotsForPerson(person) {
-  if (!person) return;
-  state.orgUnits
-    .filter((unit) => unit.leaderMemberId === person.id)
-    .forEach((unit) => {
-      // Legacy fields stay synchronized for old sessions/exports, while every current UI read
-      // resolves the person through leaderMemberId.
-      unit.leader = person.name;
-      unit.leaderTitle = memberGrade(person);
-      unit.leaderRole = UNIT_LEADER_LABELS[unit.level] || "리더";
-    });
-}
-
-function syncPersonSnapshotsEverywhere(person) {
-  syncLeaderSnapshotsForPerson(person);
-  (state.sessions || []).forEach((session) => {
-    if (session.leaderPersonId === person.id) {
-      session.leader = person.name;
-      session.leaderTitle = memberGrade(person);
-    }
-    session.members = (session.members || []).map((member) =>
-      (member.memberId || member.id) === person.id
-        ? { ...member, name: person.name, position: memberGrade(person), jobTitle: memberJobTitle(person) }
-        : member
-    );
-    session.leaderGroup = (session.leaderGroup || []).map((leader) =>
-      (leader.memberId || leader.id) === person.id
-        ? { ...leader, name: person.name, position: memberGrade(person), jobTitle: memberJobTitle(person) }
-        : leader
-    );
-  });
-}
-
-function repairOrgPersonReferences() {
-  state.orgMembers = (state.orgMembers || []).map((member) => {
-    const jobGrade = memberGrade(member);
-    return {
-      ...member,
-      jobGrade,
-      position: jobGrade,
-      jobTitle: member.jobTitle || "",
-      employmentStatus: member.employmentStatus || "재직",
-    };
-  });
-  (state.orgUnits || []).forEach((unit) => {
-    const linked = unit.leaderMemberId && state.orgMembers.find((member) => member.id === unit.leaderMemberId);
-    if (linked) {
-      syncLeaderSnapshotsForPerson(linked);
-      return;
-    }
-    if (!unit.leader) return;
-    const globalMatches = state.orgMembers.filter((member) => member.name === unit.leader);
-    const descendantIds = new Set([unit.id, ...descendantUnitIds(unit.id)]);
-    const localMatches = globalMatches.filter((member) => descendantIds.has(member.parentId));
-    const match = localMatches.length === 1 ? localMatches[0] : (globalMatches.length === 1 ? globalMatches[0] : null);
-    if (match) {
-      unit.leaderMemberId = match.id;
-      syncLeaderSnapshotsForPerson(match);
-    }
-  });
-}
-
-function sortedOrgMembers(members) {
-  const mode = state.orgMemberSort || "rank-desc";
-  if (mode === "default") return [...members];
-  return [...members].sort((a, b) => {
-    if (mode === "name") return a.name.localeCompare(b.name, "ko");
-    const delta = positionRank(a.jobGrade || a.position) - positionRank(b.jobGrade || b.position);
-    if (delta) return mode === "rank-asc" ? -delta : delta;
-    return a.name.localeCompare(b.name, "ko");
-  });
-}
-
-function distinctPeopleCount(unit) {
-  if (!unit) return 0;
-  const unitIds = new Set([unit.id, ...descendantUnitIds(unit.id)]);
-  const ids = new Set(state.orgMembers.filter((member) => unitIds.has(member.parentId)).map((member) => member.id));
-  state.orgUnits.filter((item) => unitIds.has(item.id)).forEach((item) => {
-    const leader = unitLeaderDetails(item);
-    if (leader?.personId) ids.add(leader.personId);
-    else if (leader?.name) {
-      const samePerson = state.orgMembers.find((member) => member.name === leader.name);
-      if (samePerson?.id) ids.add(samePerson.id);
-    }
-  });
-  return ids.size;
-}
-
-function distinctDirectPeopleCount(unit) {
-  if (!unit) return 0;
-  const ids = new Set(state.orgMembers.filter((member) => member.parentId === unit.id).map((member) => member.id));
-  const leader = unitLeaderDetails(unit);
-  if (leader?.personId) ids.add(leader.personId);
-  else if (leader?.name) {
-    const samePerson = state.orgMembers.find((member) => member.name === leader.name);
-    if (samePerson?.id) ids.add(samePerson.id);
-  }
-  return ids.size;
-}
-
-function orgMemberOptionsForUnit(unitId) {
-  const unit = state.orgUnits.find((item) => item.id === unitId);
-  if (!unit) return [];
-  const options = state.orgMembers.map((member) => ({
-    value: `member:${member.id}`,
-    name: member.name,
-    position: memberGrade(member),
-    jobTitle: memberJobTitle(member),
-    orgLabel: orgPathLabel(member.parentId),
-  }));
-  if (unit.leader && !unit.leaderMemberId) {
-    options.push({
-      value: `current:${unit.id}`,
-      name: unit.leader,
-      position: normalizePosition(unit.leaderTitle),
-      jobTitle: "",
-      orgLabel: "기존 리더 정보",
-    });
-  }
-  return options.sort((a, b) => a.name.localeCompare(b.name, "ko") || a.orgLabel.localeCompare(b.orgLabel, "ko"));
-}
-
-function optionHtml(items, selectedId, emptyLabel) {
-  const empty = `<option value="">${escapeHtml(emptyLabel)}</option>`;
-  return empty + items.map((item) => `<option value="${escapeHtml(item.id)}" ${selectedId === item.id ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("");
-}
-
-function syncDraftOrgFromTeam(teamId = state.draftTeamId) {
-  const team = state.orgUnits.find((unit) => unit.id === teamId && unit.level === "team");
-  if (!team) {
-    state.draftDivision = "";
-    state.draftHq = "";
-    state.draftTeam = "";
-    state.draftTeamId = "";
-    state.draftLeader = "";
-    state.draftLeaderTitle = "";
-    state.draftMembers = [];
-    return;
-  }
-
-  const parent = state.orgUnits.find((unit) => unit.id === team.parentId);
-  const grandParent = parent ? state.orgUnits.find((unit) => unit.id === parent.parentId) : null;
-  const isDirectTopLevel = parent && grandParent?.level === "company";
-  const hq = parent?.level === "hq" && !isDirectTopLevel ? parent : null;
-  const division = isDirectTopLevel ? parent : (parent?.level === "division" ? parent : grandParent);
-  state.draftTeamId = team.id;
-  state.draftHqId = hq?.id || "";
-  state.draftDivisionId = division?.id || "";
-  state.draftTeam = team.name;
-  state.draftHq = hq?.name || "";
-  state.draftDivision = division?.name || "";
-  const teamLeader = unitLeaderDetails(team);
-  state.draftLeader = teamLeader?.name || "";
-  state.draftLeaderTitle = teamLeader?.grade || "";
-  state.draftMembers = state.orgMembers
-    .filter((member) => member.parentId === team.id)
-    .map((member) => ({ id: member.id, name: member.name, position: memberGrade(member), jobTitle: memberJobTitle(member) }));
-}
-
-function ensureDraftOrgSelection() {
-  if (!state.orgUnits || !state.orgUnits.length) return { divisionList: [], hqList: [], teamList: [] };
-  const company = state.orgUnits.find((unit) => unit.id === state.selectedCompany && unit.level === "company") || state.orgUnits.find((unit) => unit.level === "company");
-  const divisionList = company ? topLevelOrgUnits(company.id) : state.orgUnits.filter((unit) => unit.parentId === "CEO");
-  if (!divisionList.some((unit) => unit.id === state.draftDivisionId)) {
-    state.draftDivisionId = state.selectedDivision && divisionList.some((unit) => unit.id === state.selectedDivision)
-      ? state.selectedDivision
-      : (divisionList[0]?.id || "");
-  }
-
-  const hqList = hqUnitsForDivision(state.draftDivisionId);
-  if (!hqList.some((unit) => unit.id === state.draftHqId)) {
-    state.draftHqId = state.selectedHq && hqList.some((unit) => unit.id === state.selectedHq)
-      ? state.selectedHq
-      : (hqList[0]?.id || "");
-  }
-
-  const teamList = teamUnitsForSelection(state.draftDivisionId, state.draftHqId);
-  if (!teamList.some((unit) => unit.id === state.draftTeamId)) {
-    state.draftTeamId = state.selectedTeam && teamList.some((unit) => unit.id === state.selectedTeam)
-      ? state.selectedTeam
-      : (teamList[0]?.id || "");
-  }
-
-  syncDraftOrgFromTeam(state.draftTeamId);
-  return { divisionList, hqList, teamList };
-}
-
-function ensureActiveOrgSelection() {
-  if (!state.orgUnits || !state.orgUnits.length) return;
-
-  const company = state.orgUnits.find((unit) => unit.id === state.selectedCompany && unit.level === "company")
-    || state.orgUnits.find((unit) => unit.level === "company");
-  if (company) state.selectedCompany = company.id;
-
-  const divisions = topLevelOrgUnits(state.selectedCompany);
-  if (!divisions.some((unit) => unit.id === state.selectedDivision)) {
-    state.selectedDivision = divisions[0]?.id || "";
-  }
-
-  const hqs = hqUnitsForDivision(state.selectedDivision);
-  if (!hqs.some((unit) => unit.id === state.selectedHq)) {
-    state.selectedHq = hqs[0]?.id || "";
-  }
-
-  const teams = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
-  if (!teams.some((unit) => unit.id === state.selectedTeam)) {
-    state.selectedTeam = teams[0]?.id || "";
-  }
-}
-
-function teamPath(teamId) {
-  const team = state.orgUnits.find((unit) => unit.id === teamId && unit.level === "team");
-  if (!team) return null;
-  const parent = state.orgUnits.find((unit) => unit.id === team.parentId);
-  const grandParent = parent ? state.orgUnits.find((unit) => unit.id === parent.parentId) : null;
-  const isDirectTopLevel = parent && grandParent?.level === "company";
-  const hq = parent?.level === "hq" && !isDirectTopLevel ? parent : null;
-  const division = isDirectTopLevel ? parent : (parent?.level === "division" ? parent : grandParent);
-  return {
-    divisionId: division?.id || "",
-    divisionName: division?.name || "",
-    hqId: hq?.id || "",
-    hqName: hq?.name || "",
-    teamId: team.id,
-    teamName: team.name,
-  };
-}
-
-function leaderCandidateForTeam(teamId) {
-  const team = state.orgUnits.find((unit) => unit.id === teamId && unit.level === "team");
-  const path = teamPath(teamId);
-  const leader = unitLeaderDetails(team);
-  if (!team || !path || !leader) return null;
-  return {
-    id: leader.personId || `leader:${team.id}`,
-    memberId: leader.personId || "",
-    teamId: team.id,
-    name: leader.name,
-    position: leader.grade,
-    role: "팀장",
-    ...path,
-  };
-}
-
-function orgMemberCandidate(member) {
-  const path = teamPath(member.parentId);
-  if (!path) return null;
-  return {
-    id: member.id,
-    memberId: member.id,
-    teamId: member.parentId,
-    name: member.name,
-    position: memberGrade(member),
-    jobTitle: memberJobTitle(member),
-    role: member.jobTitle || member.role || "",
-    ...path,
-  };
-}
-
-function teamMemberCandidates(teamId, includeLeaders = false) {
-  return state.orgMembers
-    .filter((member) => member.parentId === teamId)
-    .map(orgMemberCandidate)
-    .filter(Boolean)
-    .filter((member) => includeLeaders || normalizePosition(member.position) !== "팀장");
-}
-
-function allMemberCandidates(includeLeaders = false) {
-  const seen = new Set();
-  return state.orgMembers
-    .map(orgMemberCandidate)
-    .filter(Boolean)
-    .filter((member) => includeLeaders || normalizePosition(member.position) !== "팀장")
-    .filter((member) => {
-      if (seen.has(member.id)) return false;
-      seen.add(member.id);
-      return true;
-    })
-    .sort((a, b) => `${a.teamName}${a.name}`.localeCompare(`${b.teamName}${b.name}`, "ko"));
-}
-
-function leaderSessions() {
-  return state.sessions.filter((session) => sameSessionType(session.type, "리더십") && Array.isArray(session.leaderGroup) && session.leaderGroup.length);
-}
-
-function selectedLeaderSession() {
-  const sessions = leaderSessions();
-  if (!sessions.length) return null;
-  if (!sessions.some((session) => session.id === state.draftCrossParentSessionId)) {
-    state.draftCrossParentSessionId = sessions[0].id;
-  }
-  return sessions.find((session) => session.id === state.draftCrossParentSessionId) || sessions[0];
-}
-
-function crossSourceTeams() {
-  const session = selectedLeaderSession();
-  if (!session) return [];
-  return (session.leaderGroup || [])
-    .map((leader) => teamPath(leader.teamId))
-    .filter(Boolean)
-    .filter((team, index, list) => list.findIndex((item) => item.teamId === team.teamId) === index);
-}
-
-function crossMemberPool() {
-  const teamIds = state.draftCrossMode === "leader-session"
-    ? state.draftCrossTeamIds
-    : [];
-  if (state.draftCrossMode === "random") return allMemberCandidates(false);
-  return teamIds.flatMap((teamId) => teamMemberCandidates(teamId, false));
-}
-
-function selectedCrossMembers() {
-  const poolById = new Map(crossMemberPool().map((member) => [member.id, member]));
-  return (state.draftCrossMemberIds || []).map((id) => poolById.get(id)).filter(Boolean);
-}
-
-function resetCrossDraft() {
-  state.draftCrossTeamIds = [];
-  state.draftCrossMemberIds = [];
-  state.draftCrossParentSessionId = "";
-}
-
-function leaderMeta(unit) {
-  const leader = unitLeaderDetails(unit);
-  if (!leader) return "";
-  return `<span class="org-card-meta">${escapeHtml(leader.role)} · ${escapeHtml(leader.name)} <small>${escapeHtml(leader.grade)}</small></span>`;
-}
-
-function applyLeaderSelection(unit, selectValue) {
-  if (!unit) return;
-  if (!selectValue) {
-    unit.leader = "";
-    unit.leaderTitle = "";
-    unit.leaderRole = "";
-    unit.leaderMemberId = "";
-    return;
-  }
-
-  const [source, id] = selectValue.split(":");
-  let name = "";
-  let position = "";
-  if (source === "member") {
-    const member = state.orgMembers.find((item) => item.id === id);
-    name = member?.name || "";
-    position = memberGrade(member);
-    unit.leaderMemberId = id;
-  } else if (source === "unit" || source === "current") {
-    const leaderUnit = state.orgUnits.find((item) => item.id === id);
-    const leader = unitLeaderDetails(leaderUnit);
-    name = leader?.name || "";
-    position = leader?.grade || "";
-    unit.leaderMemberId = leader?.personId || "";
-  }
-
-  unit.leader = name;
-  unit.leaderTitle = normalizePosition(position);
-  unit.leaderRole = UNIT_LEADER_LABELS[unit.level] || "리더";
-}
-
-function statsForCohort(cohort, type = "리더십") {
-  (state.responses || []).forEach(assertNotQuantInput);
-  const dynamicQuestions = getQuestionsForCohort(cohort, type);
-  return PHASES.map((phase) => {
-    const rows = state.responses.filter((row) => row.cohort === Number(cohort) && row.phase === phase);
-    const sessionIds = new Set(state.sessions.filter((s) => sameSessionType(s.type, type)).map((s) => s.id));
-    const scoped = rows.filter((row) => sessionIds.has(row.sessionId));
-    const stats = { phase, n: scoped.length };
-    dynamicQuestions.forEach((q) => {
-      const key = q.id;
-      const values = scoped.map((row) => scoreOf(row[key])).filter((v) => typeof v === "number");
-      stats[`${key}_avg`] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-    });
-    return stats;
-  });
-}
-
-function parseCSV(text, sessionId, phase) {
-  const XLSX = globalThis.XLSX;
-  if (!XLSX) {
-    return { parsed: [], errors: ["SheetJS 라이브러리를 로드하지 못했습니다."] };
-  }
-  
-  let matrix;
-  try {
-    const workbook = XLSX.read(text, { type: "string" });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-    matrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-  } catch (e) {
-    return { parsed: [], errors: ["CSV 파일 형식이 올바르지 않거나 손상되었습니다: " + e.message] };
-  }
-
-  if (matrix.length < 2) return { parsed: [], errors: ["CSV에 데이터 행이 없습니다."] };
-  
-  const headers = matrix[0].map((h) => String(h || "").trim());
-  const errors = [];
-  const piiHeaders = headers.filter((h) => /(이름|사번|이메일|email|전화|phone|휴대폰)/i.test(h));
-  if (piiHeaders.length) errors.push(`개인 식별 컬럼이 포함되어 있습니다: ${piiHeaders.join(", ")}`);
-  
-  // Resolve questions for this phase and session
-  const survey = state.surveys.find(s => s.sessionId === sessionId && s.phase === phase);
-  const questions = survey && survey.questions && survey.questions.length > 0 ? 
-                    survey.questions : 
-                    defaultQuestions(phase);
-
-  const tagToIndex = {};
-  headers.forEach((header, index) => {
-    const match = header.match(/\[(기수|q[0-9]+)\]/i);
-    if (match) tagToIndex[match[1].toLowerCase()] = index;
-  });
-
-  const requiredTags = ["기수", ...questions.map(q => q.id)];
-  requiredTags.forEach((tag) => {
-    if (tagToIndex[tag.toLowerCase()] === undefined) {
-      errors.push(`필수 태그 [${tag}] 컬럼이 없습니다.`);
-    }
-  });
-  if (errors.length) return { parsed: [], errors };
-
-  const parsed = matrix.slice(1).filter(cells => cells.some(c => String(c).trim() !== "")).map((cells) => {
-    const row = {
-      id: uid(),
-      sessionId,
-      phase,
-      cohort: Number(cells[tagToIndex["기수"]] || 0),
-      createdAt: new Date().toISOString(),
-    };
-
-    // Parse quant questions
-    questions.filter(q => q.type === "quant").forEach((q) => {
-      const key = q.id;
-      const raw = String(cells[tagToIndex[key.toLowerCase()]] ?? "").trim();
-      const numeric = Number(raw);
-      row[key] = Number.isFinite(numeric) && raw !== "" ? numeric : SCORE_MAP[raw] ?? null;
-    });
-
-    // Parse qual questions
-    questions.filter(q => q.type === "qual").forEach((q) => {
-      const key = q.id;
-      row[key] = cells[tagToIndex[key.toLowerCase()]] || "";
-    });
-
-    return row;
-  });
-  return { parsed, errors: [] };
-}
 
 function appShellClasses() {
   const classes = [];
@@ -926,6 +207,9 @@ function render() {
   const orgScrollState = captureOrgScrollState();
   app.className = appShellClasses();
 
+  const today = todayISO();
+  const todayActionCount = dashboardActionQueue({ state, today }).filter(a => a.group === 'today').length;
+
   const toggleIcon = state.sidebarCollapsed
     ? `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 0 1 0-1.414L10.586 10 7.293 6.707a1 1 0 0 1 1.414-1.414l4 4a1 1 0 0 1 0 1.414l-4 4a1 1 0 0 1-1.414 0Z" clip-rule="evenodd"/></svg>`
     : `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 0 1 0 1.414L9.414 10l3.293 3.293a1 1 0 0 1-1.414 1.414l-4-4a1 1 0 0 1 0-1.414l4-4a1 1 0 0 1 1.414 0Z" clip-rule="evenodd"/></svg>`;
@@ -949,6 +233,22 @@ function render() {
       } else {
         btn.classList.remove("active");
       }
+
+      // Dynamic update of badge in incremental path
+      if (viewId === 'dashboard') {
+        const iconSpan = btn.querySelector(".nav-icon");
+        if (iconSpan) {
+          const oldBadge = iconSpan.querySelector(".nav-badge");
+          if (oldBadge) oldBadge.remove();
+
+          if (todayActionCount > 0 && state.activeView !== 'dashboard') {
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = 'nav-badge';
+            badgeSpan.textContent = todayActionCount > 9 ? '9+' : todayActionCount;
+            iconSpan.appendChild(badgeSpan);
+          }
+        }
+      }
     });
     const dbDot = app.querySelector(".db-dot");
     if (dbDot) {
@@ -968,6 +268,22 @@ function render() {
       sessionCountSpan.textContent = `${state.sessions.length} sessions`;
     }
 
+    const notifBtn = app.querySelector("#topbar-notif-btn");
+    if (notifBtn) {
+      if (todayActionCount > 0) {
+        notifBtn.classList.add("has-notif");
+        if (!notifBtn.querySelector(".topbar-notif-dot")) {
+          const dot = document.createElement("span");
+          dot.className = "topbar-notif-dot";
+          notifBtn.appendChild(dot);
+        }
+      } else {
+        notifBtn.classList.remove("has-notif");
+        const dot = notifBtn.querySelector(".topbar-notif-dot");
+        if (dot) dot.remove();
+      }
+    }
+
     const canvas = app.querySelector(".canvas");
     if (canvas) {
       canvas.innerHTML = renderView();
@@ -978,18 +294,23 @@ function render() {
         <div class="brand">
           <img src="./assets/lina_logo_square.png" alt="" />
           <div class="brand-text">
-            <strong>Culture Platform</strong>
-            <span>Operator OS</span>
+            <strong>조직문화 플랫폼</strong>
+            <span>운영 관리자</span>
           </div>
           <button type="button" class="sidebar-toggle-btn" id="toggle-sidebar" title="${state.sidebarCollapsed ? '메뉴 펼치기' : '메뉴 접기'}">${toggleIcon}</button>
         </div>
         <nav>
-          <span class="nav-label">Workspace</span>
-          ${VIEWS.map(([id, en, ko]) => `
-            <button class="${state.activeView === id ? "active" : ""}" data-view="${id}" title="${ko}">
-              <span class="nav-icon">${NAV_ICONS[id] || ''}</span>
-              <span class="nav-text"><span class="nav-en">${en}</span><span class="nav-ko">${ko}</span></span>
-            </button>`).join("")}
+          <span class="nav-label">메뉴</span>
+          ${VIEWS.map(([id, en, ko]) => {
+            const badge = (id === 'dashboard' && todayActionCount > 0 && state.activeView !== 'dashboard')
+              ? `<span class="nav-badge">${todayActionCount > 9 ? '9+' : todayActionCount}</span>`
+              : '';
+            return `
+              <button class="${state.activeView === id ? "active" : ""}" data-view="${id}" title="${ko}">
+                <span class="nav-icon">${NAV_ICONS[id] || ''}${badge}</span>
+                <span class="nav-text"><span class="nav-en">${en}</span><span class="nav-ko">${ko}</span></span>
+              </button>`;
+          }).join("")}
         </nav>
         <div class="sidebar-note">
           <div class="db-status">
@@ -1012,20 +333,26 @@ function render() {
           </button>
           <div class="searchbox">세션, 조직, 설문 검색</div>
           <div class="topbar-actions">
-            ${LOCAL_PREVIEW ? `
-              <div class="local-preview-badge" title="Firebase 로그인과 원격 저장을 사용하지 않는 로컬 확인 모드입니다.">
-                <span class="local-preview-dot"></span>로컬 미리보기
+            ${LOCAL_PREVIEW ? `<div class="local-preview-badge" title="Firebase 로그인과 원격 저장을 사용하지 않는 로컬 확인 모드입니다."><span class="local-preview-dot"></span>로컬 미리보기</div>` : ''}
+            <button class="topbar-notif-btn ${todayActionCount > 0 ? 'has-notif' : ''}" id="topbar-notif-btn" data-view="dashboard" title="오늘 할 일">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" /></svg>
+              ${todayActionCount > 0 ? `<span class="topbar-notif-dot"></span>` : ''}
+            </button>
+            <button class="primary compact" data-view="sessions" id="topbar-new-session">+ 새 세션</button>
+            <div class="topbar-user-menu" id="topbar-user-menu">
+              <button type="button" class="topbar-user-btn" id="topbar-user-btn" aria-haspopup="true" aria-expanded="false" title="계정 메뉴">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-7 9a7 7 0 1 1 14 0H3Z"/></svg>
+              </button>
+              <div class="topbar-user-dropdown" id="topbar-user-dropdown" hidden>
+                <div class="topbar-user-email" id="signed-in-email"></div>
+                <div class="topbar-user-divider"></div>
+                <button type="button" id="access-admin-button" class="topbar-dropdown-item" hidden>회원 승인</button>
+                <button type="button" id="audit-log-button" class="topbar-dropdown-item" hidden>운영 로그</button>
+                <button type="button" class="topbar-dropdown-item" data-view="upload">데이터 가져오기</button>
+                <div class="topbar-user-divider"></div>
+                <button type="button" id="auth-logout-button" class="topbar-dropdown-item danger">로그아웃</button>
               </div>
-            ` : `
-              <div class="auth-user-controls">
-                <button type="button" id="access-admin-button" class="auth-admin-button" hidden>회원 승인</button>
-                <span id="signed-in-email" class="signed-in-email"></span>
-                <button type="button" id="auth-logout-button" class="auth-logout-button">로그아웃</button>
-              </div>
-            `}
-            <span class="topbar-session-count">${state.sessions.length} sessions</span>
-            <button class="ghost" data-view="upload">데이터 가져오기</button>
-            <button class="primary compact" data-view="sessions">새 세션</button>
+            </div>
           </div>
         </header>
         <div class="canvas">
@@ -1051,337 +378,64 @@ function renderView() {
   return renderHomeDashboard({ state, pulseCache, commitmentsCache: state.pulseCommitments });
 }
 
-function renderDashboard() {
-  return "";
+function auditActionLabel(action) {
+  return ({
+    session_created: '세션 생성',
+    session_updated: '세션 수정',
+    session_deleted: '세션 삭제',
+    survey_distribution_toggled: '설문 배포',
+    response_deleted: '응답 삭제',
+    commitment_saved: '약속 저장',
+    commitment_deleted: '약속 삭제'
+  })[action] || action || '-';
 }
 
-function renderOrgSelectRow(divisionList, hqList, teamList) {
-  return `
-    <div class="session-org-row">
-      <label>부문명
-        <select id="session-division">
-          ${optionHtml(divisionList, state.draftDivisionId, "부문 선택")}
-        </select>
-      </label>
-      <label>본부명
-        <select id="session-hq" ${hqList.length ? "" : "disabled"}>
-          ${optionHtml(hqList, state.draftHqId, hqList.length ? "본부 선택" : "본부 없음/직속")}
-        </select>
-      </label>
-      <label>팀명
-        <select id="session-team" ${state.draftDivisionId ? "" : "disabled"}>
-          ${optionHtml(teamList, state.draftTeamId, "팀 선택")}
-        </select>
-      </label>
-    </div>
-    ${renderSessionPulseSummary()}
-  `;
+function formatAuditTimestamp(value) {
+  const date = value?.toDate?.() || (value ? new Date(value) : null);
+  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString('ko-KR') : '방금 전';
 }
 
-function renderSessionPulseSummary() {
-  if (!state.draftDivisionId && !state.draftHqId && !state.draftTeamId) return "";
-  if (!pulseCache.loaded) {
-    return `<div class="session-pulse-summary muted"><strong>Pulse Survey</strong><span>진단 정보를 불러오는 중입니다.</span></div>`;
-  }
-
-  const year = Number(state.pulseYear || Math.max(...Object.keys(pulseCache.years || {}).map(Number).filter(Number.isFinite)));
-  const pair = comparisonPair(pulseCache.years || {}, year) || { previousYear: null };
-  const currentDoc = pulseCache.years?.[year];
-  if (!currentDoc) return "";
-  const diagnostics = pulseDiagnostics(currentDoc, pair.previousYear ? pulseCache.years?.[pair.previousYear] : null);
-  const selectedIds = new Set([state.draftDivisionId, state.draftHqId, state.draftTeamId].filter(Boolean));
-  const selectedNames = [state.draftDivision, state.draftHq, state.draftTeam].filter(Boolean).map(value => String(value).replace(/\s+/g, ""));
-  const row = diagnostics.rows.find(item => {
-    const mappedIds = PULSE_DIV_MAP[item.id]?.orgUnitIds || [];
-    if (mappedIds.some(id => selectedIds.has(id))) return true;
-    const pulseName = String(item.id).replace(/\s+/g, "");
-    return selectedNames.some(name => name === pulseName || name.includes(pulseName) || pulseName.includes(name));
-  });
-
-  if (!row) {
-    return `<div class="session-pulse-summary muted"><strong>Pulse Survey</strong><span>선택 조직과 연결된 ${year}년 진단 데이터가 없습니다.</span></div>`;
-  }
-
-  const delta = row.delta;
-  const deltaText = pair.previousYear && delta !== null
-    ? `${pair.previousYear}년 대비 ${delta > 0 ? "+" : ""}${Math.round(delta * 100)}pp`
-    : "비교 데이터 없음";
-  return `
-    <div class="session-pulse-summary">
-      <div><strong>Pulse Survey · ${escapeHtml(row.id)}</strong><span>세션 설계 전 확인할 1차 스크리닝 정보</span></div>
-      <span class="session-pulse-tag">${year} 긍정 ${row.overall !== null ? `${Math.round(row.overall * 100)}%` : "—"}</span>
-      <span class="session-pulse-tag ${delta < 0 ? "risk" : ""}">${deltaText}</span>
-      <span class="session-pulse-tag ${row.rag?.key === "R" ? "risk" : ""}">${escapeHtml(row.rag?.label || "상태 확인")}</span>
-      <span class="session-pulse-tag focus">우선 대화 · ${escapeHtml(row.focusDomain || "경험 확인")}</span>
+async function openAuditLogModal() {
+  const root = document.getElementById('access-admin-root');
+  if (!root) return;
+  root.innerHTML = `
+    <div class="access-admin-overlay audit-log-overlay" role="dialog" aria-modal="true" aria-label="운영 로그">
+      <section class="access-admin-panel audit-log-panel">
+        <header><div><span>Audit trail</span><h2>운영 로그</h2><p>최근 변경 기록 20건을 확인합니다.</p></div><button type="button" id="audit-log-close" aria-label="닫기">×</button></header>
+        <div id="audit-log-list" class="access-admin-loading"><span class="auth-spinner"></span>운영 로그를 불러오는 중입니다.</div>
+      </section>
     </div>`;
-}
-
-function renderTeamBuildingPanel(divisionList, hqList, teamList) {
-  return `
-    <div class="session-config-panel">
-      <div class="session-config-head">
-        <strong>팀 전체 참여</strong>
-        <span>한 팀을 선택하면 팀장과 팀원 데이터를 불러옵니다.</span>
-      </div>
-      ${renderOrgSelectRow(divisionList, hqList, teamList)}
-      ${state.draftTeamId ? (() => {
-          const divUnit = state.orgUnits.find(u => u.id === state.draftDivisionId);
-          const hqUnit  = state.orgUnits.find(u => u.id === state.draftHqId);
-          const divLeader = unitLeaderDetails(divUnit);
-          const hqLeader  = unitLeaderDetails(hqUnit);
-          return `
-        <div class="selected-team-wrap">
-          <div class="selected-team-badge" style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-            <div>
-              <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
-                ${escapeHtml(state.draftDivision)} &rsaquo; ${escapeHtml(state.draftHq)} &rsaquo; <strong style="color:var(--ink);">${escapeHtml(state.draftTeam)}</strong>
-              </div>
-              <div style="display:flex; flex-wrap:wrap; gap:14px; font-size:12.5px; color:var(--ink);">
-                <span><span style="color:var(--muted); font-weight:700;">부문장</span> &nbsp;${divLeader ? `${escapeHtml(divLeader.name)} ${escapeHtml(divLeader.grade)}` : '미지정'}</span>
-                <span><span style="color:var(--muted); font-weight:700;">본부장</span> &nbsp;${hqLeader ? `${escapeHtml(hqLeader.name)} ${escapeHtml(hqLeader.grade)}` : '미지정'}</span>
-                <span><span style="color:var(--muted); font-weight:700;">팀장</span> &nbsp;${escapeHtml(state.draftLeader || '미지정')} ${state.draftLeaderTitle ? `(${escapeHtml(state.draftLeaderTitle)})` : ''}</span>
-                <span><span style="color:var(--muted); font-weight:700;">팀원</span> &nbsp;${state.draftMembers.length}명</span>
-              </div>
-            </div>
-            <button type="button" id="open-org-picker" style="flex-shrink:0; padding:5px 11px; border:1px solid var(--line-strong); border-radius:7px; background:rgba(255,255,255,0.7); color:var(--muted); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all 0.15s;" onmouseover="this.style.color='var(--blue)';this.style.borderColor='var(--blue)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--line-strong)'">
-              팀 변경
-            </button>
-          </div>
-        </div>`;
-        })() : `
-        <div class="selected-team-wrap">
-          <button type="button" class="primary" id="open-org-picker">조직도에서 팀 선택</button>
-        </div>
-      `}
-    </div>
-  `;
-}
-
-function renderLeaderSessionPanel(divisionList, hqList, teamList) {
-  const leader = leaderCandidateForTeam(state.draftTeamId);
-  const group = state.draftLeaderGroup || [];
-  const alreadyAdded = leader && group.some((item) => item.teamId === leader.teamId);
-  return `
-      <div class="session-config-panel">
-        <div class="session-config-head">
-        <strong>리더십 그룹 구성</strong>
-        <span>부문/본부/팀을 선택하고 리더를 추가합니다. 권장 인원은 6명입니다.</span>
-      </div>
-      ${renderOrgSelectRow(divisionList, hqList, teamList)}
-      <div class="session-picker-actions">
-        <div>
-          <strong>${leader ? `${escapeHtml(leader.name)} · ${escapeHtml(leader.teamName)}` : "리더를 선택해 주세요"}</strong>
-          <span>${leader ? `${escapeHtml(leader.divisionName)} > ${escapeHtml(leader.hqName)}` : "팀에 등록된 팀장 정보가 있어야 추가할 수 있습니다."}</span>
-        </div>
-        <button type="button" class="primary compact" id="add-team-leader" ${!leader || alreadyAdded ? "disabled" : ""}>리더 추가</button>
-      </div>
-      <div class="selection-summary">
-        <strong>선택된 리더 ${group.length}명</strong>
-        <span>${group.length < 6 ? `권장 인원까지 ${6 - group.length}명 남음` : "권장 인원 충족"}</span>
-      </div>
-      ${group.length ? `
-        <div class="selection-chip-grid">
-          ${group.map((item) => `
-            <div class="selection-chip">
-              <div>
-                <strong>${escapeHtml(item.name)}</strong>
-                <span>${escapeHtml(item.teamName)} · ${escapeHtml(item.position || "팀장")}</span>
-              </div>
-              <button type="button" data-remove-leader="${escapeHtml(item.teamId)}" aria-label="리더 제거">삭제</button>
-            </div>
-          `).join("")}
-        </div>
-      ` : `<div class="empty compact">아직 추가된 리더가 없습니다.</div>`}
-    </div>
-  `;
-}
-
-function renderCrossFunctionalPanel() {
-  const mode = state.draftCrossMode || "leader-session";
-  const sessions = leaderSessions();
-  const parentSession = selectedLeaderSession();
-  const sourceTeams = crossSourceTeams();
-  const memberPool = crossMemberPool();
-  const selectedMembers = selectedCrossMembers();
-  return `
-      <div class="session-config-panel">
-        <div class="session-config-head">
-        <strong>협업 그룹 구성</strong>
-        <span>리더십 세션의 추천 흐름을 쓰거나, 리더십 세션 없이 전체 조직에서 무작위로 구성합니다.</span>
-      </div>
-      <div class="mode-switch">
-        <label class="${mode === "leader-session" ? "active" : ""}">
-          <input type="radio" name="cross-mode" value="leader-session" ${mode === "leader-session" ? "checked" : ""} />
-          리더십 세션 기반
-        </label>
-        <label class="${mode === "random" ? "active" : ""}">
-          <input type="radio" name="cross-mode" value="random" ${mode === "random" ? "checked" : ""} />
-          전체 조직 무작위
-        </label>
-      </div>
-
-      ${mode === "leader-session" ? `
-        <label>기준 리더십 세션
-          <select id="cross-parent-session" ${sessions.length ? "" : "disabled"}>
-            ${sessions.length ? sessions.map((session) => `<option value="${escapeHtml(session.id)}" ${parentSession?.id === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))} · ${session.leaderGroup.length}명</option>`).join("") : `<option value="">등록된 리더십 세션 없음</option>`}
-          </select>
-        </label>
-        ${sourceTeams.length ? `
-          <div class="selection-summary">
-            <strong>참여 팀 선택</strong>
-            <span>${state.draftCrossTeamIds.length}개 팀 선택</span>
-          </div>
-          <div class="checkbox-grid team-source-grid">
-            ${sourceTeams.map((team) => `
-              <label class="check-card ${state.draftCrossTeamIds.includes(team.teamId) ? "active" : ""}">
-                <input type="checkbox" data-cross-team="${escapeHtml(team.teamId)}" ${state.draftCrossTeamIds.includes(team.teamId) ? "checked" : ""} />
-                <span><strong>${escapeHtml(team.teamName)}</strong><small>${escapeHtml(team.divisionName)} > ${escapeHtml(team.hqName)}</small></span>
-              </label>
-            `).join("")}
-          </div>
-        ` : `<div class="empty compact">먼저 리더십 세션을 등록해야 추천 팀을 불러올 수 있습니다.</div>`}
-        ${state.draftCrossTeamIds.length ? renderCrossMemberSelector(memberPool, selectedMembers) : ""}
-      ` : `
-        <div class="random-config-row">
-          <label>무작위 인원 수
-            <input id="cross-random-count" type="number" min="1" max="30" value="${Number(state.draftCrossRandomCount || 6)}" />
-          </label>
-          <button type="button" class="primary" id="generate-random-cross">무작위 구성</button>
-        </div>
-        <p class="config-note">팀장 직급은 제외하고 전체 조직 구성원 풀에서 중복 없이 뽑습니다.</p>
-        ${renderSelectedCrossMembers(selectedMembers)}
-      `}
-    </div>
-  `;
-}
-
-function renderCrossMemberSelector(memberPool, selectedMembers) {
-  return `
-    <div class="selection-summary">
-      <strong>추천 구성원 선택</strong>
-      <span>${selectedMembers.length}명 선택</span>
-    </div>
-    <div class="checkbox-grid member-pool-grid">
-      ${memberPool.length ? memberPool.map((member) => `
-        <label class="check-card ${state.draftCrossMemberIds.includes(member.id) ? "active" : ""}">
-          <input type="checkbox" data-cross-member="${escapeHtml(member.id)}" ${state.draftCrossMemberIds.includes(member.id) ? "checked" : ""} />
-          <span><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(member.teamName)} · ${escapeHtml(member.position)}</small></span>
-        </label>
-      `).join("") : `<div class="empty compact">선택한 팀에서 불러올 구성원이 없습니다.</div>`}
-    </div>
-  `;
-}
-
-function renderSelectedCrossMembers(selectedMembers) {
-  return selectedMembers.length ? `
-    <div class="selection-summary">
-      <strong>선택된 구성원 ${selectedMembers.length}명</strong>
-      <span>세션 등록 시 참여자로 저장됩니다.</span>
-    </div>
-    <div class="selection-chip-grid">
-      ${selectedMembers.map((member) => `
-        <div class="selection-chip">
-          <div>
-            <strong>${escapeHtml(member.name)}</strong>
-            <span>${escapeHtml(member.teamName)} · ${escapeHtml(member.position)}</span>
-          </div>
-          <button type="button" data-remove-cross-member="${escapeHtml(member.id)}" aria-label="구성원 제거">삭제</button>
-        </div>
-      `).join("")}
-    </div>
-  ` : `<div class="empty compact">아직 구성원이 선택되지 않았습니다.</div>`;
-}
-
-function renderSessionConfigPanel(divisionList, hqList, teamList) {
-  const type = normalizeSessionType(state.draftType);
-  if (type === "팀빌딩") return renderTeamBuildingPanel(divisionList, hqList, teamList);
-  if (type === "리더십") return renderLeaderSessionPanel(divisionList, hqList, teamList);
-  return renderCrossFunctionalPanel();
-}
-
-function canCreateDraftSession() {
-  const type = normalizeSessionType(state.draftType);
-  if (type === "팀빌딩") return Boolean(state.draftTeamId);
-  if (type === "리더십") return Boolean((state.draftLeaderGroup || []).length);
-  if (type === "협업") return Boolean((state.draftCrossMemberIds || []).length);
-  return false;
-}
-
-function renderSessions() {
-  const orgPopupHtml = state.showOrgPopup ? renderOrgPopup() : "";
-  const attendanceModalHtml = state.showAttendanceModal ? renderAttendanceModal() : "";
-  const duplicateWarningHtml = state.duplicateSessionWarning ? renderDuplicateWarningModal() : "";
-  const { divisionList, hqList, teamList } = ensureDraftOrgSelection();
-  
-  let mainContentHtml = "";
-  if (state.activeSessionTab === "calendar") {
-    mainContentHtml = renderCalendar();
-  } else {
-    mainContentHtml = `
-      <section class="panel">
-        <div class="session-form">
-          <div class="session-meta-row">
-            <label>세션 유형
-              <select id="session-type">
-                ${Object.keys(SESSION_TYPES).map((type) => `<option value="${type}" ${normalizeSessionType(state.draftType) === type ? "selected" : ""}>${sessionTypeLabel(type)}</option>`).join("")}
-              </select>
-            </label>
-            <label>기수<input id="cohort" type="number" min="1" value="${state.draftCohort}" /></label>
-            <label>연도<input id="cohort-year" type="number" min="2000" value="${state.draftYear}" /></label>
-          </div>
-          ${renderSessionConfigPanel(divisionList, hqList, teamList)}
-        </div>
-        <div class="schedule-head">
-          <div>
-            <strong>${sessionTypeLabel(state.draftType)}</strong>
-            <span>${sessionTypeDef(state.draftType).desc}</span>
-          </div>
-          <button class="secondary small" id="add-round">회차 추가</button>
-        </div>
-        <div class="schedule-table">
-          ${state.draftSchedule.map(scheduleRow).join("")}
-        </div>
-        <div class="panel-actions">
-          ${state.editingSessionId ? `
-            <span style="font-size:12px;color:#0ea5e9;font-weight:700;margin-right:8px;">세션 수정 중</span>
-            <button class="ghost" id="cancel-edit-session">취소</button>
-          ` : ''}
-          <button class="primary" id="create-session" ${canCreateDraftSession() ? "" : "disabled"}>
-            ${state.editingSessionId ? '수정 완료' : '세션 등록'}
-          </button>
-        </div>
-      </section>
-      <section>
-        ${sectionTitle("등록된 세션", `${state.sessions.length}개`)}
-        ${state.sessions.length ? sessionsByTypeGrouped() : emptyCard("아직 등록된 세션이 없습니다.")}
-      </section>
-    `;
+  document.getElementById('audit-log-close')?.addEventListener('click', () => { root.innerHTML = ''; });
+  root.querySelector('.audit-log-overlay')?.addEventListener('click', (event) => {
+    if (event.target.classList.contains('audit-log-overlay')) root.innerHTML = '';
+  });
+  const list = document.getElementById('audit-log-list');
+  try {
+    const logs = await fetchRecentAuditLogs(20);
+    if (!logs.length) {
+      list.className = 'access-admin-empty';
+      list.textContent = '아직 기록된 운영 로그가 없습니다.';
+      return;
+    }
+    list.className = 'audit-log-table-wrap';
+    list.innerHTML = `
+      <table class="audit-log-table">
+        <thead><tr><th>시각</th><th>액션</th><th>대상</th><th>사용자</th><th>내용</th></tr></thead>
+        <tbody>
+          ${logs.map((log) => `
+            <tr>
+              <td>${escapeHtml(formatAuditTimestamp(log.timestamp))}</td>
+              <td>${escapeHtml(auditActionLabel(log.action))}</td>
+              <td>${escapeHtml(log.targetType || '-')}${log.targetId ? `<small>${escapeHtml(log.targetId)}</small>` : ''}</td>
+              <td>${escapeHtml(log.userId || '-')}</td>
+              <td>${escapeHtml(log.detail || '')}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (error) {
+    list.className = 'access-admin-empty error';
+    list.textContent = `운영 로그를 불러오지 못했습니다. ${error?.message || ''}`;
   }
-
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">Session operations</span>
-        <h1>조직문화 세션 스케줄 및 운영 관리</h1>
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button class="secondary" id="btn-db-download">DB 다운로드</button>
-        <button class="primary compact" id="btn-db-upload">DB 전송</button>
-      </div>
-    </section>
-    <div class="tab-container">
-      <div class="tab-header">
-        <button class="tab-btn ${state.activeSessionTab === 'list' ? 'active' : ''}" id="btn-session-list">목록 및 등록</button>
-        <button class="tab-btn ${state.activeSessionTab === 'calendar' ? 'active' : ''}" id="btn-session-calendar">일정 캘린더</button>
-      </div>
-      <div class="tab-content">
-        ${mainContentHtml}
-      </div>
-    </div>
-    ${orgPopupHtml}
-    ${attendanceModalHtml}
-    ${duplicateWarningHtml}
-  `;
 }
 
 function renderOrgPopup() {
@@ -1585,7 +639,7 @@ function renderOrg() {
   return `
     <section class="page-head">
       <div>
-        <span class="eyebrow">Organization</span>
+        <span class="eyebrow">조직 관리</span>
         <h1>조직 정보 및 인력 구성 관리</h1>
         <p>전사, 부문, 본부, 팀의 계층 구조를 관리하고 구성원을 드래그 앤 드롭으로 부서 이동 시킵니다.</p>
       </div>
@@ -2284,7 +1338,7 @@ function renderSurveyCreator() {
   return `
     <section class="page-head">
       <div>
-        <span class="eyebrow">Survey Creator</span>
+        <span class="eyebrow">설문지 제작</span>
         <h1>동적 설문 설계 및 배포 QR 생성</h1>
         <p>세션 및 회차별 모바일 설문을 설계하고, 자동 생성된 QR 코드로 구성원들의 응답을 실시간으로 적재합니다.</p>
       </div>
@@ -2478,7 +1532,7 @@ function renderUpload() {
   return `
     <section class="page-head">
       <div>
-        <span class="eyebrow">Upload</span>
+        <span class="eyebrow">CSV 업로드</span>
         <h1>Validate anonymous survey files before they enter analysis.</h1>
       </div>
     </section>
@@ -2521,32 +1575,30 @@ function renderAnalytics() {
   return `
     <section class="page-head">
       <div>
-        <span class="eyebrow">Survey Result Viewer</span>
-        <h1>설문 결과 보기</h1>
+        <span class="eyebrow">문항별 응답</span>
+        <h1>문항별 응답</h1>
         <p>각 기수와 세션 유형을 선택하여 설문 문항별 객관식 응답 분포와 주관식 답변 원문을 확인합니다.</p>
       </div>
     </section>
     
-    <section class="panel filters-panel" style="margin-bottom:18px;">
+    <section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
         <label>세션 유형
-          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics')">
+          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics'); window.applyAnalyticsFilter()">
             ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
           </select>
         </label>
         <label>대상 기수
-          <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics')">
+          <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics'); window.applyAnalyticsFilter()">
             ${cohortOptionsHtml(type, cohort, false)}
           </select>
         </label>
         <label>세션 선택
-          <select id="analytics-session-select">
+          <select id="analytics-session-select" onchange="window.applyAnalyticsFilter()">
             ${scopedSessionOptions(type, cohort, sessionId, false)}
           </select>
         </label>
-        <button class="primary" id="apply-analytics-filter" type="button" onclick="window.applyAnalyticsFilter()">적용</button>
       </div>
-      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
     </section>
 
     ${cohort ? (() => {
@@ -2581,6 +1633,26 @@ function renderAnalytics() {
       `;
     })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
   `;
+}
+
+function cohortOptionsHtml(type, selectedCohort, isReport = false) {
+  const cohorts = cohortsForType(type);
+  const allOption = isReport ? `<option value="all" ${selectedCohort === "all" ? "selected" : ""}>전체 기수</option>` : "";
+  const cohortOptions = cohorts.map((c) => {
+    const yearLabel = yearForCohortType(c, type) ? `${yearForCohortType(c, type)}년 ` : "";
+    const count = sessionsForTypeCohort(type, c).length;
+    return `<option value="${c}" ${Number(selectedCohort) === c ? "selected" : ""}>${yearLabel}${c}기 (${count}개 세션)</option>`;
+  }).join("");
+  return allOption + cohortOptions;
+}
+
+function scopedSessionOptions(type, cohort, selectedSessionId = "", isReport = false) {
+  const sessions = sessionsForTypeCohort(type, cohort);
+  const compareAllOption = isReport ? `<option value="all" ${selectedSessionId === "all" ? "selected" : ""}>전체 비교 분석</option>` : "";
+  const sessionOptions = sessions.map((session) =>
+    `<option value="${session.id}" ${selectedSessionId === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))}</option>`
+  ).join("");
+  return compareAllOption + sessionOptions;
 }
 
 // ── Radar Chart (4-axis SVG diamond) ────────────────────────────
@@ -2823,7 +1895,7 @@ function renderCompareReport(type, cohort) {
     <div id="report-export-content" class="report-export-content">
     <section class="page-head report-export-header">
       <div>
-        <span class="eyebrow">Cohort Compare Analysis</span>
+        <span class="eyebrow">기수 비교 분석</span>
         <h1>전체 팀별 결과 비교 분석</h1>
         <p>${subtitle}</p>
       </div>
@@ -2835,7 +1907,7 @@ function renderCompareReport(type, cohort) {
       </div>
     </section>
 
-    <section class="panel filters-panel" style="margin-bottom:18px;" data-html2canvas-ignore="true">
+    <section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
         <label>세션 유형
           <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
@@ -3161,8 +2233,8 @@ function renderReport() {
     <div id="report-export-content" class="report-export-content">
     <section class="page-head report-export-header">
       <div>
-        <span class="eyebrow">Analysis Report</span>
-        <h1>분석 결과</h1>
+        <span class="eyebrow">변화 분석 리포트</span>
+        <h1>변화 분석 리포트</h1>
         <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
       </div>
       ${cohort && session ? `
@@ -3178,7 +2250,7 @@ function renderReport() {
         </div>` : ""}
     </section>
 
-    <section class="panel filters-panel" style="margin-bottom:18px;" data-html2canvas-ignore="true">
+    <section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
         <label>세션 유형
           <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
@@ -3429,7 +2501,7 @@ function renderReport() {
                 <span>사전 정성 신호</span>
               </div>
               <div id="qual-signal-pre-container">
-                ${preSig ? '' : `<div class="empty">${hasPreQual ? '사전 정성 분석 결과가 없습니다. "설문 결과 보기" 페이지에서 AI 분석을 먼저 완료해 주세요.' : '사전 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
+                ${preSig ? '' : `<div class="empty">${hasPreQual ? '사전 정성 분석 결과가 없습니다. "문항별 응답" 페이지에서 AI 분석을 먼저 완료해 주세요.' : '사전 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
               </div>
             </div>
             <div>
@@ -3437,7 +2509,7 @@ function renderReport() {
                 <span>사후 정성 신호</span>
               </div>
               <div id="qual-signal-post-container">
-                ${postSig ? '' : `<div class="empty">${hasPostQual ? '사후 정성 분석 결과가 없습니다. "설문 결과 보기" 페이지에서 AI 분석을 먼저 완료해 주세요.' : '사후 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
+                ${postSig ? '' : `<div class="empty">${hasPostQual ? '사후 정성 분석 결과가 없습니다. "문항별 응답" 페이지에서 AI 분석을 먼저 완료해 주세요.' : '사후 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
               </div>
             </div>
           </div>
@@ -3947,6 +3019,36 @@ function bindLayout() {
     state.sidebarCollapsed = !state.sidebarCollapsed;
     saveState();
   });
+
+  const topbarUserBtn = document.getElementById('topbar-user-btn');
+  if (topbarUserBtn && !topbarUserBtn.dataset.menuBound) {
+    topbarUserBtn.addEventListener('click', () => {
+      const dropdown = document.getElementById('topbar-user-dropdown');
+      if (!dropdown) return;
+      const isOpen = !dropdown.hidden;
+      dropdown.hidden = isOpen;
+      topbarUserBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+    topbarUserBtn.dataset.menuBound = 'true';
+  }
+  const auditLogButton = document.getElementById('audit-log-button');
+  if (auditLogButton && !auditLogButton.dataset.auditBound) {
+    auditLogButton.addEventListener('click', () => {
+      const dropdown = document.getElementById('topbar-user-dropdown');
+      if (dropdown) dropdown.hidden = true;
+      openAuditLogModal();
+    });
+    auditLogButton.dataset.auditBound = 'true';
+  }
+  if (!window.topbarUserDropdownClickBound) {
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#topbar-user-menu')) {
+        const dropdown = document.getElementById('topbar-user-dropdown');
+        if (dropdown) dropdown.hidden = true;
+      }
+    });
+    window.topbarUserDropdownClickBound = true;
+  }
 }
 
 function bindCanvasEvents() {
@@ -4519,6 +3621,7 @@ function bindSessions() {
   });
   document.querySelector("#cancel-edit-session")?.addEventListener("click", () => {
     state.editingSessionId = null;
+    state.sessionDrawerOpen = false;
     state.draftSchedule = makeSchedule(state.draftType);
     state.draftLeaderGroup = [];
     saveState();
@@ -4570,6 +3673,7 @@ function bindSessions() {
         saveSessionToFirestore(updatedSession);
       }
       state.editingSessionId = null;
+      state.sessionDrawerOpen = false;
       state.draftSchedule = makeSchedule(type);
       saveState();
       render();
@@ -4661,6 +3765,7 @@ function bindSessions() {
     }
 
     state.sessions.unshift(session);
+    state.sessionDrawerOpen = false;
     state.draftSchedule = makeSchedule(type);
     saveState();
     saveSessionToFirestore(session);
@@ -4669,6 +3774,21 @@ function bindSessions() {
   });
   document.querySelector("#btn-db-upload")?.addEventListener("click", uploadStateToDb);
   document.querySelector("#btn-db-download")?.addEventListener("click", downloadStateFromDb);
+
+  document.getElementById('btn-open-session-drawer')?.addEventListener('click', () => {
+    state.sessionDrawerOpen = true;
+    render();
+  });
+  document.getElementById('close-session-drawer')?.addEventListener('click', () => {
+    state.sessionDrawerOpen = false;
+    state.editingSessionId = null;
+    render();
+  });
+  document.getElementById('session-drawer-overlay')?.addEventListener('click', () => {
+    state.sessionDrawerOpen = false;
+    state.editingSessionId = null;
+    render();
+  });
 }
 
 function bindUpload() {
@@ -4681,7 +3801,7 @@ function bindUpload() {
     const phase = document.querySelector("#upload-phase").value;
     const text = await selected.text();
     await ensureXlsxLoaded();
-    const { parsed, errors } = parseCSV(text, sessionId, phase);
+    const { parsed, errors, droppedPii } = parseCSV(text, sessionId, phase);
     const linkedSurvey = (state.surveys || []).find((survey) => survey.sessionId === sessionId && survey.phase === phase);
     const uploadedAt = new Date().toISOString();
     state.uploadRows = parsed.map((row) => ({
@@ -4693,6 +3813,7 @@ function bindUpload() {
     }));
     state.uploadErrors = errors;
     state.uploadFileName = selected.name;
+    state.uploadPiiDropped = droppedPii || [];
     render();
   });
   document.querySelector("#upload-session")?.addEventListener("change", () => {
@@ -4716,6 +3837,8 @@ function bindUpload() {
     state.responses.push(...rowsToSave);
     state.uploadRows = [];
     state.uploadErrors = [];
+    state.uploadPiiDropped = [];
+    state.uploadSuccessMsg = `${rowsToSave.length}행 저장 완료`;
     // Land the 변화 분석 화면 exactly on the session + 시점 we just uploaded, so freshly added
     // (e.g. 사전) data is visible immediately instead of defaulting to another phase tab.
     const first = rowsToSave[0];
@@ -5024,6 +4147,7 @@ window.startEditSession = function(id) {
   const session = state.sessions.find(s => s.id === id);
   if (!session) return;
   state.editingSessionId = id;
+  state.sessionDrawerOpen = true;
   state.activeSessionTab = 'list';
   state.draftType = normalizeSessionType(session.type);
   state.draftSchedule = JSON.parse(JSON.stringify(session.schedule));
@@ -5048,7 +4172,10 @@ window.startEditSession = function(id) {
 window.deleteSession = function(id) {
   if (!confirm('이 세션을 삭제하시겠습니까?\n세션에 연결된 설문 및 응답 데이터는 유지됩니다.')) return;
   state.sessions = state.sessions.filter(s => s.id !== id);
-  if (state.editingSessionId === id) state.editingSessionId = null;
+  if (state.editingSessionId === id) {
+    state.editingSessionId = null;
+    state.sessionDrawerOpen = false;
+  }
   saveState();
   deleteSessionFromFirestore(id);
   window.updateResponsesSubscription();
@@ -5336,7 +4463,7 @@ window.deleteSurvey = function(id) {
   const survey = (state.surveys || []).find((item) => item.id === id);
   if (!survey) return;
   const responseCount = surveyRows(survey).length;
-  if (!confirm(`이 설문의 배포를 종료하고 링크와 QR을 비활성화할까요?\n\n기존 응답 ${responseCount}건과 업로드 결과는 삭제되지 않으며 설문 결과 보기에서 계속 확인할 수 있습니다.`)) return;
+  if (!confirm(`이 설문의 배포를 종료하고 링크와 QR을 비활성화할까요?\n\n기존 응답 ${responseCount}건과 업로드 결과는 삭제되지 않으며 문항별 응답에서 계속 확인할 수 있습니다.`)) return;
   const now = new Date().toISOString();
   survey.status = "closed";
   survey.distributionActive = false;

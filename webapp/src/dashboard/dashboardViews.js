@@ -8,7 +8,7 @@ import {
   dashboardSupportOrgs
 } from './dashboardEngine.js?v=20260623-dashboard-actions-v1';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
-import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260623-dashboard-actions-v1';
+import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260627-audit-log-v1';
 
 // Helper to count week sessions
 function displayWeekSessionsCount(state, today) {
@@ -118,6 +118,7 @@ function render5SignalRadarChart(pulseSignals) {
 
 export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
   const today = todayISO();
+  const isLoading = state.dbStatus === 'connecting' || state.dbStatus === undefined;
   const snapshot = dashboardSnapshot({ state, pulseCache, today });
   const allActions = dashboardActionQueue({ state, today });
   const todayActions = allActions.filter((act) => act.group === "today");
@@ -251,7 +252,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
             <span class="kpi-label">오늘 할 일</span>
             <button type="button" class="tooltip-icon" aria-label="오늘 할 일 설명" aria-expanded="false" data-help-text="기한 초과 약속, 오늘 세션, 사후설문 대기, 미정 회차처럼 오늘 직접 처리해야 하는 작업 개수입니다. 예정 알림과 보고 준비 완료는 제외합니다.">?</button>
           </div>
-          <div class="kpi-value">${todayActions.length}</div>
+          <div class="kpi-value">${isLoading ? '<span class="kpi-skeleton"></span>' : todayActions.length}</div>
           <div class="kpi-desc">즉시 조치 필요</div>
         </div>
         <div class="kpi-card highlight-purple cursor-pointer" data-nav="pulse" data-pulse-view="listening">
@@ -259,7 +260,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
             <span class="kpi-label">응답 대기</span>
             <button type="button" class="tooltip-icon" aria-label="응답 대기 설명" aria-expanded="false" data-help-text="작성 중이거나 공감 피드백(We Heard) 작성이 진행되지 않은 약속 개수입니다.">?</button>
           </div>
-          <div class="kpi-value">${snapshot.responseWaiting}</div>
+          <div class="kpi-value">${isLoading ? '<span class="kpi-skeleton"></span>' : snapshot.responseWaiting}</div>
           <div class="kpi-desc">공감 피드백 미등록</div>
         </div>
         <div class="kpi-card highlight-amber cursor-pointer" data-scroll-to="dashboard-week-schedule">
@@ -267,7 +268,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
             <span class="kpi-label">이번 주 세션</span>
             <button type="button" class="tooltip-icon" aria-label="이번 주 세션 설명" aria-expanded="false" data-help-text="오늘부터 향후 7일 이내에 예정된 세션 회차들의 개수입니다.">?</button>
           </div>
-          <div class="kpi-value">${displayWeekSessionsCount(state, today)}</div>
+          <div class="kpi-value">${isLoading ? '<span class="kpi-skeleton"></span>' : displayWeekSessionsCount(state, today)}</div>
           <div class="kpi-desc">7일 이내 일정</div>
         </div>
         <div class="kpi-card highlight-green cursor-pointer" data-nav="report">
@@ -275,7 +276,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
             <span class="kpi-label">보고 준비</span>
             <button type="button" class="tooltip-icon" aria-label="보고 준비 설명" aria-expanded="false" data-help-text="사전 및 사후 설문 적재가 완료되어 최종 경영진 보고서 조회가 가능한 세션 개수입니다.">?</button>
           </div>
-          <div class="kpi-value">${snapshot.reportReady}</div>
+          <div class="kpi-value">${isLoading ? '<span class="kpi-skeleton"></span>' : snapshot.reportReady}</div>
           <div class="kpi-desc">사전·사후 적재 완료</div>
         </div>
       </div>
@@ -475,7 +476,8 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
             <div class="trust-funnel-content">
               ${funnel.youSaid === 0 ? `
                 <div class="empty-state-card">
-                  <p>등록된 약속(Commitment)이 아직 없습니다.</p>
+                  <p class="empty-state-title">등록된 약속이 아직 없습니다</p>
+                  <p class="empty-state-desc">구성원의 정성 의견을 조직의 행동 약속으로 연결합니다.<br>첫 약속을 등록하면 이행 현황과 신뢰 회복 흐름이 여기 표시됩니다.</p>
                   <button class="primary compact margin-top" data-nav="pulse" data-pulse-view="listening" data-open-commitment-form="true">첫 약속 등록</button>
                 </div>
               ` : `

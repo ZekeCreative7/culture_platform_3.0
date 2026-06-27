@@ -242,10 +242,10 @@
 | 08 | 06-22 | 데이터 위기 + orphan recovery | 해결, App Check 버그 발견 | 3/5 (위기 자체는 예방 가능했음) |
 | 09 | 06-22~23 | 분석 전문가 리뷰 + 7개 개선 | 성공, 분석 품질 급상승 | 5/5 |
 | 10 | 06-23~24 | 대시보드 운영 UX + 실시간 동기화 | 성공 | 4/5 |
+| 11 | 06-25~26 | 설문 템플릿 + 회고 문서 + UX 개선 10개 배치 | Q9 버그, 세션 카드 밀도, 캘린더 색, 정량/정성 토글, 회고 체계 | 5/5 |
 
 **전체 프로젝트 종합 점수: 4 / 5**  
 방향 결정력과 실행력은 매우 높았다. 재작업의 상당 부분은 초반 설계(데이터 모델, 디자인 레퍼런스, 분석 방법론) 를 뒤로 미룬 데서 비롯됐다. 다음 프로젝트에서 이 세 가지를 먼저 잡으면 같은 기간에 더 완성도 높은 결과가 나올 것이다.
-| 11 | 06-25~26 | 설문 템플릿 보존 + 회고 문서 통합 | 설문 삭제 후에도 문항 재사용 가능한 `surveyTemplates` Firestore 컬렉션 신설; 여러 창에 흩어진 작업 회고 체계 완성 | 성공 | 4/5 |
 
 ---
 
@@ -267,4 +267,89 @@
 
 ---
 
-_최종 업데이트: 2026-06-26. 작성: Claude Sonnet 4.6 (세션 ID: 현재 세션)_
+---
+
+## 11. 이 프로젝트 고유의 데이터 레이어 구조 (다음 개발자/에이전트를 위한 필수 메모)
+
+이 플랫폼은 **표면에서 보기엔 단일 데이터처럼 보이지만 실제론 4개 레이어가 독립적**으로 동작한다.  
+이것을 모르면 이 프로젝트에서 가장 비싼 재작업(org split → revert)을 반복하게 된다.
+
+| # | 레이어 이름 | 파일 위치 | 내용 | 변경 시 영향 범위 |
+|---:|---|---|---|---|
+| ① | 조직 구조 (org) | `webapp/src/org_data.json` | 실제 조직 계층 — 본부 → 팀 → 팀원 | 조직도 화면, 세션 팀 선택 드롭다운 |
+| ② | Pulse 리포팅 division | `webapp/src/config/pulseDivisions.js` + `pulseDivisionMap.js` | Pulse 결과를 묶는 방식 (org와 다를 수 있음) | Pulse 본부별 카드만 영향 |
+| ③ | 세션 데이터 | Firestore `sessions` 컬렉션 | 팀빌딩/팀장/크로스 세션, 기수, 스케줄, 설문 | Change/분석 탭, 기수 셀렉트 |
+| ④ | UI 표시 | `webapp/src/app.js` render 함수들 | 화면에 어떻게 보이는가 (render layer) | 해당 화면만 영향 |
+
+**핵심 교훈 (06-20 scar):**  
+"고객솔루션본부를 나눠줘"는 ② 레이어 요청이었는데 ① 레이어로 구현했다 → 전면 revert.  
+**요청을 받으면 항상 먼저: "어느 레이어예요? org_data인지, Pulse division인지?"**
+
+---
+
+---
+
+## 12. 핵심 기술 교훈 (재사용 가능한 코드 패턴)
+
+> 추상적 프로세스 교훈이 아니라, 실제 버그와 수정 코드에서 나온 구체적 패턴이다.
+
+### T-1. Firebase App Check 디버그 토큰 영속화
+
+**문제**: `self.FIREBASE_APPCHECK_DEBUG_TOKEN = true` 사용 시 → 매 새로고침마다 새 UUID 생성 → 미등록 토큰 → Firestore 전체 오프라인. 수 시간의 "데이터 사라짐" 패닉으로 이어졌다.
+
+```js
+const STORAGE_KEY = 'FIREBASE_APPCHECK_DEBUG_TOKEN';
+let token = localStorage.getItem(STORAGE_KEY);
+if (!token) { token = crypto.randomUUID(); localStorage.setItem(STORAGE_KEY, token); }
+self.FIREBASE_APPCHECK_DEBUG_TOKEN = token;
+```
+
+**적용 시점**: Firebase 연동 Day 2에 반드시. 기능 개발 전 인프라 완성 단계에서.
+
+---
+
+### T-2. Firestore `setDoc` undefined 필드 거부 패턴
+
+**문제**: optional 필드에 `undefined`가 들어가면 `Unsupported field value: undefined` 에러.
+
+```js
+// 나쁜 예 — sessionType이 없으면 undefined 전달
+{ sessionType: normalizeSessionType(survey.sessionType) }
+
+// 좋은 예 — 없으면 키 자체를 제외
+...(survey.sessionType ? { sessionType: normalizeSessionType(survey.sessionType) } : {})
+```
+
+**적용 시점**: Firestore write 코드 작성 시 모든 optional 필드에 적용.
+
+---
+
+### T-3. 매칭 로직은 공유 함수로 — `rowMatchesSurvey` 패턴
+
+**문제**: `surveyRows()`의 응답 매칭 로직(surveyId OR sessionId+phase+cohort 폴백)을 고아 스캔 함수에서 별도 구현 → 기준 불일치 → 중복 카드 생성.
+
+**패턴**: 같은 판단 기준을 두 곳 이상에서 쓰면 → 반드시 함수 추출 + 양쪽 재사용.
+
+**확인 질문**: "이 기능은 기존 로직과 같은 판단 기준을 쓰는가?" — 새 기능 작성 전에 먼저.
+
+---
+
+### T-4. GitHub Pages 비-Jekyll 정적 사이트
+
+**문제**: `.nojekyll` 파일이 없으면 레거시 Jekyll 빌더 실패 → 이후 모든 배포 큐 블록.
+
+**수정**: 루트에 빈 파일 `.nojekyll` 추가. 한 번만. 배포 확인은 Actions 탭 `pages-build-deployment` 실행 상태로.
+
+---
+
+### T-5. Codex + Claude 역할 분담
+
+| 구분 | Codex에게 | Claude에게 |
+|---|---|---|
+| 작업 유형 | 100줄+ 신규 기능, 명확한 스펙 | 버그픽스, 검증, 수습, UI 조정 |
+| 스펙 필수 항목 | **레이어 정의 + 완료 기준 + 금지 항목** | 증상 + 스크린샷 |
+| 결과물 처리 | Claude가 반드시 검증 | 직접 커밋/푸시 |
+
+---
+
+_최종 업데이트: 2026-06-26. 작성: Claude Sonnet 4.6_

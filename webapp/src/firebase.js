@@ -12,7 +12,9 @@ import {
   serverTimestamp,
   writeBatch,
   query,
-  where
+  where,
+  orderBy,
+  limit
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import {
   getAuth,
@@ -60,5 +62,5 @@ export const appCheck = initializeAppCheck(firebaseApp, {
 export const db = getFirestore(firebaseApp);
 export const auth = getAuth(firebaseApp);
 setPersistence(auth, browserLocalPersistence).catch((error) => console.error('Firebase 로그인 유지 설정 실패:', error));
-export { collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where };
+export { collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, limit };
 export { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut };

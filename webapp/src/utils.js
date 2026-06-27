@@ -241,3 +241,34 @@ export function makeSchedule(type) {
     absences: [],
   }));
 }
+
+export function maskIfSmall(n, value) {
+  if (n !== null && n < 3) return "—";
+  return value;
+}
+
+export const lockSvg = `<svg viewBox="0 0 24 24" width="11" height="11" style="fill:currentColor; display:inline-block; vertical-align:middle; margin-right:2px;"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>`;
+
+export function targetCountForSession(session) {
+  if (!session) return 0;
+  if (Array.isArray(session.members) && session.members.length) return session.members.length;
+  if (Array.isArray(session.leaderGroup) && session.leaderGroup.length) return session.leaderGroup.length;
+  return 0;
+}
+
+export function emptyCard(text, tone = "") {
+  return `<div class="empty ${tone}">${text}</div>`;
+}
+
+export function sectionTitle(title, meta = "") {
+  return `<div class="section-title"><h2>${title}</h2><span>${meta}</span></div>`;
+}
+
+export function fmt(value) {
+  return typeof value === "number" ? value.toFixed(2) : "-";
+}
+
+export function metricCard(label, value, note) {
+  return `<article class="metric"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`;
+}
+

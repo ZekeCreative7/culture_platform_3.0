@@ -17,7 +17,7 @@ import { QUESTIONS } from '../config/questions.js';
 import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 
 // Helper to calculate session status
-function getSessionStatus(session) {
+export function getSessionStatus(session) {
   const schedule = session.schedule || [];
   const confirmed = schedule.filter((item) => item.confirmed && item.date);
   if (!confirmed.length) return "시작전";

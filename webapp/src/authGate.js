@@ -1,7 +1,7 @@
 import {
   auth, db, collection, doc, getDoc, getDocs, setDoc, onSnapshot, serverTimestamp, writeBatch,
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
-} from './firebase.js?v=20260622-closed-surveys-collapse-v1';
+} from './firebase.js?v=20260627-audit-log-v1';
 
 export const MASTER_EMAIL = 'rhokoo7@naver.com';
 
@@ -176,6 +176,7 @@ async function logout() {
   clearPendingListener();
   accessGrantedUid = '';
   currentUser = null;
+  window.__currentUserEmail = '';
   await signOut(auth);
 }
 
@@ -205,6 +206,8 @@ export function syncAuthControls() {
     adminButton.dataset.authBound = 'true';
     adminButton.addEventListener('click', openAccessAdmin);
   }
+  const auditButton = $('#audit-log-button');
+  if (auditButton) auditButton.hidden = !isMaster();
   const logoutButton = $('#auth-logout-button');
   if (logoutButton && !logoutButton.dataset.authBound) {
     logoutButton.dataset.authBound = 'true';
@@ -290,6 +293,7 @@ export function initializeAuthGate({ onAccessGranted }) {
 
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
+    window.__currentUserEmail = user?.email || '';
     if (!user) {
       accessGrantedUid = '';
       clearPendingListener();

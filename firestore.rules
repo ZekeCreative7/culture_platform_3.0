@@ -75,11 +75,16 @@ service cloud.firestore {
       allow read, write: if isApproved();
     }
 
+    match /auditLogs/{logId} {
+      allow read: if isMaster();
+      allow write: if signedIn();
+    }
+
     match /QualSignal/{document=**} {
       allow read, write: if isApproved();
     }
 
-    // Fallback for other collections (except accessRequests, mail, appState, responses, surveys, sessions, pulseResults, pulseCommitments, QualSignal)
+    // Fallback for other collections (except accessRequests, mail, appState, responses, surveys, sessions, pulseResults, pulseCommitments, auditLogs, QualSignal)
     match /{collectionName}/{document=**} {
       allow read, write: if collectionName != 'accessRequests'
         && collectionName != 'mail'
@@ -89,6 +94,7 @@ service cloud.firestore {
         && collectionName != 'sessions'
         && collectionName != 'pulseResults'
         && collectionName != 'pulseCommitments'
+        && collectionName != 'auditLogs'
         && collectionName != 'QualSignal'
         && isApproved();
     }

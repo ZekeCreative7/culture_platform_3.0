@@ -9,7 +9,7 @@ import { parsePulseWorkbook } from "./pulseUpload.js";
 import { renderCommitmentsBoard, bindCommitmentsEvents, getStatusLabel, createPulseCommitmentDraft } from "./pulseCommitments.js?v=20260620-operating-insights-v1";
 import { QUESTIONS } from "../config/questions.js";
 import { DOMAINS, THEMES } from "../config/domains.js";
-import { commitmentsCache, pulseCache } from "../state.js";
+import { commitmentsCache, pulseCache } from "../state.js?v=20260627-audit-log-v1";
 
 const DEFAULT_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 
@@ -229,7 +229,7 @@ function renderUploadPanel(state) {
       <div class="upload-panel-content">
         <div class="pulse-upload-main">
           <div>
-            <span class="eyebrow">Pulse upload</span>
+            <span class="eyebrow">진단 데이터 업로드</span>
             <h2>연도별 Pulse 템플릿 업로드</h2>
             <p>다운로드한 템플릿을 채워 올리면 해당 연도의 전사·본부 집계가 DB에 저장되고 바로 분석에 반영됩니다.</p>
           </div>
@@ -270,7 +270,7 @@ function renderNoData(state, cache) {
   return `
     <section class="panel pulse-empty-panel">
       <div>
-        <span class="eyebrow">Pulse data</span>
+        <span class="eyebrow">진단 데이터</span>
         <h2>${message}</h2>
         <p>개인 응답이 아니라 본부별 집계값만 받는 흐름입니다. 기존 세션 설문 CSV 업로드와는 분리해서 운영합니다.</p>
       </div>
@@ -786,7 +786,7 @@ function renderListeningView({ state, cache }) {
     return `
       <section class="panel pulse-empty-panel">
         <div>
-          <span class="eyebrow">Division Analysis</span>
+          <span class="eyebrow">부문 분석</span>
           <h2>조직별로 확대해 보기</h2>
           <p>분석을 원하는 본부/조직을 선택해 주세요. 전사와 동일한 7장면 분석 스토리 구조로 자세히 들여다볼 수 있습니다.</p>
         </div>
@@ -1231,7 +1231,7 @@ export function renderPulse({ state, pulseCache }) {
   return `
     <section class="page-head pulse-head">
       <div>
-        <span class="eyebrow">Pulse Insights</span>
+        <span class="eyebrow">조직 진단</span>
         <h1>조직 진단 · 추천</h1>
         <p>Pulse Survey 집계값을 활용해 구성원의 감정을 경청하고, 신뢰를 지킬 수 있는 실행 약속으로 연결합니다.</p>
       </div>

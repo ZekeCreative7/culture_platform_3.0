@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260622-closed-surveys-collapse-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, limit as firestoreLimit } from './firebase.js?v=20260627-audit-log-v1';
 import { 
   PHASES, 
   normalizeSessionType, 
@@ -7,9 +7,16 @@ import {
   todayISO, 
   uid, 
   defaultQuestions,
-  normalizePosition
+  normalizePosition,
+  sessionStartDate,
+  sameSessionType,
+  sessionYear,
+  sessionLabel,
+  scoreOf,
+  SESSION_TYPES
 } from './utils.js?v=20260622-org-backup-restore-v2';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
+import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
 export const ORG_STORE_KEY = "culture-platform-org-v1";
@@ -21,6 +28,22 @@ export const commitmentsCache = { loaded: false, loading: false };
 export let dbStatus = 'connecting';
 const listeners = [];
 
+async function writeAuditLog({ action, targetId, targetType, detail = '' }) {
+  try {
+    const userId = window.__currentUserEmail || 'unknown';
+    await addDoc(collection(db, 'auditLogs'), {
+      action,
+      userId,
+      targetId,
+      targetType,
+      detail,
+      timestamp: serverTimestamp()
+    });
+  } catch (e) {
+    console.warn('[auditLog] write failed', e);
+  }
+}
+
 export function subscribe(listener) {
   listeners.push(listener);
 }
@@ -29,13 +52,25 @@ export function notify() {
   listeners.forEach(l => l());
 }
 
+let _dbErrorTimer = null;
 export function setDbStatus(status) {
   dbStatus = status;
+  state.dbStatus = status;
   notify();
+  if (status === 'error') {
+    clearTimeout(_dbErrorTimer);
+    _dbErrorTimer = setTimeout(() => {
+      if (dbStatus === 'error') setDbStatus('connected');
+    }, 5000);
+  } else {
+    clearTimeout(_dbErrorTimer);
+  }
 }
 
 export const blankState = () => ({
   activeView: "dashboard",
+  dbStatus: 'connecting',
+  sessionDrawerOpen: false,
   sessions: [],
   responses: [],
   qualSignals: [],
@@ -51,6 +86,8 @@ export const blankState = () => ({
   uploadRows: [],
   uploadErrors: [],
   uploadFileName: "",
+  uploadPiiDropped: [],
+  uploadSuccessMsg: "",
   orgUnits: [],
   orgMembers: [],
   orgDataVersion: 0,
@@ -327,7 +364,15 @@ export function subscribeSessionsFromFirestore(onChange = () => {}) {
 export async function saveSessionToFirestore(session) {
   try {
     const { id, ...data } = session;
-    await setDoc(doc(db, 'sessions', id), { ...data, updatedAt: serverTimestamp() });
+    const docRef = doc(db, 'sessions', id);
+    const existing = await getDoc(docRef);
+    await setDoc(docRef, { ...data, updatedAt: serverTimestamp() });
+    await writeAuditLog({
+      action: existing.exists() ? 'session_updated' : 'session_created',
+      targetId: id,
+      targetType: 'session',
+      detail: sessionLabel(session)
+    });
     setDbStatus('connected');
   } catch (e) {
     console.error('Firestore 세션 저장 실패:', e);
@@ -338,6 +383,7 @@ export async function saveSessionToFirestore(session) {
 export async function deleteSessionFromFirestore(id) {
   try {
     await deleteDoc(doc(db, 'sessions', id));
+    await writeAuditLog({ action: 'session_deleted', targetId: id, targetType: 'session' });
   } catch (e) {
     console.error('Firestore 세션 삭제 실패:', e);
   }
@@ -383,6 +429,7 @@ export async function fetchAllResponsesFromFirestore() {
 export async function deleteResponseFromFirestore(id) {
   try {
     await deleteDoc(doc(db, 'responses', id));
+    await writeAuditLog({ action: 'response_deleted', targetId: id, targetType: 'response' });
   } catch (e) {
     console.error('Firestore 응답 삭제 실패:', e);
   }
@@ -414,6 +461,22 @@ export async function setSurveyDistributionActiveInFirestore(id, active) {
     },
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await writeAuditLog({
+    action: 'survey_distribution_toggled',
+    targetId: id,
+    targetType: 'survey',
+    detail: active ? '배포 활성화' : '배포 비활성화'
+  });
+}
+
+export async function fetchRecentAuditLogs(count = 20) {
+  const auditQuery = query(
+    collection(db, 'auditLogs'),
+    orderBy('timestamp', 'desc'),
+    firestoreLimit(count)
+  );
+  const snap = await getDocs(auditQuery);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 // 설문을 지워도 다음 세션 만들 때 불러올 예시 질문이 남도록, 배포 설문과는 별도 컬렉션에 저장한다.
@@ -554,6 +617,12 @@ export async function savePulseCommitmentToFirestore(commitment) {
   try {
     const { id, ...data } = commitment;
     await setDoc(doc(db, 'pulseCommitments', id), { ...data, updatedAt: serverTimestamp() });
+    await writeAuditLog({
+      action: 'commitment_saved',
+      targetId: id,
+      targetType: 'commitment',
+      detail: commitment.title || commitment.owner || commitment.department || ''
+    });
     const idx = state.pulseCommitments.findIndex(c => c.id === id);
     if (idx >= 0) {
       state.pulseCommitments[idx] = commitment;
@@ -570,6 +639,7 @@ export async function savePulseCommitmentToFirestore(commitment) {
 export async function deletePulseCommitmentFromFirestore(id) {
   try {
     await deleteDoc(doc(db, 'pulseCommitments', id));
+    await writeAuditLog({ action: 'commitment_deleted', targetId: id, targetType: 'commitment' });
     state.pulseCommitments = state.pulseCommitments.filter(c => c.id !== id);
     saveState();
   } catch (e) {
@@ -673,4 +743,162 @@ export async function saveQualSignalToFirestore(qualSignal) {
     setDbStatus('error');
     throw e;
   }
+}
+
+export function sessionsSortedByStart() {
+  return [...state.sessions].sort((a, b) => {
+    const da = sessionStartDate(a);
+    const db = sessionStartDate(b);
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return da.localeCompare(db);
+  });
+}
+
+export function phasesForSession(sessionId) {
+  return PHASES.filter((phase) => (state.responses || []).some((row) => row.sessionId === sessionId && row.phase === phase));
+}
+
+export function getQuestionsForCohort(cohort, type) {
+  const sessionIds = (state.sessions || []).filter(s => sameSessionType(s.type, type) && s.cohort === Number(cohort)).map(s => s.id);
+  const survey = (state.surveys || []).find(s => sessionIds.includes(s.sessionId));
+  if (survey && survey.questions && survey.questions.length > 0) {
+    return survey.questions.filter(q => q.type === "quant");
+  }
+  return defaultQuestions("사후").filter(q => q.type === "quant");
+}
+
+export function sessionsForCohort(cohort) {
+  const cohortNum = Number(cohort);
+  return (state.sessions || [])
+    .filter((session) => Number(session.cohort) === cohortNum)
+    .sort((a, b) => `${a.type} ${sessionLabel(a)}`.localeCompare(`${b.type} ${sessionLabel(b)}`, "ko"));
+}
+
+export function availableSessionTypes() {
+  const present = new Set((state.sessions || []).map((s) => normalizeSessionType(s.type)));
+  return Object.keys(SESSION_TYPES || {}).filter((t) => present.has(t));
+}
+
+export function cohortsForType(type) {
+  const cohorts = (state.sessions || [])
+    .filter((s) => sameSessionType(s.type, type))
+    .map((s) => Number(s.cohort))
+    .filter(Boolean);
+  return [...new Set(cohorts)].sort((a, b) => a - b);
+}
+
+export function sessionsForTypeCohort(type, cohort) {
+  if (cohort === "all") {
+    return (state.sessions || [])
+      .filter((s) => sameSessionType(s.type, type))
+      .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
+  }
+  const cohortNum = Number(cohort);
+  return (state.sessions || [])
+    .filter((s) => sameSessionType(s.type, type) && Number(s.cohort) === cohortNum)
+    .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
+}
+
+export function yearForCohortType(cohort, type) {
+  const cohortNum = Number(cohort);
+  const match = (state.sessions || []).find((s) => sameSessionType(s.type, type) && Number(s.cohort) === cohortNum);
+  return match ? sessionYear(match) : "";
+}
+
+export function questionSetForSession(sessionId, phase = "사후") {
+  const surveys = (state.surveys || []).filter((survey) => survey.sessionId === sessionId && Array.isArray(survey.questions) && survey.questions.length);
+  const survey = surveys.find((item) => item.phase === phase) || surveys[0];
+  return (survey?.questions || defaultQuestions(phase)).filter((q) => q.type === "quant");
+}
+
+export function phaseHasQuantQuestions(sessionId, phase) {
+  const survey = (state.surveys || []).find((s) => s.sessionId === sessionId && s.phase === phase);
+  if (!survey) return true;
+  if (!(survey.questions || []).length) return true;
+  return (survey.questions || []).some((q) => q.type === "quant");
+}
+
+export function statsForSession(cohort, sessionId) {
+  (state.responses || []).forEach(assertNotQuantInput);
+  const questions = questionSetForSession(sessionId);
+  return PHASES.map((phase) => {
+    const rows = (state.responses || []).filter((row) =>
+      row.sessionId === sessionId && row.phase === phase
+    );
+    const stats = { phase, n: rows.length };
+    questions.forEach((q) => {
+      const key = q.id;
+      const values = rows.map((row) => scoreOf(row[key])).filter((v) => typeof v === "number");
+      stats[`${key}_avg`] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+    });
+    return stats;
+  });
+}
+
+export function ensureScopedSelection(kind) {
+  const typeField    = kind === "analytics" ? "selectedAnalyticsType"     : "selectedReportType";
+  const cohortField  = kind === "analytics" ? "selectedAnalyticsCohort"   : "selectedReportCohort";
+  const sessionField = kind === "analytics" ? "selectedAnalyticsSessionId": "selectedReportSessionId";
+  const isReport = kind === "report";
+
+  const types = availableSessionTypes();
+  if (!types.includes(normalizeSessionType(state[typeField]))) {
+    state[typeField] = types[0] || normalizeSessionType(state[typeField] || "팀빌딩");
+  }
+  const type = normalizeSessionType(state[typeField]);
+
+  const cohorts = cohortsForType(type);
+  if (state[cohortField] !== "all") {
+    const cVal = Number(state[cohortField]);
+    if (!cohorts.includes(cVal)) {
+      state[cohortField] = cohorts[0] || "";
+    }
+  }
+  const cohort = state[cohortField] === "all" ? "all" : Number(state[cohortField] || 0);
+
+  const sessions = sessionsForTypeCohort(type, cohort);
+  const sessIds = sessions.map(s => s.id);
+  if (state[sessionField] !== "all" || !isReport) {
+    if (!sessIds.includes(state[sessionField])) {
+      state[sessionField] = sessIds[0] || "";
+    }
+  }
+  return { type, cohort, cohorts, sessions, session: sessions.find(s => s.id === state[sessionField]) };
+}
+
+export function isAnalyticsSectionCollapsed(key) {
+  return (state.collapsedAnalyticsSections || []).includes(key);
+}
+
+export function collapsibleSectionHeader(title, meta, key) {
+  const collapsed = isAnalyticsSectionCollapsed(key);
+  return `
+    <button type="button" class="section-title section-title-toggle" onclick="toggleAnalyticsSection('${key}')">
+      <h2><span class="section-title-chevron">${collapsed ? "▸" : "▾"}</span>${title}</h2>
+      <span>${meta}</span>
+    </button>
+  `;
+}
+
+export function rowMatchesSurvey(row, survey) {
+  if (row.surveyId === survey.id) return true;
+  const cohort = Number(survey.sessionCohort) || 0;
+  return row.sessionId === survey.sessionId
+    && row.phase === survey.phase
+    && (!cohort || Number(row.cohort) === cohort);
+}
+
+export function surveyRows(survey) {
+  return (state.responses || []).filter((row) => rowMatchesSurvey(row, survey));
+}
+
+export function surveyDistributionActive(survey) {
+  return survey?.distribution?.active ?? survey?.distributionActive ?? (survey?.status !== "closed" && !survey?.deletedAt);
+}
+
+export function surveyQuestionsForDistribution(survey) {
+  const configured = (survey.questions || []).filter((q) => q.type === "quant");
+  return configured.length ? configured : defaultQuestions(survey.phase || "사후").filter((q) => q.type === "quant");
 }

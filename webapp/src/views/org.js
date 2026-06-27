@@ -506,9 +506,9 @@ export function renderMemberCard(member, matches) {
 
 export function renderOrgEditorModal() {
   const editor = state.orgEditor;
-  if (!editor || !editor.open) return "";
+  if (!editor) return "";
 
-  if (editor.type === "unit") {
+  if (editor.kind === "unit" || editor.type === "unit") {
     const isEdit = editor.mode === "edit";
     const unit = isEdit ? state.orgUnits.find((item) => item.id === editor.id) : null;
     const parentId = isEdit ? unit?.parentId : editor.parentId;
@@ -558,26 +558,26 @@ export function renderOrgEditorModal() {
             <div class="form-grid compact" style="grid-template-columns:1fr; gap:16px;">
               ${parent ? `<div class="form-info-row"><strong>상위 부서:</strong> <span>${escapeHtml(parent.name)}</span></div>` : ""}
               <label>부서명
-                <input type="text" id="node-name" value="${escapeHtml(unit?.name || "")}" placeholder="부서명을 입력하세요" class="input-text" />
+                <input type="text" id="org-unit-name" value="${escapeHtml(unit?.name || "")}" placeholder="부서명을 입력하세요" class="input-text" />
               </label>
               <label>부서 유형
-                <select id="node-level" ${isEdit ? "disabled" : ""} class="input-text">
+                <select id="org-unit-level" ${isEdit ? "disabled" : ""} class="input-text">
                   ${levelOptions.join("")}
                 </select>
               </label>
               ${isEdit ? `
                 <label>부서 리더 지정
-                  <select id="node-leader-select" class="input-text">
+                  <select id="org-unit-leader" class="input-text" onchange="window.toggleLeaderManualRow?.(this.value)">
                     <option value="">-- 리더 없음/직접 입력 --</option>
                     ${leaderOptions.map((opt) => `<option value="${escapeHtml(opt.value)}" ${currentLeaderVal === opt.value ? "selected" : ""}>${escapeHtml(opt.name)} (${escapeHtml(opt.position)} · ${escapeHtml(opt.orgLabel)})</option>`).join("")}
                   </select>
                 </label>
                 <div class="form-grid compact" style="grid-template-columns:1fr 1fr; gap:12px; margin-top:-4px;" id="node-leader-manual-row">
                   <label>리더 이름 (직접 지정 시)
-                    <input type="text" id="node-leader-manual-name" value="${escapeHtml(unit?.leaderMemberId ? "" : (unit?.leader || ""))}" placeholder="이름" class="input-text" ${unit?.leaderMemberId ? "disabled" : ""} />
+                    <input type="text" id="org-unit-leader-manual-name" value="${escapeHtml(unit?.leaderMemberId ? "" : (unit?.leader || ""))}" placeholder="이름" class="input-text" ${unit?.leaderMemberId ? "disabled" : ""} />
                   </label>
                   <label>리더 직위/직급
-                    <select id="node-leader-manual-title" class="input-text" ${unit?.leaderMemberId ? "disabled" : ""}>
+                    <select id="org-unit-leader-manual-title" class="input-text" ${unit?.leaderMemberId ? "disabled" : ""}>
                       <option value="">-- 직위 선택 --</option>
                       ${POSITION_OPTIONS.map(opt => `<option value="${opt}" ${(!unit?.leaderMemberId && unit?.leaderTitle === opt) ? "selected" : ""}>${opt}</option>`).join("")}
                     </select>

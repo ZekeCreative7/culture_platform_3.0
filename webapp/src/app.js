@@ -1,18 +1,40 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260627-session-redesign-v1';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260627-session-redesign-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
-import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260627-pipeline-v2';
 import { renderComm, bindComm } from './views/comm.js?v=20260627-comm-v1';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js?v=20260627-pipeline-v2';
-import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260627-report-pdf-a4-fit-v1';
-import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
-import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
+import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260627-report-pdf-blocks-v2';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-multitenant-v1';
-import { parseCSV } from './views/upload.js?v=20260627-session-redesign-v1';
+import { parseCSV, renderUpload, renderUploadPreview } from './views/upload.js?v=20260627-session-redesign-v1';
 import { exportBackupJson, importBackupJson } from './backup.js';
+import {
+  renderReport,
+  renderCompareReport,
+  REPORT_DIMS,
+  dimAvg,
+  dimSpread,
+  ragInfo,
+  dimRecommendation
+} from './views/report.js?v=20260627-session-redesign-v1';
+import {
+  renderCalendar,
+  renderMonthCalendar,
+  renderWeekCalendar,
+  renderDayCalendar,
+  renderAttendanceModal,
+  renderDuplicateWarningModal,
+  renderSurveyResponsePanel,
+  renderSurveyCreator
+} from './views/survey.js?v=20260627-session-redesign-v1';
+import {
+  renderAnalytics,
+  renderChart,
+  renderStatsTable,
+  qualResponseRows
+} from './views/analytics.js?v=20260627-session-redesign-v1';
 import {
   renderSessions,
   renderOrgSelectRow,
@@ -32,7 +54,9 @@ import {
   selectedCrossMembers,
   resetCrossDraft,
   getStatus,
-  sessionsByTypeGrouped
+  sessionsByTypeGrouped,
+  sessionCard,
+  scheduleRow
 } from './views/sessions.js?v=20260627-session-redesign-v1';
 import {
   validateAndRepairSelectedOrg,
@@ -62,16 +86,23 @@ import {
   orgMemberCandidate,
   teamMemberCandidates,
   allMemberCandidates,
-  positionRank
+  positionRank,
+  renderOrg,
+  renderOrgPopup,
+  renderOrgActionMenu,
+  renderOrgUnitCard,
+  renderMemberCard,
+  renderOrgEditorModal,
+  persistOrganization
 } from './views/org.js?v=20260627-session-redesign-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, ROUND_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
-  UNIT_LABELS, UNIT_LEADER_LABELS, SCORE_MAP, SCALE_LABELS, scoreOf, isQualText, todayISO,
-  addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
-  normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
-  sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule,
-  targetCountForSession
+  UNIT_LABELS, UNIT_LEADER_LABELS, isQualText, todayISO,
+  uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
+  normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear,
+  sessionLabel, makeSchedule,
+  emptyCard
 } from './utils.js?v=20260627-questions-v1';
 
 import {
@@ -444,2557 +475,6 @@ async function openAuditLogModal() {
   }
 }
 
-function renderOrgPopup() {
-  const companyList = state.orgUnits.filter(u => u.level === "company");
-  const divisionList = topLevelOrgUnits(state.selectedCompany);
-  const hqList = hqUnitsForDivision(state.selectedDivision);
-  const teamList = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
-
-  return `
-    <div class="modal-overlay">
-      <div class="modal-card org-picker-modal">
-        <div class="modal-header">
-          <h2>세션 대상 팀 선택</h2>
-          <button type="button" class="close-btn" id="close-org-picker">&times;</button>
-        </div>
-        <div class="modal-body org-picker-body">
-          <div class="picker-column">
-            <h4>전사</h4>
-            ${companyList.map(c => `<div class="picker-item ${state.selectedCompany === c.id ? "active" : ""}" onclick="selectOrgNode('company', '${c.id}')">${escapeHtml(c.name)}</div>`).join("")}
-          </div>
-          <div class="picker-column">
-            <h4>부문</h4>
-            ${divisionList.map(d => `<div class="picker-item ${state.selectedDivision === d.id ? "active" : ""}" onclick="selectOrgNode('division', '${d.id}')">${escapeHtml(d.name)}</div>`).join("")}
-          </div>
-          <div class="picker-column">
-            <h4>본부</h4>
-            ${hqList.map(h => `<div class="picker-item ${state.selectedHq === h.id ? "active" : ""}" onclick="selectOrgNode('hq', '${h.id}')">${escapeHtml(h.name)}</div>`).join("")}
-          </div>
-          <div class="picker-column">
-            <h4>팀</h4>
-            ${teamList.map(t => `<div class="picker-item ${state.selectedTeam === t.id ? "active" : ""}" onclick="selectOrgNode('team', '${t.id}')">${escapeHtml(t.name)}</div>`).join("")}
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="secondary" type="button" id="cancel-org-picker">취소</button>
-          <button class="primary" type="button" id="confirm-org-picker" ${!state.selectedTeam ? "disabled" : ""}>선택 완료</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderOrgActionMenu(actionsHtml, label = "조직 옵션") {
-  return `
-    <details class="org-card-menu" onclick="event.stopPropagation();">
-      <summary class="org-card-menu-trigger" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
-        <span></span><span></span><span></span>
-      </summary>
-      <div class="org-card-actions">
-        ${actionsHtml}
-      </div>
-    </details>
-  `;
-}
-
-function leaderMeta(unit) {
-  const leader = unitLeaderDetails(unit);
-  if (!leader) return "";
-  return `<span class="org-card-meta">${escapeHtml(leader.role)} · ${escapeHtml(leader.name)} <small>${escapeHtml(leader.grade)}</small></span>`;
-}
-
-function renderOrgUnitCard(unit, activeId, matches, displayLevel = unit.level) {
-  const actionsHtml = `
-    ${["division", "hq"].includes(unit.level) ? `<button data-org-direct-members="${escapeHtml(unit.id)}" title="직속 구성원">직속</button>` : ""}
-    <button data-org-edit-unit="${escapeHtml(unit.id)}" title="설정">설정</button>
-    <button class="delete-btn-red" onclick="event.stopPropagation(); deleteOrgNode('${unit.id}')" title="삭제">삭제</button>
-  `;
-  return `
-    <div class="org-card ${activeId === unit.id ? "active" : ""} ${matches(unit.name) ? "searched-match" : ""}" onclick="selectOrgNode('${displayLevel}', '${unit.id}')"
-         ${displayLevel === "hq" || displayLevel === "team" ? `draggable="true" ondragstart="handleDragStart(event, '${unit.id}', '${displayLevel}')" ondragend="handleDragEnd(event)"` : ""}
-         ${displayLevel !== "company" ? `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${unit.id}', '${displayLevel}')"` : ""}>
-      <div class="org-card-main">
-        <span class="org-card-title">${escapeHtml(unit.name)}</span>
-        ${leaderMeta(unit)}
-        <span class="org-card-meta">고유 인원 · <small>${distinctPeopleCount(unit)}명</small></span>
-      </div>
-      ${renderOrgActionMenu(actionsHtml)}
-    </div>
-  `;
-}
-
-function renderMemberCard(member, matches) {
-  const position = memberGrade(member);
-  const jobTitle = memberJobTitle(member);
-  const actionsHtml = `
-    <button data-org-edit-member="${escapeHtml(member.id)}" title="수정">수정</button>
-    <button class="delete-btn-red" onclick="event.stopPropagation(); deleteMember('${member.id}')" title="삭제">삭제</button>
-  `;
-  return `
-    <div class="org-card member-card ${matches(member.name) ? "searched-match" : ""}" draggable="true" ondragstart="handleDragStart(event, '${member.id}', 'member')" ondragend="handleDragEnd(event)">
-      <div class="org-card-main">
-        <span class="org-card-title">${escapeHtml(member.name)}</span>
-        <span class="org-card-meta">직급 · <small>${escapeHtml(position)}</small>${jobTitle ? ` · 직책 ${escapeHtml(jobTitle)}` : ""}</span>
-      </div>
-      ${renderOrgActionMenu(actionsHtml, "구성원 옵션")}
-    </div>
-  `;
-}
-
-function renderOrgEditorModal() {
-  const editor = state.orgEditor;
-  if (!editor) return "";
-
-  if (editor.kind === "member") {
-    const member = editor.mode === "edit" ? state.orgMembers.find((item) => item.id === editor.id) : null;
-    return `
-      <div class="modal-overlay">
-        <div class="modal-card org-editor-modal">
-          <div class="modal-header">
-            <h2>${editor.mode === "add" ? "구성원 추가" : "구성원 수정"}</h2>
-            <button type="button" class="close-btn" id="close-org-editor">&times;</button>
-          </div>
-          <div class="modal-body org-editor-body">
-            <label>이름
-              <input id="org-member-name" value="${escapeHtml(member?.name || "")}" placeholder="구성원 이름" />
-            </label>
-            <label>직급
-              <select id="org-member-position">
-                ${rankOptions(member?.jobGrade || member?.position || "Specialist")}
-              </select>
-            </label>
-            <label>직책
-              <input id="org-member-job-title" value="${escapeHtml(member?.jobTitle || "")}" placeholder="예: 팀장, 프로젝트 리드" />
-            </label>
-            <label>재직 상태
-              <select id="org-member-employment-status">
-                ${["재직", "휴직", "퇴직"].map((status) => `<option value="${status}" ${status === (member?.employmentStatus || "재직") ? "selected" : ""}>${status}</option>`).join("")}
-              </select>
-            </label>
-          </div>
-          <div class="modal-footer">
-            <button class="secondary" type="button" id="cancel-org-editor">취소</button>
-            <button class="primary" type="button" id="save-org-editor">저장</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  const unit = editor.mode === "edit" ? state.orgUnits.find((item) => item.id === editor.id) : null;
-  const levelLabel = UNIT_LABELS[editor.level] || "조직";
-  const leaderOptions = unit ? orgMemberOptionsForUnit(unit.id) : orgMemberOptionsForUnit(editor.parentId);
-  const selectedLeaderValue = unit?.leaderMemberId
-    ? `member:${unit.leaderMemberId}`
-    : (unit?.leader ? `current:${unit.id}` : "");
-
-  return `
-    <div class="modal-overlay">
-      <div class="modal-card org-editor-modal">
-        <div class="modal-header">
-          <h2>${editor.mode === "add" ? `${levelLabel} 추가` : `${levelLabel} 설정`}</h2>
-          <button type="button" class="close-btn" id="close-org-editor">&times;</button>
-        </div>
-        <div class="modal-body org-editor-body">
-          <label>${levelLabel} 이름
-            <input id="org-unit-name" value="${escapeHtml(unit?.name || "")}" placeholder="${levelLabel} 이름" />
-          </label>
-          ${editor.level !== "company" ? `
-            <label>${UNIT_LEADER_LABELS[editor.level]} 설정
-              <input id="org-unit-leader-search" placeholder="이름 또는 소속 검색" oninput="filterOrgLeaderOptions(this.value)" />
-              <select id="org-unit-leader">
-                <option value="">미지정</option>
-                ${leaderOptions.map((option) => {
-                  const label = `${option.name} · ${option.position}${option.jobTitle ? ` · ${option.jobTitle}` : ""}${option.orgLabel ? ` · ${option.orgLabel}` : ""}`;
-                  return `<option value="${escapeHtml(option.value)}" data-search="${escapeHtml(label.toLowerCase())}" ${selectedLeaderValue === option.value ? "selected" : ""}>${escapeHtml(label)}</option>`;
-                }).join("")}
-              </select>
-            </label>
-          ` : `
-            <label>${UNIT_LEADER_LABELS[editor.level] || "리더"} 직급
-              <select id="org-unit-leader-title">
-                ${rankOptions(unit?.leaderTitle || (editor.level === "company" ? "사장" : "부문장"))}
-              </select>
-            </label>
-          `}
-          ${editor.level !== "company" ? `<p class="org-editor-note">전체 구성원에서 검색해 지정합니다. 상위 조직 리더의 겸임도 가능합니다.</p>` : ""}
-        </div>
-        <div class="modal-footer">
-          <button class="secondary" type="button" id="cancel-org-editor">취소</button>
-          <button class="primary" type="button" id="save-org-editor">저장</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderOrg() {
-  validateAndRepairSelectedOrg();
-
-  const companyList = state.orgUnits.filter(u => u.level === "company");
-  const divisionList = topLevelOrgUnits(state.selectedCompany);
-  const hqList = hqUnitsForDivision(state.selectedDivision);
-  const teamList = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
-  const directUnit = state.orgUnits.find((unit) => unit.id === state.orgDirectUnitId && ["division", "hq"].includes(unit.level));
-  const memberParentId = directUnit?.id || state.selectedTeam || state.selectedHq || state.selectedDivision || state.selectedCompany;
-  const activeMemberUnit = state.orgUnits.find((unit) => unit.id === memberParentId);
-  const memberList = sortedOrgMembers(state.orgMembers.filter(m => m.parentId === memberParentId));
-  const activeUnitLeader = unitLeaderDetails(activeMemberUnit);
-  const activeUnitRole = UNIT_LEADER_LABELS[activeMemberUnit?.level] || "리더";
-
-  // Check if each node matches search query
-  const matches = (nodeName) => {
-    if (!state.orgSearchQuery) return false;
-    return nodeName.toLowerCase().includes(state.orgSearchQuery.toLowerCase());
-  };
-
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">조직 관리</span>
-        <h1>조직 정보 및 인력 구성 관리</h1>
-        <p>전사, 부문, 본부, 팀의 계층 구조를 관리하고 구성원을 드래그 앤 드롭으로 부서 이동 시킵니다.</p>
-      </div>
-    </section>
-
-    <!-- Search Bar -->
-    <div class="org-search-container">
-      <div class="org-search-box">
-        <input id="org-search-input" value="${escapeHtml(state.orgSearchQuery)}" placeholder="부서명 또는 이름으로 검색... (예: 마케팅전략팀, 홍지희)" />
-        <button class="primary" id="btn-org-search">검색</button>
-        ${state.orgSearchQuery ? `<button class="secondary" id="btn-org-search-clear">초기화</button>` : ""}
-      </div>
-    </div>
-    
-    <div class="org-workspace">
-      <!-- 1. Company Column -->
-      <div class="org-column" id="col-company">
-        <div class="org-column-header">
-          <h3>전사 (${companyList.length})</h3>
-          <button class="column-add-btn" onclick="addOrgNode('company', null)" title="회사 추가">+</button>
-        </div>
-        <div class="org-column-body">
-          ${companyList.map(c => renderOrgUnitCard(c, state.selectedCompany, matches)).join("")}
-        </div>
-      </div>
-
-      <!-- 2. Division Column -->
-      <div class="org-column" id="col-division" 
-           ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${state.selectedCompany}', 'company')">
-        <div class="org-column-header">
-          <h3>부문 (${divisionList.length})</h3>
-          <button class="column-add-btn" onclick="addOrgNode('division', '${state.selectedCompany}')" title="부문 추가">+</button>
-        </div>
-        <div class="org-column-body">
-          ${divisionList.map(d => renderOrgUnitCard(d, state.selectedDivision, matches, "division")).join("")}
-        </div>
-      </div>
-
-      <!-- 3. HQ Column -->
-      <div class="org-column" id="col-hq"
-           ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${state.selectedDivision}', 'division')">
-        <div class="org-column-header">
-          <h3>본부 (${hqList.length})</h3>
-          <button class="column-add-btn" onclick="addOrgNode('hq', '${state.selectedDivision}')" title="본부 추가">+</button>
-        </div>
-        <div class="org-column-body">
-          ${hqList.map(h => renderOrgUnitCard(h, state.selectedHq, matches)).join("")}
-        </div>
-      </div>
-
-      <!-- 4. Team Column -->
-      <div class="org-column" id="col-team"
-           ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${state.selectedHq || state.selectedDivision}', '${state.selectedHq ? "hq" : "division"}')">
-        <div class="org-column-header">
-          <h3>팀 (${teamList.length})</h3>
-          <button class="column-add-btn" onclick="addOrgNode('team', '${state.selectedHq}')" title="팀 추가">+</button>
-        </div>
-        <div class="org-column-body">
-          ${teamList.map(t => renderOrgUnitCard(t, state.selectedTeam, matches)).join("")}
-        </div>
-      </div>
-
-      <!-- 5. Member Column -->
-      <div class="org-column" id="col-member"
-           ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${memberParentId}', '${activeMemberUnit?.level || "team"}')">
-        <div class="org-column-header">
-          <h3>${activeMemberUnit?.level === "team" ? "구성원" : "직속 구성원"} (${distinctDirectPeopleCount(activeMemberUnit)})</h3>
-          <button class="column-add-btn" onclick="addOrgMember('${memberParentId}')" title="구성원 추가">+</button>
-        </div>
-        <div style="padding:8px 10px 0;">
-          <select aria-label="구성원 정렬" onchange="setOrgMemberSort(this.value)" style="width:100%; font-size:12px;">
-            <option value="default" ${state.orgMemberSort === "default" ? "selected" : ""}>기본 순서</option>
-            <option value="rank-desc" ${state.orgMemberSort === "rank-desc" ? "selected" : ""}>직급 높은 순</option>
-            <option value="rank-asc" ${state.orgMemberSort === "rank-asc" ? "selected" : ""}>직급 낮은 순</option>
-            <option value="name" ${state.orgMemberSort === "name" ? "selected" : ""}>이름 가나다순</option>
-          </select>
-        </div>
-        <div class="org-column-body">
-          <!-- Leader -->
-          ${activeUnitLeader ? `
-            <div class="org-card leader-card ${matches(activeUnitLeader.name) ? "searched-match" : ""}">
-              <div class="org-card-badge">${escapeHtml(activeUnitRole)}</div>
-              <div class="org-card-main">
-                <span class="org-card-title"><strong>${escapeHtml(activeUnitLeader.name)}</strong></span>
-                <span class="org-card-meta">${escapeHtml(activeUnitLeader.grade)} / ${escapeHtml(activeUnitRole)}${activeUnitLeader.jobTitle && activeUnitLeader.jobTitle !== activeUnitRole ? ` · ${escapeHtml(activeUnitLeader.jobTitle)}` : ""}</span>
-              </div>
-              ${renderOrgActionMenu(`
-                <button data-org-edit-unit="${escapeHtml(activeMemberUnit.id)}" title="수정">수정</button>
-                <button class="delete-btn-red" onclick="event.stopPropagation(); deleteTeamLeader('${activeMemberUnit.id}')" title="삭제">삭제</button>
-              `, "리더 옵션")}
-            </div>
-          ` : ""}
-          
-          <!-- Members -->
-          ${memberList.map(m => renderMemberCard(m, matches)).join("")}
-        </div>
-      </div>
-    </div>
-    ${renderOrgEditorModal()}
-  `;
-}
-
-function persistOrganization() {
-  saveOrgData();
-  saveState();
-  saveOrganizationToFirestore().catch((error) => {
-    console.error("Firestore 조직도 저장 실패:", error);
-    setDbStatus("error");
-  });
-}
-
-function renderCalendar() {
-  const d = new Date(state.calendarDate);
-  const year = d.getFullYear();
-  const month = d.getMonth();
-
-  let headerHtml = `
-    <div class="calendar-controls">
-      <div class="calendar-nav-buttons">
-        <button class="calendar-nav-btn" id="cal-prev-btn" aria-label="이전달">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-        </button>
-        <h3>${year}년 ${month + 1}월</h3>
-        <button class="calendar-nav-btn" id="cal-next-btn" aria-label="다음달">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-        </button>
-      </div>
-      <div class="calendar-view-toggle">
-        <button class="tab-btn small ${state.calendarView === 'month' ? 'active' : ''}" id="cal-view-month">월별</button>
-        <button class="tab-btn small ${state.calendarView === 'week' ? 'active' : ''}" id="cal-view-week">주별</button>
-        <button class="tab-btn small ${state.calendarView === 'day' ? 'active' : ''}" id="cal-view-day">일별</button>
-      </div>
-    </div>
-  `;
-
-  if (state.calendarView === "month") {
-    headerHtml += renderMonthCalendar(year, month);
-  } else if (state.calendarView === "week") {
-    headerHtml += renderWeekCalendar(d);
-  } else {
-    headerHtml += renderDayCalendar(d);
-  }
-
-  return headerHtml;
-}
-
-function renderMonthCalendar(year, month) {
-  const firstDay = new Date(year, month, 1).getDay();
-  const totalDays = new Date(year, month + 1, 0).getDate();
-  const daysHeader = ["일", "월", "화", "수", "목", "금", "토"];
-  
-  let html = `
-    <div class="month-calendar-grid">
-      ${daysHeader.map(d => `<div class="grid-header-cell">${d}</div>`).join("")}
-  `;
-
-  for (let i = 0; i < firstDay; i++) {
-    html += `<div class="grid-day-cell pad"></div>`;
-  }
-
-  for (let day = 1; day <= totalDays; day++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const events = [];
-    state.sessions.forEach(session => {
-      (session.schedule || []).forEach(item => {
-        if (item.date === dateStr) {
-          events.push({ session, item });
-        }
-      });
-    });
-
-    html += `
-      <div class="grid-day-cell ${dateStr === todayISO() ? 'today' : ''}">
-        <span class="day-num">${day}</span>
-        <div class="day-events">
-          ${events.map(({ session, item }) => {
-            const type = normalizeSessionType(session.type);
-            const accent = sessionTypeDef(type).accent;
-            const label = type === "팀빌딩" ? session.team : sessionLabel(session);
-            return `
-              <div class="calendar-event-pill" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
-                <strong>${item.seq}회</strong> ${escapeHtml(label)}
-              </div>
-            `;
-          }).join("")}
-        </div>
-      </div>
-    `;
-  }
-
-  const remainingCells = (firstDay + totalDays) % 7;
-  if (remainingCells > 0) {
-    for (let i = remainingCells; i < 7; i++) {
-      html += `<div class="grid-day-cell pad"></div>`;
-    }
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-function renderWeekCalendar(anchorDate) {
-  const startOfWeek = new Date(anchorDate);
-  const dayOfWeek = startOfWeek.getDay();
-  startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek);
-
-  const daysHeader = ["일", "월", "화", "수", "목", "금", "토"];
-  let html = `<div class="week-calendar-list">`;
-
-  for (let i = 0; i < 7; i++) {
-    const current = new Date(startOfWeek);
-    current.setDate(startOfWeek.getDate() + i);
-    const dateStr = current.toISOString().slice(0, 10);
-
-    const events = [];
-    state.sessions.forEach(session => {
-      (session.schedule || []).forEach(item => {
-        if (item.date === dateStr) {
-          events.push({ session, item });
-        }
-      });
-    });
-
-    html += `
-      <div class="week-day-row ${dateStr === todayISO() ? 'today' : ''}">
-        <div class="week-day-meta">
-          <strong>${daysHeader[i]}요일</strong>
-          <span>${current.getMonth() + 1}/${current.getDate()}</span>
-        </div>
-        <div class="week-day-events">
-          ${events.length ? events.map(({ session, item }) => {
-            const accent = sessionTypeDef(session.type).accent;
-            const label = sessionLabel(session);
-            return `
-              <div class="week-event-card" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
-                <div class="time-tag">${item.startTime} (${item.duration}분)</div>
-                <strong>${escapeHtml(item.content)} (${item.seq}회차)</strong>
-                <small>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(label)}</small>
-              </div>
-            `;
-          }).join("") : `<div class="no-events-placeholder">일정이 없습니다.</div>`}
-        </div>
-      </div>
-    `;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-function renderDayCalendar(anchorDate) {
-  const dateStr = anchorDate.toISOString().slice(0, 10);
-  const events = [];
-  state.sessions.forEach(session => {
-    (session.schedule || []).forEach(item => {
-      if (item.date === dateStr) {
-        events.push({ session, item });
-      }
-    });
-  });
-
-  events.sort((a, b) => a.item.startTime.localeCompare(b.item.startTime));
-
-  return `
-    <div class="day-calendar-view">
-      <div class="day-header-meta">
-        <strong>${anchorDate.toLocaleDateString("ko-KR", { weekday: 'long' })}</strong>
-        <span>${anchorDate.toLocaleDateString("ko-KR", { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-      </div>
-      <div class="day-events-list">
-        ${events.length ? events.map(({ session, item }) => {
-          const accent = sessionTypeDef(session.type).accent;
-          const label = sessionLabel(session);
-          return `
-            <div class="day-event-card" style="--accent:${accent}" onclick="openAttendance('${session.id}', '${item.id}')">
-              <div class="event-time">${item.startTime} ~ ${addMinutes(item.startTime, item.duration)} (${item.duration}분)</div>
-              <div class="event-info">
-                <h3>${escapeHtml(item.content)} (${item.seq}회차)</h3>
-                <p>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(label)}</p>
-                ${item.note ? `<small>메모: ${escapeHtml(item.note)}</small>` : ""}
-              </div>
-              <div class="event-action-badge">상태: ${item.status === 'confirmed' ? '확정' : '예정'}</div>
-            </div>
-          `;
-        }).join("") : `<div class="empty-day-placeholder">오늘 등록된 세션 일정이 없습니다.</div>`}
-      </div>
-    </div>
-  `;
-}
-
-function addMinutes(timeStr, mins) {
-  const [h, m] = timeStr.split(":").map(Number);
-  const date = new Date();
-  date.setHours(h, m + mins);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
-
-function renderDuplicateWarningModal() {
-  const existing = state.sessions.find(s => s.id === state.duplicateSessionWarning);
-  if (!existing) return "";
-  return `
-    <div class="modal-overlay">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h2>이미 등록된 기수입니다</h2>
-          <button type="button" class="close-btn" id="close-duplicate-warning">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p>${escapeHtml(existing.type)} · ${escapeHtml(sessionLabel(existing))} 세션이 이미 있습니다. 새로 만드는 대신 기존 세션을 수정하시겠습니까?</p>
-        </div>
-        <div class="modal-footer">
-          <button class="secondary" type="button" id="cancel-duplicate-warning">취소</button>
-          <button class="primary" type="button" id="edit-existing-session">기존 세션 수정하기</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderAttendanceModal() {
-  const session = state.sessions.find(s => s.id === state.activeAttendanceSessionId);
-  const item = session ? session.schedule.find(i => i.id === state.activeAttendanceItemId) : null;
-
-  if (!session || !item) return "";
-
-  const members = session.members || [];
-  const absences = item.absences || [];
-
-  return `
-    <div class="modal-overlay">
-      <div class="modal-card attendance-modal">
-        <div class="modal-header">
-          <h2>출석 및 세션 기록 관리</h2>
-          <button type="button" class="close-btn" id="close-attendance">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="attendance-meta">
-            <h3>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</h3>
-            <h4>${item.seq}회차: ${escapeHtml(item.content || "콘텐츠 미확정")}</h4>
-            <p><strong>일시:</strong> ${item.date || "미정"} ${item.startTime} (${item.duration}분)</p>
-          </div>
-          
-          <div class="attendance-form-section">
-            <h4>참석 정보 기록</h4>
-            <label style="flex-direction:row; align-items:center; gap:8px;">
-              <input type="checkbox" id="round-completed" ${item.status === 'completed' ? 'checked' : ''} />
-              이 세션 회차 완료 처리 (완료 시 통계 반영)
-            </label>
-          </div>
-
-          <div class="attendance-list-section">
-            <h4>구성원 결석 체크 (결석자 선택)</h4>
-            ${members.length ? `
-              <div class="attendance-members-grid">
-                ${members.map(m => {
-                  const isAbsent = absences.includes(m.id);
-                  return `
-                    <label class="attendance-member-checkbox ${isAbsent ? 'absent' : ''}">
-                      <input type="checkbox" data-member-id="${m.id}" ${isAbsent ? 'checked' : ''} onchange="toggleAbsentStyle(this)" />
-                      <span>${escapeHtml(m.name)} <small>${escapeHtml(m.position || "팀원")}</small></span>
-                    </label>
-                  `;
-                }).join("")}
-              </div>
-            ` : `
-              <p class="muted">세션에 등록된 참여자가 없습니다. 세션 등록 화면에서 참여자 구성을 먼저 완료해 주세요.</p>
-            `}
-          </div>
-          
-          <div class="attendance-note-section">
-            <label>세션 일지 / 피드백 메모
-              <textarea id="attendance-note" style="min-height:80px; width:100%;" class="input-text">${escapeHtml(item.note || "")}</textarea>
-            </label>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="secondary" type="button" id="cancel-attendance">취소</button>
-          <button class="primary" type="button" id="save-attendance">기록 저장</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderSurveyResponsePanel(survey, session, showReset = true) {
-  const rows = surveyRows(survey);
-  const target = targetCountForSession(session);
-  const answered = rows.length;
-  const uploadedCount = rows.filter((row) => String(row.sourceType || "").includes("업로드")).length;
-  const linkedCount = answered - uploadedCount;
-  const rate = target ? Math.min(100, Math.round((answered / target) * 100)) : 0;
-  // 데이터 리셋은 설문/QR 배포 화면(설문지)에서만 노출한다. Change(변화 분석)는 읽기 전용 분석 화면이라
-  // 실수로 응답을 날리지 않도록 리셋 버튼을 숨긴다.
-  const resetBtn = showReset
-    ? `<button class="ghost compact" style="font-size:11px; color:#ef4444; border-color:#fecaca;" onclick="resetSurveyResponses('${survey.id}')" ${answered ? "" : "disabled"}>응답 완전 삭제</button>`
-    : "";
-  // A survey that is explicitly configured with no 객관식(척도) 문항 — e.g. a 중간 설문 that is
-  // open-ended only — must NOT borrow the default q1~q8 quant questions and show a misleading
-  // distribution against a large response count. Say "객관식 없음" and point to the 정성 영역.
-  const configuredQuant = (survey.questions || []).filter((q) => q.type === "quant");
-  const hasQuestionConfig = (survey.questions || []).length > 0;
-  if (hasQuestionConfig && !configuredQuant.length) {
-    return `
-      <div class="survey-live-panel">
-        <div class="survey-live-head">
-          <div>
-            <strong>${answered}건 응답 · 객관식 없음</strong>
-            <span>링크/QR ${linkedCount}건 · 파일 업로드 ${uploadedCount}건 · 응답 내용은 정성 응답 영역에서 확인하세요.</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:10px;">${resetBtn}</div>
-        </div>
-        <div class="empty" style="margin-top:12px;">집계할 객관식(척도) 문항이 없습니다.</div>
-      </div>
-    `;
-  }
-
-  const questions = surveyQuestionsForDistribution(survey);
-
-  const distributionRows = questions.map((q) => {
-    const counts = [5, 4, 3, 2, 1].map((score) => rows.filter((row) => scoreOf(row[q.id]) === score).length);
-    const total = counts.reduce((sum, value) => sum + value, 0);
-    const avg = total
-      ? [5, 4, 3, 2, 1].reduce((sum, score, index) => sum + score * counts[index], 0) / total
-      : null;
-    return { ...q, counts, total, avg };
-  });
-
-  return `
-    <div class="survey-live-panel">
-      <div class="survey-live-head">
-        <div>
-          <strong>${target ? `${target}명 대상 · ${answered}건 응답` : `${answered}건 응답`}</strong>
-          <span>${target ? `진행률 ${rate}%${answered > target ? " · 중복/재제출 포함" : ""}` : "대상 인원은 세션 구성원 등록 후 표시"} · 링크/QR ${linkedCount}건 · 파일 업로드 ${uploadedCount}건</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <b>${answered}</b>
-          ${resetBtn}
-        </div>
-      </div>
-      ${target ? `
-        <div class="survey-progress"><i style="width:${rate}%"></i></div>
-      ` : ""}
-      <div class="survey-distribution-list">
-        ${distributionRows.map((q) => `
-          <article>
-            <div class="survey-dist-title">
-              <strong>${escapeHtml(q.text)}</strong>
-              <span>${q.avg !== null ? `${q.avg.toFixed(2)} / 5` : "응답 없음"}</span>
-            </div>
-            <div class="survey-dist-bars" aria-label="${escapeHtml(q.text)} 응답 분포">
-              ${[5, 4, 3, 2, 1].map((score, index) => {
-                const count = q.counts[index];
-                const pct = q.total ? Math.round((count / q.total) * 100) : 0;
-                return `
-                  <div>
-                    <em>${score}</em>
-                    <span><i style="width:${pct}%"></i></span>
-                    <b>${count}</b>
-                  </div>
-                `;
-              }).join("")}
-            </div>
-          </article>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function surveySessionCohortKey(session) {
-  return `${sessionYear(session) || session.year || ''}:${Number(session.cohort) || ''}`;
-}
-
-function surveySessionTargetLabel(session) {
-  const type = normalizeSessionType(session.type);
-  if (type === '팀빌딩') return session.team || session.teamName || sessionLabel(session);
-  const teams = session.participatingTeams
-    || [...new Set((session.members || []).map((member) => member.teamName).filter(Boolean))].join(', ');
-  return teams || sessionLabel(session);
-}
-
-function renderSurveyCreator() {
-  const activeSessions = state.sessions || [];
-  const activeSurveys = (state.surveys || []).filter(surveyDistributionActive);
-  const closedSurveys = (state.surveys || []).filter((survey) => !surveyDistributionActive(survey));
-  const draftQuestions = state.draftSurveyQuestions || [];
-  const currentStep = state.surveyCreatorStep || 1;
-  const selectedDraftSession = activeSessions.find((session) => session.id === state.draftSurveySessionId);
-  const requestedSessionType = state.draftSurveySessionType || selectedDraftSession?.type || '';
-  const draftSessionType = requestedSessionType ? normalizeSessionType(requestedSessionType) : '';
-  const sessionsForType = draftSessionType
-    ? activeSessions.filter((session) => sameSessionType(session.type, draftSessionType))
-    : [];
-  const cohortOptions = [...new Map(sessionsForType.map((session) => {
-    const key = surveySessionCohortKey(session);
-    return [key, { key, year: sessionYear(session) || session.year || '', cohort: Number(session.cohort) || '' }];
-  })).values()].sort((a, b) => Number(b.year || 0) - Number(a.year || 0) || Number(a.cohort || 0) - Number(b.cohort || 0));
-  const draftCohortKey = state.draftSurveyCohortKey || (selectedDraftSession ? surveySessionCohortKey(selectedDraftSession) : '');
-  const sessionsForCohort = draftCohortKey
-    ? sessionsForType.filter((session) => surveySessionCohortKey(session) === draftCohortKey)
-    : [];
-  const availableSessionTypes = Object.keys(SESSION_TYPES).filter((type) => activeSessions.some((session) => sameSessionType(session.type, type)));
-
-  // Real-time validation checks for Step 3
-  const hasTitle = Boolean((state.draftSurveyTitle || "").trim());
-  const hasSession = Boolean(state.draftSurveySessionId);
-  const hasSource = Boolean((state.draftGoogleFormUrl || "").trim() || draftQuestions.length > 0);
-  const isValid = hasTitle && hasSession && hasSource;
-
-  // Stepper Header HTML
-  const stepperHtml = `
-    <div class="stepper-bar" style="display:flex; justify-content:space-between; margin-bottom:24px; position:relative; padding:0 24px;">
-      <!-- Background track line -->
-      <div style="position:absolute; top:15px; left:24px; right:24px; height:3px; background:#e2e8f0; z-index:1; border-radius:2px;"></div>
-      <div style="position:absolute; top:15px; left:24px; width:calc(${(currentStep - 1) * 50}% - ${(currentStep - 1) * 12}px); height:3px; background:var(--neon-blue); z-index:2; transition:width 0.3s ease; border-radius:2px;"></div>
-      
-      <!-- Step 1 -->
-      <div onclick="window.setSurveyCreatorStep(1)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
-        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 1 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 1 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 1 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">1</div>
-        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 1 ? 'var(--ink)' : 'var(--muted)'};">기본 정보</span>
-      </div>
-      
-      <!-- Step 2 -->
-      <div onclick="window.setSurveyCreatorStep(2)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
-        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 2 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 2 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 2 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">2</div>
-        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 2 ? 'var(--ink)' : 'var(--muted)'};">설문 설계</span>
-      </div>
-
-      <!-- Step 3 -->
-      <div onclick="window.setSurveyCreatorStep(3)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
-        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 3 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 3 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 3 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">3</div>
-        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 3 ? 'var(--ink)' : 'var(--muted)'};">검증 및 배포</span>
-      </div>
-    </div>
-  `;
-
-  // Step 1: Basic Settings HTML
-  const step1Html = `
-    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
-      <label>설문 제목
-        <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 리더십 세션 2026년 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
-      </label>
-      <div class="survey-session-cascade">
-        <label>세션 종류
-          <select id="survey-session-type-select" onchange="updateSurveyDraftSessionType(this.value)">
-            <option value="">-- 종류 선택 --</option>
-            ${availableSessionTypes.map((type) => `<option value="${escapeHtml(type)}" ${draftSessionType === type ? 'selected' : ''}>${escapeHtml(sessionTypeLabel(type))}</option>`).join('')}
-          </select>
-        </label>
-        <label>기수
-          <select id="survey-session-cohort-select" onchange="updateSurveyDraftCohort(this.value)" ${draftSessionType ? '' : 'disabled'}>
-            <option value="">-- 기수 선택 --</option>
-            ${cohortOptions.map((item) => `<option value="${escapeHtml(item.key)}" ${draftCohortKey === item.key ? 'selected' : ''}>${item.year ? `${escapeHtml(item.year)}년 ` : ''}${escapeHtml(item.cohort)}기</option>`).join('')}
-          </select>
-        </label>
-        <label>팀 / 대상 세션
-          <select id="survey-session-select" onchange="updateSurveyDraftField('draftSurveySessionId', this.value)" ${draftCohortKey ? '' : 'disabled'}>
-            <option value="">-- 팀 선택 --</option>
-            ${sessionsForCohort.map((session) => `<option value="${escapeHtml(session.id)}" ${state.draftSurveySessionId === session.id ? 'selected' : ''}>${escapeHtml(surveySessionTargetLabel(session))}</option>`).join('')}
-          </select>
-        </label>
-      </div>
-      <label>설문 시점
-        <select id="survey-phase-select" onchange="updateSurveyDraftPhase(this.value)">
-          <option value="사전" ${state.draftSurveyPhase === "사전" ? "selected" : ""}>사전</option>
-          <option value="사후" ${state.draftSurveyPhase === "사후" ? "selected" : ""}>사후</option>
-          <option value="팔로우업" ${state.draftSurveyPhase === "팔로우업" ? "selected" : ""}>팔로우업 (60일)</option>
-        </select>
-      </label>
-      
-      <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-        <button class="primary" type="button" onclick="window.setSurveyCreatorStep(2)" style="width:120px;">다음 단계 ➔</button>
-      </div>
-    </div>
-  `;
-
-  // Step 2: Survey Design HTML
-  const step2Html = `
-    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
-      <!-- Google Form URL (primary method) -->
-      <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #bae6fd; border-radius:10px; padding:16px;">
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-          <span style="font-size:11px;font-weight:800;color:var(--blue-mid);">URL</span>
-          <strong style="font-size:13px; color:var(--ink);">구글 폼 URL 연결 (권장)</strong>
-        </div>
-        <p style="font-size:11.5px; color:var(--muted); margin:0 0 10px 0; line-height:1.6;">구글 폼에서 설문을 직접 만들고 배포용 링크를 붙여넣으세요. 해당 링크로 QR 코드가 생성됩니다.</p>
-        <label style="font-size:12px; font-weight:700; color:var(--ink-2);">구글 폼 URL
-          <input id="survey-google-form-url" value="${escapeHtml(state.draftGoogleFormUrl)}" placeholder="https://forms.gle/... 또는 https://docs.google.com/forms/..." oninput="updateSurveyDraftField('draftGoogleFormUrl', this.value)" style="margin-top:6px;" />
-        </label>
-      </div>
-
-      <!-- Divider -->
-      <div style="display:flex; align-items:center; gap:10px; color:var(--muted); font-size:11px; font-weight:700;">
-        <div style="flex:1; height:1px; background:var(--line);"></div>
-        또는 자체 설문 직접 설계
-        <div style="flex:1; height:1px; background:var(--line);"></div>
-      </div>
-
-      <!-- Template loader -->
-      ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length > 0 || (state.surveyTemplates || []).length > 0 ? `
-      <div style="display:flex; gap:8px; align-items:flex-end;">
-        <label style="flex:1; font-size:12px; font-weight:700; color:var(--ink-2);">기존 설문/템플릿에서 질문 불러오기
-          <select id="survey-template-select" style="margin-top:4px;">
-            <option value="">-- 템플릿 선택 --</option>
-            ${(state.surveyTemplates || []).length ? `<optgroup label="템플릿">${state.surveyTemplates.map(t => `<option value="tpl:${t.id}">${escapeHtml(t.title)} (${(t.questions || []).length}문항${t.phase ? ` · ${t.phase}` : ''})</option>`).join('')}</optgroup>` : ''}
-            ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length ? `<optgroup label="배포 중인 설문">${state.surveys.filter(s => s.questions && s.questions.length > 0).map(s => `<option value="${s.id}">${escapeHtml(s.title)} (${s.questions.length}문항 · ${s.phase})</option>`).join('')}</optgroup>` : ''}
-          </select>
-        </label>
-        <button class="secondary compact" style="white-space:nowrap; flex-shrink:0;" onclick="loadSurveyTemplate()">불러오기</button>
-      </div>
-      ` : ''}
-
-      <!-- Questions Editor -->
-      <div class="survey-questions-preview" style="background:var(--surface-soft); border-radius:8px; padding:16px; border:1px solid var(--line); ${state.draftGoogleFormUrl ? 'opacity:0.45; pointer-events:none;' : ''}">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <h4 style="margin:0;">설문지 질문 구성 (${draftQuestions.length}문항)</h4>
-          <button class="secondary small compact" onclick="addSurveyDraftQuestion()">+ 질문 추가</button>
-        </div>
-
-        <div class="draft-questions-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:10px;">
-          ${draftQuestions.map((q, idx) => `
-            <div class="draft-q-row">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <span style="font-size:11px; font-weight:800; color:var(--cyan); text-transform:uppercase; letter-spacing:0.04em;">${q.id.toUpperCase()} · ${q.type === 'quant' ? '5점 척도' : '주관식 텍스트'}</span>
-                <button onclick="deleteSurveyDraftQuestion('${q.id}')" style="background:transparent; border:none; padding:3px 8px; font-size:12px; color:var(--muted); cursor:pointer; border-radius:4px; transition:all 0.15s; font-weight:700;">&times; 삭제</button>
-              </div>
-              <input style="min-height:38px; font-size:13px; width:100%; border:1.5px solid #e5e7eb; border-radius:var(--radius-sm); background:#ffffff; color:var(--ink); padding:8px 12px; outline:none; box-sizing:border-box;" value="${escapeHtml(q.text)}" placeholder="질문 내용을 입력하세요." oninput="updateSurveyDraftQuestionText('${q.id}', this.value)" />
-              <div style="display:inline-flex; gap:4px; background:#f3f4f6; padding:3px; border-radius:8px; border:1px solid #e5e7eb; margin-top:2px;">
-                <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'quant' ? '#fff' : 'var(--muted)'}; background:${q.type === 'quant' ? 'var(--neon-blue)' : 'transparent'};">
-                  <input type="radio" name="qtype-${q.id}" value="quant" ${q.type === 'quant' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'quant')" style="display:none;" /> 5점 척도
-                </label>
-                <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'qual' ? '#fff' : 'var(--muted)'}; background:${q.type === 'qual' ? 'var(--neon-blue)' : 'transparent'};">
-                  <input type="radio" name="qtype-${q.id}" value="qual" ${q.type === 'qual' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'qual')" style="display:none;" /> 주관식
-                </label>
-              </div>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-      
-      <div style="display:flex; justify-content:space-between; margin-top:10px;">
-        <button class="secondary" type="button" onclick="window.setSurveyCreatorStep(1)" style="width:120px;">➔ 이전 단계</button>
-        <button class="primary" type="button" onclick="window.setSurveyCreatorStep(3)" style="width:120px;">다음 단계 ➔</button>
-      </div>
-    </div>
-  `;
-
-  // Step 3: Verification & Submit HTML
-  const checkIcon = (valid) => valid 
-    ? `<span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#e6f4ea; color:#137333; font-weight:800; font-size:12px;">✓</span>`
-    : `<span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#fce8e6; color:#c5221f; font-weight:800; font-size:12px;">✗</span>`;
-
-  const step3Html = `
-    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-        <h4 style="margin:0 0 14px 0; font-size:14px; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">배포 활성 조건 검증 체크리스트</h4>
-        
-        <div style="display:flex; flex-direction:column; gap:12px;">
-          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasTitle ? '#1e293b' : '#64748b'};">
-            ${checkIcon(hasTitle)}
-            <span>설문 제목 입력</span>
-            ${state.draftSurveyTitle ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${escapeHtml(state.draftSurveyTitle)})</small>` : ''}
-          </div>
-          
-          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasSession ? '#1e293b' : '#64748b'};">
-            ${checkIcon(hasSession)}
-            <span>대상 세션 선택</span>
-            ${hasSession && activeSessions.find(s => s.id === state.draftSurveySessionId) ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${escapeHtml(activeSessions.find(s => s.id === state.draftSurveySessionId).type)})</small>` : ''}
-          </div>
-          
-          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasSource ? '#1e293b' : '#64748b'};">
-            ${checkIcon(hasSource)}
-            <span>설문 소스 구성 (구글 폼 또는 자체 질문)</span>
-            ${hasSource ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${state.draftGoogleFormUrl ? '구글 폼 URL' : `${draftQuestions.length}개 질문`})</small>` : ''}
-          </div>
-        </div>
-      </div>
-
-      ${(state.qrBaseUrl || '').includes('localhost') || (state.qrBaseUrl || '').includes('127.0.0.1') ? `
-      <div style="background:#fef3c7; border:1.5px solid #fbbf24; border-radius:8px; padding:12px 14px; font-size:12px; color:#92400e; line-height:1.6;">
-        <strong>주의</strong> · QR 베이스 주소가 <strong>localhost</strong>로 설정되어 있어 모바일에서 열리지 않습니다.<br/>
-        배포 설문은 <strong>GitHub Pages URL</strong>을 사용하세요:<br/>
-        <code style="font-size:11px; word-break:break-all;">https://zekecreative7.github.io/culture_platform_3.0/webapp</code>
-      </div>
-      ` : ''}
-
-      <div style="display:flex; gap:8px; margin-top:10px;">
-        <button class="secondary" type="button" onclick="window.setSurveyCreatorStep(2)" style="width:120px;">➔ 이전 단계</button>
-        ${state.editingSurveyId ? `<button class="ghost" id="cancel-edit-survey" type="button" onclick="window.cancelSurveyEdit()">취소</button>` : ''}
-        <button class="primary" id="btn-create-survey-submit" style="flex:1;" onclick="window.submitSurveyDraft()" ${isValid ? '' : 'disabled'}>
-          ${state.editingSurveyId ? '수정 완료' : '배포 및 QR 생성'}
-        </button>
-      </div>
-    </div>
-  `;
-
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">설문지 제작</span>
-        <h1>동적 설문 설계 및 배포 QR 생성</h1>
-        <p>세션 및 회차별 모바일 설문을 설계하고, 자동 생성된 QR 코드로 구성원들의 응답을 실시간으로 적재합니다.</p>
-      </div>
-    </section>
-
-    <div class="workspace-grid">
-      <!-- Left: Create Survey -->
-      <div class="panel">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-          <h3 style="margin:0;">${state.editingSurveyId ? '설문 수정' : '새 설문 조사 설계'}</h3>
-          ${state.editingSurveyId ? `
-            <span style="font-size:12px;color:#0ea5e9;font-weight:700;">설문 수정 중</span>
-          ` : ''}
-        </div>
-        
-        <!-- Stepper Navigation -->
-        ${stepperHtml}
-        
-        <!-- Step Contents -->
-        ${currentStep === 1 ? step1Html : currentStep === 2 ? step2Html : step3Html}
-      </div>
-
-      <!-- Right: Generated Surveys -->
-      <div>
-        ${sectionTitle("배포 중인 설문지 및 QR", `${activeSurveys.length}건`)}
-        ${activeSurveys.length > 1 ? `
-        <div style="display:flex; gap:8px; margin-bottom:12px; justify-content:flex-end;">
-          <button class="ghost compact" style="font-size:11.5px;" onclick="collapseAllSurveys(true)">전체 접기</button>
-          <button class="ghost compact" style="font-size:11.5px;" onclick="collapseAllSurveys(false)">전체 펼치기</button>
-        </div>` : ''}
-        <div class="surveys-grid">
-          ${activeSurveys.length ? activeSurveys.map(s => {
-            const sess = state.sessions.find(session => session.id === s.sessionId);
-            const sessLabel = sess ? `${sess.type} · ${sessionLabel(sess)}` : "만료된 세션";
-            const isCollapsed = (state.collapsedSurveyIds || []).includes(s.id);
-
-            // If Google Form URL is set, use it directly for QR
-            let surveyLink;
-            if (s.googleFormUrl) {
-              surveyLink = s.googleFormUrl;
-            } else {
-              const qrHost = (state.qrBaseUrl || new URL('.', window.location.href).href).replace(/\/$/, '');
-              surveyLink = `${qrHost}/survey.html?surveyId=${s.id}`;
-            }
-
-            // Generate QR Code locally using qrcode.min.js
-            let qrUrl = "";
-            try {
-              const qr = qrcode(0, 'L');
-              qr.addData(surveyLink);
-              qr.make();
-              qrUrl = qr.createDataURL(4);
-            } catch (err) {
-              qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(surveyLink)}`;
-            }
-
-            if (isCollapsed) {
-              const collapsedRows = surveyRows(s);
-              const collapsedTarget = targetCountForSession(sess);
-              return `
-                <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
-                  <div style="flex:1; min-width:0;">
-                    <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.title)}</strong>
-                    <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${escapeHtml(sessLabel)} · ${escapeHtml(s.phase)} · 대상 ${collapsedTarget || "-"}명 · 응답 ${collapsedRows.length}건${s.googleFormUrl ? ' · 구글 폼' : ''}</span>
-                  </div>
-                  <button onclick="startEditSurvey('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--blue-mid); cursor:pointer; white-space:nowrap; flex-shrink:0;">수정</button>
-                  <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; flex-shrink:0;">펼치기 ▾</button>
-                  <button class="ghost compact" onclick="deleteSurvey('${s.id}')" title="배포 종료" style="color:#b45309; border-color:#fcd34d; font-weight:800; padding:6px 10px;">✕</button>
-                </div>
-              `;
-            }
-
-            return `
-              <div class="survey-deploy-card">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                  <div class="survey-deploy-info" style="flex:1; min-width:0;">
-                    <strong>${escapeHtml(s.title)}</strong>
-                    <span>${escapeHtml(sessLabel)} [${escapeHtml(s.phase)}]${s.googleFormUrl ? ' · <span style="color:#0ea5e9;font-weight:800;">구글 폼</span>' : ''}</span>
-                  </div>
-                  <div style="display:flex; gap:6px; flex-shrink:0;">
-                    <button onclick="startEditSurvey('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--blue-mid); cursor:pointer;">수정</button>
-                    <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--muted); cursor:pointer;">접기 ▴</button>
-                    <button class="ghost compact" onclick="deleteSurvey('${s.id}')" title="배포 종료" style="color:#b45309; border-color:#fcd34d; font-weight:800; padding:6px 10px;">✕</button>
-                  </div>
-                </div>
-                <input class="input-text compact-url" readonly value="${surveyLink}" onclick="this.select(); document.execCommand('copy'); alert('링크가 복사되었습니다!');" title="클릭 시 주소 복사" />
-                <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                  <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
-                  <button class="ghost compact" onclick="copySurveyLink('${surveyLink}')">링크 복사</button>
-                  ${!s.googleFormUrl ? `<button class="ghost compact" style="font-size:11px;" onclick="downloadSurveyTemplate('${s.id}')">CSV 템플릿 ↓</button>` : ''}
-                  ${!s.googleFormUrl && s.questions && s.questions.length ? `<button class="ghost compact" style="font-size:11px;" onclick="saveSurveyAsTemplate('${s.id}')">질문 템플릿으로 저장</button>` : ''}
-                </div>
-                <div style="display:flex; gap:14px; align-items:flex-start;">
-                  <div style="flex:1;">
-                    <button onclick="uploadSurveyResults('${s.id}')" style="width:100%; padding:9px; background:#eff6ff; border:1.5px dashed #93c5fd; border-radius:8px; color:#1d4ed8; font-size:12px; font-weight:700; cursor:pointer; text-align:center; transition:all 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
-                      ↑ 결과 CSV 업로드
-                    </button>
-                  </div>
-                  <div class="survey-deploy-qr" style="padding:10px;">
-                    <img src="${qrUrl}" alt="QR Code" style="width:100px; height:100px;" />
-                    <button onclick="downloadQrCode('${s.id}')" class="secondary compact" style="display:block; width:100%; text-align:center; margin-top:4px; font-size:10px;">QR 다운로드</button>
-                  </div>
-                </div>
-                ${renderSurveyResponsePanel(s, sess)}
-              </div>
-            `;
-          }).join("") : emptyCard("현재 배포 중인 설문지가 없습니다.")}
-        </div>
-
-        ${closedSurveys.length ? `
-          <div style="margin-top:28px;">
-            <button type="button" class="section-title section-title-toggle" style="width:100%; text-align:left;" onclick="toggleClosedSurveysSection()">
-              <h2><span class="section-title-chevron">${state.closedSurveysCollapsed ? "▸" : "▾"}</span>배포 종료 · 응답 보관</h2>
-              <span>${closedSurveys.length}건</span>
-            </button>
-            ${state.closedSurveysCollapsed ? "" : `
-            <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">링크와 QR만 비활성화된 상태입니다. 응답 결과는 Change(변화 분석) 화면에서 세션·단계로 그대로 조회됩니다.</p>
-            <div class="surveys-grid">
-              ${closedSurveys.map((survey) => {
-                const session = state.sessions.find((item) => item.id === survey.sessionId);
-                const sessionText = session ? `${session.type} · ${sessionLabel(session)}` : "만료된 세션";
-                return `
-                  <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
-                    <div style="flex:1; min-width:0;">
-                      <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(survey.title)}</strong>
-                      <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${escapeHtml(sessionText)} [${escapeHtml(survey.phase)}] · 배포 종료</span>
-                    </div>
-                    <button onclick="startEditSurvey('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--blue-mid); cursor:pointer; white-space:nowrap; flex-shrink:0;">정의 수정</button>
-                    <button onclick="reopenSurveyDistribution('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; flex-shrink:0;">배포 재개</button>
-                    <button onclick="uploadSurveyResults('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:#1d4ed8; cursor:pointer; white-space:nowrap; flex-shrink:0;">CSV 업로드</button>
-                    <button onclick="deleteRecoveredSurveyCard('${survey.id}')" style="background:none; border:1.5px solid #fcd34d; border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:#b45309; cursor:pointer; white-space:nowrap; flex-shrink:0;">카드 삭제</button>
-                  </div>`;
-              }).join("")}
-            </div>
-            `}
-          </div>
-        ` : ""}
-
-        <div style="margin-top:28px;">
-          ${sectionTitle("지난 데이터 점검", "")}
-          <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">예전에 삭제된 설문에 연결돼 있던 응답이 DB에 남아있는지 확인합니다. 응답 자체는 보존돼 있을 가능성이 높고, 이 스캔은 그것을 다시 화면에 연결만 해 줍니다.</p>
-          <button class="ghost compact" style="font-size:11.5px;" onclick="scanForOrphanResponses()" ${state.orphanScanLoading ? "disabled" : ""}>
-            ${state.orphanScanLoading ? "스캔 중..." : "DB에서 연결 끊긴 응답 찾기"}
-          </button>
-          ${state.orphanScanResult && state.orphanScanResult.length ? `
-            <button class="primary compact" style="font-size:11.5px;" onclick="recoverAllOrphanSurveys()">전체 복구 (같은 세션·단계 중복은 최신 기준으로 합침)</button>
-          ` : ""}
-          ${state.orphanScanError ? `<p style="color:#dc2626; font-size:12px; margin-top:8px;">스캔 실패: ${escapeHtml(state.orphanScanError)}</p>` : ""}
-          ${state.orphanScanResult ? (
-            state.orphanScanResult.length ? `
-              <div class="surveys-grid" style="margin-top:12px;">
-                ${state.orphanScanResult.map((g) => `
-                  <div class="survey-deploy-card">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                      <div class="survey-deploy-info" style="flex:1; min-width:0;">
-                        <strong>연결 끊긴 응답 ${g.count}건</strong>
-                        <span>${escapeHtml(g.sessionLabel)} [${escapeHtml(g.phase || "단계 미상")}]${g.cohort ? ` · ${g.cohort}기` : ""}</span>
-                      </div>
-                      <button class="primary compact" onclick="recoverOrphanSurvey('${g.key}')">설문으로 복구</button>
-                    </div>
-                    <span style="font-size:11.5px; color:var(--muted);">링크/QR ${g.linkedCount}건 · 파일 업로드 ${g.uploadedCount}건${g.firstAt ? ` · ${g.firstAt.slice(0, 10)} ~ ${g.lastAt.slice(0, 10)}` : ""}</span>
-                  </div>
-                `).join("")}
-              </div>
-            ` : `<p style="font-size:12px; color:var(--muted); margin-top:8px;">연결 끊긴 응답을 찾지 못했습니다. 현재 보이는 설문 목록이 전부입니다.</p>`
-          ) : ""}
-        </div>
-
-        <div style="margin-top:28px;">
-          ${sectionTitle("템플릿", `${(state.surveyTemplates || []).length}건`)}
-          <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">설문을 삭제해도 남는 질문 보관함입니다. 위 설문 카드를 펼친 뒤 "질문 템플릿으로 저장"을 누르면 여기 추가됩니다.</p>
-          <div class="surveys-grid">
-            ${(state.surveyTemplates || []).length ? state.surveyTemplates.map(t => `
-              <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
-                <div style="flex:1; min-width:0;">
-                  <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(t.title)}</strong>
-                  <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${[t.sessionType, t.phase].filter(Boolean).map(escapeHtml).join(" · ")}${t.sessionType || t.phase ? " · " : ""}${(t.questions || []).length}문항</span>
-                </div>
-                <button class="delete-survey-btn" onclick="deleteSurveyTemplate('${t.id}')" style="position:static; margin-left:0;">&times;</button>
-              </div>
-            `).join("") : emptyCard("저장된 템플릿이 없습니다.")}
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderUpload() {
-  const selected = state.sessions[0];
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">CSV 업로드</span>
-        <h1>Validate anonymous survey files before they enter analysis.</h1>
-      </div>
-    </section>
-    <section class="panel">
-      ${state.sessions.length ? `
-        <div class="form-grid compact">
-          <label>세션
-            <select id="upload-session">
-              ${state.sessions.map((session) => `<option value="${session.id}">${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</option>`).join("")}
-            </select>
-          </label>
-          <label>시점
-            <select id="upload-phase">${PHASES.map((phase) => `<option>${phase}</option>`).join("")}</select>
-          </label>
-          <label>CSV 파일<input id="csv-file" type="file" accept=".csv,text/csv" /></label>
-        </div>
-        <div class="upload-hint">컬럼명은 [기수], [q1]~[q8], 선택적으로 [q9]~[q11] 태그를 포함해야 합니다. 이름, 이메일, 사번 컬럼은 저장하지 않습니다.</div>
-        ${selected ? uploadStateCard(selected) : ""}
-        ${renderUploadPreview()}
-      ` : emptyCard("먼저 세션을 등록하세요.")}
-    </section>
-  `;
-}
-
-function allCohorts() {
-  const fromResponses = state.responses.map(r => Number(r.cohort)).filter(Boolean);
-  const fromSessions  = (state.sessions || []).map(s => Number(s.cohort)).filter(Boolean);
-  return [...new Set([...fromResponses, ...fromSessions])].sort((a, b) => a - b);
-}
-
-function renderAnalytics() {
-  const scope = ensureScopedSelection("analytics");
-  const type = scope.type;
-  const cohort = scope.cohort;
-  const cohorts = scope.cohorts;
-  const session = scope.session;
-  const sessionId = session?.id || "";
-  const types = availableSessionTypes();
-
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">문항별 응답</span>
-        <h1>문항별 응답</h1>
-        <p>각 기수와 세션 유형을 선택하여 설문 문항별 객관식 응답 분포와 주관식 답변 원문을 확인합니다.</p>
-      </div>
-    </section>
-    
-    <section class="panel filters-panel" data-html2canvas-ignore="true">
-      <div class="form-grid compact scoped-filter-grid">
-        <label>세션 유형
-          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics'); window.applyAnalyticsFilter()">
-            ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
-          </select>
-        </label>
-        <label>대상 기수
-          <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics'); window.applyAnalyticsFilter()">
-            ${cohortOptionsHtml(type, cohort, false)}
-          </select>
-        </label>
-        <label>세션 선택
-          <select id="analytics-session-select" onchange="window.applyAnalyticsFilter()">
-            ${scopedSessionOptions(type, cohort, sessionId, false)}
-          </select>
-        </label>
-      </div>
-    </section>
-
-    ${cohort ? (() => {
-      const phasesWithData = PHASES.filter((p) =>
-        (state.surveys || []).some((s) => s.sessionId === sessionId && s.phase === p)
-        || (state.responses || []).some((r) => r.sessionId === sessionId && r.phase === p)
-      );
-      const activePhase = (state.selectedAnalyticsPhase && PHASES.includes(state.selectedAnalyticsPhase))
-        ? state.selectedAnalyticsPhase
-        : (phasesWithData[0] || PHASES[0]);
-      const phaseMeta = session
-        ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)} · ${activePhase}`
-        : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 · ${activePhase}`;
-      return `
-        <div class="phase-tabs" role="tablist" aria-label="설문 시점">
-          ${PHASES.map((p) => {
-            const has = phasesWithData.includes(p);
-            const isActive = p === activePhase;
-            return `<button type="button" role="tab" aria-selected="${isActive}" class="phase-tab${isActive ? ' active' : ''}${has ? '' : ' empty'}" onclick="setAnalyticsPhase('${p}')" title="${has ? '' : '응답 없음'}">${p}${has ? '' : ' <span class="phase-tab-empty-dot">○</span>'}</button>`;
-          }).join('')}
-        </div>
-        <section class="analytics-split">
-          <div>
-            ${collapsibleSectionHeader("정량 응답", phaseMeta, "quant")}
-            ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session, activePhase)}
-          </div>
-          <div>
-            ${collapsibleSectionHeader("정성 응답", phaseMeta, "qual")}
-            ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId, activePhase)}
-          </div>
-        </section>
-      `;
-    })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
-  `;
-}
-
-function cohortOptionsHtml(type, selectedCohort, isReport = false) {
-  const cohorts = cohortsForType(type);
-  const allOption = isReport ? `<option value="all" ${selectedCohort === "all" ? "selected" : ""}>전체 기수</option>` : "";
-  const cohortOptions = cohorts.map((c) => {
-    const yearLabel = yearForCohortType(c, type) ? `${yearForCohortType(c, type)}년 ` : "";
-    const count = sessionsForTypeCohort(type, c).length;
-    return `<option value="${c}" ${Number(selectedCohort) === c ? "selected" : ""}>${yearLabel}${c}기 (${count}개 세션)</option>`;
-  }).join("");
-  return allOption + cohortOptions;
-}
-
-function scopedSessionOptions(type, cohort, selectedSessionId = "", isReport = false) {
-  const sessions = sessionsForTypeCohort(type, cohort);
-  const compareAllOption = isReport ? `<option value="all" ${selectedSessionId === "all" ? "selected" : ""}>전체 비교 분석</option>` : "";
-  const sessionOptions = sessions.map((session) =>
-    `<option value="${session.id}" ${selectedSessionId === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))}</option>`
-  ).join("");
-  return compareAllOption + sessionOptions;
-}
-
-// ── Radar Chart (4-axis SVG diamond) ────────────────────────────
-function renderRadarChart(dimScores) {
-  const cx = 110, cy = 110, r = 76;
-  const angles = [-Math.PI / 2, 0, Math.PI / 2, Math.PI]; // top, right, bottom, left
-  const ptAt = (angle, factor) => [cx + r * factor * Math.cos(angle), cy + r * factor * Math.sin(angle)];
-  const pathOf = pts => `M${pts.map(p => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' L')} Z`;
-  const gridLevels = [0.2, 0.4, 0.6, 0.8, 1.0];
-  const labelOffset = [
-    [cx, cy - r - 22, 'middle'],
-    [cx + r + 10, cy, 'start'],
-    [cx, cy + r + 22, 'middle'],
-    [cx - r - 10, cy, 'end'],
-  ];
-  const scorePts = dimScores.map((d, i) => ptAt(angles[i], d.score !== null ? d.score / 5 : 0));
-  return `
-    <svg class="report-radar-chart" viewBox="0 0 220 220" width="220" height="220" style="overflow:visible; display:block;">
-      ${gridLevels.map(f => `<path d="${pathOf(angles.map(a => ptAt(a, f)))}" fill="none" stroke="#e2e8f0" stroke-width="${f === 1 ? 1.5 : 1}" stroke-dasharray="${f < 1 ? '3 3' : ''}"/>`).join('')}
-      ${angles.map(a => { const p = ptAt(a, 1); return `<line x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="#cbd5e1" stroke-width="1.2"/>`; }).join('')}
-      <path d="${pathOf(scorePts)}" fill="rgba(0,82,255,0.16)" stroke="#0052ff" stroke-width="2.5" stroke-linejoin="round"/>
-      ${scorePts.map((p, i) => dimScores[i].score !== null ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5" fill="${dimScores[i].color}" stroke="#fff" stroke-width="2" stroke-dasharray="${dimScores[i].singleItem ? '2 1.5' : ''}"/>` : '').join('')}
-      ${dimScores.map((d, i) => `
-        <text x="${labelOffset[i][0]}" y="${labelOffset[i][1]}" text-anchor="${labelOffset[i][2]}" font-size="11" font-weight="700" fill="#334155" font-family="'Plus Jakarta Sans',sans-serif">${d.label}${d.singleItem ? '＊' : ''}</text>
-        ${d.score !== null ? `<text x="${labelOffset[i][0]}" y="${Number(labelOffset[i][1]) + 14}" text-anchor="${labelOffset[i][2]}" font-size="11.5" font-weight="800" fill="${d.color}" font-family="'Plus Jakarta Sans',sans-serif">${d.score.toFixed(2)}</text>` : ''}
-      `).join('')}
-      ${[1,2,3,4,5].map(n => `<text x="${(cx + 3).toFixed(1)}" y="${(cy - (r * n / 5) + 4).toFixed(1)}" font-size="9" fill="#b0bec5" font-family="sans-serif">${n}</text>`).join('')}
-    </svg>
-  `;
-}
-
-// ── Qualitative Result Parser ────────────────────────────────────
-function parseQualResult(text) {
-  if (!text || text.trim().length < 20) return null;
-  const sections = {};
-  const lines = text.split('\n');
-  let key = null, buf = [];
-  for (const line of lines) {
-    const hm = line.match(/^#{1,3}\s+(.+)/);
-    if (hm) {
-      if (key !== null) sections[key] = buf.join('\n').trim();
-      key = hm[1].trim();
-      buf = [];
-    } else {
-      buf.push(line);
-    }
-  }
-  if (key !== null) sections[key] = buf.join('\n').trim();
-  return Object.keys(sections).length >= 2 ? sections : null;
-}
-
-function renderQualSections(sections) {
-  const ICONS = { '핵심 키워드': '01', '주요 테마': '02', '대표 발언': '03', '조직문화 진단': '04', '세션 운영 제언': '05' };
-  const COLOR = { '핵심 키워드': '#0052ff', '주요 테마': '#7b2cff', '대표 발언': '#00a89d', '조직문화 진단': '#f4b000', '세션 운영 제언': '#00a866' };
-
-  return Object.entries(sections).map(([k, v]) => {
-    const icon = ICONS[k] || '•';
-    const accent = COLOR[k] || '#64748b';
-    // For 핵심 키워드, render as pill tags
-    if (k === '핵심 키워드') {
-      const tags = v.split(/[·,\n]/).map(t => t.trim()).filter(Boolean);
-      return `
-        <div style="background:#f8fafc; border:1.5px solid ${accent}33; border-radius:12px; padding:16px 20px;">
-          <div style="font-size:11px; font-weight:800; color:${accent}; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">${icon} ${k}</div>
-          <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            ${tags.map(t => `<span style="background:${accent}14; color:${accent}; border:1px solid ${accent}33; border-radius:99px; padding:4px 14px; font-size:12.5px; font-weight:700;">${escapeHtml(t)}</span>`).join('')}
-          </div>
-        </div>`;
-    }
-    // For 대표 발언, render each "..." as a blockquote
-    if (k === '대표 발언') {
-      const quotes = v.split('\n').map(l => l.trim()).filter(l => l.startsWith('"') || l.startsWith('"') || l.startsWith('•') || l.startsWith('-'));
-      return `
-        <div style="background:#f8fafc; border:1.5px solid ${accent}33; border-radius:12px; padding:16px 20px;">
-          <div style="font-size:11px; font-weight:800; color:${accent}; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px;">${icon} ${k}</div>
-          ${quotes.length ? quotes.map(q => `<div style="border-left:3px solid ${accent}; padding:8px 12px; margin-bottom:8px; font-size:13px; color:#0c2340; line-height:1.7; background:${accent}08; border-radius:0 8px 8px 0;">${escapeHtml(q.replace(/^[-•""]/, '').trim())}</div>`).join('') : `<p style="font-size:13px; line-height:1.7; color:#334155; margin:0; white-space:pre-wrap;">${escapeHtml(v)}</p>`}
-        </div>`;
-    }
-    // Default: text block
-    return `
-      <div style="background:#f8fafc; border:1.5px solid ${accent}33; border-radius:12px; padding:16px 20px;">
-        <div style="font-size:11px; font-weight:800; color:${accent}; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">${icon} ${k}</div>
-        <div style="font-size:13.5px; line-height:1.85; color:#0c2340; white-space:pre-wrap;">${escapeHtml(v)}</div>
-      </div>`;
-  }).join('');
-}
-
-// ── Report Analysis Helpers ──────────────────────────────────────
-const REPORT_DIMS = [
-  { key: 'psych',      label: '심리적 안전감', qs: ['q1','q2','q3'], color: '#0052ff' },
-  { key: 'silo',       label: '사일로 해소',   qs: ['q4','q5','q6'], color: '#00a89d' },
-  { key: 'resilience', label: '회복탄력성',    qs: ['q7'],           color: '#f4b000' },
-  { key: 'mood',       label: '전반 분위기',   qs: ['q8'],           color: '#7b2cff' },
-];
-
-function dimAvg(phaseStats, qs) {
-  assertNotQuantInput(phaseStats);
-  if (!phaseStats) return null;
-  const vals = qs.map(q => phaseStats[`${q}_avg`]).filter(v => typeof v === 'number');
-  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
-}
-
-// 응답자별(개인별) 차원 점수의 최소·최대를 구한다. 평균만 보면 팀이 양극화돼 있어도
-// (예: 절반은 매우 긍정, 절반은 매우 부정) 보통 수준처럼 보일 수 있어 별도로 둔다.
-// 익명 보장을 위해 N<3인 경우는 호출 측에서 노출하지 않는다.
-function dimSpread(sessionId, phase, qs) {
-  const rows = (state.responses || []).filter(row => row.sessionId === sessionId && row.phase === phase);
-  const perRespondent = rows
-    .map(row => {
-      const vals = qs.map(q => scoreOf(row[q])).filter(v => typeof v === 'number');
-      return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
-    })
-    .filter(v => v !== null);
-  if (perRespondent.length < 3) return null;
-  return { min: Math.min(...perRespondent), max: Math.max(...perRespondent), n: perRespondent.length };
-}
-
-function ragInfo(score) {
-  if (score === null) return { label:'데이터 없음', color:'#94a3b8', bg:'#f8fafc', bar:'#e2e8f0' };
-  if (score >= 4.0)   return { label:'양호',       color:'#008a54', bg:'rgba(0,168,102,0.08)', bar:'#00a866' };
-  if (score >= 3.0)   return { label:'주의',       color:'#a46900', bg:'rgba(244,176,0,0.10)', bar:'#f4b000' };
-  return               { label:'위험',       color:'#c00032', bg:'rgba(227,0,59,0.07)', bar:'#e3003b' };
-}
-
-function dimRecommendation(key, score) {
-  if (score === null) return '사전 설문 데이터가 충분하지 않습니다. 사전 설문을 진행한 후 분석이 가능합니다.';
-  const recs = {
-    psych: [
-      [3.0, '구성원들이 의견 표현에 심리적 부담을 느끼고 있습니다. 세션 초반 "심리적 안전 계약" 수립에 충분한 시간을 배분하고, 판단 없이 듣기 규칙을 팀이 함께 설정하게 하세요.'],
-      [3.5, '심리적 안전감이 형성 중입니다. 소규모 그룹 대화와 경청 훈련을 반복 강화하고, 리더의 취약성 공유가 선행되면 효과가 큽니다.'],
-      [4.0, '심리적 안전감은 양호합니다. 더 심층적인 취약성 공유와 건설적 이의제기 문화로 발전시키세요.'],
-      [6.0, '심리적 안전감이 매우 높습니다. 이를 토대로 심층 피드백 문화와 실험 친화적 환경을 조직 전반에 확산하세요.'],
-    ],
-    silo: [
-      [3.0, '부서·팀 간 협업 장벽이 높습니다. 타 팀 업무 이해 세션과 공동 목표 설정 워크숍을 우선 편성하고, 크로스팀 접점 기회를 구조적으로 만드세요.'],
-      [3.5, '사일로가 일부 존재합니다. 크로스팀 미션 시뮬레이션을 포함하고, 협업 저해 요인을 팀이 직접 도출하게 하세요.'],
-      [4.0, '횡적 소통이 원활합니다. 협업 성공 사례를 세션에서 공유·확산하여 긍정 모멘텀을 유지하세요.'],
-      [6.0, '사일로가 매우 낮습니다. 협업 모범 사례를 경영진 공유 아젠다로 활용하고 조직 학습 자산화하세요.'],
-    ],
-    resilience: [
-      [3.0, '구성원 소진(번아웃) 위험 신호가 감지됩니다. 회복 루틴 설계와 심리 자원 점검 워크숍을 세션 최우선 아젠다로 배치하세요.'],
-      [3.5, '긴장감이 있으나 관리 가능 수준입니다. 스트레스 대처 전략 공유 시간을 확보하고, 자기돌봄 계획을 작성하도록 안내하세요.'],
-      [4.0, '양호한 회복력을 보입니다. 구성원 간 회복 방식을 공유하며 팀 차원의 상호지지 체계를 강화하세요.'],
-      [6.0, '높은 회복탄력성을 보입니다. 이 에너지를 팀 도전 과제 해결에 적극 활용하고 회복 문화를 명문화하세요.'],
-    ],
-    mood: [
-      [3.0, '전반적 팀 분위기가 침체되어 있습니다. 세션 초반 소소한 성공 경험 공유와 진심 어린 인정 활동으로 긍정 에너지를 먼저 충전하세요.'],
-      [3.5, '분위기 개선의 여지가 있습니다. 구성원 간 Recognition 활동과 비공식 유대 기회를 늘리고, 함께하는 즐거운 경험을 의도적으로 설계하세요.'],
-      [4.0, '팀 분위기가 좋습니다. 이를 유지하는 팀 문화 요소를 명시적으로 언어화하고 새로운 구성원에게도 전달될 수 있게 문서화하세요.'],
-      [6.0, '매우 긍정적인 팀 분위기입니다. 이 에너지를 조직 전체에 전파하는 방안을 논의하고 문화 앰배서더 역할을 부여하세요.'],
-    ],
-  };
-  const list = recs[key] || [];
-  const match = list.find(([t]) => score < t);
-  return match ? match[1] : (list[list.length-1]?.[1] || '');
-}
-
-function renderCompareReport(type, cohort) {
-  const sessions = sessionsForTypeCohort(type, cohort);
-  const types = availableSessionTypes();
-  const isAllCohorts = cohort === "all";
-  const cohortText = isAllCohorts ? "전체 기수" : `${cohort}기`;
-  const yearPrefix = (!isAllCohorts && yearForCohortType(cohort, type)) ? `${yearForCohortType(cohort, type)}년 ` : "";
-  const subtitle = `${sessionTypeLabel(type)} · ${yearPrefix}${cohortText} 전체 팀의 조직문화 진단 결과를 통합 비교합니다.`;
-  const currentFilterLabel = `현재 적용: ${escapeHtml(sessionTypeLabel(type))} · ${yearPrefix}${cohortText} 전체 비교 분석`;
-  
-  // 데이터 수집
-  const sessionScores = sessions.map(session => {
-    const stats = statsForSession(session.cohort, session.id);
-    const pre = stats.find(s => s.phase === '사전') || null;
-    const mid = stats.find(s => s.phase === '중간') || null;
-    const post = stats.find(s => s.phase === '사후') || null;
-    
-    // 최신 시점 우선순위: 사후 -> 중간 -> 사전
-    const diagnosis = (post && post.n >= 1) ? post : ((mid && mid.n >= 1) ? mid : ((pre && pre.n >= 1) ? pre : null));
-    
-    if (!diagnosis) {
-      return { session, hasData: false, overall: null };
-    }
-    
-    const psych = dimAvg(diagnosis, ['q1', 'q2', 'q3']);
-    const silo = dimAvg(diagnosis, ['q4', 'q5', 'q6']);
-    const resilience = dimAvg(diagnosis, ['q7']);
-    const mood = dimAvg(diagnosis, ['q8']);
-
-    // 문항 수 가중평균: 단일 문항 지표(회복탄력성·전반 분위기)가 3문항 지표(심리적 안전감·
-    // 사일로 해소)와 동일한 비중을 갖지 않도록 REPORT_DIMS의 문항 수를 가중치로 사용한다.
-    const weighted = REPORT_DIMS
-      .map(dim => ({ score: dimAvg(diagnosis, dim.qs), weight: dim.qs.length }))
-      .filter(d => d.score !== null);
-    const overall = weighted.length
-      ? weighted.reduce((sum, d) => sum + d.score * d.weight, 0) / weighted.reduce((sum, d) => sum + d.weight, 0)
-      : null;
-
-    const target = targetCountForSession(session);
-    const responseRate = target ? Math.round((diagnosis.n / target) * 100) : null;
-
-    return {
-      session,
-      hasData: true,
-      phase: diagnosis.phase,
-      n: diagnosis.n,
-      responseRate,
-      scores: { psych, silo, resilience, mood },
-      overall
-    };
-  });
-  
-  // 유효 데이터가 있는 세션만 랭킹 산정 및 정렬
-  const rankedSessions = sessionScores
-    .filter(s => s.hasData && s.overall !== null)
-    .sort((a, b) => b.overall - a.overall);
-    
-  // 공동 순위 계산
-  let currentRank = 1;
-  let prevScore = null;
-  rankedSessions.forEach((s, idx) => {
-    if (prevScore !== null && s.overall < prevScore) {
-      currentRank = idx + 1;
-    }
-    s.rank = currentRank;
-    prevScore = s.overall;
-  });
-  
-  // 데이터가 없는 세션들
-  const noDataSessions = sessionScores.filter(s => !s.hasData);
-
-  // 팀마다 진단에 쓴 시점(사전/중간/사후)이 다를 수 있다 — 다른 시점 점수를 같은 순위표에서
-  // 비교하고 있다는 것을 운영자가 알 수 있도록 표시한다.
-  const phaseBadgeColor = (phase) => ({ '사전': '#94a3b8', '중간': '#b47700', '사후': '#0052ff', '팔로우업': '#34c759' }[phase] || '#94a3b8');
-  const hasMixedPhases = new Set(rankedSessions.map(s => s.phase)).size > 1;
-
-  // 평균 종합 정보
-  const validOverallScores = rankedSessions.map(s => s.overall).filter(v => v !== null);
-  const avgOverall = validOverallScores.length 
-    ? (validOverallScores.reduce((a, b) => a + b, 0) / validOverallScores.length).toFixed(2) 
-    : '—';
-  
-  return `
-    <div id="report-export-content" class="report-export-content">
-    <section class="page-head report-export-header">
-      <div>
-        <span class="eyebrow">기수 비교 분석</span>
-        <h1>전체 팀별 결과 비교 분석</h1>
-        <p>${subtitle}</p>
-      </div>
-      <div class="report-export-actions" data-html2canvas-ignore="true">
-        <button class="report-export-button pdf" id="download-report-pdf" type="button" onclick="window.downloadReportPdf(event)">
-          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 11h6M7 14h4"/></svg>
-          <span><b>PDF 리포트</b><small>전체 비교 화면 디자인</small></span>
-        </button>
-      </div>
-    </section>
-
-    <section class="panel filters-panel" data-html2canvas-ignore="true">
-      <div class="form-grid compact scoped-filter-grid">
-        <label>세션 유형
-          <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
-            ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
-          </select>
-        </label>
-        <label>대상 기수
-          <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
-            ${cohortOptionsHtml(type, cohort, true)}
-          </select>
-        </label>
-        <label>세션 선택
-          <select id="report-session-select">
-            ${scopedSessionOptions(type, cohort, "all", true)}
-          </select>
-        </label>
-        <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
-      </div>
-      <div class="filter-current">${currentFilterLabel}</div>
-    </section>
-
-    ${renderSessionOutcomeIntro(type)}
-
-    <div class="report-summary" style="margin-bottom:28px;">
-      <div>
-        <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">총 세션(팀) 수</span>
-        <strong style="font-size:28px; font-weight:800; color:var(--cb-ink);">${sessions.length}개</strong>
-      </div>
-      <div>
-        <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">진단 완료 팀 수</span>
-        <strong style="font-size:28px; font-weight:800; color:#00a866;">${rankedSessions.length}개</strong>
-      </div>
-      <div>
-        <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">${isAllCohorts ? "전체 평균 종합점수" : "기수 평균 종합점수"}</span>
-        <strong style="font-size:28px; font-weight:800; color:var(--cb-blue);">${avgOverall}<span style="font-size:14px; color:var(--cb-muted); font-weight:500;"> / 5</span></strong>
-      </div>
-    </div>
-
-    <section class="report-export-section" style="margin-bottom:28px;">
-      <div class="section-title" style="margin-bottom:12px;">
-        <h2>① 종합 점수 및 순위</h2>
-        <span>종합점수 기준 정렬 · 동점 시 공동 순위 부여</span>
-      </div>
-      ${hasMixedPhases ? `<p style="font-size:11.5px; color:#a46900; background:rgba(244,176,0,0.10); border:1px solid rgba(244,176,0,0.3); border-radius:8px; padding:8px 12px; margin:0 0 12px;">팀마다 진단에 쓴 설문 시점(사전/중간/사후)이 다릅니다. 시점이 다른 팀끼리의 순위·점수 차이는 세션 진행도 차이를 반영할 수 있어 그대로 비교하지 않도록 주의하세요.</p>` : ''}
-      ${!rankedSessions.length && !noDataSessions.length ? `<div class="empty">비교할 세션이 없습니다.</div>` : `
-        <div style="overflow-x:auto;">
-          <table class="compare-ranking-table">
-            <thead>
-              <tr>
-                <th style="text-align:center;">순위</th>
-                <th>세션(팀)명</th>
-                <th style="text-align:center;">진단 시점</th>
-                <th style="text-align:center;">참여 인원</th>
-                <th style="text-align:center;">종합 점수</th>
-                <th style="text-align:center;">심리적 안전감</th>
-                <th style="text-align:center;">전반 분위기</th>
-                <th style="text-align:center;">사일로 해소</th>
-                <th style="text-align:center;">회복탄력성</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rankedSessions.map(s => {
-                const rag = ragInfo(s.overall);
-                const scoreSpan = (val) => {
-                  if (val === null || val === undefined) return '<span style="color:#cbd5e1;">—</span>';
-                  const r = ragInfo(val);
-                  return `<span style="font-weight:700; color:${r.color};">${val.toFixed(2)}</span>`;
-                };
-                return `
-                  <tr>
-                    <td class="rank-cell">${s.rank}위</td>
-                    <td class="team-cell">${escapeHtml(sessionLabel(s.session))}</td>
-                    <td style="text-align:center;">
-                      ${isAllCohorts ? `<span style="color:var(--cb-muted); margin-right:4px;">${s.session.cohort}기</span>` : ''}
-                      <span style="font-weight:700; color:${phaseBadgeColor(s.phase)}; background:${phaseBadgeColor(s.phase)}14; padding:2px 8px; border-radius:99px; font-size:11.5px;">${s.phase}</span>
-                    </td>
-                    <td style="text-align:center; font-weight:600;">N=${s.n}${s.responseRate !== null ? `<span style="font-weight:500; color:var(--cb-muted); font-size:11px;"> (${s.responseRate}%)</span>` : ''}</td>
-                    <td class="overall-cell" style="text-align:center;">
-                      <span style="font-size:14px; font-weight:800; color:${rag.color}; background:${rag.color}14; padding:3px 10px; border-radius:12px;">
-                        ${s.overall.toFixed(2)}
-                      </span>
-                    </td>
-                    <td style="text-align:center;">${scoreSpan(s.scores.psych)}</td>
-                    <td style="text-align:center;">${scoreSpan(s.scores.mood)}</td>
-                    <td style="text-align:center;">${scoreSpan(s.scores.silo)}</td>
-                    <td style="text-align:center;">${scoreSpan(s.scores.resilience)}</td>
-                  </tr>
-                `;
-              }).join("")}
-              ${noDataSessions.map(s => `
-                <tr style="opacity:0.6; background:#fafafa;">
-                  <td style="text-align:center; color:#cbd5e1;">—</td>
-                  <td class="team-cell" style="color:var(--cb-muted);">${escapeHtml(sessionLabel(s.session))}</td>
-                  <td style="text-align:center; color:var(--cb-muted);">${isAllCohorts ? `${s.session.cohort}기` : '—'}</td>
-                  <td style="text-align:center; color:#cbd5e1;">N=0</td>
-                  <td style="text-align:center; color:#cbd5e1;">—</td>
-                  <td style="text-align:center; color:#cbd5e1;">—</td>
-                  <td style="text-align:center; color:#cbd5e1;">—</td>
-                  <td style="text-align:center; color:#cbd5e1;">—</td>
-                  <td style="text-align:center; color:#cbd5e1;">—</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-      `}
-    </section>
-
-    <section class="report-export-section" style="margin-bottom:28px;">
-      <div class="section-title" style="margin-bottom:16px;">
-        <h2>② 핵심 지표별 팀 비교</h2>
-        <span>4대 핵심 조직문화 지표별 팀 점수 대조</span>
-      </div>
-      
-      ${!rankedSessions.length ? `<div class="empty">시각화할 진단 데이터가 없습니다.</div>` : `
-        <div class="compare-charts-grid">
-          ${REPORT_DIMS.map(dim => {
-            const dimRanked = [...rankedSessions]
-              .map(s => ({ teamName: sessionLabel(s.session), val: s.scores[dim.key] }))
-              .filter(s => s.val !== null)
-              .sort((a, b) => b.val - a.val);
-            
-            return `
-              <div class="compare-chart-card">
-                <h3>
-                  <span>${dim.label}</span>
-                  <span style="color:${dim.color};">${dim.key.toUpperCase()}</span>
-                </h3>
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                  ${dimRanked.map(item => {
-                    const pct = Math.round((item.val / 5) * 100);
-                    const rag = ragInfo(item.val);
-                    return `
-                      <div class="compare-bar-row">
-                        <div class="compare-bar-label" title="${escapeHtml(item.teamName)}">${escapeHtml(item.teamName)}</div>
-                        <div class="compare-bar-container">
-                          <div class="compare-bar-fill" style="width:${pct}%; background:${dim.color};"></div>
-                        </div>
-                        <div class="compare-bar-value" style="color:${rag.color};">${item.val.toFixed(2)}</div>
-                      </div>
-                    `;
-                  }).join("")}
-                </div>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      `}
-    </section>
-
-    <section class="report-export-section" style="margin-bottom:28px;">
-      <div class="section-title" style="margin-bottom:16px;">
-        <h2>③ 팀별 정성 신호 비교</h2>
-        <span>AI 정성 분석 기반 톤 분포 · 주요 신호 및 주의 플래그 대조</span>
-      </div>
-      
-      ${!rankedSessions.length ? `<div class="empty">정성 비교를 진행할 진단 완료 팀이 없습니다.</div>` : `
-        <div class="compare-qual-grid">
-          ${rankedSessions.map(s => {
-            const dbPhase = s.phase === '사전' ? 'pre' : (s.phase === '사후' ? 'post' : 'mid');
-            const qualSignal = (state.qualSignals || []).find(q => q.session_id === s.session.id && q.phase === dbPhase && q.review?.status === 'confirmed');
-            const teamName = sessionLabel(s.session);
-            
-            let toneBarHtml = '<div style="font-size:12px; color:var(--cb-muted);">확정된 정성 분석 결과 없음</div>';
-            let axisBadgesHtml = '';
-            let themesHtml = '<div style="font-size:12px; color:var(--cb-muted);">테마 정보 없음</div>';
-            let flagsHtml = '';
-            
-            if (qualSignal) {
-              const tone = qualSignal.tone_distribution || { positive: 0, neutral: 0, negative: 0 };
-              const toneTotal = Math.max(1, tone.positive + tone.neutral + tone.negative);
-              const posPct = ((tone.positive / toneTotal) * 100).toFixed(1);
-              const neuPct = ((tone.neutral / toneTotal) * 100).toFixed(1);
-              const negPct = ((tone.negative / toneTotal) * 100).toFixed(1);
-              
-              toneBarHtml = `
-                <div>
-                  <div class="compare-tone-bar">
-                    <div class="compare-tone-seg" style="width:${posPct}%; background:#1d9e75;" title="긍정 ${tone.positive}명"></div>
-                    <div class="compare-tone-seg" style="width:${neuPct}%; background:#bbb;" title="중립 ${tone.neutral}명"></div>
-                    <div class="compare-tone-seg" style="width:${negPct}%; background:#d85a30;" title="부정 ${tone.negative}명"></div>
-                  </div>
-                  <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--cb-muted); margin-top:4px;">
-                    <span>긍정 ${posPct}%</span>
-                    <span>중립 ${neuPct}%</span>
-                    <span>부정 ${negPct}%</span>
-                  </div>
-                </div>
-              `;
-              
-              const AXIS_KEYS = ['team_climate', 'wellness', 'psych_safety', 'dialogue_safety', 'change_adaptability', 'collaboration'];
-              const AXIS_LABEL = {
-                team_climate: '분위기', wellness: '웰니스', psych_safety: '안전감',
-                dialogue_safety: '대화', change_adaptability: '변화', collaboration: '협업'
-              };
-              
-              const activeAxes = AXIS_KEYS.map(k => {
-                const a = qualSignal.axis_signals?.[k] || { mentioned: false };
-                return { key: k, label: AXIS_LABEL[k], ...a };
-              }).filter(a => a.mentioned);
-              
-              if (activeAxes.length) {
-                axisBadgesHtml = `
-                  <div class="compare-axis-grid">
-                    ${activeAxes.slice(0, 3).map(a => `
-                      <div class="compare-axis-badge ${a.direction}" title="${escapeHtml(a.evidence_quote || '')}">
-                        ${escapeHtml(a.label)}: ${a.strength === 'strong' ? '강' : (a.strength === 'moderate' ? '중' : '약')}
-                      </div>
-                    `).join("")}
-                    ${activeAxes.length > 3 ? `<div class="compare-axis-badge none">+${activeAxes.length - 3}개 더보기</div>` : ''}
-                  </div>
-                `;
-              } else {
-                axisBadgesHtml = '<div style="font-size:11px; color:var(--cb-muted); text-align:center; padding:6px; background:var(--cb-soft); border-radius:6px;">언급된 정성 축 없음</div>';
-              }
-              
-              if (qualSignal.themes && qualSignal.themes.length) {
-                themesHtml = `
-                  <div class="compare-theme-list">
-                    ${qualSignal.themes.slice(0, 2).map(t => {
-                      const dotColor = t.direction === 'positive' ? '#1d9e75' : (t.direction === 'negative' ? '#d85a30' : '#ba7517');
-                      return `
-                        <div class="compare-theme-item" title="${escapeHtml(t.quotes?.[0] || '')}">
-                          <span class="compare-theme-dot" style="background:${dotColor};"></span>
-                          <span style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${escapeHtml(t.label)}</span>
-                          <span style="font-size:11px; color:var(--cb-muted); flex-shrink:0;">(${t.mention_count}회)</span>
-                        </div>
-                      `;
-                    }).join("")}
-                  </div>
-                `;
-              }
-              
-              if (qualSignal.flags && qualSignal.flags.length) {
-                flagsHtml = `
-                  <div style="margin-top:auto; padding-top:10px; border-top:1px dashed var(--cb-line-soft);">
-                    ${qualSignal.flags.map(f => `
-                      <span class="compare-flag-badge ${f.severity}" title="${escapeHtml(f.quote || '')}">
-                        ⚠ ${escapeHtml(f.label)}
-                      </span>
-                    `).join("")}
-                  </div>
-                `;
-              }
-            } else {
-              toneBarHtml = `
-                <div style="font-size:11.5px; color:var(--cb-muted); text-align:center; padding:12px; background:var(--cb-soft); border-radius:8px; border:1px dashed var(--cb-line-soft);">
-                  AI 분석 결과가 없습니다.<br>
-                  <span style="font-size:10.5px;">설문 결과 보기에서 AI 분석을 완료해 주세요.</span>
-                </div>
-              `;
-            }
-            
-            return `
-              <div class="compare-qual-card">
-                <div class="compare-qual-card-header">
-                  <div>
-                    <h3>${escapeHtml(teamName)}</h3>
-                    <span style="font-weight:600; color:var(--cb-blue);">${s.phase} 진단</span>
-                  </div>
-                  <span>N=${s.n}</span>
-                </div>
-                
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                  <div>
-                    <div style="font-size:11px; font-weight:700; color:var(--cb-muted); margin-bottom:4px;">답변 톤 분할</div>
-                    ${toneBarHtml}
-                  </div>
-                  
-                  ${qualSignal ? `
-                    <div>
-                      <div style="font-size:11px; font-weight:700; color:var(--cb-muted); margin-bottom:6px;">주요 정성 신호 (최대 3개)</div>
-                      ${axisBadgesHtml}
-                    </div>
-                    
-                    <div>
-                      <div style="font-size:11px; font-weight:700; color:var(--cb-muted); margin-bottom:6px;">핵심 테마</div>
-                      ${themesHtml}
-                    </div>
-                  ` : ''}
-                </div>
-                
-                ${flagsHtml}
-              </div>
-            `;
-          }).join("")}
-        </div>
-      `}
-    </section>
-    </div>
-  `;
-}
-
-function renderReport() {
-  const scope = ensureScopedSelection("report");
-  const type = scope.type;
-  const cohort = scope.cohort;
-  const cohorts = scope.cohorts;
-  const session = scope.session;
-
-  if (state.selectedReportSessionId === "all" && cohort) {
-    return renderCompareReport(type, cohort);
-  }
-
-  const sessionId = session?.id || "";
-  const types = availableSessionTypes();
-  const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
-  const pre      = stats.find(s => s.phase === '사전')    || null;
-  const mid      = stats.find(s => s.phase === '중간')    || null;
-  const post     = stats.find(s => s.phase === '사후')    || null;
-  const followup = stats.find(s => s.phase === '팔로우업') || null;
-
-  const hasPreData      = pre      && pre.n      >= 1;
-  const hasPostData     = post     && post.n     >= 1;
-  const hasFollowupData = followup && followup.n >= 1;
-  // "현 상황"은 가장 최근에 확보된 설문을 보여준다. DT기획팀처럼 사후 설문만 있는
-  // 세션도 진단 카드와 운영 제안이 비어 보이지 않도록 사후 → 중간 → 사전 순으로 선택한다.
-  const diagnosis = hasPostData ? post : (mid?.n >= 1 ? mid : (hasPreData ? pre : null));
-  const diagnosisPhase = diagnosis?.phase || '사전';
-  const hasDiagnosisData = Boolean(diagnosis?.n >= 1);
-  const diagnosisTarget = session ? targetCountForSession(session) : 0;
-  const diagnosisResponseRate = diagnosis && diagnosisTarget ? Math.round((diagnosis.n / diagnosisTarget) * 100) : null;
-
-  return `
-    <div id="report-export-content" class="report-export-content">
-    <section class="page-head report-export-header">
-      <div>
-        <span class="eyebrow">변화 분석 리포트</span>
-        <h1>변화 분석 리포트</h1>
-        <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
-      </div>
-      ${cohort && session ? `
-        <div class="report-export-actions" data-html2canvas-ignore="true">
-          <button class="report-export-button excel" id="download-report-xlsx" type="button" onclick="window.downloadReportXlsx(event)">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 10l2 3m0-3-2 3m4-3h2v3h-2"/></svg>
-            <span><b>엑셀 다운로드</b><small>질문·익명 응답</small></span>
-          </button>
-          <button class="report-export-button pdf" id="download-report-pdf" type="button" onclick="window.downloadReportPdf(event)">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 11h6M7 14h4"/></svg>
-            <span><b>PDF 리포트</b><small>화면 디자인 포함</small></span>
-          </button>
-        </div>` : ""}
-    </section>
-
-    <section class="panel filters-panel" data-html2canvas-ignore="true">
-      <div class="form-grid compact scoped-filter-grid">
-        <label>세션 유형
-          <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
-            ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
-          </select>
-        </label>
-        <label>대상 기수
-          <select id="report-cohort-select" onchange="refreshScopedSessionSelect('report')">
-            ${cohortOptionsHtml(type, cohort, true)}
-          </select>
-        </label>
-        <label>세션 선택
-          <select id="report-session-select">
-            ${scopedSessionOptions(type, cohort, sessionId, true)}
-          </select>
-        </label>
-        <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
-      </div>
-      <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
-    </section>
-
-    ${renderSessionOutcomeIntro(type)}
-
-    ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
-
-    <!-- ① 현 상황 진단 -->
-    <section class="report-export-section report-diagnosis-section" style="margin-bottom:28px;">
-      <div class="section-title" style="margin-bottom:16px;">
-        <h2>① 현 상황 진단</h2>
-        <span>${diagnosisPhase} 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${diagnosis ? diagnosis.n : 0}${diagnosisResponseRate !== null ? ` (응답률 ${diagnosisResponseRate}%)` : ''}</span>
-      </div>
-      ${!hasDiagnosisData ? `<div class="empty">진단에 사용할 설문 응답이 없습니다.</div>` : `
-      <div class="report-diagnosis-grid">
-        <!-- Radar Chart -->
-        <div class="report-radar-card">
-          <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em;">영역별 현황</div>
-          ${renderRadarChart(REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs), color: d.color, singleItem: d.qs.length === 1 })))}
-          <div style="font-size:11px; color:#94a3b8; text-align:center; line-height:1.5;">${diagnosisPhase} 설문 · N=${diagnosis.n}${REPORT_DIMS.some(d => d.qs.length === 1) ? ' · ＊단일 문항 지표' : ''}</div>
-        </div>
-        <!-- Dimension Score Cards -->
-        <div class="report-dimension-grid">
-          ${REPORT_DIMS.map(dim => {
-            const score = dimAvg(diagnosis, dim.qs);
-            const rag = ragInfo(score);
-            const pct = score ? Math.round((score/5)*100) : 0;
-            const subLabel = { psych: 'Psychological Safety', silo: 'Silo Reduction', resilience: 'Resilience', mood: 'Team Climate' }[dim.key] || '';
-            const isSingleItem = dim.qs.length === 1;
-            const spread = sessionId ? dimSpread(sessionId, diagnosisPhase, dim.qs) : null;
-            const isPolarized = spread && (spread.max - spread.min) >= 2.0;
-            return `
-              <div style="background:${rag.bg}; border:1.5px solid ${rag.bar}33; border-radius:12px; padding:16px 18px; position:relative; overflow:hidden;">
-                <div style="position:absolute; left:0; top:0; bottom:0; width:3px; background:${dim.color};"></div>
-                <div style="padding-left:8px;">
-                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-                    <div>
-                      <div style="font-size:13px; font-weight:800; color:#0c2340;">${dim.label}</div>
-                      <div style="font-size:10.5px; color:#94a3b8; font-weight:600; margin-top:1px;">${subLabel}${isSingleItem ? ' · 단일 문항' : ''}</div>
-                    </div>
-                    <span style="font-size:10.5px; font-weight:800; color:${rag.color}; background:${rag.color}18; padding:2px 9px; border-radius:99px; white-space:nowrap; margin-left:6px; flex-shrink:0;">${rag.label}</span>
-                  </div>
-                  <div style="font-size:26px; font-weight:800; color:${rag.color}; margin-bottom:8px;">${score !== null ? score.toFixed(2) : '—'}<span style="font-size:12px; color:#94a3b8; font-weight:500;"> / 5</span></div>
-                  <div style="background:#e2e8f0; border-radius:99px; height:5px; overflow:hidden;">
-                    <div style="width:${pct}%; height:100%; background:${rag.bar}; border-radius:99px;"></div>
-                  </div>
-                  ${spread ? `
-                    <div style="margin-top:8px; font-size:10.5px; color:${isPolarized ? '#c00032' : '#94a3b8'}; font-weight:${isPolarized ? '700' : '500'};">
-                      응답 범위 ${spread.min.toFixed(1)}–${spread.max.toFixed(1)}${isPolarized ? ' · 양극화 주의' : ''}
-                    </div>` : ''}
-                </div>
-              </div>`;
-          }).join("")}
-          <!-- Summary callout -->
-          <div style="grid-column: 1 / -1; background:rgba(0,82,255,0.06); border:1.5px solid rgba(0,82,255,0.22); border-radius:12px; padding:14px 18px;">
-            <p style="font-size:12.5px; line-height:1.8; color:#0c2340; margin:0;">
-              ${(() => {
-                const scores = REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs) })).filter(d => d.score !== null).sort((a,b) => a.score - b.score);
-                if (!scores.length) return '데이터가 충분하지 않습니다.';
-                const low = scores[0], high = scores[scores.length - 1];
-                const allRag = REPORT_DIMS.map(d => { const s = dimAvg(diagnosis, d.qs); return { ...d, s, rag: ragInfo(s) }; }).filter(d => d.s !== null);
-                return `<strong>집중 개입 필요</strong>: ${low.label} (${low.score.toFixed(1)}) · <strong>강점 활용 가능</strong>: ${high.label} (${high.score.toFixed(1)}). ${allRag.some(d => d.s < 3.0) ? '심리적 안전 수준이 위험 구간에 있어 세션 초반 안전 계약 수립이 최우선입니다.' : allRag.every(d => d.s >= 4.0) ? '전 영역이 양호 이상으로 심화 세션 및 확산 활동으로 진입할 수 있습니다.' : '전반적으로 관리 가능한 수준이며 집중 영역 중심으로 세션을 설계하세요.'}`;
-              })()}
-            </p>
-          </div>
-        </div>
-      </div>
-      `}
-    </section>
-
-    <!-- ② 세션 운영 제안 -->
-    <section class="report-export-section" style="margin-bottom:28px;">
-      <div class="section-title" style="margin-bottom:16px;">
-        <h2>② 세션 운영 제안</h2>
-        <span>${diagnosisPhase} 진단 기반 퍼실리테이션 가이드</span>
-      </div>
-      ${!hasDiagnosisData ? `<div class="empty">설문 데이터가 있어야 제안을 생성할 수 있습니다.</div>` : `
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        ${REPORT_DIMS.map((dim, idx) => {
-          const score = dimAvg(diagnosis, dim.qs);
-          const rag = ragInfo(score);
-          const priority = score !== null && score < 3.5 ? '우선 집중' : score !== null && score < 4.0 ? '강화 권장' : '강점 유지';
-          const priorityColor = score !== null && score < 3.5 ? '#e3003b' : score !== null && score < 4.0 ? '#f4b000' : '#00a866';
-          return `
-            <div class="panel report-recommendation-card" style="padding:16px 20px; display:flex; gap:16px; align-items:flex-start;">
-              <div style="min-width:32px; height:32px; border-radius:8px; background:${dim.color}18; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; color:${dim.color};">${idx+1}</div>
-              <div style="flex:1;">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                  <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
-                  <span style="font-size:10.5px; font-weight:800; color:${priorityColor}; background:${priorityColor}12; padding:2px 8px; border-radius:99px;">${priority}</span>
-                  ${score !== null ? `<span style="font-size:11.5px; color:#64748b;">${score.toFixed(2)} / 5.00</span>` : ''}
-                </div>
-                <p style="font-size:13px; line-height:1.7; color:#334155; margin:0;">${dimRecommendation(dim.key, score)}</p>
-              </div>
-            </div>
-          `;
-        }).join("")}
-      </div>
-      `}
-    </section>
-
-    <!-- ③ 변화 분석 -->
-    <section class="report-export-section" style="margin-bottom:28px;">
-      <div class="section-title" style="margin-bottom:16px;">
-        <h2>③ 변화 분석</h2>
-        <span>사전 → 사후${hasFollowupData ? ' → 팔로우업' : ''} · N<3 마스킹 적용</span>
-      </div>
-      ${!hasPreData && !hasPostData ? `<div class="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>` : `
-      <div class="report-change-grid" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px;">
-        ${REPORT_DIMS.map(dim => {
-          const preScore      = pre      && pre.n      >= 3 ? dimAvg(pre,      dim.qs) : null;
-          const midScore      = mid      && mid.n      >= 3 ? dimAvg(mid,      dim.qs) : null;
-          const postScore     = post     && post.n     >= 3 ? dimAvg(post,     dim.qs) : null;
-          const followupScore = followup && followup.n >= 3 ? dimAvg(followup, dim.qs) : null;
-
-          // 핵심 델타는 사전→사후, 팔로우업 있으면 사후→팔로우업도 표시
-          const delta         = preScore !== null && postScore     !== null ? postScore     - preScore  : null;
-          const followupDelta = postScore !== null && followupScore !== null ? followupScore - postScore : null;
-          const deltaColor    = delta === null ? '#94a3b8' : delta > 0.2 ? '#00a866' : delta < -0.2 ? '#e3003b' : '#f4b000';
-          const fuDeltaColor  = followupDelta === null ? '#94a3b8' : followupDelta > 0.2 ? '#00a866' : followupDelta < -0.2 ? '#e3003b' : '#f4b000';
-
-          const shortInterpretation = delta === null ? ''
-            : delta > 0.5 ? '큰 변화'
-            : delta > 0.2 ? '소폭 개선'
-            : delta > -0.2 ? '변화 미미'
-            : '주의';
-
-          const interpretation = delta === null ? ''
-            : delta > 0.5 ? '평균 차이가 큽니다 — 사전·사후 응답자 구성이 달랐을 가능성도 함께 점검하세요.'
-            : delta > 0.2 ? '평균이 개선 방향입니다 — 표본 수가 적다면 참고용으로 해석하세요.'
-            : delta > -0.2 ? '평균 차이가 미미합니다 — 추가 개입 필요 여부를 정성 신호와 함께 확인하세요.'
-            : '평균이 하락했습니다 — 환경 요인과 응답자 구성 변화를 함께 점검하세요.';
-
-          const prePct      = preScore      !== null ? (preScore      - 1) * 25 : 0;
-          const postPct     = postScore     !== null ? (postScore     - 1) * 25 : 0;
-          const followupPct = followupScore !== null ? (followupScore - 1) * 25 : 0;
-          const minPct      = Math.min(prePct, postPct);
-          const widthPct    = Math.abs(postPct - prePct);
-          const fuMinPct    = followupScore !== null ? Math.min(postPct, followupPct) : 0;
-          const fuWidthPct  = followupScore !== null ? Math.abs(followupPct - postPct) : 0;
-
-          return `
-            <div class="report-change-card" style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
-              <div style="position:absolute; top:0; left:0; right:0; height:3px; background:${dim.color};"></div>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:6px;">
-                <strong style="font-size:13px; color:#0c2340;">${dim.label}</strong>
-                <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                  ${delta !== null
-                    ? `<span style="font-size:12px; font-weight:800; color:${deltaColor}; background:${deltaColor}14; padding:3px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:4px;">
-                        사전→사후 ${delta > 0 ? '+' : ''}${delta.toFixed(2)} ${delta > 0.2 ? '↑' : delta < -0.2 ? '↓' : '→'}
-                        <span style="font-size:10px; opacity:0.85; font-weight:700; border-left:1px solid ${deltaColor}40; padding-left:4px; margin-left:2px;">${shortInterpretation}</span>
-                       </span>`
-                    : `<span class="masked-badge" style="border:none; padding:3px 10px; border-radius:99px; background:rgba(148,163,184,0.1); color:#64748b; font-size:11px; display:inline-flex; align-items:center; gap:4px;">${lockSvg} N&lt;3 보호</span>`}
-                  ${followupDelta !== null
-                    ? `<span style="font-size:12px; font-weight:800; color:${fuDeltaColor}; background:${fuDeltaColor}14; padding:3px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:4px;">
-                        팔로우업 ${followupDelta > 0 ? '+' : ''}${followupDelta.toFixed(2)} ${followupDelta > 0.2 ? '↑' : followupDelta < -0.2 ? '↓' : '→'}
-                       </span>`
-                    : followupScore === null && hasFollowupData
-                      ? `<span class="masked-badge" style="border:none; padding:3px 10px; border-radius:99px; background:rgba(148,163,184,0.1); color:#64748b; font-size:11px; display:inline-flex; align-items:center; gap:4px;">${lockSvg} 팔로우업 N&lt;3</span>`
-                      : ''}
-                </div>
-              </div>
-
-              ${preScore !== null && postScore !== null ? `
-                <!-- Dumbbell Chart -->
-                <div class="dumbbell-chart-container" style="margin: 16px 0; padding: 0 6px;">
-                  <div style="display:flex; justify-content:space-between; margin-bottom: 6px; font-size:10.5px; font-weight:700; color:#94a3b8; letter-spacing:0.02em;">
-                    <span>1.0</span><span>2.0</span><span>3.0</span><span>4.0</span><span>5.0</span>
-                  </div>
-                  <div class="dumbbell-track" style="position:relative; height:10px; background:#f1f5f9; border-radius:5px; display:flex; align-items:center;">
-                    <div style="position:absolute; left:25%; width:1px; height:10px; background:#e2e8f0;"></div>
-                    <div style="position:absolute; left:50%; width:1px; height:10px; background:#e2e8f0;"></div>
-                    <div style="position:absolute; left:75%; width:1px; height:10px; background:#e2e8f0;"></div>
-                    <!-- pre→post line -->
-                    <div style="position:absolute; left:${minPct}%; width:${widthPct}%; height:4px; background:${deltaColor}; border-radius:2px; opacity:0.85; z-index:1;"></div>
-                    ${followupScore !== null ? `<!-- post→followup line --><div style="position:absolute; left:${fuMinPct}%; width:${fuWidthPct}%; height:4px; background:${fuDeltaColor}; border-radius:2px; opacity:0.6; z-index:1;"></div>` : ''}
-                    <!-- pre dot -->
-                    <div style="position:absolute; left:${prePct}%; transform:translateX(-50%); width:12px; height:12px; border-radius:50%; background:#94a3b8; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.15); z-index:2;" title="사전: ${preScore.toFixed(2)}"></div>
-                    <!-- post dot -->
-                    <div style="position:absolute; left:${postPct}%; transform:translateX(-50%); width:14px; height:14px; border-radius:50%; background:${dim.color}; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.2); z-index:3;" title="사후: ${postScore.toFixed(2)}">
-                      <span style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#fff; font-size:8px; font-weight:900; pointer-events:none;">${delta > 0.05 ? '▶' : delta < -0.05 ? '◀' : ''}</span>
-                    </div>
-                    ${followupScore !== null ? `<!-- followup dot --><div style="position:absolute; left:${followupPct}%; transform:translateX(-50%); width:13px; height:13px; border-radius:50%; background:#34c759; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.2); z-index:4;" title="팔로우업: ${followupScore.toFixed(2)}"></div>` : ''}
-                  </div>
-                  <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:11.5px; flex-wrap:wrap; gap:4px;">
-                    <span style="color:#64748b; font-weight:600;">사전: <strong style="color:#475569;">${preScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${pre.n})</span></span>
-                    ${midScore !== null ? `<span style="color:#b47700; font-weight:600;">중간: <strong>${midScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${mid.n})</span></span>` : ''}
-                    <span style="color:${dim.color}; font-weight:700;">사후: <strong>${postScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${post.n})</span></span>
-                    ${followupScore !== null ? `<span style="color:#34c759; font-weight:700;">팔로우업: <strong>${followupScore.toFixed(2)}</strong> <span style="font-weight:500; font-size:10px;">(N=${followup.n})</span></span>` : ''}
-                  </div>
-                </div>
-              ` : `
-                <!-- Masked view -->
-                <div class="masked-cell" style="padding:14px; border-radius:10px; display:flex; align-items:center; justify-content:center; min-height:80px; margin: 12px 0;">
-                  <span class="masked-badge">${lockSvg} N&lt;3 보호 마스킹됨</span>
-                </div>
-              `}
-              ${interpretation ? `<p style="font-size:11.5px; color:#64748b; margin:10px 0 0; line-height:1.5;">${interpretation}</p>` : ''}
-            </div>`;
-        }).join("")}
-      </div>
-      <p style="font-size:11.5px; color:#94a3b8; margin:10px 0 0; line-height:1.6;">N이 3 미만인 데이터는 익명 보장을 위해 마스킹 처리됩니다. 응답은 개인 추적 없이 익명으로 수집되어 사전·사후가 동일인 비교가 아니며, 수치는 통계적 유의성이 아닌 운영 방향 참고 지표입니다.</p>
-      `}
-    </section>
-
-    <!-- ④ 현장의 목소리 (정성 신호) -->
-    ${(() => {
-      if (!session) return '';
-
-      const preSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
-      const postSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
-
-      const preQual = qualResponseRows(session.cohort, session.type, session.id, "사전");
-      const postQual = qualResponseRows(session.cohort, session.type, session.id, "사후");
-
-      const hasPreQual = preQual.rows.length > 0;
-      const hasPostQual = postQual.rows.length > 0;
-
-      if (!hasPreQual && !hasPostQual) {
-        return `
-          <section class="report-export-section" style="margin-bottom:28px;">
-            <div class="section-title" style="margin-bottom:16px;">
-              <h2>④ 현장의 목소리 (정성 신호)</h2>
-            </div>
-            <div class="empty">이 세션에는 분석할 주관식 응답 데이터가 없습니다.</div>
-          </section>
-        `;
-      }
-
-      return `
-        <section class="report-export-section" style="margin-bottom:28px;">
-          <div class="section-title" style="margin-bottom:16px;">
-            <h2>④ 현장의 목소리 (정성 신호)</h2>
-            <span>AI 정성 분석 · 측정값 아님 · 참고</span>
-          </div>
-          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
-            <div>
-              <div style="font-size:14px; font-weight:600; margin-bottom:8px;">
-                <span>사전 정성 신호</span>
-              </div>
-              <div id="qual-signal-pre-container">
-                ${preSig ? '' : `<div class="empty">${hasPreQual ? '사전 정성 분석 결과가 없습니다. "문항별 응답" 페이지에서 AI 분석을 먼저 완료해 주세요.' : '사전 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
-              </div>
-            </div>
-            <div>
-              <div style="font-size:14px; font-weight:600; margin-bottom:8px;">
-                <span>사후 정성 신호</span>
-              </div>
-              <div id="qual-signal-post-container">
-                ${postSig ? '' : `<div class="empty">${hasPostQual ? '사후 정성 분석 결과가 없습니다. "문항별 응답" 페이지에서 AI 분석을 먼저 완료해 주세요.' : '사후 주관식 설문이 배포되지 않았거나 응답이 없습니다.'}</div>`}
-              </div>
-            </div>
-          </div>
-        </section>
-      `;
-    })()}
-
-    `}
-    </div>
-  `;
-}
-
-function metricCard(label, value, note) {
-  return `<article class="metric"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`;
-}
-
-function sectionTitle(title, meta = "") {
-  return `<div class="section-title"><h2>${title}</h2><span>${meta}</span></div>`;
-}
-
-function isAnalyticsSectionCollapsed(key) {
-  return (state.collapsedAnalyticsSections || []).includes(key);
-}
-
-function collapsibleSectionHeader(title, meta, key) {
-  const collapsed = isAnalyticsSectionCollapsed(key);
-  return `
-    <button type="button" class="section-title section-title-toggle" onclick="toggleAnalyticsSection('${key}')">
-      <h2><span class="section-title-chevron">${collapsed ? "▸" : "▾"}</span>${title}</h2>
-      <span>${meta}</span>
-    </button>
-  `;
-}
-
-function renderQuantSection(sessionId, session, phase = "") {
-  if (!session) return emptyCard("선택된 세션이 없습니다.");
-  const surveys = (phase ? [phase] : PHASES)
-    .map((p) => (state.surveys || []).find((s) => s.sessionId === sessionId && s.phase === p))
-    .filter(Boolean);
-  if (!surveys.length) {
-    return emptyCard(phase ? `${phase} 시점에 배포된 설문이 없습니다.` : "배포된 설문이 없습니다.");
-  }
-  return `<div style="display:flex; flex-direction:column; gap:20px;">${surveys.map((survey) => `
-    <div>
-      <div class="qual-group-head" style="margin-bottom:8px;"><strong>${escapeHtml(survey.phase)}</strong><span>${escapeHtml(survey.title)}</span></div>
-      ${renderSurveyResponsePanel(survey, session, false)}
-    </div>
-  `).join("")}</div>`;
-}
-
-function emptyCard(text, tone = "") {
-  return `<div class="empty ${tone}">${text}</div>`;
-}
-
-function eventCard(session, item) {
-  const accent = sessionTypeDef(session.type).accent;
-  return `
-    <article class="list-card" style="--accent:${accent}">
-      <div>
-        <span>${item.date} · ${item.startTime} · ${item.duration}분</span>
-        <strong>${escapeHtml(item.content)}</strong>
-        <small>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</small>
-      </div>
-      <em>${item.seq}회</em>
-    </article>
-  `;
-}
-
-function uploadStateCard(session) {
-  const done = phasesForSession(session.id);
-  return `
-    <article class="list-card" style="--accent:${sessionTypeDef(session.type).accent}">
-      <div>
-        <span>${escapeHtml(sessionTypeLabel(session.type))}</span>
-        <strong>${escapeHtml(sessionLabel(session))}</strong>
-        <small>${PHASES.map((phase) => `<b class="pill ${done.includes(phase) ? "done" : ""}">${phase} ${done.includes(phase) ? "완료" : "대기"}</b>`).join("")}</small>
-      </div>
-    </article>
-  `;
-}
-
-function alertCard(session) {
-  const count = session.schedule.filter((item) => !item.confirmed || !item.date).length;
-  return `
-    <article class="list-card warning" style="--accent:#b86e00">
-      <div>
-        <span>미정 ${count}회차</span>
-        <strong>${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}</strong>
-      </div>
-    </article>
-  `;
-}
-
-function typeSummary(type) {
-  const list = state.sessions.filter((session) => sameSessionType(session.type, type));
-  const active = list.filter((session) => getStatus(session)[0] === "진행중").length;
-  return `
-    <article class="type-card" style="--accent:${SESSION_TYPES[type].accent}">
-      <span>${sessionTypeLabel(type)}</span>
-      <strong>${list.length}</strong>
-      <small>진행중 ${active}개</small>
-    </article>
-  `;
-}
-
-function scheduleRow(item) {
-  const roundTypeOptions = Object.entries(ROUND_TYPES).map(([val, def]) =>
-    `<option value="${val}" ${item.roundType === val ? 'selected' : ''}>${def.label}</option>`
-  ).join('');
-  return `
-    <div class="schedule-row" data-id="${item.id}">
-      <strong>${item.seq}회</strong>
-      <label class="check"><input type="checkbox" data-field="confirmed" ${item.confirmed ? "checked" : ""} />확정</label>
-      <input type="date" data-field="date" value="${item.date}" />
-      <input data-field="startTime" value="${item.startTime}" />
-      <input data-field="content" value="${escapeHtml(item.content)}" />
-      <select data-field="roundType" class="round-type-select" title="회차 유형">
-        ${roundTypeOptions}
-      </select>
-      <input type="number" data-field="duration" value="${item.duration}" min="30" step="30" />
-      <input data-field="note" value="${escapeHtml(item.note)}" placeholder="메모" />
-    </div>
-  `;
-}
-
-function sessionCard(session) {
-  const [status, tone] = getStatus(session);
-  const confirmed = session.schedule.filter((item) => item.confirmed && item.date).length;
-  const total     = session.schedule.length;
-  const uploadCount = phasesForSession(session.id).length;
-  const isEditing = state.editingSessionId === session.id;
-
-  const preQual = qualResponseRows(session.cohort, session.type, session.id, "사전");
-  const postQual = qualResponseRows(session.cohort, session.type, session.id, "사후");
-
-  const hasPreQual = preQual.rows.length > 0;
-  const hasPostQual = postQual.rows.length > 0;
-
-  let qualButtons = '';
-  if (hasPreQual || hasPostQual) {
-    const hasPreSig = (state.qualSignals || []).some(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
-    const hasPostSig = (state.qualSignals || []).some(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
-
-    qualButtons = `
-      <div class="session-qual-actions" style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; border-top: 0.5px solid var(--color-border-tertiary,#eee); padding-top: 10px;">
-        ${hasPreQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'pre')" style="font-size: 11px; padding: 4px 8px;">${hasPreSig ? '정성 분석 수정 (사전) ✓' : '정성 분석 (사전)'}</button>` : ''}
-        ${hasPostQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'post')" style="font-size: 11px; padding: 4px 8px;">${hasPostSig ? '정성 분석 수정 (사후) ✓' : '정성 분석 (사후)'}</button>` : ''}
-      </div>
-    `;
-  }
-
-  return `
-    <article class="session-card compact${isEditing ? ' editing' : ''}">
-      <div class="session-card-actions">
-        <b class="status ${tone}">${status}</b>
-        <button class="icon-btn" onclick="startEditSession('${session.id}')" title="${isEditing ? '편집 중' : '수정'}" aria-label="${isEditing ? '편집 중' : '세션 수정'}">${isEditing ? '●' : '✎'}</button>
-        <button class="icon-btn danger" onclick="deleteSession('${session.id}')" title="삭제" aria-label="세션 삭제">×</button>
-      </div>
-      <div class="session-top">
-        <div>
-          <span>${escapeHtml(sessionTypeLabel(session.type))}</span>
-          <h3>${escapeHtml(sessionLabel(session))}</h3>
-        </div>
-      </div>
-      <div class="session-meta">
-        <span title="일정이 확정된 회차 수">일정 확정 ${confirmed}/${total}회차</span>
-        <span title="날짜 미정 또는 미확정 회차">⏳ 미확정 ${total - confirmed}회차</span>
-        <span title="사전/사후 설문 CSV 업로드 완료 단계">설문 응답 업로드 ${uploadCount}/2단계</span>
-      </div>
-      ${qualButtons}
-    </article>
-  `;
-}
-
-function renderUploadPreview() {
-  if (state.uploadErrors.length) return `<div class="error-list">${state.uploadErrors.map((err) => `<p>${escapeHtml(err)}</p>`).join("")}</div>`;
-  if (!state.uploadRows.length) return `<div class="drop-preview">CSV를 선택하면 검증 결과와 첫 5행이 여기에 표시됩니다.</div>`;
-  
-  const uploadSessionSelect = document.querySelector("#upload-session");
-  const uploadPhaseSelect = document.querySelector("#upload-phase");
-  const sessionId = uploadSessionSelect ? uploadSessionSelect.value : (state.sessions[0] ? state.sessions[0].id : "");
-  const phase = uploadPhaseSelect ? uploadPhaseSelect.value : "사전";
-  
-  const survey = state.surveys.find(s => s.sessionId === sessionId && s.phase === phase);
-  const questions = survey && survey.questions && survey.questions.length > 0 ? 
-                    survey.questions.filter(q => q.type === "quant") : 
-                    defaultQuestions(phase).filter(q => q.type === "quant");
-
-  const previewQs = questions.slice(0, 4);
-  const rows = state.uploadRows.slice(0, 5);
-
-  return `
-    <div class="preview-head">
-      <strong>${state.uploadRows.length}행 검증 통과</strong>
-      <button class="primary" id="save-upload">저장</button>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>기수</th>
-            <th>시점</th>
-            ${previewQs.map((q) => `<th>${escapeHtml(q.text)}</th>`).join("")}
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map((row) => `
-            <tr>
-              <td>${row.cohort}</td>
-              <td>${row.phase}</td>
-              ${previewQs.map((q) => `<td>${row[q.id] ?? "-"}</td>`).join("")}
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function renderChart(stats, cohort, type, sessionId = "") {
-  const pre = stats.find(s => s.phase === '사전') || {};
-  const mid = stats.find(s => s.phase === '중간') || {};
-  const post = stats.find(s => s.phase === '사후') || {};
-  const dynamicQuestions = sessionId ? questionSetForSession(sessionId) : getQuestionsForCohort(cohort, type);
-  return `
-    <div class="chart">
-      ${dynamicQuestions.map((q) => {
-        const key = q.id;
-        const label = q.text;
-        const preValue = pre[`${key}_avg`] || 0;
-        const midValue = mid[`${key}_avg`] || 0;
-        const postValue = post[`${key}_avg`] || 0;
-        return `
-          <div class="chart-row">
-            <span class="chart-label-text" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-            <div class="bar-track-container">
-              <div class="bar-track">
-                <i class="bar-pre" style="width:${preValue * 20}%" title="사전: ${preValue ? preValue.toFixed(2) : '-'}"></i>
-                ${midValue ? `<span class="bar-mid" style="width:${midValue * 20}%" title="중간: ${midValue.toFixed(2)}"></span>` : ''}
-                <b class="bar-post" style="width:${postValue * 20}%" title="사후: ${postValue ? postValue.toFixed(2) : '-'}"></b>
-              </div>
-            </div>
-            <em>${postValue && preValue ? (postValue - preValue).toFixed(2) : "-"}</em>
-          </div>
-        `;
-      }).join("")}
-      <div class="legend">
-        <span><i class="legend-pre"></i>사전</span>
-        <span><i class="legend-post"></i>사후</span>
-      </div>
-    </div>
-  `;
-}
-
-function renderStatsTable(stats, masked, cohort, type, sessionId = "") {
-  const pre = stats.find(s => s.phase === '사전') || { n: 0 };
-  const post = stats.find(s => s.phase === '사후') || { n: 0 };
-  const shouldMask = masked && (pre.n < 3 || post.n < 3);
-  const dynamicQuestions = sessionId ? questionSetForSession(sessionId) : getQuestionsForCohort(cohort, type);
-  return `
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>문항</th><th>사전</th><th>사후</th><th>변화량</th></tr></thead>
-        <tbody>
-          ${dynamicQuestions.map((q) => {
-            const key = q.id;
-            const label = q.text;
-            if (shouldMask) {
-              return `<tr>
-                <td class="table-q-text">${escapeHtml(label)}</td>
-                <td class="masked-cell"><span class="masked-badge">${lockSvg} N&lt;3 보호</span></td>
-                <td class="masked-cell"><span class="masked-badge">${lockSvg} N&lt;3 보호</span></td>
-                <td>-</td>
-              </tr>`;
-            }
-            const pv = pre[`${key}_avg`];
-            const qv = post[`${key}_avg`];
-            const delta = typeof pv === "number" && typeof qv === "number" ? qv - pv : null;
-            return `<tr><td class="table-q-text">${escapeHtml(label)}</td><td>${fmt(pv)}</td><td>${fmt(qv)}</td><td class="${delta > 0 ? "plus" : delta < 0 ? "minus" : ""}">${delta === null ? "-" : delta.toFixed(2)}</td></tr>`;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function qualResponseRows(cohort, type, sessionId = "", phase = "") {
-  const cohortNum = Number(cohort);
-  const sessionIds = new Set(sessionId
-    ? [sessionId]
-    : (state.sessions || []).filter((s) => sameSessionType(s.type, type)).map((s) => s.id));
-  // Same cohort number can be shared by a 팀빌딩 session and a 리더십 session at once — always
-  // require the survey's own sessionType to match, so the two never get pooled together.
-  const relevantSurveys = (state.surveys || []).filter(s =>
-    sessionIds.has(s.sessionId) || (Number(s.sessionCohort) === cohortNum && sameSessionType(s.sessionType, type))
-  );
-  // Classify 정성 문항 from the survey(s) of the SELECTED 시점 only. The same q-id can be 주관식 in
-  // one 시점 and 객관식 in another (e.g. DT기획팀 q1~q3: 중간엔 주관식, 사후엔 척도). Pooling qual ids
-  // across phases made 사후 정성 영역에 q1~q3 척도 점수가 새어 나왔다. Scope to the phase to stop it.
-  const classifySurveys = phase ? relevantSurveys.filter(s => s.phase === phase) : relevantSurveys;
-  const configuredQualIds = [...new Set(classifySurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
-  // Only fall back to the legacy q9~q11 guess when the selected phase has no configured survey at
-  // all — e.g. orphaned CSV-only data with no survey doc.
-  const hasExplicitConfig = classifySurveys.some(s => (s.questions || []).length > 0);
-  const qualIds = hasExplicitConfig ? configuredQualIds : ['q9', 'q10', 'q11'];
-  const phaseOk = (r) => !phase || r.phase === phase;
-
-  // Filter helper: check if a response has qualitative text in fields that are qualitative in its own survey
-  const hasQualTextInSurvey = (r) => {
-    const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
-    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-      : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-    return rQualIds.some(id => isQualText(r[id]));
-  };
-
-  let rows;
-  if (sessionId) {
-    // A specific session is selected: match purely by sessionId (+ phase). The cohort field on a
-    // response is only a stale snapshot and must NOT gate visibility — that mismatch is exactly
-    // what made 리스크관리팀 정성 응답 disappear while its 정량 응답 still showed.
-    rows = (state.responses || []).filter(r =>
-      sessionIds.has(r.sessionId) && phaseOk(r) && hasQualTextInSurvey(r)
-    );
-  } else {
-    // Cohort/type-level aggregation (no single session): scope by cohort + the session set.
-    rows = (state.responses || []).filter(r =>
-      r.cohort === cohortNum && sessionIds.has(r.sessionId) && phaseOk(r) && hasQualTextInSurvey(r)
-    );
-    // Fallback for orphaned rows whose sessionId no longer matches any session (e.g. CSV upload
-    // with a stale id) — only keep them if their linked survey confirms the same session type,
-    // so a 팀빌딩 1기 response never shows up under 리더십 1기 just because the cohort number matches.
-    if (!rows.length) {
-      rows = (state.responses || []).filter(r => {
-        if (r.cohort !== cohortNum || !phaseOk(r) || !hasQualTextInSurvey(r)) return false;
-        const survey = (state.surveys || []).find(s => s.id === r.surveyId);
-        return Boolean(survey && sameSessionType(survey.sessionType, type));
-      });
-    }
-  }
-  return { qualIds, rows };
-}
-
-function qualQuestionLabel(qid, type, sessionId = "", phase = "") {
-  // Prefer the survey that matches this exact 세션 + 시점 so a q-id reused across surveys with
-  // different wording shows the right question text; fall back to any same-type survey, then legacy.
-  let survey = sessionId
-    ? (state.surveys || []).find(s => s.sessionId === sessionId && (!phase || s.phase === phase) && (s.questions || []).some(q => q.id === qid))
-    : null;
-  if (!survey) survey = (state.surveys || []).find(s => sameSessionType(s.sessionType, type) && (s.questions || []).some(q => q.id === qid));
-  const text = survey?.questions?.find(q => q.id === qid)?.text;
-  if (text) return text;
-  if (qid === 'q9')  return '세션 참여 전 기대하는 점';
-  if (qid === 'q10') return '세션 중 도움이 된 점';
-  if (qid === 'q11') return '운영진에게 전달하고 싶은 메시지';
-  return qid;
-}
-
-function renderQualByQuestion(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
-  return qualIds.map((id) => {
-    const answers = rows.filter((r) => {
-      const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
-      const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-        ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-        : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-      return rQualIds.includes(id) && isQualText(r[id]);
-    }).map((r) => ({ phase: r.phase || '', answer: r[id] }));
-
-    if (!answers.length) return '';
-    return `
-      <div class="qual-group">
-        <div class="qual-group-head"><strong>${escapeHtml(qualQuestionLabel(id, type, sessionId, phase))}</strong><span>${answers.length}건</span></div>
-        ${answers.map((a) => `
-          <article class="qual-answer-row">
-            ${showPhase ? `<div class="qual-answer-meta"><span>${escapeHtml(a.phase)}</span></div>` : ''}
-            <p>${escapeHtml(a.answer)}</p>
-          </article>
-        `).join("")}
-      </div>
-    `;
-  }).join("");
-}
-
-function renderQualByPerson(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
-  const peopleRows = rows.filter((row) => {
-    const rSurvey = state.surveys.find(s => s.id === row.surveyId || (s.sessionId === row.sessionId && s.phase === row.phase));
-    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-      : defaultQuestions(row.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-    return rQualIds.some((id) => isQualText(row[id]));
-  });
-
-  return peopleRows.map((row, index) => {
-    const rSurvey = state.surveys.find(s => s.id === row.surveyId || (s.sessionId === row.sessionId && s.phase === row.phase));
-    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-      : defaultQuestions(row.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-
-    const answers = qualIds.filter((id) => rQualIds.includes(id) && isQualText(row[id])).map((id) => ({ 
-      label: qualQuestionLabel(id, type, sessionId, row.phase || phase), 
-      answer: row[id] 
-    }));
-
-    if (!answers.length) return '';
-    return `
-      <div class="qual-group">
-        <div class="qual-group-head"><strong>응답자 ${index + 1}</strong>${showPhase ? `<span>${escapeHtml(row.phase || '')}</span>` : ''}</div>
-        ${answers.map((a) => `
-          <article class="qual-answer-row">
-            <div class="qual-answer-meta"><span>${escapeHtml(a.label)}</span></div>
-            <p>${escapeHtml(a.answer)}</p>
-          </article>
-        `).join("")}
-      </div>
-    `;
-  }).join("");
-}
-
-function renderQualSection(cohort, type, sessionId = "", phase = "") {
-  const { qualIds, rows } = qualResponseRows(cohort, type, sessionId, phase);
-  const phases = [...new Set(rows.map((r) => r.phase).filter(Boolean))];
-  const singlePhase = phase || (phases.length === 1 ? phases[0] : '');
-  const showPhase = !singlePhase;
-  const totalAnswers = rows.reduce((sum, row) => sum + qualIds.filter((id) => isQualText(row[id])).length, 0);
-  const groupBy = state.qualAnswersGroupBy === 'person' ? 'person' : 'question';
-  const body = groupBy === 'person'
-    ? renderQualByPerson(rows, qualIds, type, showPhase, sessionId, phase)
-    : renderQualByQuestion(rows, qualIds, type, showPhase, sessionId, phase);
-
-  let aiButtonHtml = '';
-  if (sessionId && (singlePhase === '사전' || singlePhase === '사후')) {
-    const dbPhase = singlePhase === '사전' ? 'pre' : 'post';
-    const hasSig = (state.qualSignals || []).some(q => q.session_id === sessionId && q.phase === dbPhase && q.review?.status === 'confirmed');
-    aiButtonHtml = `
-      <button class="secondary compact" onclick="window.openQualAnalysisModal('${sessionId}', '${dbPhase}')" style="font-size: 11.5px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; margin-left: 8px;">
-        AI 정성 분석 ${hasSig ? '수정 ✓' : '시작'}
-      </button>
-    `;
-  }
-
-  return `
-    <div class="qual-section-toolbar">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="muted" style="font-size:12px;">${singlePhase ? `${escapeHtml(singlePhase)} 설문 · ` : ''}총 ${totalAnswers}건</span>
-        ${aiButtonHtml}
-      </div>
-      <div class="pulse-segmented" aria-label="보기 방식">
-        <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question" onclick="window.setQualAnswersGroupBy('question')">질문으로 보기</button>
-        <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person" onclick="window.setQualAnswersGroupBy('person')">사람으로 보기</button>
-      </div>
-    </div>
-    <div style="display:flex; flex-direction:column; gap:16px; margin-top:14px;">
-      ${totalAnswers ? body : emptyCard("정성 응답이 없습니다.")}
-    </div>
-  `;
-}
-
-function fmt(value) {
-  return typeof value === "number" ? value.toFixed(2) : "-";
-}
-
 function renderIfActive(views) {
   if (views.includes(state.activeView)) render();
 }
@@ -3030,10 +510,15 @@ function bindLayout() {
         state.selectedAnalyticsSessionId = state.selectedReportSessionId;
       }
       state.activeView = nextView;
+      if (button.id === "topbar-new-session") {
+        state.sessionDrawerOpen = true;
+      }
       state.mobileNavOpen = false;
       saveState();
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
+      } else {
+        render();
       }
     });
   });
@@ -3224,101 +709,7 @@ function bindOrg() {
     render();
   });
 
-  document.querySelector("#close-org-editor")?.addEventListener("click", () => {
-    state.orgEditor = null;
-    render();
-  });
-  document.querySelector("#cancel-org-editor")?.addEventListener("click", () => {
-    state.orgEditor = null;
-    render();
-  });
-  document.querySelector("#save-org-editor")?.addEventListener("click", () => {
-    const editor = state.orgEditor;
-    if (!editor) return;
 
-    if (editor.kind === "member") {
-      const name = document.querySelector("#org-member-name")?.value.trim();
-      const position = document.querySelector("#org-member-position")?.value || "Specialist";
-      const jobTitle = document.querySelector("#org-member-job-title")?.value.trim() || "";
-      const employmentStatus = document.querySelector("#org-member-employment-status")?.value || "재직";
-      if (!name) {
-        alert("구성원 이름을 입력해 주세요.");
-        return;
-      }
-
-      if (editor.mode === "add") {
-        state.orgMembers.push({
-          recordType: "person",
-          id: `person-${editor.parentId}-${Math.floor(Math.random() * 100000)}`,
-          name,
-          parentId: editor.parentId,
-          level: "member",
-          jobGrade: position,
-          position,
-          jobTitle,
-          employmentStatus,
-          role: jobTitle || "팀원",
-          tags: "팀원",
-          generation: "30대"
-        });
-      } else {
-        const member = state.orgMembers.find((item) => item.id === editor.id);
-        if (member) {
-          member.name = name;
-          member.jobGrade = position;
-          member.position = position;
-          member.jobTitle = jobTitle;
-          member.employmentStatus = employmentStatus;
-          member.role = jobTitle || member.role || "팀원";
-          syncPersonSnapshotsEverywhere(member);
-          (state.sessions || [])
-            .filter((session) => session.leaderPersonId === member.id
-              || (session.members || []).some((item) => (item.memberId || item.id) === member.id)
-              || (session.leaderGroup || []).some((item) => (item.memberId || item.id) === member.id))
-            .forEach((session) => saveSessionToFirestore(session));
-        }
-      }
-    } else if (editor.kind === "unit") {
-      const name = document.querySelector("#org-unit-name")?.value.trim();
-      if (!name) {
-        alert(`${UNIT_LABELS[editor.level] || "조직"} 이름을 입력해 주세요.`);
-        return;
-      }
-
-      let unit = editor.mode === "edit" ? state.orgUnits.find((item) => item.id === editor.id) : null;
-      if (!unit) {
-        unit = {
-          recordType: "unit",
-          id: `${editor.level.toUpperCase()}_${Math.floor(Math.random() * 100000)}`,
-          level: editor.level,
-          parentId: editor.parentId,
-          name,
-          leader: "",
-          leaderTitle: "",
-          leaderRole: "",
-          leaderMemberId: ""
-        };
-        state.orgUnits.push(unit);
-        if (editor.level === "company") state.selectedCompany = unit.id;
-        if (editor.level === "division") state.selectedDivision = unit.id;
-        if (editor.level === "hq") state.selectedHq = unit.id;
-        if (editor.level === "team") state.selectedTeam = unit.id;
-      }
-
-      unit.name = name;
-      if (editor.level !== "company") {
-        applyLeaderSelection(unit, document.querySelector("#org-unit-leader")?.value || "");
-      } else {
-        unit.leaderTitle = document.querySelector("#org-unit-leader-title")?.value || unit.leaderTitle;
-        unit.leaderRole = UNIT_LEADER_LABELS[editor.level] || unit.leaderRole;
-      }
-    }
-
-    state.orgEditor = null;
-    syncDraftOrgFromTeam(state.draftTeamId);
-    persistOrganization();
-    render();
-  });
 }
 
 // 설문 설계 화면("survey" 뷰)의 버튼 바인딩. 이 화면은 bindSessions()가 아니라
@@ -3429,6 +820,21 @@ window.cancelSurveyEdit = function() {
 };
 
 function bindSessions() {
+  document.getElementById('btn-open-session-drawer')?.addEventListener('click', () => {
+    state.sessionDrawerOpen = true;
+    render();
+  });
+  document.getElementById('close-session-drawer')?.addEventListener('click', () => {
+    state.sessionDrawerOpen = false;
+    state.editingSessionId = null;
+    render();
+  });
+  document.getElementById('session-drawer-overlay')?.addEventListener('click', () => {
+    state.sessionDrawerOpen = false;
+    state.editingSessionId = null;
+    render();
+  });
+
   document.querySelector("#btn-session-list")?.addEventListener("click", () => {
     state.activeSessionTab = "list";
     saveState();
@@ -3871,21 +1277,6 @@ function bindSessions() {
     const dd = document.getElementById("session-more-dropdown");
     if (dd) dd.style.display = "none";
   }, { once: false });
-
-  document.getElementById('btn-open-session-drawer')?.addEventListener('click', () => {
-    state.sessionDrawerOpen = true;
-    render();
-  });
-  document.getElementById('close-session-drawer')?.addEventListener('click', () => {
-    state.sessionDrawerOpen = false;
-    state.editingSessionId = null;
-    render();
-  });
-  document.getElementById('session-drawer-overlay')?.addEventListener('click', () => {
-    state.sessionDrawerOpen = false;
-    state.editingSessionId = null;
-    render();
-  });
 }
 
 function bindUpload() {
@@ -4529,6 +1920,223 @@ window.deleteMember = function(id) {
   render();
 };
 
+window.openOrgNodeEditor = function(id, mode) {
+  if (mode === "edit") {
+    window.renameOrgNode(id);
+  } else {
+    const parentUnit = state.orgUnits.find(u => u.id === id);
+    const nextLevel = parentUnit?.level === "company" ? "division" :
+                      parentUnit?.level === "division" ? "hq" : "team";
+    window.addOrgNode(nextLevel, id);
+  }
+};
+
+window.openOrgMemberEditor = function(id, parentId) {
+  if (id) {
+    window.renameMember(id);
+  } else {
+    window.addOrgMember(parentId);
+  }
+};
+
+window.deleteOrgMember = function(id) {
+  window.deleteMember(id);
+};
+
+window.closeOrgPopup = function() {
+  state.activeOrgPopupUnitId = "";
+  saveState();
+  render();
+};
+
+window.closeOrgEditor = function() {
+  state.orgEditor = null;
+  render();
+};
+
+window.saveOrgNode = function() {
+  const editor = state.orgEditor;
+  if (!editor) return;
+  const name = document.querySelector("#org-unit-name")?.value.trim();
+  if (!name) {
+    alert(`${UNIT_LABELS[editor.level] || "조직"} 이름을 입력해 주세요.`);
+    return;
+  }
+
+  let unit = editor.mode === "edit" ? state.orgUnits.find((item) => item.id === editor.id) : null;
+  if (!unit) {
+    unit = {
+      recordType: "unit",
+      id: `${editor.level.toUpperCase()}_${Math.floor(Math.random() * 100000)}`,
+      level: editor.level,
+      parentId: editor.parentId,
+      name,
+      leader: "",
+      leaderTitle: "",
+      leaderRole: "",
+      leaderMemberId: ""
+    };
+    state.orgUnits.push(unit);
+    if (editor.level === "company") state.selectedCompany = unit.id;
+    if (editor.level === "division") state.selectedDivision = unit.id;
+    if (editor.level === "hq") state.selectedHq = unit.id;
+    if (editor.level === "team") state.selectedTeam = unit.id;
+  }
+
+  unit.name = name;
+  if (editor.level !== "company") {
+    const selectVal = document.querySelector("#org-unit-leader")?.value || "";
+    applyLeaderSelection(unit, selectVal);
+    if (!selectVal) {
+      const manualName = document.querySelector("#org-unit-leader-manual-name")?.value.trim() || "";
+      const manualTitle = document.querySelector("#org-unit-leader-manual-title")?.value || "";
+      if (manualName) {
+        unit.leader = manualName;
+        unit.leaderTitle = manualTitle;
+      }
+    }
+  } else {
+    unit.leaderTitle = document.querySelector("#org-unit-leader-manual-title")?.value || unit.leaderTitle;
+    unit.leaderRole = UNIT_LEADER_LABELS[editor.level] || unit.leaderRole;
+  }
+
+  state.orgEditor = null;
+  syncDraftOrgFromTeam(state.draftTeamId);
+  persistOrganization();
+  render();
+};
+
+window.saveOrgMember = function() {
+  const editor = state.orgEditor;
+  if (!editor) return;
+  const name = document.querySelector("#org-member-name")?.value.trim();
+  const position = document.querySelector("#org-member-position")?.value || "Specialist";
+  const jobTitle = document.querySelector("#org-member-job-title")?.value.trim() || "";
+  const employmentStatus = document.querySelector("#org-member-employment-status")?.value || "재직";
+  if (!name) {
+    alert("구성원 이름을 입력해 주세요.");
+    return;
+  }
+
+  if (editor.mode === "add") {
+    state.orgMembers.push({
+      recordType: "person",
+      id: `person-${editor.parentId}-${Math.floor(Math.random() * 100000)}`,
+      name,
+      parentId: editor.parentId,
+      level: "member",
+      jobGrade: position,
+      position,
+      jobTitle,
+      employmentStatus,
+      role: jobTitle || "팀원",
+      tags: "팀원",
+      generation: "30대"
+    });
+  } else {
+    const member = state.orgMembers.find((item) => item.id === editor.id);
+    if (member) {
+      member.name = name;
+      member.jobGrade = position;
+      member.position = position;
+      member.jobTitle = jobTitle;
+      member.employmentStatus = employmentStatus;
+      member.role = jobTitle || member.role || "팀원";
+      syncPersonSnapshotsEverywhere(member);
+      (state.sessions || [])
+        .filter((session) => session.leaderPersonId === member.id
+          || (session.members || []).some((item) => (item.memberId || item.id) === member.id)
+          || (session.leaderGroup || []).some((item) => (item.memberId || item.id) === member.id))
+        .forEach((session) => saveSessionToFirestore(session));
+    }
+  }
+
+  state.orgEditor = null;
+  syncDraftOrgFromTeam(state.draftTeamId);
+  persistOrganization();
+  render();
+};
+
+window.selectOrgUnit = function(id) {
+  const unit = state.orgUnits.find(u => u.id === id);
+  if (!unit) return;
+  
+  if (state.activeOrgView === "tree") {
+    state.activeOrgPopupUnitId = id;
+  } else {
+    window.selectOrgNode(unit.level, id);
+  }
+  saveState();
+  render();
+};
+
+window.setOrgView = function(viewType) {
+  state.activeOrgView = viewType;
+  saveState();
+  render();
+};
+
+window.clearOrgSearch = function() {
+  state.orgSearchQuery = "";
+  saveState();
+  render();
+};
+
+window.triggerOrgUpload = function() {
+  alert("일괄 업로드 기능은 준비 중입니다. 백업 복원(.json) 기능을 이용해 데이터를 업로드하시거나 관리자를 통해 등록해 주세요.");
+};
+
+window.triggerOrgBackup = async function() {
+  try {
+    await exportBackupJson();
+  } catch (e) {
+    alert("백업 중 오류가 발생했습니다: " + e.message);
+  }
+};
+
+window.triggerOrgRestore = function() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      await importBackupJson(file);
+    } catch (err) {
+      alert("복원 중 오류가 발생했습니다: " + err.message);
+    }
+  };
+  input.click();
+};
+
+window.resetOrganizationData = async function() {
+  if (!confirm("정말 모든 조직 데이터(부서 및 구성원)를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")) return;
+  state.orgUnits = [];
+  state.orgMembers = [];
+  state.selectedCompany = "";
+  state.selectedDivision = "";
+  state.selectedHq = "";
+  state.selectedTeam = "";
+  persistOrganization();
+  render();
+  alert("조직 데이터가 초기화되었습니다.");
+};
+
+window.toggleLeaderManualRow = function(value) {
+  const nameInput = document.querySelector("#org-unit-leader-manual-name");
+  const titleSelect = document.querySelector("#org-unit-leader-manual-title");
+  const isDisabled = Boolean(value);
+  if (nameInput) {
+    nameInput.disabled = isDisabled;
+    if (isDisabled) nameInput.value = "";
+  }
+  if (titleSelect) {
+    titleSelect.disabled = isDisabled;
+    if (isDisabled) titleSelect.value = "";
+  }
+};
+
 window.renameTeamLeader = function(teamId) {
   const team = state.orgUnits.find(u => u.id === teamId);
   if (!team) return;
@@ -4977,6 +2585,18 @@ async function initApp({ localPreview = false } = {}) {
   });
 }
 
+function qualQuestionLabel(qid, type, sessionId = "", phase = "") {
+  let survey = sessionId
+    ? (state.surveys || []).find(s => s.sessionId === sessionId && (!phase || s.phase === phase) && (s.questions || []).some(q => q.id === qid))
+    : null;
+  if (!survey) survey = (state.surveys || []).find(s => sameSessionType(s.sessionType, type) && (s.questions || []).some(q => q.id === qid));
+  const text = survey?.questions?.find(q => q.id === qid)?.text;
+  if (text) return text;
+  if (qid === 'q9')  return '세션 참여 전 기대하는 점';
+  if (qid === 'q10') return '세션 중 도움이 된 점';
+  if (qid === 'q11') return '운영진에게 전달하고 싶은 메시지';
+  return qid;
+}
 
 window.openQualAnalysisModal = function(sessionId, phase) {
   const session = state.sessions.find(s => s.id === sessionId);

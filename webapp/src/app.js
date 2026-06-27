@@ -9,7 +9,7 @@ import { dashboardActionQueue } from './dashboard/dashboardEngine.js?v=20260623-
 import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260623-report-pdf-portrait-v3';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-audit-log-v1';
+import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-multitenant-v1';
 import { parseCSV } from './views/upload.js?v=20260627-ux-fix-v1';
 import {
   renderSessions,
@@ -82,14 +82,14 @@ import {
   loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore, fetchRecentAuditLogs,
-  
+  migrateOrganizationId,
   sessionsSortedByStart, phasesForSession, getQuestionsForCohort, sessionsForCohort,
   availableSessionTypes,
   cohortsForType, sessionsForTypeCohort, yearForCohortType,
   questionSetForSession, phaseHasQuantQuestions, statsForSession, ensureScopedSelection,
   rowMatchesSurvey, surveyRows,
   surveyDistributionActive, surveyQuestionsForDistribution
-} from './state.js?v=20260627-audit-log-v1';
+} from './state.js?v=20260627-multitenant-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -348,6 +348,7 @@ function render() {
                 <div class="topbar-user-divider"></div>
                 <button type="button" id="access-admin-button" class="topbar-dropdown-item" hidden>회원 승인</button>
                 <button type="button" id="audit-log-button" class="topbar-dropdown-item" hidden>운영 로그</button>
+                <button type="button" id="migrate-org-button" class="topbar-dropdown-item" hidden>DB 조직 태깅</button>
                 <button type="button" class="topbar-dropdown-item" data-view="upload">데이터 가져오기</button>
                 <div class="topbar-user-divider"></div>
                 <button type="button" id="auth-logout-button" class="topbar-dropdown-item danger">로그아웃</button>
@@ -3045,6 +3046,26 @@ function bindLayout() {
       openAuditLogModal();
     });
     auditLogButton.dataset.auditBound = 'true';
+  }
+  const migrateBtn = document.getElementById('migrate-org-button');
+  if (migrateBtn && !migrateBtn.dataset.migrateBound) {
+    migrateBtn.addEventListener('click', async () => {
+      const dropdown = document.getElementById('topbar-user-dropdown');
+      if (dropdown) dropdown.hidden = true;
+      if (!confirm('Firestore의 모든 기존 데이터에 organizationId="lina"를 태깅합니다.\n이 작업은 1회만 실행하면 됩니다. 계속하시겠습니까?')) return;
+      migrateBtn.disabled = true;
+      migrateBtn.textContent = '태깅 중...';
+      try {
+        const count = await migrateOrganizationId('lina');
+        alert(`완료: ${count}건 태깅되었습니다.`);
+      } catch (e) {
+        alert('오류: ' + e.message);
+      } finally {
+        migrateBtn.disabled = false;
+        migrateBtn.textContent = 'DB 조직 태깅';
+      }
+    });
+    migrateBtn.dataset.migrateBound = 'true';
   }
   if (!window.topbarUserDropdownClickBound) {
     document.addEventListener('click', (e) => {

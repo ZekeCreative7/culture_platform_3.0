@@ -94,6 +94,20 @@ async function ensurePendingRequest(user) {
   return requestRef;
 }
 
+async function resolveOrgId(user) {
+  if (isMaster(user)) { window.__currentOrgId = 'lina'; return; }
+  try {
+    const snap = await getDoc(doc(db, 'accessRequests', user.uid));
+    window.__currentOrgId = snap.data()?.organizationId || 'lina';
+  } catch (_) {
+    window.__currentOrgId = 'lina';
+  }
+}
+
+export function getCurrentOrgId() {
+  return window.__currentOrgId || 'lina';
+}
+
 async function grantAccess(user) {
   if (accessGrantedUid === user.uid) return;
   accessGrantedUid = user.uid;
@@ -105,6 +119,7 @@ async function grantAccess(user) {
     spinner: true
   });
   try {
+    await resolveOrgId(user);
     await onAccessGrantedHandler?.(user);
     hideGate();
     syncAuthControls();
@@ -208,6 +223,8 @@ export function syncAuthControls() {
   }
   const auditButton = $('#audit-log-button');
   if (auditButton) auditButton.hidden = !isMaster();
+  const migrateButton = $('#migrate-org-button');
+  if (migrateButton) migrateButton.hidden = !isMaster();
   const logoutButton = $('#auth-logout-button');
   if (logoutButton && !logoutButton.dataset.authBound) {
     logoutButton.dataset.authBound = 'true';

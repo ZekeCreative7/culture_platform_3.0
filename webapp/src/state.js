@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, limit as firestoreLimit } from './firebase.js?v=20260627-audit-log-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, limit as firestoreLimit } from './firebase.js?v=20260627-multitenant-v1';
 import { 
   PHASES, 
   normalizeSessionType, 
@@ -22,6 +22,8 @@ export const STORE_KEY = "culture-platform-webapp-v1";
 export const ORG_STORE_KEY = "culture-platform-org-v1";
 export const PULSE_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 
+function getCurrentOrgId() { return window.__currentOrgId || 'lina'; }
+
 export const pulseCache = { years: {}, loading: false, loaded: false, error: "" };
 export const commitmentsCache = { loaded: false, loading: false };
 
@@ -37,6 +39,7 @@ async function writeAuditLog({ action, targetId, targetType, detail = '' }) {
       targetId,
       targetType,
       detail,
+      organizationId: getCurrentOrgId(),
       timestamp: serverTimestamp()
     });
   } catch (e) {
@@ -322,7 +325,7 @@ export function syncSurveysToSessions() {
 
 export async function loadSurveysFromFirestore() {
   try {
-    const snap = await getDocs(collection(db, 'surveys'));
+    const snap = await getDocs(query(collection(db, 'surveys'), where('organizationId', '==', getCurrentOrgId())));
     state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
     syncSurveysToSessions();
     saveState();
@@ -333,7 +336,7 @@ export async function loadSurveysFromFirestore() {
 
 export async function loadSessionsFromFirestore() {
   try {
-    const snap = await getDocs(collection(db, 'sessions'));
+    const snap = await getDocs(query(collection(db, 'sessions'), where('organizationId', '==', getCurrentOrgId())));
     if (snap.docs.length > 0) {
       const firestoreSessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
       const firestoreIds = new Set(firestoreSessions.map(s => s.id));
@@ -349,7 +352,7 @@ export async function loadSessionsFromFirestore() {
 }
 
 export function subscribeSessionsFromFirestore(onChange = () => {}) {
-  return onSnapshot(collection(db, 'sessions'), (snap) => {
+  return onSnapshot(query(collection(db, 'sessions'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
     state.sessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
     syncSurveysToSessions();
     saveState();
@@ -366,7 +369,7 @@ export async function saveSessionToFirestore(session) {
     const { id, ...data } = session;
     const docRef = doc(db, 'sessions', id);
     const existing = await getDoc(docRef);
-    await setDoc(docRef, { ...data, updatedAt: serverTimestamp() });
+    await setDoc(docRef, { ...data, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() });
     await writeAuditLog({
       action: existing.exists() ? 'session_updated' : 'session_created',
       targetId: id,
@@ -419,7 +422,7 @@ export async function deleteSurveyDocFromFirestore(id) {
 }
 
 export async function fetchAllResponsesFromFirestore() {
-  const snap = await getDocs(collection(db, 'responses'));
+  const snap = await getDocs(query(collection(db, 'responses'), where('organizationId', '==', getCurrentOrgId())));
   return snap.docs.map((d) => {
     const data = d.data();
     return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
@@ -443,7 +446,7 @@ export async function saveResponsesToFirestore(rows) {
     chunk.forEach(row => {
       const { id, ...data } = row;
       const docRef = doc(collection(db, 'responses'));
-      batch.set(docRef, { ...data, createdAt: serverTimestamp() });
+      batch.set(docRef, { ...data, organizationId: getCurrentOrgId(), createdAt: serverTimestamp() });
     });
     await batch.commit();
   }
@@ -459,6 +462,7 @@ export async function setSurveyDistributionActiveInFirestore(id, active) {
       status: active ? 'active' : 'closed',
       ...(active ? { publishedAt: now, closedAt: '', deletedAt: '' } : { closedAt: now, deletedAt: now })
     },
+    organizationId: getCurrentOrgId(),
     updatedAt: serverTimestamp()
   }, { merge: true });
   await writeAuditLog({
@@ -482,7 +486,7 @@ export async function fetchRecentAuditLogs(count = 20) {
 // 설문을 지워도 다음 세션 만들 때 불러올 예시 질문이 남도록, 배포 설문과는 별도 컬렉션에 저장한다.
 export async function loadSurveyTemplatesFromFirestore() {
   try {
-    const snap = await getDocs(collection(db, 'surveyTemplates'));
+    const snap = await getDocs(query(collection(db, 'surveyTemplates'), where('organizationId', '==', getCurrentOrgId())));
     state.surveyTemplates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     saveState();
   } catch (e) {
@@ -491,7 +495,7 @@ export async function loadSurveyTemplatesFromFirestore() {
 }
 
 export async function saveSurveyTemplateToFirestore(id, data) {
-  await setDoc(doc(db, 'surveyTemplates', id), { ...data, updatedAt: serverTimestamp() });
+  await setDoc(doc(db, 'surveyTemplates', id), { ...data, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() });
 }
 
 export async function deleteSurveyTemplateFromFirestore(id) {
@@ -499,7 +503,7 @@ export async function deleteSurveyTemplateFromFirestore(id) {
 }
 
 export async function updateSurveyInFirestore(id, data) {
-  await setDoc(doc(db, 'surveys', id), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, 'surveys', id), { ...data, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() }, { merge: true });
 }
 
 export async function loadPulseYears() {
@@ -508,7 +512,7 @@ export async function loadPulseYears() {
   pulseCache.loading = true;
   pulseCache.error = "";
   try {
-    const snap = await getDocs(collection(db, 'pulseResults'));
+    const snap = await getDocs(query(collection(db, 'pulseResults'), where('organizationId', '==', getCurrentOrgId())));
     const yearsData = {};
     snap.docs.forEach((d) => {
       const year = Number(d.id);
@@ -540,7 +544,7 @@ export async function loadPulseYears() {
 }
 
 export function subscribePulseYearsFromFirestore(onChange = () => {}) {
-  return onSnapshot(collection(db, 'pulseResults'), (snap) => {
+  return onSnapshot(query(collection(db, 'pulseResults'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
     const yearsData = {};
     snap.docs.forEach((d) => {
       const year = Number(d.id);
@@ -576,6 +580,7 @@ export async function savePulseResultToFirestore(payload) {
   const normalized = normalizePulseDoc(payload, payload.year);
   await setDoc(doc(db, 'pulseResults', String(payload.year)), {
     ...normalized,
+    organizationId: getCurrentOrgId(),
     updatedAt: serverTimestamp(),
   });
   pulseCache.years[payload.year] = normalized;
@@ -587,7 +592,7 @@ export async function loadPulseCommitments() {
   if (commitmentsCache.loaded || commitmentsCache.loading) return;
   commitmentsCache.loading = true;
   try {
-    const snap = await getDocs(collection(db, 'pulseCommitments'));
+    const snap = await getDocs(query(collection(db, 'pulseCommitments'), where('organizationId', '==', getCurrentOrgId())));
     state.pulseCommitments = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     commitmentsCache.loaded = true;
     saveState();
@@ -599,7 +604,7 @@ export async function loadPulseCommitments() {
 }
 
 export function subscribePulseCommitmentsFromFirestore(onChange = () => {}) {
-  return onSnapshot(collection(db, 'pulseCommitments'), (snap) => {
+  return onSnapshot(query(collection(db, 'pulseCommitments'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
     state.pulseCommitments = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     commitmentsCache.loaded = true;
     commitmentsCache.loading = false;
@@ -616,7 +621,7 @@ export function subscribePulseCommitmentsFromFirestore(onChange = () => {}) {
 export async function savePulseCommitmentToFirestore(commitment) {
   try {
     const { id, ...data } = commitment;
-    await setDoc(doc(db, 'pulseCommitments', id), { ...data, updatedAt: serverTimestamp() });
+    await setDoc(doc(db, 'pulseCommitments', id), { ...data, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() });
     await writeAuditLog({
       action: 'commitment_saved',
       targetId: id,
@@ -728,7 +733,7 @@ export async function downloadStateFromDb() {
 export async function saveQualSignalToFirestore(qualSignal) {
   try {
     const docId = `${qualSignal.session_id}__${qualSignal.phase}`;
-    await setDoc(doc(db, 'QualSignal', docId), { ...qualSignal, updatedAt: serverTimestamp() });
+    await setDoc(doc(db, 'QualSignal', docId), { ...qualSignal, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() });
     setDbStatus('connected');
 
     const idx = state.qualSignals.findIndex(q => q.id === docId);
@@ -743,6 +748,30 @@ export async function saveQualSignalToFirestore(qualSignal) {
     setDbStatus('error');
     throw e;
   }
+}
+
+/**
+ * 기존 Firestore 데이터(organizationId 없는 docs)에 기본 orgId를 일괄 태깅.
+ * 마스터 계정으로 1회 실행: await migrateOrganizationId()
+ */
+export async function migrateOrganizationId(orgId = 'lina') {
+  const targets = ['sessions', 'surveys', 'responses', 'surveyTemplates', 'pulseResults', 'pulseCommitments', 'QualSignal'];
+  let total = 0;
+  for (const colName of targets) {
+    const snap = await getDocs(collection(db, colName));
+    const toUpdate = snap.docs.filter(d => !d.data().organizationId);
+    if (!toUpdate.length) continue;
+    const CHUNK = 500;
+    for (let i = 0; i < toUpdate.length; i += CHUNK) {
+      const batch = writeBatch(db);
+      toUpdate.slice(i, i + CHUNK).forEach(d => batch.set(d.ref, { organizationId: orgId }, { merge: true }));
+      await batch.commit();
+    }
+    total += toUpdate.length;
+    console.log(`[migrate] ${colName}: ${toUpdate.length}건 태깅 완료`);
+  }
+  console.log(`[migrate] 완료 — 총 ${total}건 organizationId='${orgId}' 적용`);
+  return total;
 }
 
 export function sessionsSortedByStart() {

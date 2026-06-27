@@ -20,7 +20,7 @@ import {
   sectionTitle, 
   sessionYear, 
   sameSessionType 
-} from '../utils.js?v=20260627-session-redesign-v1';
+} from '../utils.js?v=20260627-questions-v1';
 
 export function renderCalendar() {
   const d = new Date(state.calendarDate);

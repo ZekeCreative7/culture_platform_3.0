@@ -20,7 +20,7 @@ import {
   sameSessionType, 
   isQualText, 
   fmt 
-} from '../utils.js?v=20260627-session-redesign-v1';
+} from '../utils.js?v=20260627-questions-v1';
 import { renderQuantSection } from './report.js?v=20260627-session-redesign-v1';
 
 export function renderAnalytics() {

@@ -9,7 +9,7 @@ import {
   emptyCard,
   SCORE_MAP,
   uid
-} from '../utils.js?v=20260627-session-redesign-v1';
+} from '../utils.js?v=20260627-questions-v1';
 
 export function uploadStateCard(session) {
   const done = phasesForSession(session.id);

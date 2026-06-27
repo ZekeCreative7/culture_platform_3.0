@@ -70,7 +70,7 @@ import {
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule,
   targetCountForSession
-} from './utils.js?v=20260627-session-redesign-v1';
+} from './utils.js?v=20260627-questions-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -3309,6 +3309,11 @@ function bindSurveyCreator() {
   // 이 화면의 버튼 동작은 renderSurveyCreator() 내부 인라인 onclick으로 바인딩됩니다.
 }
 
+function draftSessionType() {
+  const session = (state.sessions || []).find(s => s.id === state.draftSurveySessionId);
+  return session?.type || null;
+}
+
 window.submitSurveyDraft = function() {
   const title = (state.draftSurveyTitle || "").trim();
   const sessionId = state.draftSurveySessionId;
@@ -3352,7 +3357,7 @@ window.submitSurveyDraft = function() {
     state.editingSurveyId = null;
     state.draftSurveyTitle = "";
     state.draftGoogleFormUrl = "";
-    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+    state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase, draftSessionType());
     saveState();
     render();
     updateSurveyInFirestore(editedId, surveyData).catch(e => {
@@ -3379,7 +3384,7 @@ window.submitSurveyDraft = function() {
   state.surveys.push({ ...newSurveyData, id: newId });
   state.draftSurveyTitle = "";
   state.draftGoogleFormUrl = "";
-  state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+  state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase, draftSessionType());
   saveState();
   render();
 
@@ -3397,7 +3402,7 @@ window.cancelSurveyEdit = function() {
   state.editingSurveyId = null;
   state.draftSurveyTitle = "";
   state.draftGoogleFormUrl = "";
-  state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase);
+  state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase, draftSessionType());
   // Reset creator step on cancel
   state.surveyCreatorStep = 1;
   saveState();
@@ -4024,9 +4029,15 @@ window.updateSurveyDraftCohort = function(value) {
   render();
 };
 
+window.loadDefaultQuestionsToDraft = function(phase) {
+  state.draftSurveyQuestions = defaultQuestions(phase || state.draftSurveyPhase, draftSessionType());
+  saveState();
+  render();
+};
+
 window.updateSurveyDraftPhase = function(val) {
   state.draftSurveyPhase = val;
-  state.draftSurveyQuestions = defaultQuestions(val);
+  state.draftSurveyQuestions = defaultQuestions(val, draftSessionType());
   saveState();
   render();
 };

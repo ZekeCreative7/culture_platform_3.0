@@ -15,7 +15,7 @@ import {
   normalizeSessionType, 
   SESSION_TYPES, 
   hasRoundPassed 
-} from '../utils.js?v=20260627-session-redesign-v1';
+} from '../utils.js?v=20260627-questions-v1';
 import { pulseDiagnostics, comparisonPair } from '../pulse/pulseEngine.js';
 import { pulseCache } from '../state.js?v=20260627-session-redesign-v1';
 import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-org-revert-v2';

@@ -1078,8 +1078,8 @@ export function renderReport() {
               <h3 style="font-size:13.5px; font-weight:800; color:#475569; border-bottom:1.5px solid #cbd5e1; padding-bottom:8px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
                 <span style="width:7px; height:7px; border-radius:50%; background:#94a3b8;"></span>사전 설문 목소리
               </h3>
-              ${preSig && preSig.analysis_result
-                ? renderQualSections(parseQualResult(preSig.analysis_result) || { '분석 내용': preSig.analysis_result })
+              ${preSig
+                ? `<div id="qual-signal-pre-container"></div>`
                 : hasPreQual
                   ? `<div class="empty" style="padding:20px;">
                        <p style="font-size:12px; margin-bottom:10px;">주관식 데이터 ${preQual.rows.length}건이 있습니다.</p>
@@ -1094,8 +1094,8 @@ export function renderReport() {
               <h3 style="font-size:13.5px; font-weight:800; color:#0052ff; border-bottom:1.5px solid #0052ff44; padding-bottom:8px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
                 <span style="width:7px; height:7px; border-radius:50%; background:#0052ff;"></span>사후 설문 목소리
               </h3>
-              ${postSig && postSig.analysis_result
-                ? renderQualSections(parseQualResult(postSig.analysis_result) || { '분석 내용': postSig.analysis_result })
+              ${postSig
+                ? `<div id="qual-signal-post-container"></div>`
                 : hasPostQual
                   ? `<div class="empty" style="padding:20px;">
                        <p style="font-size:12px; margin-bottom:10px;">주관식 데이터 ${postQual.rows.length}건이 있습니다.</p>
@@ -1128,7 +1128,7 @@ export function cohortOptionsHtml(type, selectedCohort, isReport = false) {
     html += `<option value="all" ${selectedCohort === 'all' ? 'selected' : ''}>[전체 비교 분석]</option>`;
   }
   cohorts.forEach(c => {
-    html += `<option value="${c}" ${selectedCohort === String(c) ? 'selected' : ''}>${c}기</option>`;
+    html += `<option value="${c}" ${String(selectedCohort) === String(c) ? 'selected' : ''}>${c}기</option>`;
   });
   return html;
 }

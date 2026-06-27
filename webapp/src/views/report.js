@@ -29,6 +29,7 @@ import {
 } from '../utils.js?v=20260627-questions-v1';
 import { comparisonPair } from '../pulse/pulseEngine.js';
 import { assertNotQuantInput } from '../qual/qual-signal.js?v=20260619-respondent-tone';
+import { renderSessionOutcomeIntro } from './sessions.js?v=20260627-state-singleton-v1';
 
 // ── Report Analysis Helpers ──────────────────────────────────────
 export const REPORT_DIMS = [

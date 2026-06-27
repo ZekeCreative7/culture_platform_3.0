@@ -108,7 +108,7 @@ export function unitLeaderDetails(unit) {
       name: person.name,
       grade: memberGrade(person),
       jobTitle: memberJobTitle(person),
-      role: UNIT_LEADER_LABELS[unit.level] || "리더",
+      role: UNIT_LEADER_LABELS[unit.level] || "팀장",
     };
   }
   if (!unit.leader) return null;
@@ -117,7 +117,7 @@ export function unitLeaderDetails(unit) {
     name: unit.leader,
     grade: normalizePosition(unit.leaderTitle),
     jobTitle: "",
-    role: UNIT_LEADER_LABELS[unit.level] || "리더",
+    role: UNIT_LEADER_LABELS[unit.level] || "팀장",
   };
 }
 
@@ -128,7 +128,7 @@ export function syncLeaderSnapshotsForPerson(person) {
     .forEach((unit) => {
       unit.leader = person.name;
       unit.leaderTitle = memberGrade(person);
-      unit.leaderRole = UNIT_LEADER_LABELS[unit.level] || "리더";
+      unit.leaderRole = UNIT_LEADER_LABELS[unit.level] || "팀장";
     });
 }
 
@@ -181,15 +181,18 @@ export function repairOrgPersonReferences() {
   });
 }
 
-export function sortedOrgMembers(members) {
+export function sortedOrgMembers(members, leaderId) {
   const mode = state.orgMemberSort || "rank-desc";
-  if (mode === "default") return [...members];
-  return [...members].sort((a, b) => {
+  const sorted = mode === "default" ? [...members] : [...members].sort((a, b) => {
     if (mode === "name") return a.name.localeCompare(b.name, "ko");
     const delta = positionRank(a.jobGrade || a.position) - positionRank(b.jobGrade || b.position);
     if (delta) return mode === "rank-asc" ? -delta : delta;
     return a.name.localeCompare(b.name, "ko");
   });
+  if (!leaderId) return sorted;
+  const idx = sorted.findIndex(m => m.id === leaderId);
+  if (idx > 0) { const [leader] = sorted.splice(idx, 1); sorted.unshift(leader); }
+  return sorted;
 }
 
 export function distinctPeopleCount(unit) {
@@ -235,7 +238,7 @@ export function orgMemberOptionsForUnit(unitId) {
       name: unit.leader,
       position: normalizePosition(unit.leaderTitle),
       jobTitle: "",
-      orgLabel: "기존 리더 정보",
+      orgLabel: "기존 팀장 정보",
     });
   }
   return options.sort((a, b) => a.name.localeCompare(b.name, "ko") || a.orgLabel.localeCompare(b.orgLabel, "ko"));
@@ -437,7 +440,7 @@ export function renderOrgPopup() {
       </div>
       <div class="popup-body">
         <p><strong>인원:</strong> 총 ${counts}명 (직속 ${directCounts}명)</p>
-        <p><strong>${UNIT_LEADER_LABELS[unit.level] || "리더"}:</strong> ${leader ? `${escapeHtml(leader.name)} ${escapeHtml(leader.grade)}` : `<span class="muted">미지정</span>`}</p>
+        <p><strong>${UNIT_LEADER_LABELS[unit.level] || "팀장"}:</strong> ${leader ? `${escapeHtml(leader.name)} ${escapeHtml(leader.grade)}` : `<span class="muted">미지정</span>`}</p>
       </div>
       ${actions.length ? `<div class="popup-foot">${actions.join("")}</div>` : ""}
     </div>
@@ -472,7 +475,7 @@ export function renderOrgUnitCard(unit, activeId, matches, displayLevel = unit.l
         <span class="badge ${displayLevel}">${UNIT_LABELS[displayLevel] || ""}</span>
         <strong>${escapeHtml(unit.name)}</strong>
         <small>
-          ${leader ? `리더: ${escapeHtml(leader.name)}` : `<span class="muted">리더 미지정</span>`} · 
+          ${leader ? `팀장: ${escapeHtml(leader.name)}` : `<span class="muted">팀장 미지정</span>`} · 
           인원 ${people}명${unit.level !== "team" ? ` (${count}개 팀)` : ""}
         </small>
       </div>
@@ -567,17 +570,17 @@ export function renderOrgEditorModal() {
                 </select>
               </label>
               ${isEdit ? `
-                <label>부서 리더 지정
+                <label>부서 팀장 지정
                   <select id="org-unit-leader" class="input-text" onchange="window.toggleLeaderManualRow?.(this.value)">
-                    <option value="">-- 리더 없음/직접 입력 --</option>
+                    <option value="">-- 팀장 없음/직접 입력 --</option>
                     ${leaderOptions.map((opt) => `<option value="${escapeHtml(opt.value)}" ${currentLeaderVal === opt.value ? "selected" : ""}>${escapeHtml(opt.name)} (${escapeHtml(opt.position)} · ${escapeHtml(opt.orgLabel)})</option>`).join("")}
                   </select>
                 </label>
                 <div class="form-grid compact" style="grid-template-columns:1fr 1fr; gap:12px; margin-top:-4px;" id="node-leader-manual-row">
-                  <label>리더 이름 (직접 지정 시)
+                  <label>팀장 이름 (직접 지정 시)
                     <input type="text" id="org-unit-leader-manual-name" value="${escapeHtml(unit?.leaderMemberId ? "" : (unit?.leader || ""))}" placeholder="이름" class="input-text" ${unit?.leaderMemberId ? "disabled" : ""} />
                   </label>
-                  <label>리더 직위/직급
+                  <label>팀장 직위/직급
                     <select id="org-unit-leader-manual-title" class="input-text" ${unit?.leaderMemberId ? "disabled" : ""}>
                       <option value="">-- 직위 선택 --</option>
                       ${POSITION_OPTIONS.map(opt => `<option value="${opt}" ${(!unit?.leaderMemberId && unit?.leaderTitle === opt) ? "selected" : ""}>${opt}</option>`).join("")}
@@ -655,7 +658,7 @@ function renderTeamPanelMembers(teamId) {
   const team = state.orgUnits.find(u => u.id === teamId);
   if (!team) return "";
   const leader = unitLeaderDetails(team);
-  const members = sortedOrgMembers(state.orgMembers.filter(m => m.parentId === teamId));
+  const members = sortedOrgMembers(state.orgMembers.filter(m => m.parentId === teamId), team?.leaderMemberId);
   const rows = members.length
     ? members.map(m => {
         const grade = memberGrade(m);
@@ -664,7 +667,7 @@ function renderTeamPanelMembers(teamId) {
         return `
           <div class="org-panel-member">
             <div class="org-panel-member-info">
-              <span class="org-panel-member-name">${escapeHtml(m.name)}${isLeader ? ' <span class="org-panel-leader-badge">리더</span>' : ""}</span>
+              <span class="org-panel-member-name">${escapeHtml(m.name)}${isLeader ? ' <span class="org-panel-leader-badge">팀장</span>' : ""}</span>
               <span class="org-panel-member-grade">${escapeHtml(grade)}${title ? ` · ${escapeHtml(title)}` : ""}</span>
             </div>
             <div class="org-panel-member-actions">
@@ -692,7 +695,7 @@ function renderDesktopPanel(teamId) {
     <div class="org-panel-header">
       <div>
         <div class="org-panel-team-name">${escapeHtml(d.team.name)}</div>
-        <div class="org-panel-team-meta">${d.members.length}명${d.leader ? ` · 리더: ${escapeHtml(d.leader.name)}` : ""}</div>
+        <div class="org-panel-team-meta">${d.members.length}명${d.leader ? ` · 팀장: ${escapeHtml(d.leader.name)}` : ""}</div>
       </div>
       <button class="ghost compact" onclick="window.closeOrgTeamPanel()" title="닫기" style="margin-left:auto; font-size:18px; line-height:1; padding:2px 6px;">×</button>
     </div>
@@ -715,7 +718,7 @@ function renderBottomSheet(teamId) {
     return `
       <div class="org-bottomsheet-member">
         <div class="org-panel-member-info">
-          <span class="org-panel-member-name">${escapeHtml(m.name)}${isLeader ? ' <span class="org-panel-leader-badge">리더</span>' : ""}</span>
+          <span class="org-panel-member-name">${escapeHtml(m.name)}${isLeader ? ' <span class="org-panel-leader-badge">팀장</span>' : ""}</span>
           <span class="org-panel-member-grade">${escapeHtml(grade)}${title ? ` · ${escapeHtml(title)}` : ""}</span>
         </div>
       </div>
@@ -729,7 +732,7 @@ function renderBottomSheet(teamId) {
       <div class="org-bottomsheet-header">
         <div>
           <div class="org-panel-team-name">${escapeHtml(d.team.name)}</div>
-          <div class="org-panel-team-meta">${d.members.length}명${d.leader ? ` · 리더: ${escapeHtml(d.leader.name)}` : ""}</div>
+          <div class="org-panel-team-meta">${d.members.length}명${d.leader ? ` · 팀장: ${escapeHtml(d.leader.name)}` : ""}</div>
         </div>
         <button class="org-bottomsheet-close" onclick="window.closeOrgTeamPanel()">×</button>
       </div>

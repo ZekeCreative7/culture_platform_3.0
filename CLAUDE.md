@@ -128,37 +128,17 @@ Latest pushed web-app migration commit:
 c220f97 Migrate to browser web app
 ```
 
-GitHub Pages setup:
+GitHub Pages setup (current):
 
-1. Open repo settings.
-2. Go to `Pages`.
-3. Source: `Deploy from a branch`.
-4. Branch: `main`.
-5. Folder: `/root`.
-6. Save.
+- Source: **GitHub Actions** (not branch deploy)
+- Workflow: `.github/workflows/deploy.yml`
+- Push to `main` → `vite build` → deploy `webapp/dist/` to Pages
 
 Expected URL:
 
 ```text
 https://zekecreative7.github.io/culture_platform_3.0/
 ```
-
-Vercel or Netlify can also deploy the `webapp/` folder directly.
-
-## Verification Already Done
-
-Local browser checks passed:
-
-- `http://localhost:4173` served `webapp/` directly.
-- `http://localhost:4174` served repository root and redirected to `/webapp/`.
-- Home/Overview rendered.
-- Logo assets loaded.
-- Session creation flow created one session.
-- Browser console had no errors after asset path fix.
-
-Known environment note:
-
-- This local environment did not have `node`, so verification used a Python static server and browser checks instead of JS build tooling.
 
 ## Immediate Next Tasks
 
@@ -169,6 +149,45 @@ Recommended next slice:
 3. Add Supabase schema and replace `localStorage` once the user wants durable production data.
 4. Improve CSV template download so uploaded forms match `[기수]`, `[q1]` to `[q11]` exactly.
 5. Add edit/delete controls for sessions and schedule rounds.
+
+## Tech Stack
+
+Decisions made as of 2026-06-27. Do not change these without the user's explicit instruction.
+
+- **Framework**: None (vanilla JS + innerHTML). Migration to React is a future option, not current priority.
+- **Build tool**: Vite 5. Run `npm run build` in `webapp/`. Output goes to `webapp/dist/`.
+- **Backend/DB**: Firebase (Firestore, Auth, App Check). npm imports via `firebase/app` etc.
+- **Deployment**: GitHub Actions → GitHub Pages. Push to `main` triggers auto build+deploy.
+- **Language**: JavaScript (no TypeScript).
+- **Base path**: `/culture_platform_3.0/` — required for GitHub Pages subdirectory serving.
+
+### Why these were chosen late
+
+This project started without Node.js in the local environment, so Vite and npm could not be used from the beginning. The build tooling was added mid-project (2026-06-27). For any future project, define the full stack before writing the first line of code.
+
+### Local dev
+
+```bash
+cd webapp
+npm run dev     # Vite dev server at http://localhost:4173
+npm run build   # Production build → webapp/dist/
+```
+
+Node.js is available at `node_portable/bin/node` if not installed globally.
+
+## Grilling Protocol
+
+**Use the `/grilling` skill before starting any new feature, screen, or significant change.**
+
+The grilling skill asks probing questions one at a time to surface hidden assumptions before implementation begins. This prevents rework caused by unclear requirements.
+
+When to invoke it:
+- Before designing a new screen or UI component
+- Before adding a new data field or changing the data model
+- Before any change that touches more than 2 files
+- Whenever the user's request is ambiguous or has multiple valid interpretations
+
+Do not skip grilling to move faster. Rework costs more than the questions do.
 
 ## Guardrails
 

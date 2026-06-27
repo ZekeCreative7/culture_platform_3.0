@@ -491,6 +491,12 @@ function renderOrgActionMenu(actionsHtml, label = "조직 옵션") {
   `;
 }
 
+function leaderMeta(unit) {
+  const leader = unitLeaderDetails(unit);
+  if (!leader) return "";
+  return `<span class="org-card-meta">${escapeHtml(leader.role)} · ${escapeHtml(leader.name)} <small>${escapeHtml(leader.grade)}</small></span>`;
+}
+
 function renderOrgUnitCard(unit, activeId, matches, displayLevel = unit.level) {
   const actionsHtml = `
     ${["division", "hq"].includes(unit.level) ? `<button data-org-direct-members="${escapeHtml(unit.id)}" title="직속 구성원">직속</button>` : ""}

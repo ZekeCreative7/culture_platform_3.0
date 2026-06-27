@@ -676,20 +676,66 @@ function renderTeamPanelMembers(teamId) {
       }).join("")
     : `<div class="acc-members-empty" style="padding:20px 0;">구성원이 없습니다.</div>`;
 
+  const actionsHtml = `
+    <button class="secondary compact" onclick="window.openOrgMemberEditor('', '${teamId}')">+ 구성원 추가</button>
+    <button class="ghost compact" onclick="window.openOrgNodeEditor('${teamId}', 'edit')">팀 수정</button>
+    <button class="ghost compact danger" onclick="window.deleteOrgNode('${teamId}')">팀 삭제</button>
+  `;
+
+  return { team, members, leader, rows, actionsHtml };
+}
+
+function renderDesktopPanel(teamId) {
+  const d = renderTeamPanelMembers(teamId);
+  if (!d) return "";
   return `
     <div class="org-panel-header">
       <div>
-        <div class="org-panel-team-name">${escapeHtml(team.name)}</div>
-        <div class="org-panel-team-meta">${members.length}명${leader ? ` · 리더: ${escapeHtml(leader.name)}` : ""}</div>
+        <div class="org-panel-team-name">${escapeHtml(d.team.name)}</div>
+        <div class="org-panel-team-meta">${d.members.length}명${d.leader ? ` · 리더: ${escapeHtml(d.leader.name)}` : ""}</div>
       </div>
-      <button class="ghost compact" onclick="window.closeOrgTeamPanel()" title="닫기" style="margin-left:auto; font-size:16px; line-height:1;">×</button>
+      <button class="ghost compact" onclick="window.closeOrgTeamPanel()" title="닫기" style="margin-left:auto; font-size:18px; line-height:1; padding:2px 6px;">×</button>
     </div>
-    <div class="org-panel-actions">
-      <button class="secondary compact" onclick="window.openOrgMemberEditor('', '${teamId}')">+ 구성원 추가</button>
-      <button class="ghost compact" onclick="window.openOrgNodeEditor('${teamId}', 'edit')">팀 수정</button>
-      <button class="ghost compact danger" onclick="window.deleteOrgNode('${teamId}')">팀 삭제</button>
+    <div class="org-panel-actions">${d.actionsHtml}</div>
+    <div class="org-panel-members">${d.rows}</div>
+  `;
+}
+
+function renderBottomSheet(teamId) {
+  if (!teamId) return `
+    <div class="org-bottomsheet-backdrop" id="org-bs-backdrop" onclick="window.closeOrgTeamPanel()"></div>
+    <div class="org-bottomsheet" id="org-bs"></div>
+  `;
+  const d = renderTeamPanelMembers(teamId);
+  if (!d) return "";
+  const memberRows = d.members.map(m => {
+    const grade = memberGrade(m);
+    const title = memberJobTitle(m);
+    const isLeader = d.team.leaderMemberId === m.id;
+    return `
+      <div class="org-bottomsheet-member">
+        <div class="org-panel-member-info">
+          <span class="org-panel-member-name">${escapeHtml(m.name)}${isLeader ? ' <span class="org-panel-leader-badge">리더</span>' : ""}</span>
+          <span class="org-panel-member-grade">${escapeHtml(grade)}${title ? ` · ${escapeHtml(title)}` : ""}</span>
+        </div>
+      </div>
+    `;
+  }).join("") || `<div style="padding:20px; font-size:13px; color:var(--text-secondary);">구성원이 없습니다.</div>`;
+
+  return `
+    <div class="org-bottomsheet-backdrop is-open" id="org-bs-backdrop" onclick="window.closeOrgTeamPanel()"></div>
+    <div class="org-bottomsheet is-open" id="org-bs">
+      <div class="org-bottomsheet-handle"></div>
+      <div class="org-bottomsheet-header">
+        <div>
+          <div class="org-panel-team-name">${escapeHtml(d.team.name)}</div>
+          <div class="org-panel-team-meta">${d.members.length}명${d.leader ? ` · 리더: ${escapeHtml(d.leader.name)}` : ""}</div>
+        </div>
+        <button class="ghost compact" onclick="window.closeOrgTeamPanel()" style="font-size:18px; line-height:1; padding:2px 8px;">×</button>
+      </div>
+      <div class="org-bottomsheet-actions">${d.actionsHtml}</div>
+      <div class="org-bottomsheet-members">${memberRows}</div>
     </div>
-    <div class="org-panel-members">${rows}</div>
   `;
 }
 
@@ -801,10 +847,12 @@ export function renderOrg() {
 
       ${selectedTeamId ? `
         <aside class="org-team-panel panel">
-          ${renderTeamPanelMembers(selectedTeamId)}
+          ${renderDesktopPanel(selectedTeamId)}
         </aside>
       ` : ""}
     </div>
+
+    ${renderBottomSheet(selectedTeamId)}
 
     ${renderOrgEditorModal()}
   `;

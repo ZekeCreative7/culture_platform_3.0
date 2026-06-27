@@ -1806,6 +1806,16 @@ window.handleDrop = function(event, targetId, targetLevel) {
   }
 };
 
+window.selectOrgDivision = function(id) {
+  window.selectOrgNode("division", id);
+};
+window.selectOrgHq = function(id) {
+  window.selectOrgNode("hq", id);
+};
+window.selectOrgTeam = function(id) {
+  window.selectOrgNode("team", id);
+};
+
 window.selectOrgNode = function(level, id) {
   state.orgDirectUnitId = "";
   if (level === "company") {

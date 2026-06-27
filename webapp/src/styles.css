@@ -6465,27 +6465,25 @@ button.disabled { opacity: .45; pointer-events: none; }
 
 /* Division rows */
 .acc-division { border-bottom: 1px solid var(--border); }
+/* Division rows — 2-line layout */
 .acc-row--division {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 20px;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 20px;
   cursor: pointer; user-select: none;
   background: #eef2f7;
-  font-weight: 700; font-size: 14px; color: var(--text-primary);
   transition: background 0.12s;
-  min-height: 48px;
+  border-bottom: 1px solid var(--border);
 }
 @media (hover: hover) { .acc-row--division:hover { background: #e2e8f2; } }
 
-/* HQ rows */
+/* HQ rows — 2-line layout */
 .acc-hq { border-bottom: 1px solid var(--border); }
 .acc-row--hq {
-  display: flex; align-items: center; gap: 12px;
-  padding: 11px 20px 11px 40px;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 20px 10px 40px;
   cursor: pointer; user-select: none;
   background: #f7f9fc;
-  font-weight: 600; font-size: 13px; color: var(--text-primary);
   transition: background 0.12s;
-  min-height: 44px;
 }
 @media (hover: hover) { .acc-row--hq:hover { background: #eef2f7; } }
 
@@ -6507,13 +6505,21 @@ button.disabled { opacity: .45; pointer-events: none; }
 .acc-team.is-selected .acc-team-arrow { color: #0055b3; }
 
 /* Shared row parts */
-.acc-chevron { font-size: 11px; color: var(--text-secondary); width: 14px; flex-shrink: 0; }
-.acc-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.acc-meta { font-size: 12px; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; margin-right: 4px; }
-.acc-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
+.acc-chevron { font-size: 11px; color: var(--text-secondary); width: 14px; flex-shrink: 0; margin-top: 3px; }
+.acc-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.acc-row-top { display: flex; align-items: center; gap: 8px; }
+.acc-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 700; font-size: 14px; color: var(--text-primary); }
+.acc-row--hq .acc-name { font-weight: 600; font-size: 13px; }
+.acc-row-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acc-leader-info { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.acc-leader-role { font-size: 11px; font-weight: 600; color: #0071e3; background: #e8f0fe;
+  padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+.acc-meta { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.acc-actions { display: none; gap: 4px; flex-shrink: 0; margin-top: 1px; }
 @media (hover: hover) {
   .acc-row--division:hover .acc-actions,
-  .acc-row--hq:hover .acc-actions { opacity: 1; }
+  .acc-row--hq:hover .acc-actions { display: flex; }
 }
 .acc-empty-children { padding: 10px 56px; font-size: 12px; color: var(--text-secondary); }
 
@@ -6621,12 +6627,11 @@ button.disabled { opacity: .45; pointer-events: none; }
   .org-bottomsheet.is-open { display: block; }
 
   /* looser rows for touch */
-  .acc-row--division { min-height: 52px; padding: 14px 16px; }
-  .acc-row--hq       { min-height: 48px; padding: 12px 16px 12px 32px; }
+  .acc-row--division { padding: 12px 16px; }
+  .acc-row--hq       { padding: 10px 16px 10px 32px; }
   .acc-row--team     { min-height: 48px; padding: 12px 16px 12px 44px; }
-  .acc-meta          { display: none; }
-  /* touch: acc-actions always visible (no hover) */
-  .acc-actions { opacity: 1; }
+  /* on touch: always show actions inline (display:flex overrides default display:none) */
+  .acc-actions { display: flex; }
 }
 
 @media (max-width: 768px) {

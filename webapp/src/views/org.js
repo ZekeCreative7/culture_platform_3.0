@@ -761,16 +761,26 @@ function renderAccordionHq(hq, expandedIds, selectedTeamId) {
   const isOpen = expandedIds.includes(hq.id);
   const teams = childUnits(hq.id, "team");
   const totalMembers = distinctPeopleCount(hq);
+  const leader = unitLeaderDetails(hq);
+  const leaderName = leader?.name || "";
+  const leaderGrade = leader?.grade || "";
   return `
     <div class="acc-hq ${isOpen ? "is-open" : ""}">
       <div class="acc-row acc-row--hq" onclick="window.toggleOrgUnit('${hq.id}')">
         <span class="acc-chevron">${isOpen ? "▾" : "▸"}</span>
-        <span class="acc-name">${escapeHtml(hq.name)}</span>
-        <span class="acc-meta">${teams.length}팀 · ${totalMembers}명</span>
-        <div class="acc-actions" onclick="event.stopPropagation()">
-          <button class="ghost compact" onclick="window.openOrgNodeEditor('${hq.id}', 'add')">+ 팀</button>
-          <button class="ghost compact" onclick="window.openOrgNodeEditor('${hq.id}', 'edit')">수정</button>
-          <button class="ghost compact danger" onclick="window.deleteOrgNode('${hq.id}')">삭제</button>
+        <div class="acc-row-body">
+          <div class="acc-row-top">
+            <span class="acc-name">${escapeHtml(hq.name)}</span>
+            <div class="acc-actions" onclick="event.stopPropagation()">
+              <button class="ghost compact" onclick="window.openOrgNodeEditor('${hq.id}', 'add')">+ 팀</button>
+              <button class="ghost compact" onclick="window.openOrgNodeEditor('${hq.id}', 'edit')">수정</button>
+              <button class="ghost compact danger" onclick="window.deleteOrgNode('${hq.id}')">삭제</button>
+            </div>
+          </div>
+          <div class="acc-row-sub">
+            ${leaderName ? `<span class="acc-leader-info">${escapeHtml(leaderName)}${leaderGrade ? ` · ${escapeHtml(leaderGrade)}` : ""}</span><span class="acc-leader-role">본부장</span>` : ""}
+            <span class="acc-meta">${teams.length}팀 · ${totalMembers}명</span>
+          </div>
         </div>
       </div>
       ${isOpen ? `
@@ -789,16 +799,26 @@ function renderAccordionDivision(div, expandedIds, selectedTeamId) {
   const directTeams = childUnits(div.id, "team");
   const totalMembers = distinctPeopleCount(div);
   const teamCount = descendantTeamIds(div.id).length;
+  const leader = unitLeaderDetails(div);
+  const leaderName = leader?.name || "";
+  const leaderGrade = leader?.grade || "";
   return `
     <div class="acc-division ${isOpen ? "is-open" : ""}">
       <div class="acc-row acc-row--division" onclick="window.toggleOrgUnit('${div.id}')">
         <span class="acc-chevron">${isOpen ? "▾" : "▸"}</span>
-        <span class="acc-name">${escapeHtml(div.name)}</span>
-        <span class="acc-meta">${teamCount}팀 · ${totalMembers}명</span>
-        <div class="acc-actions" onclick="event.stopPropagation()">
-          <button class="ghost compact" onclick="window.openOrgNodeEditor('${div.id}', 'add')">+ 본부/팀</button>
-          <button class="ghost compact" onclick="window.openOrgNodeEditor('${div.id}', 'edit')">수정</button>
-          <button class="ghost compact danger" onclick="window.deleteOrgNode('${div.id}')">삭제</button>
+        <div class="acc-row-body">
+          <div class="acc-row-top">
+            <span class="acc-name">${escapeHtml(div.name)}</span>
+            <div class="acc-actions" onclick="event.stopPropagation()">
+              <button class="ghost compact" onclick="window.openOrgNodeEditor('${div.id}', 'add')">+ 본부/팀</button>
+              <button class="ghost compact" onclick="window.openOrgNodeEditor('${div.id}', 'edit')">수정</button>
+              <button class="ghost compact danger" onclick="window.deleteOrgNode('${div.id}')">삭제</button>
+            </div>
+          </div>
+          <div class="acc-row-sub">
+            ${leaderName ? `<span class="acc-leader-info">${escapeHtml(leaderName)}${leaderGrade ? ` · ${escapeHtml(leaderGrade)}` : ""}</span><span class="acc-leader-role">부문장</span>` : ""}
+            <span class="acc-meta">${teamCount}팀 · ${totalMembers}명</span>
+          </div>
         </div>
       </div>
       ${isOpen ? `

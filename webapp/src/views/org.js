@@ -14,7 +14,7 @@ import {
   UNIT_LEADER_LABELS, 
   UNIT_LABELS, 
   sameSessionType 
-} from '../utils.js?v=20260627-session-redesign-v1';
+} from '../utils.js?v=20260627-questions-v1';
 
 export function validateAndRepairSelectedOrg() {
   if (!state.orgUnits || state.orgUnits.length === 0) return;

@@ -13,7 +13,7 @@ import {
   isQualText,
   normalizeSessionType,
   scoreOf
-} from '../utils.js';
+} from '../utils.js?v=20260627-questions-v1';
 import { QUESTIONS } from '../config/questions.js';
 import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 

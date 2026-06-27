@@ -1,4 +1,4 @@
-import { uid } from '../utils.js';
+import { uid } from '../utils.js?v=20260627-questions-v1';
 
 const PII_PATTERN = /(이름|성명|사번|이메일|email|전화|phone|휴대폰|주민|주소)/i;
 

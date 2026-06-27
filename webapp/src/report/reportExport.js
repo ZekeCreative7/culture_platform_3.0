@@ -1,4 +1,4 @@
-import { scoreOf } from "../utils.js";
+import { scoreOf } from "../utils.js?v=20260627-questions-v1";
 
 function loadScriptOnce(src) {
   return new Promise((resolve, reject) => {

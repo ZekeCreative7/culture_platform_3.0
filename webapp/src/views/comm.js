@@ -1,4 +1,4 @@
-import { escapeHtml, uid, todayISO } from '../utils.js?v=20260627-pipeline-v3';
+import { escapeHtml, uid, todayISO } from '../utils.js?v=20260627-questions-v1';
 
 // ── 옵션 상수 ─────────────────────────────────────────────
 export const COMM_TYPES = [

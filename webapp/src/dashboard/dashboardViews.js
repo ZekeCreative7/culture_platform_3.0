@@ -9,7 +9,7 @@ import {
   dashboardTeamPipeline,
   PIPELINE_STAGES
 } from './dashboardEngine.js?v=20260627-pipeline-v2';
-import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
+import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js?v=20260627-questions-v1';
 import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260627-state-singleton-v1';
 
 // Helper to count week sessions

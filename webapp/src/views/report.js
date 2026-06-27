@@ -25,7 +25,7 @@ import {
   sectionTitle, 
   sessionYear, 
   scoreOf 
-} from '../utils.js?v=20260622-org-backup-restore-v2';
+} from '../utils.js?v=20260627-ux-fix-v1';
 import { comparisonPair } from '../pulse/pulseEngine.js';
 import { assertNotQuantInput } from '../qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderRadarChart } from './analytics.js?v=20260627-session-fix-v1';

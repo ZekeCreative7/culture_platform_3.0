@@ -20,7 +20,7 @@ import {
   sectionTitle, 
   sessionYear, 
   sameSessionType 
-} from '../utils.js?v=20260622-org-backup-restore-v2';
+} from '../utils.js?v=20260627-ux-fix-v1';
 
 export function renderCalendar() {
   const d = new Date(state.calendarDate);

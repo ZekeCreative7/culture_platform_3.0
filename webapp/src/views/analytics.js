@@ -20,7 +20,7 @@ import {
   sameSessionType, 
   isQualText, 
   fmt 
-} from '../utils.js?v=20260622-org-backup-restore-v2';
+} from '../utils.js?v=20260627-ux-fix-v1';
 import { renderQuantSection } from './report.js?v=20260627-session-fix-v1';
 
 export function renderAnalytics() {

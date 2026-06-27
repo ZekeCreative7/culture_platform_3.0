@@ -13,7 +13,7 @@ import {
   UNIT_LEADER_LABELS, 
   UNIT_LABELS, 
   sameSessionType 
-} from '../utils.js?v=20260622-org-backup-restore-v2';
+} from '../utils.js?v=20260627-ux-fix-v1';
 
 export function validateAndRepairSelectedOrg() {
   if (!state.orgUnits || state.orgUnits.length === 0) return;

@@ -14,7 +14,7 @@ import {
   sessionLabel,
   scoreOf,
   SESSION_TYPES
-} from './utils.js?v=20260622-org-backup-restore-v2';
+} from './utils.js?v=20260627-ux-fix-v1';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 

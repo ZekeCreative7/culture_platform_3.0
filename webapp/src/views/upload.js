@@ -9,7 +9,7 @@ import {
   emptyCard,
   SCORE_MAP,
   uid
-} from '../utils.js?v=20260622-org-backup-restore-v2';
+} from '../utils.js?v=20260627-ux-fix-v1';
 
 export function uploadStateCard(session) {
   const done = phasesForSession(session.id);

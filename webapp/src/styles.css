@@ -6305,8 +6305,54 @@ nav button.active,
 
 button.disabled { opacity: .45; pointer-events: none; }
 
+/* AI 다듬기 루프 */
+.comm-loop { padding: 20px 22px; }
+.comm-loop-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.comm-loop-status { font-size: 12px; color: var(--text-secondary); background: var(--bg-subtle); border-radius: 99px; padding: 2px 10px; }
+
+.comm-loop-step { margin-bottom: 20px; }
+.comm-loop-step:last-child { margin-bottom: 0; }
+.loop-step-label { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary); }
+.step-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  background: var(--blue); color: #fff;
+  border-radius: 4px; padding: 2px 7px;
+}
+.step-badge.green { background: #34c759; }
+
+/* 피드백 패널 */
+.comm-feedback-panel { background: #f8faff; border: 1px solid #d0e3ff; border-radius: 10px; padding: 16px 18px; }
+.fb-group { margin-bottom: 12px; }
+.fb-group:last-of-type { margin-bottom: 16px; }
+.fb-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.fb-options { display: flex; gap: 6px; flex-wrap: wrap; }
+.fb-btn {
+  border: 1px solid var(--border); border-radius: 99px;
+  padding: 5px 13px; font-size: 12px; font-family: inherit;
+  background: #fff; color: var(--text-primary); cursor: pointer; transition: all .12s;
+}
+.fb-btn:hover { border-color: var(--blue); color: var(--blue); }
+.fb-btn.active { border-color: var(--blue); background: var(--blue); color: #fff; }
+
+/* 수정 프롬프트 결과 */
+.comm-refined-result { margin-top: 4px; }
+
+/* 히스토리 */
+.comm-history { margin-top: 18px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.comm-history summary { font-size: 13px; font-weight: 500; padding: 10px 14px; cursor: pointer; background: var(--bg-subtle); user-select: none; }
+.comm-history-list { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.history-item { border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.history-item:last-child { border-bottom: none; padding-bottom: 0; }
+.history-item-head { font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 4px; }
+.history-excerpt { font-size: 12px; color: var(--text-secondary); margin: 0 0 6px; line-height: 1.5; }
+.history-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.htag { font-size: 11px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 99px; padding: 2px 8px; color: var(--text-secondary); }
+
+.comm-final-desc { font-size: 12px; color: var(--text-secondary); margin: 4px 0 10px; }
+
 @media (max-width: 768px) {
   .comm-body { grid-template-columns: 1fr; }
   .comm-type-grid { grid-template-columns: repeat(2, 1fr); }
+  .fb-options { gap: 4px; }
 }
 

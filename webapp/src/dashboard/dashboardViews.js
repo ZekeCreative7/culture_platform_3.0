@@ -148,17 +148,41 @@ function renderTeamPipelineSection({ state, today }) {
     ? `<div class="pipeline-empty">등록된 세션이 없습니다. 세션을 먼저 등록하세요.</div>`
     : sortedTeams.map(t => renderTeamCard(t, null)).join("");
 
-  const divisionContent = [...divisionMap.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([div, divTeams]) => {
-      const sorted = [...divTeams].sort((a, b) => (stageIndex[b.stage] ?? 0) - (stageIndex[a.stage] ?? 0));
-      return `
-        <div class="pipeline-division-group">
-          <h4 class="pipeline-division-title">${escapeHtml(div)}</h4>
-          <div class="pipeline-team-grid">${sorted.map(t => renderTeamCard(t, null)).join("")}</div>
+  const allTeamsSortedByDivision = [...teams].sort((a, b) => {
+    const divCmp = (a.division || "").localeCompare(b.division || "");
+    if (divCmp !== 0) return divCmp;
+    return (stageIndex[b.stage] ?? 0) - (stageIndex[a.stage] ?? 0);
+  });
+
+  const divisionTableContent = teams.length === 0
+    ? `<div class="pipeline-empty">등록된 세션이 없습니다.</div>`
+    : `
+      <div class="pipeline-table">
+        <div class="pipeline-table-head">
+          <span>팀 / 부문</span>
+          <span>단계</span>
+          <span>세션</span>
         </div>
-      `;
-    }).join("") || `<div class="pipeline-empty">등록된 세션이 없습니다.</div>`;
+        ${allTeamsSortedByDivision.map(team => {
+          const stage = PIPELINE_STAGES.find(s => s.key === team.stage) || PIPELINE_STAGES[0];
+          return `
+            <div class="pipeline-table-row" data-stage="${team.stage}" data-session-id="${team.activeSessionId || team.latestSessionId || ''}">
+              <div class="pipeline-table-team">
+                <strong>${escapeHtml(team.teamName)}</strong>
+                ${team.division ? `<span>${escapeHtml(team.division)}</span>` : ''}
+              </div>
+              <div>
+                <span class="pipeline-stage-pill" style="background:${stage.color}18;color:${stage.color};border:1px solid ${stage.color}40">
+                  <span class="pipeline-stage-dot" style="background:${stage.color}"></span>
+                  ${stage.label}
+                </span>
+              </div>
+              <div class="pipeline-table-count">${team.sessionCount}개</div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
 
   return `
     <section class="panel dashboard-section" id="dashboard-team-pipeline">
@@ -188,7 +212,7 @@ function renderTeamPipelineSection({ state, today }) {
       <div class="pipeline-content" id="pipeline-content">
         ${viewMode === "team"
           ? `<div class="pipeline-team-grid">${teamGrid}</div>`
-          : divisionContent
+          : divisionTableContent
         }
       </div>
     </section>

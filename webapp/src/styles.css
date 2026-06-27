@@ -1972,6 +1972,16 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 .pipeline-division-group { display: block; margin-bottom: 20px; }
 .pipeline-division-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0 0 8px; }
 .pipeline-empty { font-size: 13px; color: var(--text-secondary); padding: 20px 0; }
+.pipeline-table { border: 0.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+.pipeline-table-head { display: grid; grid-template-columns: 1fr 160px 60px; padding: 7px 14px; background: var(--surface-1); border-bottom: 0.5px solid var(--border); font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.pipeline-table-row { display: grid; grid-template-columns: 1fr 160px 60px; padding: 10px 14px; border-bottom: 0.5px solid var(--border); align-items: center; cursor: pointer; }
+.pipeline-table-row:last-child { border-bottom: none; }
+.pipeline-table-row:hover { background: var(--surface-1); }
+.pipeline-table-team strong { display: block; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.pipeline-table-team span { font-size: 11px; color: var(--text-secondary); }
+.pipeline-stage-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 100px; }
+.pipeline-stage-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pipeline-table-count { font-size: 12px; color: var(--text-secondary); }
 .session-link-select { width: 100%; }
 
 @media (max-width: 900px) {

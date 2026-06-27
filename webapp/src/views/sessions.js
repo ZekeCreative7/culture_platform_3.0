@@ -3,18 +3,19 @@ import {
   phasesForSession, 
   sessionsSortedByStart 
 } from '../state.js?v=20260627-session-redesign-v1';
-import { 
-  escapeHtml, 
-  sessionTypeLabel, 
-  sessionLabel, 
-  sessionTypeDef, 
-  emptyCard, 
-  sectionTitle, 
-  sessionYear, 
-  sameSessionType, 
-  normalizeSessionType, 
-  SESSION_TYPES, 
-  hasRoundPassed 
+import {
+  escapeHtml,
+  sessionTypeLabel,
+  sessionLabel,
+  sessionTypeDef,
+  emptyCard,
+  sectionTitle,
+  sessionYear,
+  sameSessionType,
+  normalizeSessionType,
+  SESSION_TYPES,
+  hasRoundPassed,
+  ROUND_TYPES
 } from '../utils.js?v=20260627-questions-v1';
 import { pulseDiagnostics, comparisonPair } from '../pulse/pulseEngine.js';
 import { pulseCache } from '../state.js?v=20260627-session-redesign-v1';
@@ -139,7 +140,10 @@ export function sessionCard(session) {
   const [status, tone] = getStatus(session);
   const confirmed = session.schedule.filter((item) => item.confirmed && item.date).length;
   const total     = session.schedule.length;
-  const uploadCount = phasesForSession(session.id).length;
+  const uploadedPhases = phasesForSession(session.id);
+  const uploadCount = uploadedPhases.length;
+  const hasFollowup = uploadedPhases.includes("팔로우업");
+  const uploadTotal = hasFollowup ? 3 : 2;
   const isEditing = state.editingSessionId === session.id;
 
   const noDataWhileActive = uploadCount === 0 && status !== "시작전";
@@ -180,7 +184,7 @@ export function sessionCard(session) {
       <div class="session-meta">
         <span title="일정이 확정된 회차 수">일정 확정 ${confirmed}/${total}회차</span>
         <span title="날짜 미정 또는 미확정 회차">⏳ 미확정 ${total - confirmed}회차</span>
-        <span title="사전/사후 설문 CSV 업로드 완료 단계">설문 응답 업로드 ${uploadCount}/2단계</span>
+        <span title="사전/사후/팔로우업 설문 CSV 업로드 완료 단계">설문 응답 업로드 ${uploadCount}/${uploadTotal}단계</span>
       </div>
       ${noDataWhileActive || incompleteAfterDone ? `
         <div class="session-alert-badges">
@@ -194,15 +198,22 @@ export function sessionCard(session) {
 }
 
 export function scheduleRow(item) {
+  const roundTypeOptions = Object.entries(ROUND_TYPES).map(([val, def]) =>
+    `<option value="${val}" ${item.roundType === val ? 'selected' : ''}>${def.label}</option>`
+  ).join('');
   return `
     <div class="schedule-row" data-id="${item.id}">
-      <strong>${item.seq}회</strong>
+      <strong class="round-seq">${item.seq}회</strong>
       <label class="check"><input type="checkbox" data-field="confirmed" ${item.confirmed ? "checked" : ""} />확정</label>
       <input type="date" data-field="date" value="${item.date}" />
-      <input data-field="startTime" value="${item.startTime}" />
-      <input data-field="content" value="${escapeHtml(item.content)}" />
+      <input data-field="startTime" value="${item.startTime}" placeholder="10:00" />
+      <input data-field="content" value="${escapeHtml(item.content)}" placeholder="내용" />
+      <select data-field="roundType" class="round-type-select" title="회차 유형">
+        ${roundTypeOptions}
+      </select>
       <input type="number" data-field="duration" value="${item.duration}" min="30" step="30" />
       <input data-field="note" value="${escapeHtml(item.note)}" placeholder="메모" />
+      <button class="icon-btn danger" data-delete-round="${item.id}" title="회차 삭제" aria-label="회차 삭제">×</button>
     </div>
   `;
 }

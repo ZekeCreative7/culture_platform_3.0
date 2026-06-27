@@ -46,7 +46,7 @@ export function renderUpload() {
           </label>
           <label>CSV 파일<input id="csv-file" type="file" accept=".csv,text/csv" /></label>
         </div>
-        <div class="upload-hint">컬럼명은 [기수], [q1]~[q8], 선택적으로 [q9]~[q11] 태그를 포함해야 합니다. 이름, 이메일, 사번 컬럼은 저장하지 않습니다.</div>
+        <div class="upload-hint">컬럼명은 [기수], [q1]~[q10] 태그를 포함해야 합니다. 팔로우업은 q11~q12(자유응답)도 포함 가능합니다. 이름·이메일·사번 컬럼은 저장하지 않습니다.</div>
         ${selected ? uploadStateCard(selected) : ""}
         ${renderUploadPreview()}
       ` : emptyCard("먼저 세션을 등록하세요.")}
@@ -62,16 +62,17 @@ export function renderUploadPreview() {
   const uploadPhaseSelect = document.querySelector("#upload-phase");
   const sessionId = uploadSessionSelect ? uploadSessionSelect.value : (state.sessions[0] ? state.sessions[0].id : "");
   const phase = uploadPhaseSelect ? uploadPhaseSelect.value : "사전";
-  
+  const selectedSession = state.sessions.find(s => s.id === sessionId);
+  const sessionType = selectedSession?.type || null;
+
   const survey = state.surveys.find(s => s.sessionId === sessionId && s.phase === phase);
-  const questions = survey && survey.questions && survey.questions.length > 0 ? 
-                    survey.questions.filter(q => q.type === "quant") : 
-                    defaultQuestions(phase).filter(q => q.type === "quant");
+  const questions = survey && survey.questions && survey.questions.length > 0 ?
+                    survey.questions.filter(q => q.type === "quant") :
+                    defaultQuestions(phase, sessionType).filter(q => q.type === "quant");
 
   const previewQs = questions.slice(0, 4);
   const rows = state.uploadRows.slice(0, 5);
 
-  const selectedSession = state.sessions.find(s => s.id === sessionId);
   const csvCohorts = [...new Set(state.uploadRows.map(r => r.cohort).filter(Boolean))];
   const sessionCohort = selectedSession ? Number(selectedSession.cohort) : null;
   const cohortMismatch = sessionCohort !== null && csvCohorts.length > 0 && !csvCohorts.includes(sessionCohort);
@@ -108,7 +109,7 @@ export function renderUploadPreview() {
   `;
 }
 
-export function parseCSV(text, sessionId, phase) {
+export function parseCSV(text, sessionId, phase, sessionType = null) {
   const XLSX = globalThis.XLSX;
   if (!XLSX) {
     return { parsed: [], errors: ["SheetJS 라이브러리를 로드하지 못했습니다."] };
@@ -133,9 +134,10 @@ export function parseCSV(text, sessionId, phase) {
   const droppedPii = piiHeaders; // caller uses this for display
   
   const survey = state.surveys.find(s => s.sessionId === sessionId && s.phase === phase);
-  const questions = survey && survey.questions && survey.questions.length > 0 ? 
-                    survey.questions : 
-                    defaultQuestions(phase);
+  const resolvedType = sessionType || state.sessions.find(s => s.id === sessionId)?.type || null;
+  const questions = survey && survey.questions && survey.questions.length > 0 ?
+                    survey.questions :
+                    defaultQuestions(phase, resolvedType);
 
   const tagToIndex = {};
   headers.forEach((header, index) => {

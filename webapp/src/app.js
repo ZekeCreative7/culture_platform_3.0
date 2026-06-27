@@ -3659,6 +3659,16 @@ function bindSessions() {
     rowEl.querySelectorAll("input").forEach((input) => input.addEventListener("input", () => updateField(input)));
     rowEl.querySelectorAll("select").forEach((sel) => sel.addEventListener("change", () => updateField(sel)));
   });
+  document.querySelectorAll("[data-delete-round]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.deleteRound;
+      if (state.draftSchedule.length <= 1) { alert("최소 1회차는 있어야 합니다."); return; }
+      state.draftSchedule = state.draftSchedule.filter(r => r.id !== id)
+        .map((r, i) => ({ ...r, seq: i + 1 }));
+      saveState();
+      render();
+    });
+  });
   document.querySelector("#add-round")?.addEventListener("click", () => {
     const next = state.draftSchedule.length + 1;
     state.draftSchedule.push({ id: uid(), seq: next, confirmed: false, date: todayISO(), startTime: "10:00", duration: sessionTypeDef(state.draftType).duration, content: "", roundType: "기타", note: "", status: "planned", absences: [] });
@@ -3860,9 +3870,10 @@ function bindUpload() {
     if (!selected) return;
     const sessionId = document.querySelector("#upload-session").value;
     const phase = document.querySelector("#upload-phase").value;
+    const sessionType = (state.sessions || []).find(s => s.id === sessionId)?.type || null;
     const text = await selected.text();
     await ensureXlsxLoaded();
-    const { parsed, errors, droppedPii } = parseCSV(text, sessionId, phase);
+    const { parsed, errors, droppedPii } = parseCSV(text, sessionId, phase, sessionType);
     const linkedSurvey = (state.surveys || []).find((survey) => survey.sessionId === sessionId && survey.phase === phase);
     const uploadedAt = new Date().toISOString();
     state.uploadRows = parsed.map((row) => ({

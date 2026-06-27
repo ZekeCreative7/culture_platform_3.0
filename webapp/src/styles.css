@@ -6389,44 +6389,104 @@ button.disabled { opacity: .45; pointer-events: none; }
 
 .comm-final-desc { font-size: 12px; color: var(--text-secondary); margin: 4px 0 10px; }
 
+/* Org split layout */
+.org-split-layout { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+.org-split-layout.has-panel { grid-template-columns: 3fr 1fr; }
+
 /* Org accordion tree */
 .org-accordion-panel { padding: 0; overflow: hidden; }
-.acc-division, .acc-hq, .acc-team { }
-.acc-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 20px;
-  cursor: pointer;
-  user-select: none;
-  border-bottom: 0.5px solid var(--border);
+
+/* Division rows — strongest visual weight */
+.acc-division { border-bottom: 2px solid var(--border); }
+.acc-division:last-child { border-bottom: none; }
+.acc-row--division {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 20px;
+  cursor: pointer; user-select: none;
+  background: var(--surface-1);
+  border-left: 3px solid #0071e3;
+  font-weight: 700; font-size: 14px; color: var(--text-primary);
   transition: background 0.1s;
 }
-.acc-row:hover { background: var(--surface-1); }
-.acc-row--division { padding-left: 20px; background: var(--bg); font-weight: 700; font-size: 14px; }
-.acc-row--hq { padding-left: 40px; font-weight: 600; font-size: 13px; }
-.acc-row--team { padding-left: 60px; font-weight: 500; font-size: 13px; }
-.acc-chevron { font-size: 11px; color: var(--text-secondary); width: 12px; flex-shrink: 0; }
-.acc-name { flex: 1; color: var(--text-primary); }
-.acc-meta { font-size: 12px; color: var(--text-secondary); white-space: nowrap; margin-right: 8px; }
-.acc-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.1s; }
-.acc-row:hover .acc-actions { opacity: 1; }
-.acc-children { border-bottom: 0.5px solid var(--border); }
-.acc-empty-children { padding: 10px 60px; font-size: 12px; color: var(--text-secondary); border-bottom: 0.5px solid var(--border); }
-.acc-members-panel { padding: 8px 80px 12px; background: var(--surface-1); border-bottom: 0.5px solid var(--border); }
-.acc-member-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 0.5px solid var(--border);
-  font-size: 13px;
+.acc-row--division:hover { background: #e8f0fb; }
+
+/* HQ rows — medium weight */
+.acc-div-children { background: white; }
+.acc-hq { border-bottom: 1px solid var(--border); }
+.acc-hq:last-child { border-bottom: none; }
+.acc-row--hq {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 20px 10px 36px;
+  cursor: pointer; user-select: none;
+  background: white;
+  border-left: 2px solid #c7d3e8;
+  font-weight: 600; font-size: 13px; color: var(--text-primary);
+  transition: background 0.1s;
 }
-.acc-member-row:last-child { border-bottom: none; }
-.acc-member-name { flex: 0 0 100px; font-weight: 500; color: var(--text-primary); }
-.acc-member-grade { flex: 1; font-size: 12px; color: var(--text-secondary); }
-.acc-member-actions { display: flex; gap: 4px; opacity: 0; }
-.acc-member-row:hover .acc-member-actions { opacity: 1; }
+.acc-row--hq:hover { background: var(--surface-1); }
+
+/* Team rows — lightest */
+.acc-hq-teams { background: var(--surface-1); }
+.acc-team { border-bottom: 0.5px solid var(--border); }
+.acc-team:last-child { border-bottom: none; }
+.acc-row--team {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px 9px 52px;
+  cursor: pointer; user-select: none;
+  background: var(--surface-1);
+  font-weight: 500; font-size: 13px; color: var(--text-primary);
+  transition: background 0.1s;
+}
+.acc-row--team:hover { background: #e8f0fb; }
+.acc-team.is-selected .acc-row--team { background: #dceeff; color: #0071e3; font-weight: 600; }
+.acc-team-arrow { font-size: 16px; color: var(--text-secondary); margin-left: auto; flex-shrink: 0; }
+.acc-team.is-selected .acc-team-arrow { color: #0071e3; }
+
+/* Shared row parts */
+.acc-chevron { font-size: 11px; color: var(--text-secondary); width: 14px; flex-shrink: 0; }
+.acc-name { flex: 1; }
+.acc-meta { font-size: 12px; color: var(--text-secondary); white-space: nowrap; margin-right: 8px; }
+.acc-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
+.acc-row--division:hover .acc-actions,
+.acc-row--hq:hover .acc-actions { opacity: 1; }
+.acc-empty-children { padding: 10px 52px; font-size: 12px; color: var(--text-secondary); }
+
+/* Right team panel */
+.org-team-panel {
+  position: sticky;
+  top: 80px;
+  padding: 0;
+  overflow: hidden;
+  animation: org-panel-in 0.18s ease;
+}
+@keyframes org-panel-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.org-panel-header {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.org-panel-team-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+.org-panel-team-meta { font-size: 12px; color: var(--text-secondary); }
+.org-panel-actions { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.org-panel-members { padding: 8px 0; }
+.org-panel-member {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 0.5px solid var(--border);
+  gap: 8px;
+}
+.org-panel-member:last-child { border-bottom: none; }
+.org-panel-member:hover { background: var(--surface-1); }
+.org-panel-member:hover .org-panel-member-actions { opacity: 1; }
+.org-panel-member-info { flex: 1; min-width: 0; }
+.org-panel-member-name { display: block; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.org-panel-member-grade { display: block; font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+.org-panel-leader-badge { font-size: 10px; font-weight: 700; background: #0071e3; color: white; border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
+.org-panel-member-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.1s; flex-shrink: 0; }
 .acc-members-empty { font-size: 12px; color: var(--text-secondary); padding: 8px 0; }
 
 @media (max-width: 768px) {

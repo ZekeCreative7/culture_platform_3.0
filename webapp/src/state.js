@@ -153,6 +153,7 @@ export const blankState = () => ({
   commDrafts: [],
   commActiveDraftId: null,
   orgExpandedUnitIds: [],
+  orgSelectedTeamId: "",
 });
 
 export const state = {};

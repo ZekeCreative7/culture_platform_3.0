@@ -651,52 +651,64 @@ export function renderOrgEditorModal() {
   `;
 }
 
-function renderAccordionMembers(teamId) {
+function renderTeamPanelMembers(teamId) {
+  const team = state.orgUnits.find(u => u.id === teamId);
+  if (!team) return "";
+  const leader = unitLeaderDetails(team);
   const members = sortedOrgMembers(state.orgMembers.filter(m => m.parentId === teamId));
-  if (!members.length) {
-    return `<div class="acc-members-empty">구성원이 없습니다.</div>`;
-  }
-  return members.map(m => {
-    const grade = memberGrade(m);
-    const title = memberJobTitle(m);
-    return `
-      <div class="acc-member-row">
-        <span class="acc-member-name">${escapeHtml(m.name)}</span>
-        <span class="acc-member-grade">${escapeHtml(grade)}${title ? ` · ${escapeHtml(title)}` : ""}</span>
-        <div class="acc-member-actions">
-          <button class="ghost compact" onclick="window.openOrgMemberEditor('${m.id}')" title="수정">수정</button>
-          <button class="ghost compact danger" onclick="window.deleteOrgMember('${m.id}')" title="삭제">삭제</button>
-        </div>
+  const rows = members.length
+    ? members.map(m => {
+        const grade = memberGrade(m);
+        const title = memberJobTitle(m);
+        const isLeader = team.leaderMemberId === m.id;
+        return `
+          <div class="org-panel-member">
+            <div class="org-panel-member-info">
+              <span class="org-panel-member-name">${escapeHtml(m.name)}${isLeader ? ' <span class="org-panel-leader-badge">리더</span>' : ""}</span>
+              <span class="org-panel-member-grade">${escapeHtml(grade)}${title ? ` · ${escapeHtml(title)}` : ""}</span>
+            </div>
+            <div class="org-panel-member-actions">
+              <button class="ghost compact" onclick="window.openOrgMemberEditor('${m.id}')">수정</button>
+              <button class="ghost compact danger" onclick="window.deleteOrgMember('${m.id}')">삭제</button>
+            </div>
+          </div>
+        `;
+      }).join("")
+    : `<div class="acc-members-empty" style="padding:20px 0;">구성원이 없습니다.</div>`;
+
+  return `
+    <div class="org-panel-header">
+      <div>
+        <div class="org-panel-team-name">${escapeHtml(team.name)}</div>
+        <div class="org-panel-team-meta">${members.length}명${leader ? ` · 리더: ${escapeHtml(leader.name)}` : ""}</div>
       </div>
-    `;
-  }).join("");
+      <button class="ghost compact" onclick="window.closeOrgTeamPanel()" title="닫기" style="margin-left:auto; font-size:16px; line-height:1;">×</button>
+    </div>
+    <div class="org-panel-actions">
+      <button class="secondary compact" onclick="window.openOrgMemberEditor('', '${teamId}')">+ 구성원 추가</button>
+      <button class="ghost compact" onclick="window.openOrgNodeEditor('${teamId}', 'edit')">팀 수정</button>
+      <button class="ghost compact danger" onclick="window.deleteOrgNode('${teamId}')">팀 삭제</button>
+    </div>
+    <div class="org-panel-members">${rows}</div>
+  `;
 }
 
-function renderAccordionTeam(team, expanded) {
+function renderAccordionTeam(team, selectedTeamId) {
   const leader = unitLeaderDetails(team);
   const memberCount = distinctDirectPeopleCount(team);
+  const isSelected = team.id === selectedTeamId;
   return `
-    <div class="acc-team ${expanded ? "is-open" : ""}">
-      <div class="acc-row acc-row--team" onclick="window.toggleOrgUnit('${team.id}')">
-        <span class="acc-chevron">${expanded ? "▾" : "▸"}</span>
+    <div class="acc-team ${isSelected ? "is-selected" : ""}">
+      <div class="acc-row acc-row--team" onclick="window.selectOrgTeamPanel('${team.id}')">
         <span class="acc-name">${escapeHtml(team.name)}</span>
         <span class="acc-meta">${memberCount}명${leader ? ` · ${escapeHtml(leader.name)}` : ""}</span>
-        <div class="acc-actions" onclick="event.stopPropagation()">
-          <button class="ghost compact" onclick="window.openOrgMemberEditor('', '${team.id}')">+ 구성원</button>
-          <button class="ghost compact" onclick="window.openOrgNodeEditor('${team.id}', 'edit')">수정</button>
-          <button class="ghost compact danger" onclick="window.deleteOrgNode('${team.id}')">삭제</button>
-        </div>
+        <span class="acc-team-arrow">›</span>
       </div>
-      ${expanded ? `
-        <div class="acc-members-panel">
-          ${renderAccordionMembers(team.id)}
-        </div>
-      ` : ""}
     </div>
   `;
 }
 
-function renderAccordionHq(hq, expandedIds) {
+function renderAccordionHq(hq, expandedIds, selectedTeamId) {
   const isOpen = expandedIds.includes(hq.id);
   const teams = childUnits(hq.id, "team");
   const totalMembers = distinctPeopleCount(hq);
@@ -713,16 +725,16 @@ function renderAccordionHq(hq, expandedIds) {
         </div>
       </div>
       ${isOpen ? `
-        <div class="acc-children">
-          ${teams.map(t => renderAccordionTeam(t, expandedIds.includes(t.id))).join("")}
-          ${!teams.length ? `<div class="acc-empty-children">팀이 없습니다. + 팀 버튼으로 추가하세요.</div>` : ""}
+        <div class="acc-hq-teams">
+          ${teams.map(t => renderAccordionTeam(t, selectedTeamId)).join("")}
+          ${!teams.length ? `<div class="acc-empty-children">팀이 없습니다.</div>` : ""}
         </div>
       ` : ""}
     </div>
   `;
 }
 
-function renderAccordionDivision(div, expandedIds) {
+function renderAccordionDivision(div, expandedIds, selectedTeamId) {
   const isOpen = expandedIds.includes(div.id);
   const hqs = childUnits(div.id, "hq");
   const directTeams = childUnits(div.id, "team");
@@ -741,10 +753,10 @@ function renderAccordionDivision(div, expandedIds) {
         </div>
       </div>
       ${isOpen ? `
-        <div class="acc-children">
-          ${hqs.map(hq => renderAccordionHq(hq, expandedIds)).join("")}
-          ${directTeams.map(t => renderAccordionTeam(t, expandedIds.includes(t.id))).join("")}
-          ${(!hqs.length && !directTeams.length) ? `<div class="acc-empty-children">하위 조직이 없습니다. + 본부/팀 버튼으로 추가하세요.</div>` : ""}
+        <div class="acc-div-children">
+          ${hqs.map(hq => renderAccordionHq(hq, expandedIds, selectedTeamId)).join("")}
+          ${directTeams.map(t => renderAccordionTeam(t, selectedTeamId)).join("")}
+          ${(!hqs.length && !directTeams.length) ? `<div class="acc-empty-children">하위 조직이 없습니다.</div>` : ""}
         </div>
       ` : ""}
     </div>
@@ -753,9 +765,9 @@ function renderAccordionDivision(div, expandedIds) {
 
 export function renderOrg() {
   const expandedIds = state.orgExpandedUnitIds || [];
+  const selectedTeamId = state.orgSelectedTeamId || "";
   const company = state.orgUnits.find(u => u.level === "company");
   const divisions = company ? topLevelOrgUnits(company.id) : [];
-
   const totalMembers = state.orgMembers.length;
   const totalTeams = state.orgUnits.filter(u => u.level === "team").length;
 
@@ -778,13 +790,21 @@ export function renderOrg() {
       </div>
     </section>
 
-    <section class="panel org-accordion-panel">
-      ${divisions.length ? divisions.map(div => renderAccordionDivision(div, expandedIds)).join("") : `
-        <div class="empty" style="padding:48px 0;">
-          조직 구조가 없습니다. 위의 <strong>+ 부문 추가</strong>로 시작하세요.
-        </div>
-      `}
-    </section>
+    <div class="org-split-layout ${selectedTeamId ? "has-panel" : ""}">
+      <section class="panel org-accordion-panel">
+        ${divisions.length ? divisions.map(div => renderAccordionDivision(div, expandedIds, selectedTeamId)).join("") : `
+          <div class="empty" style="padding:48px 0;">
+            조직 구조가 없습니다. 위의 <strong>+ 부문 추가</strong>로 시작하세요.
+          </div>
+        `}
+      </section>
+
+      ${selectedTeamId ? `
+        <aside class="org-team-panel panel">
+          ${renderTeamPanelMembers(selectedTeamId)}
+        </aside>
+      ` : ""}
+    </div>
 
     ${renderOrgEditorModal()}
   `;

@@ -1891,6 +1891,18 @@ window.toggleOrgUnit = function(id) {
   render();
 };
 
+window.selectOrgTeamPanel = function(id) {
+  state.orgSelectedTeamId = state.orgSelectedTeamId === id ? "" : id;
+  saveState();
+  render();
+};
+
+window.closeOrgTeamPanel = function() {
+  state.orgSelectedTeamId = "";
+  saveState();
+  render();
+};
+
 window.showDirectMembers = function(unitId) {
   const unit = state.orgUnits.find((item) => item.id === unitId);
   if (!unit) return;

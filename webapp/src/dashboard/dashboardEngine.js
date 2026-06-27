@@ -198,6 +198,29 @@ export function dashboardActionQueue({ state, today }) {
       });
     }
 
+    // 7b. 60-day followup alert (session complete + post survey done + 60+ days since last round)
+    if (sessStatus === "완료" && hasPost) {
+      const lastRoundDate = (session.schedule || [])
+        .filter(r => r.confirmed && r.date)
+        .map(r => r.date)
+        .sort()
+        .at(-1);
+      if (lastRoundDate) {
+        const daysSince = Math.floor((new Date(today) - new Date(lastRoundDate)) / 86400000);
+        if (daysSince >= 60) {
+          actions.push({
+            type: "followup_needed",
+            group: "today",
+            priority: 5,
+            date: lastRoundDate,
+            title: `[60일 팔로우업] ${title} — 세션 종료 ${daysSince}일 경과. 변화 확인 CSV 업로드 필요`,
+            targetView: "upload",
+            sessionId: session.id
+          });
+        }
+      }
+    }
+
     // 7. Report ready
     if (hasPre && hasPost) {
       actions.push({
@@ -415,4 +438,92 @@ export function dashboardSupportOrgs(pulseCache, selectedYear, sessions) {
       sessionDetails
     };
   });
+}
+
+// PIPELINE_STAGES: ordered list used for team tracker
+export const PIPELINE_STAGES = [
+  { key: "세션없음",       label: "세션 없음",       color: "#8e8e93" },
+  { key: "진행중",         label: "세션 진행 중",     color: "#0071e3" },
+  { key: "사후설문완료",   label: "사후 설문 완료",   color: "#34c759" },
+  { key: "팔로우업필요",   label: "60일 팔로우업",    color: "#ff9f0a" },
+  { key: "변화신호확인",   label: "변화 신호 확인",   color: "#5856d6" },
+  { key: "정체경고",       label: "정체 경고",        color: "#ff3b30" },
+];
+
+// Compute pipeline stage for a single team (based on their latest session)
+function teamPipelineStage({ session, responses, today }) {
+  if (!session) return "세션없음";
+  const status = getSessionStatus(session);
+  if (status === "진행중" || status === "시작전") return "진행중";
+
+  // session is "완료" — check post-survey
+  const hasPre = responses.some(r => r.sessionId === session.id && r.phase === "사전");
+  const hasPost = responses.some(r => r.sessionId === session.id && r.phase === "사후");
+  if (!hasPost) return "진행중"; // completed sessions without post survey still need it
+
+  // Find last session round date
+  const schedule = session.schedule || [];
+  const lastRoundDate = schedule
+    .filter(r => r.confirmed && r.date)
+    .map(r => r.date)
+    .sort()
+    .at(-1);
+
+  const daysSinceEnd = lastRoundDate
+    ? Math.floor((new Date(today) - new Date(lastRoundDate)) / 86400000)
+    : 0;
+
+  if (daysSinceEnd >= 60) return "팔로우업필요";
+  return "사후설문완료";
+}
+
+// Build team pipeline for all teams across all sessions
+export function dashboardTeamPipeline({ state, today }) {
+  const sessions = state.sessions || [];
+  const responses = state.responses || [];
+
+  // Collect unique teams from sessions
+  const teamMap = new Map(); // key: teamName, value: { teamName, division, sessions[] }
+  for (const session of sessions) {
+    const teamName = session.team || session.teamName || null;
+    const division = session.division || session.hq || "";
+    if (!teamName) continue;
+    if (!teamMap.has(teamName)) {
+      teamMap.set(teamName, { teamName, division, sessions: [] });
+    }
+    teamMap.get(teamName).sessions.push(session);
+  }
+
+  const teams = [];
+  for (const [, info] of teamMap) {
+    // Pick the "latest" session for stage calculation
+    const latestSession = [...info.sessions].sort((a, b) => {
+      const aDate = (a.schedule || []).filter(r => r.confirmed && r.date).map(r => r.date).sort().at(-1) || "";
+      const bDate = (b.schedule || []).filter(r => r.confirmed && r.date).map(r => r.date).sort().at(-1) || "";
+      return bDate.localeCompare(aDate);
+    })[0];
+
+    const stage = teamPipelineStage({ session: latestSession, responses, today });
+    const sessionCount = info.sessions.length;
+    const activeSession = info.sessions.find(s => getSessionStatus(s) === "진행중");
+
+    teams.push({
+      teamName: info.teamName,
+      division: info.division,
+      stage,
+      sessionCount,
+      latestSessionId: latestSession?.id,
+      activeSessionId: activeSession?.id,
+    });
+  }
+
+  // Group by division for division view
+  const divisionMap = new Map();
+  for (const team of teams) {
+    const div = team.division || "미분류";
+    if (!divisionMap.has(div)) divisionMap.set(div, []);
+    divisionMap.get(div).push(team);
+  }
+
+  return { teams, divisionMap };
 }

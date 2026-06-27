@@ -1533,10 +1533,16 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: po
 .schedule-table { display: grid; gap: 10px; min-width: 0; }
 .schedule-row {
   display: grid;
-  grid-template-columns: 48px 100px 148px 90px minmax(160px,1fr) 90px minmax(120px,0.7fr);
+  grid-template-columns: 48px 100px 148px 90px minmax(140px,1fr) 130px 80px minmax(110px,0.6fr);
   gap: 10px; align-items: center; padding: 10px 16px;
   background: #ffffff; border: 1px solid #e0f2fe;
   border-radius: var(--radius-md); transition: all 0.18s ease; min-width: 0;
+}
+.round-type-select {
+  font-size: 11px; font-weight: 600; padding: 4px 6px;
+  border: 1px solid #d0d0d0; border-radius: 6px;
+  background: #f5f5f7; color: var(--ink); cursor: pointer;
+  min-width: 0; width: 100%;
 }
 .schedule-row > * { min-width: 0; }
 .schedule-row:hover { background: #f0f9ff; border-color: var(--blue); box-shadow: 0 0 0 2px rgba(14,165,233,0.10); }
@@ -1911,6 +1917,46 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 .report-pdf-document .report-radar-card,
 .report-pdf-document .report-change-card { box-shadow: 0 8px 24px rgba(28,74,125,.08); }
 .report-pdf-document .panel:hover { transform: none; }
+
+/* ── Team Pipeline Tracker ─────────────────────────────── */
+.pipeline-view-toggle { display: flex; gap: 4px; }
+.pipeline-toggle-btn {
+  padding: 5px 14px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer;
+}
+.pipeline-toggle-btn.active {
+  background: var(--blue); color: #fff; border-color: var(--blue);
+}
+.pipeline-stage-legend {
+  display: flex; flex-wrap: wrap; gap: 12px 20px;
+  padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.legend-count { font-weight: 600; color: var(--text-primary); }
+.pipeline-team-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px;
+}
+.team-pipeline-card {
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface);
+}
+.pipeline-card-stage {
+  padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;
+}
+.pipeline-stage-label { font-size: 11px; font-weight: 600; }
+.pipeline-pulse-badge {
+  font-size: 10px; background: #34c75920; color: #34c759; padding: 2px 6px; border-radius: 4px;
+}
+.pipeline-card-body {
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 2px;
+}
+.pipeline-team-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.pipeline-division-name { font-size: 11px; color: var(--text-secondary); }
+.pipeline-session-count { font-size: 11px; color: var(--text-secondary); }
+.pipeline-division-group { margin-bottom: 20px; }
+.pipeline-division-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0 0 8px; }
+.pipeline-empty { font-size: 13px; color: var(--text-secondary); padding: 20px 0; }
+.session-link-select { width: 100%; }
 
 @media (max-width: 900px) {
   .report-export-header { align-items: flex-start; }

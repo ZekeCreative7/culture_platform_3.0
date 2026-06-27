@@ -4,7 +4,7 @@ import {
   saveOrgData, 
   saveOrganizationToFirestore, 
   setDbStatus 
-} from '../state.js?v=20260627-audit-log-v1';
+} from '../state.js?v=20260627-session-redesign-v1';
 import { 
   escapeHtml, 
   normalizePosition, 
@@ -13,7 +13,7 @@ import {
   UNIT_LEADER_LABELS, 
   UNIT_LABELS, 
   sameSessionType 
-} from '../utils.js?v=20260627-ux-fix-v1';
+} from '../utils.js?v=20260627-session-redesign-v1';
 
 export function validateAndRepairSelectedOrg() {
   if (!state.orgUnits || state.orgUnits.length === 0) return;

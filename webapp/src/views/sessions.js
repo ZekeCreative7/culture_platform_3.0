@@ -2,7 +2,7 @@ import {
   state, 
   phasesForSession, 
   sessionsSortedByStart 
-} from '../state.js?v=20260627-audit-log-v1';
+} from '../state.js?v=20260627-session-redesign-v1';
 import { 
   escapeHtml, 
   sessionTypeLabel, 
@@ -15,9 +15,9 @@ import {
   normalizeSessionType, 
   SESSION_TYPES, 
   hasRoundPassed 
-} from '../utils.js?v=20260627-ux-fix-v1';
+} from '../utils.js?v=20260627-session-redesign-v1';
 import { pulseDiagnostics, comparisonPair } from '../pulse/pulseEngine.js';
-import { pulseCache } from '../state.js?v=20260627-audit-log-v1';
+import { pulseCache } from '../state.js?v=20260627-session-redesign-v1';
 import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 import { 
   unitLeaderDetails, 
@@ -28,13 +28,13 @@ import {
   ensureDraftOrgSelection, 
   optionHtml,
   renderOrgPopup
-} from './org.js?v=20260627-ux-fix-v1';
+} from './org.js?v=20260627-session-redesign-v1';
 import { 
   renderAttendanceModal, 
   renderDuplicateWarningModal, 
   renderCalendar 
-} from './survey.js?v=20260627-ux-fix-v1';
-import { qualResponseRows } from './analytics.js?v=20260627-ux-fix-v1';
+} from './survey.js?v=20260627-session-redesign-v1';
+import { qualResponseRows } from './analytics.js?v=20260627-session-redesign-v1';
 
 export function renderSessionOutcomeIntro(type) {
   const normalizedType = normalizeSessionType(type);

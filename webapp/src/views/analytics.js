@@ -8,7 +8,7 @@ import {
   collapsibleSectionHeader,
   questionSetForSession,
   getQuestionsForCohort
-} from '../state.js?v=20260627-audit-log-v1';
+} from '../state.js?v=20260627-session-redesign-v1';
 import { 
   PHASES, 
   escapeHtml, 
@@ -20,8 +20,8 @@ import {
   sameSessionType, 
   isQualText, 
   fmt 
-} from '../utils.js?v=20260627-ux-fix-v1';
-import { renderQuantSection } from './report.js?v=20260627-ux-fix-v1';
+} from '../utils.js?v=20260627-session-redesign-v1';
+import { renderQuantSection } from './report.js?v=20260627-session-redesign-v1';
 
 export function renderAnalytics() {
   const scope = ensureScopedSelection("analytics");

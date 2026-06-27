@@ -5,10 +5,12 @@ import {
   dashboardOperatingLoop,
   dashboardWeekSchedule,
   dashboardPulseSignals,
-  dashboardSupportOrgs
-} from './dashboardEngine.js?v=20260623-dashboard-actions-v1';
+  dashboardSupportOrgs,
+  dashboardTeamPipeline,
+  PIPELINE_STAGES
+} from './dashboardEngine.js?v=20260627-pipeline-v1';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
-import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260627-audit-log-v1';
+import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260627-pipeline-v1';
 
 // Helper to count week sessions
 function displayWeekSessionsCount(state, today) {
@@ -113,6 +115,83 @@ function render5SignalRadarChart(pulseSignals) {
         ` : ''}
       </div>
     </div>
+  `;
+}
+
+function renderTeamPipelineSection({ state, today }) {
+  const { teams, divisionMap } = dashboardTeamPipeline({ state, today });
+  const viewMode = state.teamPipelineView || "team"; // "team" | "division"
+
+  const stageIndex = Object.fromEntries(PIPELINE_STAGES.map((s, i) => [s.key, i]));
+
+  const renderTeamCard = (team, pulseCache) => {
+    const stage = PIPELINE_STAGES.find(s => s.key === team.stage) || PIPELINE_STAGES[0];
+    const hasPulse = !!pulseCache?.loaded;
+    return `
+      <div class="team-pipeline-card" data-stage="${team.stage}" data-session-id="${team.activeSessionId || team.latestSessionId || ''}">
+        <div class="pipeline-card-stage" style="background:${stage.color}20;border-left:3px solid ${stage.color}">
+          <span class="pipeline-stage-label" style="color:${stage.color}">${stage.label}</span>
+          ${hasPulse ? `<span class="pipeline-pulse-badge">진단완료</span>` : ""}
+        </div>
+        <div class="pipeline-card-body">
+          <strong class="pipeline-team-name">${escapeHtml(team.teamName)}</strong>
+          ${team.division ? `<span class="pipeline-division-name">${escapeHtml(team.division)}</span>` : ""}
+          <span class="pipeline-session-count">${team.sessionCount}개 세션</span>
+        </div>
+      </div>
+    `;
+  };
+
+  const sortedTeams = [...teams].sort((a, b) => (stageIndex[b.stage] ?? 0) - (stageIndex[a.stage] ?? 0));
+
+  const teamGrid = teams.length === 0
+    ? `<div class="pipeline-empty">등록된 세션이 없습니다. 세션을 먼저 등록하세요.</div>`
+    : sortedTeams.map(t => renderTeamCard(t, null)).join("");
+
+  const divisionContent = [...divisionMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([div, divTeams]) => {
+      const sorted = [...divTeams].sort((a, b) => (stageIndex[b.stage] ?? 0) - (stageIndex[a.stage] ?? 0));
+      return `
+        <div class="pipeline-division-group">
+          <h4 class="pipeline-division-title">${escapeHtml(div)}</h4>
+          <div class="pipeline-team-grid">${sorted.map(t => renderTeamCard(t, null)).join("")}</div>
+        </div>
+      `;
+    }).join("") || `<div class="pipeline-empty">등록된 세션이 없습니다.</div>`;
+
+  return `
+    <section class="panel dashboard-section" id="dashboard-team-pipeline">
+      <div class="section-header">
+        <div>
+          <h3>팀 변화 파이프라인</h3>
+          <span class="section-subtitle">각 팀의 세션 진행 → 사후 설문 → 팔로우업 단계 현황</span>
+        </div>
+        <div class="pipeline-view-toggle">
+          <button class="pipeline-toggle-btn ${viewMode === 'team' ? 'active' : ''}" data-pipeline-view="team">팀별</button>
+          <button class="pipeline-toggle-btn ${viewMode === 'division' ? 'active' : ''}" data-pipeline-view="division">본부별</button>
+        </div>
+      </div>
+
+      <!-- Stage Legend -->
+      <div class="pipeline-stage-legend">
+        ${PIPELINE_STAGES.map(s => `
+          <div class="legend-item">
+            <span class="legend-dot" style="background:${s.color}"></span>
+            <span class="legend-label">${s.label}</span>
+            <span class="legend-count">${teams.filter(t => t.stage === s.key).length}</span>
+          </div>
+        `).join("")}
+      </div>
+
+      <!-- Content -->
+      <div class="pipeline-content" id="pipeline-content">
+        ${viewMode === "team"
+          ? `<div class="pipeline-team-grid">${teamGrid}</div>`
+          : divisionContent
+        }
+      </div>
+    </section>
   `;
 }
 
@@ -280,6 +359,9 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
           <div class="kpi-desc">사전·사후 적재 완료</div>
         </div>
       </div>
+
+      <!-- 팀 변화 파이프라인 트래커 -->
+      ${renderTeamPipelineSection({ state, today })}
 
       <!-- 2-Column Body Layout -->
       <div class="dashboard-body-layout">
@@ -734,6 +816,28 @@ export function bindHomeDashboard({ state, saveState, render }) {
       saveState();
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
+      }
+    });
+  });
+
+  // Pipeline view toggle (team / division)
+  document.querySelectorAll(".pipeline-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.teamPipelineView = btn.dataset.pipelineView;
+      saveState();
+    });
+  });
+
+  // Pipeline team card click → navigate to sessions
+  document.querySelectorAll(".team-pipeline-card[data-session-id]").forEach(card => {
+    const sessionId = card.dataset.sessionId;
+    if (!sessionId) return;
+    card.style.cursor = "pointer";
+    card.addEventListener("click", () => {
+      state.activeView = "sessions";
+      saveState();
+      if (typeof window.startEditSession === "function") {
+        window.startEditSession(sessionId);
       }
     });
   });

@@ -4,7 +4,7 @@ import {
   surveyDistributionActive, 
   surveyQuestionsForDistribution, 
   rowMatchesSurvey 
-} from '../state.js?v=20260627-audit-log-v1';
+} from '../state.js?v=20260627-session-redesign-v1';
 import { 
   PHASES, 
   escapeHtml, 
@@ -20,7 +20,7 @@ import {
   sectionTitle, 
   sessionYear, 
   sameSessionType 
-} from '../utils.js?v=20260627-ux-fix-v1';
+} from '../utils.js?v=20260627-session-redesign-v1';
 
 export function renderCalendar() {
   const d = new Date(state.calendarDate);

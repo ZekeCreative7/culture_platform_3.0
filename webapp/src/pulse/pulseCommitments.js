@@ -14,6 +14,7 @@ export function createPulseCommitmentDraft(state) {
     commitment: "",
     ownerRole: "",
     dueDate: "",
+    sessionId: "",
     status: "draft",
     evidence: "",
     createdAt: new Date().toISOString()
@@ -61,8 +62,8 @@ export function renderCommitmentsBoard({ state, savePulseCommitment, deletePulse
 
       <!-- 신규 등록 폼 -->
       <div class="commitment-form-container panel" id="pulse-commitment-form">
-        ${draft 
-          ? renderCommitmentForm(draft) 
+        ${draft
+          ? renderCommitmentForm(draft, false, state)
           : `<button class="primary" id="btn-show-commitment-form">신규 약속 등록</button>`
         }
       </div>
@@ -79,7 +80,7 @@ function renderCommitmentCard(c, state) {
     return `
       <article class="commitment-card editing panel">
         <h4>약속 수정</h4>
-        ${renderCommitmentForm(c, true)}
+        ${renderCommitmentForm(c, true, state)}
       </article>
     `;
   }
@@ -126,7 +127,7 @@ function renderCommitmentCard(c, state) {
   `;
 }
 
-function renderCommitmentForm(c, isEdit = false) {
+function renderCommitmentForm(c, isEdit = false, state = null) {
   const isDone = c.status === "done";
   return `
     <form class="commitment-form" data-id="${c.id || ''}" data-is-edit="${isEdit}">
@@ -161,6 +162,17 @@ function renderCommitmentForm(c, isEdit = false) {
           <input type="date" name="dueDate" required value="${c.dueDate || ''}" />
         </label>
       </div>
+
+      ${state?.sessions?.length ? `
+      <div class="form-row">
+        <label>
+          <strong>연결 세션 (선택)</strong>
+          <select name="sessionId" class="session-link-select">
+            <option value="">— 세션 연결 안 함 —</option>
+            ${(state.sessions || []).map(s => `<option value="${s.id}" ${c.sessionId === s.id ? "selected" : ""}>${escapeHtml(s.teamName || s.id)} · ${escapeHtml(s.type || "")}</option>`).join("")}
+          </select>
+        </label>
+      </div>` : ""}
 
       <div class="form-row">
         <label>
@@ -328,6 +340,7 @@ export function bindCommitmentsEvents({ state, saveState, savePulseCommitment, d
     const ownerRole = formData.get("ownerRole").trim();
     const dueDate = formData.get("dueDate");
     const status = formData.get("status");
+    const sessionId = formData.get("sessionId") || "";
     const evidence = formData.get("evidence").trim();
 
     if (status === "done" && !evidence) {
@@ -345,6 +358,7 @@ export function bindCommitmentsEvents({ state, saveState, savePulseCommitment, d
       scopeType: state.pulseScopeId === "company" ? "company" : "division",
       scopeId: state.pulseScopeId || "company",
       sourceQuestionIds: [19],
+      sessionId,
       employeeVoice,
       acknowledgement,
       commitment: commitmentText,

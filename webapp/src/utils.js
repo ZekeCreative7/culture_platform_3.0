@@ -11,13 +11,28 @@ export const QUANT_LABELS = {
   q8: "전반 분위기",
 };
 
+export const ROUND_TYPES = {
+  '웰니스':    { label: '웰니스',      color: '#34c759' },
+  'OD-강의':  { label: 'OD 강의',     color: '#0071e3' },
+  'OD-간담회': { label: 'OD 간담회',   color: '#ff9500' },
+  '웰니스+OD': { label: '웰니스 + OD', color: '#5856d6' },
+  '기타':      { label: '기타',        color: '#8e8e93' },
+};
+
 export const SESSION_TYPES = {
   팀빌딩: {
     english: "Teambuilding",
-    weeks: 8,
+    weeks: 6,
     accent: "#0071e3",
     desc: "특정 팀의 팀장과 팀원이 함께 참여합니다.",
-    template: ["WOW세션", "명상세션", "커뮤니케이션세션", "간담회", "파트너요가", "에너지회복"],
+    template: [
+      { content: "WOW세션",         roundType: "OD-강의"  },
+      { content: "명상세션",         roundType: "웰니스"   },
+      { content: "커뮤니케이션세션", roundType: "OD-강의"  },
+      { content: "간담회",           roundType: "OD-간담회"},
+      { content: "파트너요가",       roundType: "웰니스"   },
+      { content: "에너지회복",       roundType: "웰니스"   },
+    ],
     duration: 60,
   },
   리더십: {
@@ -25,7 +40,12 @@ export const SESSION_TYPES = {
     weeks: 4,
     accent: "#138a66",
     desc: "협업이 필요한 리더십 그룹을 운영합니다.",
-    template: ["웰니스 + WOW세션", "웰니스 + WOW세션", "웰니스 + WOW세션", "웰니스 + WOW세션"],
+    template: [
+      { content: "웰니스 + WOW세션", roundType: "웰니스+OD" },
+      { content: "웰니스 + WOW세션", roundType: "웰니스+OD" },
+      { content: "웰니스 + WOW세션", roundType: "웰니스+OD" },
+      { content: "웰니스 + WOW세션", roundType: "웰니스+OD" },
+    ],
     duration: 120,
   },
   협업: {
@@ -33,8 +53,24 @@ export const SESSION_TYPES = {
     weeks: 6,
     accent: "#b86e00",
     desc: "여러 팀에서 모인 구성원이 실행 과제를 다룹니다.",
-    template: Array(6).fill("협업 세션"),
+    template: Array(6).fill(null).map(() => ({ content: "협업 세션", roundType: "OD-강의" })),
     duration: 120,
+  },
+  테스트: {
+    english: "Test",
+    weeks: 1,
+    accent: "#8e8e93",
+    desc: "테스트용 임시 세션입니다.",
+    template: [{ content: "테스트 회차", roundType: "기타" }],
+    duration: 60,
+  },
+  커스텀: {
+    english: "Custom",
+    weeks: 1,
+    accent: "#5856d6",
+    desc: "자유롭게 구성하는 커스텀 세션입니다.",
+    template: [{ content: "커스텀 회차", roundType: "기타" }],
+    duration: 60,
   },
 };
 
@@ -228,18 +264,23 @@ export function makeSchedule(type) {
   const sessionType = normalizeSessionType(type);
   const config = sessionTypeDef(sessionType);
   const base = todayISO();
-  return config.template.map((content, index) => ({
-    id: uid(),
-    seq: index + 1,
-    confirmed: index < 2,
-    date: addWeeks(base, index),
-    startTime: "10:00",
-    duration: config.duration,
-    content,
-    note: "",
-    status: index < 2 ? "confirmed" : "planned",
-    absences: [],
-  }));
+  return config.template.map((item, index) => {
+    const content = typeof item === 'string' ? item : item.content;
+    const roundType = typeof item === 'string' ? '기타' : item.roundType;
+    return {
+      id: uid(),
+      seq: index + 1,
+      confirmed: index < 2,
+      date: addWeeks(base, index),
+      startTime: "10:00",
+      duration: config.duration,
+      content,
+      roundType,
+      note: "",
+      status: index < 2 ? "confirmed" : "planned",
+      absences: [],
+    };
+  });
 }
 
 export function maskIfSmall(n, value) {

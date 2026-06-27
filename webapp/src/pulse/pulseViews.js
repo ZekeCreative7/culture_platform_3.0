@@ -9,7 +9,7 @@ import { parsePulseWorkbook } from "./pulseUpload.js";
 import { renderCommitmentsBoard, bindCommitmentsEvents, getStatusLabel, createPulseCommitmentDraft } from "./pulseCommitments.js?v=20260620-operating-insights-v1";
 import { QUESTIONS } from "../config/questions.js";
 import { DOMAINS, THEMES } from "../config/domains.js";
-import { commitmentsCache, pulseCache } from "../state.js?v=20260627-audit-log-v1";
+import { commitmentsCache, pulseCache } from "../state.js?v=20260627-session-redesign-v1";
 
 const DEFAULT_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 

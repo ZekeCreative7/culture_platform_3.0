@@ -1,16 +1,16 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260627-audit-log-v1';
-import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260627-audit-log-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260627-session-redesign-v1';
+import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260627-session-redesign-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
-import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260623-dashboard-actions-v2';
-import { dashboardActionQueue } from './dashboard/dashboardEngine.js?v=20260623-dashboard-actions-v1';
+import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260627-pipeline-v1';
+import { dashboardActionQueue } from './dashboard/dashboardEngine.js?v=20260627-pipeline-v1';
 import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260623-report-pdf-portrait-v3';
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-multitenant-v1';
-import { parseCSV } from './views/upload.js?v=20260627-ux-fix-v1';
+import { parseCSV } from './views/upload.js?v=20260627-session-redesign-v1';
 import {
   renderSessions,
   renderOrgSelectRow,
@@ -31,7 +31,7 @@ import {
   resetCrossDraft,
   getStatus,
   sessionsByTypeGrouped
-} from './views/sessions.js?v=20260627-ux-fix-v1';
+} from './views/sessions.js?v=20260627-session-redesign-v1';
 import {
   validateAndRepairSelectedOrg,
   childUnits,
@@ -61,16 +61,16 @@ import {
   teamMemberCandidates,
   allMemberCandidates,
   positionRank
-} from './views/org.js?v=20260627-ux-fix-v1';
+} from './views/org.js?v=20260627-session-redesign-v1';
 
 import {
-  PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
+  PHASES, QUANT_LABELS, SESSION_TYPES, ROUND_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
   UNIT_LABELS, UNIT_LEADER_LABELS, SCORE_MAP, SCALE_LABELS, scoreOf, isQualText, todayISO,
   addWeeks, uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear, cohortPrefix,
   sessionLabel, yearForCohort, hasRoundPassed, normalizeSessionRecord, makeSchedule,
   targetCountForSession
-} from './utils.js?v=20260627-module-split-v1';
+} from './utils.js?v=20260627-session-redesign-v1';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -89,7 +89,7 @@ import {
   questionSetForSession, phaseHasQuantQuestions, statsForSession, ensureScopedSelection,
   rowMatchesSurvey, surveyRows,
   surveyDistributionActive, surveyQuestionsForDistribution
-} from './state.js?v=20260627-multitenant-v1';
+} from './state.js?v=20260627-pipeline-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -2623,6 +2623,9 @@ function typeSummary(type) {
 }
 
 function scheduleRow(item) {
+  const roundTypeOptions = Object.entries(ROUND_TYPES).map(([val, def]) =>
+    `<option value="${val}" ${item.roundType === val ? 'selected' : ''}>${def.label}</option>`
+  ).join('');
   return `
     <div class="schedule-row" data-id="${item.id}">
       <strong>${item.seq}회</strong>
@@ -2630,6 +2633,9 @@ function scheduleRow(item) {
       <input type="date" data-field="date" value="${item.date}" />
       <input data-field="startTime" value="${item.startTime}" />
       <input data-field="content" value="${escapeHtml(item.content)}" />
+      <select data-field="roundType" class="round-type-select" title="회차 유형">
+        ${roundTypeOptions}
+      </select>
       <input type="number" data-field="duration" value="${item.duration}" min="30" step="30" />
       <input data-field="note" value="${escapeHtml(item.note)}" placeholder="메모" />
     </div>
@@ -3632,17 +3638,18 @@ function bindSessions() {
     });
   });
   document.querySelectorAll(".schedule-row").forEach((rowEl) => {
-    rowEl.querySelectorAll("input").forEach((input) => {
-      input.addEventListener("input", () => {
-        const item = state.draftSchedule.find((entry) => entry.id === rowEl.dataset.id);
-        const field = input.dataset.field;
-        item[field] = input.type === "checkbox" ? input.checked : input.type === "number" ? Number(input.value) : input.value;
-      });
-    });
+    const updateField = (el) => {
+      const item = state.draftSchedule.find((entry) => entry.id === rowEl.dataset.id);
+      if (!item) return;
+      const field = el.dataset.field;
+      item[field] = el.type === "checkbox" ? el.checked : el.type === "number" ? Number(el.value) : el.value;
+    };
+    rowEl.querySelectorAll("input").forEach((input) => input.addEventListener("input", () => updateField(input)));
+    rowEl.querySelectorAll("select").forEach((sel) => sel.addEventListener("change", () => updateField(sel)));
   });
   document.querySelector("#add-round")?.addEventListener("click", () => {
     const next = state.draftSchedule.length + 1;
-    state.draftSchedule.push({ id: uid(), seq: next, confirmed: false, date: todayISO(), startTime: "10:00", duration: sessionTypeDef(state.draftType).duration, content: "", note: "", status: "planned", absences: [] });
+    state.draftSchedule.push({ id: uid(), seq: next, confirmed: false, date: todayISO(), startTime: "10:00", duration: sessionTypeDef(state.draftType).duration, content: "", roundType: "기타", note: "", status: "planned", absences: [] });
     saveState();
     render();
   });

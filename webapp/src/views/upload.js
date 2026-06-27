@@ -1,4 +1,4 @@
-import { state, phasesForSession } from '../state.js?v=20260627-audit-log-v1';
+import { state, phasesForSession } from '../state.js?v=20260627-session-redesign-v1';
 import { 
   PHASES, 
   escapeHtml, 
@@ -9,7 +9,7 @@ import {
   emptyCard,
   SCORE_MAP,
   uid
-} from '../utils.js?v=20260627-ux-fix-v1';
+} from '../utils.js?v=20260627-session-redesign-v1';
 
 export function uploadStateCard(session) {
   const done = phasesForSession(session.id);

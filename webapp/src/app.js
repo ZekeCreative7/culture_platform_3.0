@@ -2955,6 +2955,15 @@ window.addEventListener('storage', (e) => {
   }
 });
 
+// React bridge: expose render/bind for VanillaCanvas component
+window.__vanillaRenderView = (view) => {
+  state.activeView = view;
+  return renderView();
+};
+window.__vanillaBindCanvas = () => {
+  bindCanvasEvents();
+};
+
 if (LOCAL_PREVIEW) {
   document.body.classList.add('local-preview');
   document.body.classList.remove('auth-locked');

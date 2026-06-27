@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/useAppStore.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
+import { VanillaCanvas, isVanillaView } from './VanillaCanvas.jsx';
 
 export function AppLayout({ children }) {
   const navigate = useNavigate();
@@ -102,7 +103,10 @@ export function AppLayout({ children }) {
           onLogout={logout}
         />
         <div className="canvas">
-          {children}
+          {isVanillaView(activeView)
+            ? <VanillaCanvas view={activeView} />
+            : children
+          }
         </div>
       </main>
     </div>

@@ -367,7 +367,7 @@ function render() {
             <span></span>
             <span></span>
           </button>
-          <div class="searchbox">세션, 조직, 설문 검색</div>
+          <input type="search" class="searchbox" id="topbar-search" placeholder="세션, 조직, 설문 검색" autocomplete="off" onkeydown="if(event.key==='Enter')window.handleTopbarSearch(this.value)" />
           <div class="topbar-actions">
             ${LOCAL_PREVIEW ? `<div class="local-preview-badge" title="Firebase 로그인과 원격 저장을 사용하지 않는 로컬 확인 모드입니다."><span class="local-preview-dot"></span>로컬 미리보기</div>` : ''}
             <button class="topbar-notif-btn ${todayActionCount > 0 ? 'has-notif' : ''}" id="topbar-notif-btn" data-view="dashboard" title="오늘 할 일">
@@ -753,6 +753,28 @@ function bindOrg() {
     setTimeout(() => document.querySelector("#org-search-input")?.focus(), 50);
   };
 
+  window.handleTopbarSearch = (query) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+    // Route to most relevant page based on keyword
+    const orgKeywords = ['팀', '부문', '본부', '구성원', '조직'];
+    const sessionKeywords = ['세션', '기수', '회차'];
+    const surveyKeywords = ['설문', '질문', '문항'];
+    if (orgKeywords.some(k => q.includes(k))) {
+      state.activeView = 'org';
+      state.orgSearchQuery = query.trim();
+    } else if (sessionKeywords.some(k => q.includes(k))) {
+      state.activeView = 'sessions';
+    } else if (surveyKeywords.some(k => q.includes(k))) {
+      state.activeView = 'survey';
+    } else {
+      // Default: search in org
+      state.activeView = 'org';
+      state.orgSearchQuery = query.trim();
+    }
+    render();
+    document.querySelector('#topbar-search')?.blur();
+  };
 
 }
 

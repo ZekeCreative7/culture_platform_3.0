@@ -305,8 +305,9 @@ export function initializeAuthGate({ onAccessGranted }) {
   onAccessGrantedHandler = onAccessGranted;
   bindGateControls();
   showGate();
-  setGateMode('busy');
-  setStatus({ title: '접속 정보를 확인하고 있습니다.', detail: '네트워크 상태에 따라 잠시 시간이 걸릴 수 있습니다.', spinner: true });
+  // Show login form immediately — don't make user wait for Firebase to initialise
+  setGateMode('login');
+  setStatus({ tone: 'ready', title: '로그인하거나 새 계정을 만들어 주세요.', detail: '회원가입 후 관리자 승인이 완료되면 접속할 수 있습니다.' });
 
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
@@ -314,11 +315,12 @@ export function initializeAuthGate({ onAccessGranted }) {
     if (!user) {
       accessGrantedUid = '';
       clearPendingListener();
-      showGate();
-      setGateMode('login');
-      setStatus({ tone: 'ready', title: '로그인하거나 새 계정을 만들어 주세요.', detail: '회원가입 후 관리자 승인이 완료되면 접속할 수 있습니다.' });
+      // Already showing login form — nothing to change
       return;
     }
+    // Existing session detected — switch to busy and proceed
+    setGateMode('busy');
+    setStatus({ title: '접속 정보를 확인하고 있습니다.', detail: '잠시만 기다려 주세요.', spinner: true });
     try {
       await checkAccess(user);
     } catch (error) {

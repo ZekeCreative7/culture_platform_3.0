@@ -212,7 +212,7 @@ export function renderQuantSection(sessionId, session, activePhase) {
   const cohort = session ? session.cohort : "";
   const type = session ? session.type : "";
   const questions = session ? questionSetForSession(session.id) : getQuestionsForCohort(cohort, type);
-  const quantQs = questions.filter((q) => !isQualText(q.id));
+  const quantQs = questions.filter((q) => q.type !== 'qual');
 
   if (!responses.length) return emptyCard("이 시점의 정량 응답이 없습니다.");
 
@@ -417,19 +417,22 @@ export function renderAnalytics() {
     <section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
         <label>세션 유형
-          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics'); window.applyAnalyticsFilter()">
+          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics')">
             ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
           </select>
         </label>
         <label>대상 기수
-          <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics'); window.applyAnalyticsFilter()">
+          <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics')">
             ${cohortOptionsHtml(type, cohort, false)}
           </select>
         </label>
         <label>세션 선택
-          <select id="analytics-session-select" onchange="window.applyAnalyticsFilter()">
+          <select id="analytics-session-select">
             ${scopedSessionOptions(type, cohort, sessionId, false)}
           </select>
+        </label>
+        <label style="align-self:flex-end">
+          <button type="button" class="btn-primary" onclick="window.applyAnalyticsFilter()" style="width:100%;height:40px">결과 보기</button>
         </label>
       </div>
     </section>

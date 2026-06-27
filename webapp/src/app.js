@@ -1,14 +1,14 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260627-session-redesign-v1';
-import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260627-session-redesign-v1';
+import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260627-state-singleton-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
-import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260627-pipeline-v2';
+import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260627-state-singleton-v1';
 import { renderComm, bindComm } from './views/comm.js?v=20260627-comm-v1';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js?v=20260627-pipeline-v2';
 import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260627-report-pdf-blocks-v2';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-multitenant-v1';
-import { parseCSV, renderUpload, renderUploadPreview } from './views/upload.js?v=20260627-session-redesign-v1';
+import { parseCSV, renderUpload, renderUploadPreview } from './views/upload.js?v=20260627-state-singleton-v1';
 import { exportBackupJson, importBackupJson } from './backup.js';
 import {
   renderReport,
@@ -18,7 +18,7 @@ import {
   dimSpread,
   ragInfo,
   dimRecommendation
-} from './views/report.js?v=20260627-session-redesign-v1';
+} from './views/report.js?v=20260627-state-singleton-v1';
 import {
   renderCalendar,
   renderMonthCalendar,
@@ -28,13 +28,13 @@ import {
   renderDuplicateWarningModal,
   renderSurveyResponsePanel,
   renderSurveyCreator
-} from './views/survey.js?v=20260627-session-redesign-v1';
+} from './views/survey.js?v=20260627-state-singleton-v1';
 import {
   renderAnalytics,
   renderChart,
   renderStatsTable,
   qualResponseRows
-} from './views/analytics.js?v=20260627-session-redesign-v1';
+} from './views/analytics.js?v=20260627-state-singleton-v1';
 import {
   renderSessions,
   renderOrgSelectRow,
@@ -57,7 +57,7 @@ import {
   sessionsByTypeGrouped,
   sessionCard,
   scheduleRow
-} from './views/sessions.js?v=20260627-session-redesign-v1';
+} from './views/sessions.js?v=20260627-state-singleton-v1';
 import {
   validateAndRepairSelectedOrg,
   childUnits,
@@ -94,7 +94,7 @@ import {
   renderMemberCard,
   renderOrgEditorModal,
   persistOrganization
-} from './views/org.js?v=20260627-session-redesign-v1';
+} from './views/org.js?v=20260627-state-singleton-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, ROUND_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -122,7 +122,7 @@ import {
   questionSetForSession, phaseHasQuantQuestions, statsForSession, ensureScopedSelection,
   rowMatchesSurvey, surveyRows,
   surveyDistributionActive, surveyQuestionsForDistribution
-} from './state.js?v=20260627-pipeline-v1';
+} from './state.js?v=20260627-state-singleton-v1';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -241,7 +241,6 @@ function render() {
   const app = document.querySelector("#app");
   const orgScrollState = captureOrgScrollState();
   app.className = appShellClasses();
-
   const today = todayISO();
   const todayActionCount = dashboardActionQueue({ state, today }).filter(a => a.group === 'today').length;
 
@@ -373,7 +372,7 @@ function render() {
               <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" /></svg>
               ${todayActionCount > 0 ? `<span class="topbar-notif-dot"></span>` : ''}
             </button>
-            <button class="primary compact" data-view="sessions" id="topbar-new-session">+ 새 세션</button>
+            <button type="button" class="primary compact" id="topbar-new-session">+ 새 세션</button>
             <div class="topbar-user-menu" id="topbar-user-menu">
               <button type="button" class="topbar-user-btn" id="topbar-user-btn" aria-haspopup="true" aria-expanded="false" title="계정 메뉴">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-7 9a7 7 0 1 1 14 0H3Z"/></svg>
@@ -399,6 +398,7 @@ function render() {
     bindLayout();
   }
   bindCanvasEvents();
+  bindSessionDrawerControls();
   syncAuthControls();
   restoreOrgScrollState(orgScrollState);
 }
@@ -413,6 +413,40 @@ function renderView() {
   if (state.activeView === "pulse") return renderPulse({ state, pulseCache });
   if (state.activeView === "comm") return renderComm({ state });
   return renderHomeDashboard({ state, pulseCache, commitmentsCache: state.pulseCommitments });
+}
+
+function openSessionDrawer({ switchToSessions = false } = {}) {
+  if (switchToSessions) {
+    state.activeView = "sessions";
+    state.activeSessionTab = "list";
+    state.mobileNavOpen = false;
+  }
+  state.editingSessionId = null;
+  state.sessionDrawerOpen = true;
+  saveState();
+  render();
+}
+
+function closeSessionDrawer() {
+  state.sessionDrawerOpen = false;
+  state.editingSessionId = null;
+  render();
+}
+
+function bindSessionDrawerControls() {
+  document.querySelectorAll("#topbar-new-session, #btn-open-session-drawer").forEach((button) => {
+    button.onclick = (event) => {
+      event.preventDefault();
+      openSessionDrawer({ switchToSessions: button.id === "topbar-new-session" });
+    };
+  });
+
+  document.querySelectorAll("#close-session-drawer, #session-drawer-overlay").forEach((button) => {
+    button.onclick = (event) => {
+      event.preventDefault();
+      closeSessionDrawer();
+    };
+  });
 }
 
 function auditActionLabel(action) {
@@ -510,9 +544,6 @@ function bindLayout() {
         state.selectedAnalyticsSessionId = state.selectedReportSessionId;
       }
       state.activeView = nextView;
-      if (button.id === "topbar-new-session") {
-        state.sessionDrawerOpen = true;
-      }
       state.mobileNavOpen = false;
       saveState();
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
@@ -820,21 +851,6 @@ window.cancelSurveyEdit = function() {
 };
 
 function bindSessions() {
-  document.getElementById('btn-open-session-drawer')?.addEventListener('click', () => {
-    state.sessionDrawerOpen = true;
-    render();
-  });
-  document.getElementById('close-session-drawer')?.addEventListener('click', () => {
-    state.sessionDrawerOpen = false;
-    state.editingSessionId = null;
-    render();
-  });
-  document.getElementById('session-drawer-overlay')?.addEventListener('click', () => {
-    state.sessionDrawerOpen = false;
-    state.editingSessionId = null;
-    render();
-  });
-
   document.querySelector("#btn-session-list")?.addEventListener("click", () => {
     state.activeSessionTab = "list";
     saveState();
@@ -1643,8 +1659,7 @@ window.deleteSurveyDraftQuestion = function(qid) {
 
 // ── Session Drawer ───────────────────────────────────────────────
 window.openSessionDrawer = function() {
-  state.sessionDrawerOpen = true;
-  render();
+  openSessionDrawer();
 };
 
 // ── Session Edit / Delete ────────────────────────────────────────

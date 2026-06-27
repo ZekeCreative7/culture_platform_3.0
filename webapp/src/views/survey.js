@@ -4,7 +4,7 @@ import {
   surveyDistributionActive, 
   surveyQuestionsForDistribution, 
   rowMatchesSurvey 
-} from '../state.js?v=20260627-session-redesign-v1';
+} from '../state.js?v=20260627-state-singleton-v1';
 import { 
   PHASES, 
   escapeHtml, 

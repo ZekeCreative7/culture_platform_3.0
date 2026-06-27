@@ -4,11 +4,12 @@ import {
   saveOrgData, 
   saveOrganizationToFirestore, 
   setDbStatus 
-} from '../state.js?v=20260627-session-redesign-v1';
+} from '../state.js?v=20260627-state-singleton-v1';
 import { 
   escapeHtml, 
   normalizePosition, 
   emptyCard, 
+  sectionTitle,
   POSITION_OPTIONS, 
   UNIT_LEADER_LABELS, 
   UNIT_LABELS, 

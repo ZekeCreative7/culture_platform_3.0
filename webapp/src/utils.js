@@ -1,4 +1,4 @@
-export const PHASES = ["사전", "사후"];
+export const PHASES = ["사전", "사후", "팔로우업"];
 
 export const QUANT_LABELS = {
   q1: "심리안전 1",
@@ -283,7 +283,21 @@ const QUESTION_SETS = {
   },
 };
 
+// 팔로우업은 세션 타입별 사전 quant를 그대로 재사용하고 qual만 교체
+function makeFollowupQuestions(sessionType) {
+  const preSet = QUESTION_SETS[normalizeSessionType(sessionType)]?.사전;
+  const quantBase = preSet
+    ? preSet.filter(q => q.type === "quant")
+    : [];
+  return [
+    ...quantBase,
+    { id: "q11", type: "qual", text: "세션 이후 60일이 지난 지금, 팀이나 협업 방식에서 실제로 달라진 점이 있다면 구체적으로 적어주세요." },
+    { id: "q12", type: "qual", text: "아직 어렵거나 변화가 느껴지지 않는 부분이 있다면 솔직하게 적어주세요. 추가로 필요한 지원이 있다면 함께 적어주세요." },
+  ];
+}
+
 export function defaultQuestions(phase, sessionType = null) {
+  if (phase === "팔로우업") return makeFollowupQuestions(sessionType);
   const type = normalizeSessionType(sessionType);
   const set = QUESTION_SETS[type]?.[phase];
   if (set) return set;

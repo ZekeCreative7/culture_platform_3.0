@@ -1213,6 +1213,7 @@ function renderSurveyCreator() {
         <select id="survey-phase-select" onchange="updateSurveyDraftPhase(this.value)">
           <option value="사전" ${state.draftSurveyPhase === "사전" ? "selected" : ""}>사전</option>
           <option value="사후" ${state.draftSurveyPhase === "사후" ? "selected" : ""}>사후</option>
+          <option value="팔로우업" ${state.draftSurveyPhase === "팔로우업" ? "selected" : ""}>팔로우업 (60일)</option>
         </select>
       </label>
       
@@ -1889,7 +1890,7 @@ function renderCompareReport(type, cohort) {
 
   // 팀마다 진단에 쓴 시점(사전/중간/사후)이 다를 수 있다 — 다른 시점 점수를 같은 순위표에서
   // 비교하고 있다는 것을 운영자가 알 수 있도록 표시한다.
-  const phaseBadgeColor = (phase) => ({ '사전': '#94a3b8', '중간': '#b47700', '사후': '#0052ff' }[phase] || '#94a3b8');
+  const phaseBadgeColor = (phase) => ({ '사전': '#94a3b8', '중간': '#b47700', '사후': '#0052ff', '팔로우업': '#34c759' }[phase] || '#94a3b8');
   const hasMixedPhases = new Set(rankedSessions.map(s => s.phase)).size > 1;
 
   // 평균 종합 정보

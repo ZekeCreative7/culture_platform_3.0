@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   root: '.',
-  base: './',
+  base: '/culture_platform_3.0/',
   build: {
     outDir: 'dist',
     emptyOutDir: true,

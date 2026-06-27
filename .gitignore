@@ -7,3 +7,4 @@ __pycache__/
 browser-data-backup-*.json
 node_portable/
 webapp/node_modules/
+webapp/dist/

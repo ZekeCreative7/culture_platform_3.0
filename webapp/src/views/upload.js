@@ -1,4 +1,4 @@
-import { state, phasesForSession } from '../state.js?v=20260627-state-singleton-v1';
+import { state, phasesForSession } from '../state.js';
 import { 
   PHASES, 
   escapeHtml, 
@@ -9,7 +9,7 @@ import {
   emptyCard,
   SCORE_MAP,
   uid
-} from '../utils.js?v=20260627-questions-v1';
+} from '../utils.js';
 
 export function uploadStateCard(session) {
   const done = phasesForSession(session.id);

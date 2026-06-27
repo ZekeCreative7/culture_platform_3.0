@@ -2,7 +2,7 @@ import {
   state, 
   phasesForSession, 
   sessionsSortedByStart 
-} from '../state.js?v=20260627-state-singleton-v1';
+} from '../state.js';
 import {
   escapeHtml,
   sessionTypeLabel,
@@ -16,10 +16,10 @@ import {
   SESSION_TYPES,
   hasRoundPassed,
   ROUND_TYPES
-} from '../utils.js?v=20260627-questions-v1';
+} from '../utils.js';
 import { pulseDiagnostics, comparisonPair } from '../pulse/pulseEngine.js';
-import { pulseCache } from '../state.js?v=20260627-state-singleton-v1';
-import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-org-revert-v2';
+import { pulseCache } from '../state.js';
+import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js';
 import { 
   unitLeaderDetails, 
   leaderCandidateForTeam, 
@@ -29,13 +29,13 @@ import {
   ensureDraftOrgSelection, 
   optionHtml,
   renderOrgPopup
-} from './org.js?v=20260627-state-singleton-v1';
+} from './org.js';
 import { 
   renderAttendanceModal, 
   renderDuplicateWarningModal, 
   renderCalendar 
-} from './survey.js?v=20260627-state-singleton-v1';
-import { qualResponseRows } from './analytics.js?v=20260627-bugfix-v1';
+} from './survey.js';
+import { qualResponseRows } from './analytics.js';
 
 export function renderSessionOutcomeIntro(type) {
   const normalizedType = normalizeSessionType(type);

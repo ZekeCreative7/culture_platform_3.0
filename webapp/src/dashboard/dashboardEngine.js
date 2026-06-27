@@ -13,9 +13,9 @@ import {
   isQualText,
   normalizeSessionType,
   scoreOf
-} from '../utils.js?v=20260627-questions-v1';
+} from '../utils.js';
 import { QUESTIONS } from '../config/questions.js';
-import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-org-revert-v2';
+import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js';
 
 // Helper to calculate session status
 export function getSessionStatus(session) {

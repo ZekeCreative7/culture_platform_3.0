@@ -4,7 +4,7 @@ import {
   saveOrgData, 
   saveOrganizationToFirestore, 
   setDbStatus 
-} from '../state.js?v=20260627-state-singleton-v1';
+} from '../state.js';
 import { 
   escapeHtml, 
   normalizePosition, 
@@ -14,7 +14,7 @@ import {
   UNIT_LEADER_LABELS, 
   UNIT_LABELS, 
   sameSessionType 
-} from '../utils.js?v=20260627-questions-v1';
+} from '../utils.js';
 
 export function validateAndRepairSelectedOrg() {
   if (!state.orgUnits || state.orgUnits.length === 0) return;

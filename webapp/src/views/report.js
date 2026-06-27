@@ -9,7 +9,7 @@ import {
   questionSetForSession, 
   getQuestionsForCohort, 
   phaseHasQuantQuestions 
-} from '../state.js?v=20260627-state-singleton-v1';
+} from '../state.js';
 import { 
   PHASES, 
   escapeHtml, 
@@ -26,10 +26,10 @@ import {
   sessionYear, 
   scoreOf,
   targetCountForSession
-} from '../utils.js?v=20260627-questions-v1';
+} from '../utils.js';
 import { comparisonPair } from '../pulse/pulseEngine.js';
-import { assertNotQuantInput } from '../qual/qual-signal.js?v=20260619-respondent-tone';
-import { renderSessionOutcomeIntro } from './sessions.js?v=20260627-bugfix-v1';
+import { assertNotQuantInput } from '../qual/qual-signal.js';
+import { renderSessionOutcomeIntro } from './sessions.js';
 
 // ── Report Analysis Helpers ──────────────────────────────────────
 export const REPORT_DIMS = [

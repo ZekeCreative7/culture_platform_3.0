@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, limit as firestoreLimit } from './firebase.js?v=20260627-multitenant-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, limit as firestoreLimit } from './firebase.js';
 import { 
   PHASES, 
   normalizeSessionType, 
@@ -14,9 +14,9 @@ import {
   sessionLabel,
   scoreOf,
   SESSION_TYPES
-} from './utils.js?v=20260627-questions-v1';
+} from './utils.js';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
-import { assertNotQuantInput } from './qual/qual-signal.js?v=20260619-respondent-tone';
+import { assertNotQuantInput } from './qual/qual-signal.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
 export const ORG_STORE_KEY = "culture-platform-org-v1";

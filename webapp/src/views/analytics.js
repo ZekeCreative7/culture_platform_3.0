@@ -10,7 +10,7 @@ import {
   getQuestionsForCohort,
   ensureScopedSelection,
   statsForSession
-} from '../state.js?v=20260627-state-singleton-v1';
+} from '../state.js';
 import { 
   PHASES, 
   escapeHtml, 
@@ -23,7 +23,7 @@ import {
   isQualText, 
   fmt,
   scoreOf
-} from '../utils.js?v=20260627-questions-v1';
+} from '../utils.js';
 
 // ── Dropdowns / Filters Helpers ──────────────────────────────────
 function cohortOptionsHtml(type, selectedCohort, isReport = false) {

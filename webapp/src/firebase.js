@@ -1,4 +1,4 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
   collection,
@@ -15,7 +15,7 @@ import {
   where,
   orderBy,
   limit
-} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+} from 'firebase/firestore';
 import {
   getAuth,
   setPersistence,
@@ -24,11 +24,11 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut
-} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+} from 'firebase/auth';
 import {
   initializeAppCheck,
   ReCaptchaEnterpriseProvider
-} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js';
+} from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAD1setZ-VrrB5do3wl6iHuVcqY91se0tk",

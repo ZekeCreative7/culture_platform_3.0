@@ -1,16 +1,13 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
+  root: '.',
+  base: './',
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
   },
-  resolve: {
-    alias: [
-      {
-        find: /^(\.\.?\/.*)\.js\?v=.*$/,
-        replacement: '$1.js'
-      }
-    ]
-  }
+  server: {
+    port: 4173,
+  },
 });

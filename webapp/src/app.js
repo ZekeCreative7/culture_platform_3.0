@@ -1,14 +1,14 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260627-multitenant-v1';
-import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260627-state-singleton-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js';
+import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
-import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';
+import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
-import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js?v=20260627-state-singleton-v1';
-import { renderComm, bindComm } from './views/comm.js?v=20260627-comm-v1';
-import { dashboardActionQueue } from './dashboard/dashboardEngine.js?v=20260627-pipeline-v2';
-import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js?v=20260627-report-pdf-blocks-v2';
-import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-multitenant-v1';
-import { parseCSV, renderUpload, renderUploadPreview } from './views/upload.js?v=20260627-state-singleton-v1';
+import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
+import { renderComm, bindComm } from './views/comm.js';
+import { dashboardActionQueue } from './dashboard/dashboardEngine.js';
+import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js';
+import { initializeAuthGate, syncAuthControls } from './authGate.js';
+import { parseCSV, renderUpload, renderUploadPreview } from './views/upload.js';
 import { exportBackupJson, importBackupJson } from './backup.js';
 import {
   renderReport,
@@ -20,7 +20,7 @@ import {
   dimRecommendation,
   cohortOptionsHtml,
   scopedSessionOptions
-} from './views/report.js?v=20260627-bugfix-v1';
+} from './views/report.js';
 import {
   renderCalendar,
   renderMonthCalendar,
@@ -30,13 +30,13 @@ import {
   renderDuplicateWarningModal,
   renderSurveyResponsePanel,
   renderSurveyCreator
-} from './views/survey.js?v=20260627-state-singleton-v1';
+} from './views/survey.js';
 import {
   renderAnalytics,
   renderChart,
   renderStatsTable,
   qualResponseRows
-} from './views/analytics.js?v=20260627-bugfix-v1';
+} from './views/analytics.js';
 import {
   renderSessions,
   renderOrgSelectRow,
@@ -59,7 +59,7 @@ import {
   sessionsByTypeGrouped,
   sessionCard,
   scheduleRow
-} from './views/sessions.js?v=20260627-bugfix-v1';
+} from './views/sessions.js';
 import {
   validateAndRepairSelectedOrg,
   childUnits,
@@ -96,7 +96,7 @@ import {
   renderMemberCard,
   renderOrgEditorModal,
   persistOrganization
-} from './views/org.js?v=20260627-state-singleton-v1';
+} from './views/org.js';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, ROUND_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
@@ -105,7 +105,7 @@ import {
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear,
   sessionLabel, makeSchedule,
   emptyCard
-} from './utils.js?v=20260627-questions-v1';
+} from './utils.js';
 
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
@@ -124,7 +124,7 @@ import {
   questionSetForSession, phaseHasQuantQuestions, statsForSession, ensureScopedSelection,
   rowMatchesSurvey, surveyRows,
   surveyDistributionActive, surveyQuestionsForDistribution
-} from './state.js?v=20260627-state-singleton-v1';
+} from './state.js';
 
 const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   && new URLSearchParams(window.location.search).get('preview') === '1';
@@ -2553,7 +2553,7 @@ async function initApp({ localPreview = false } = {}) {
     || (state.orgDataVersion || 0) < ORG_DATA_VERSION;
   if (orgNeedsSeed) {
     try {
-      const response = await fetch(`./src/org_data.json?v=${ORG_DATA_VERSION}`);
+      const response = await fetch('./src/org_data.json');
       const data = await response.json();
       state.orgUnits = data.units;
       state.orgMembers = data.members;
@@ -2726,7 +2726,7 @@ window.downloadReportXlsx = async function(event) {
   const original = button.innerHTML;
   button.disabled = true;
   button.classList.add("is-loading");
-  button.innerHTML = `<span><b>엑셀 생성 중</b><small>잠시만 기다려 주세요</small></span>`;
+  button.innerHTML = '<span><b>엑셀 생성 중</b><small>잠시만 기다려 주세요</small></span>';
   try {
     await downloadReportWorkbook(reportExportPayload());
   } catch (error) {
@@ -2745,7 +2745,7 @@ window.downloadReportPdf = async function(event) {
   const original = button.innerHTML;
   button.disabled = true;
   button.classList.add("is-loading");
-  button.innerHTML = `<span><b>PDF 생성 중</b><small>분석 화면을 정리하고 있어요</small></span>`;
+  button.innerHTML = '<span><b>PDF 생성 중</b><small>분석 화면을 정리하고 있어요</small></span>';
   try {
     const scope = ensureScopedSelection("report");
     let meta;

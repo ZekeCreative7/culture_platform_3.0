@@ -3,9 +3,16 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node scripts/check-imports.js"
+  },
+  "dependencies": {
+    "firebase": "^10.14.1"
   },
   "devDependencies": {
+    "vite": "^5.4.0",
     "vitest": "^1.0.0"
   }
 }

@@ -4,7 +4,7 @@ import {
   surveyDistributionActive, 
   surveyQuestionsForDistribution, 
   rowMatchesSurvey 
-} from '../state.js?v=20260627-state-singleton-v1';
+} from '../state.js';
 import { 
   PHASES, 
   escapeHtml, 
@@ -22,7 +22,7 @@ import {
   sameSessionType,
   lockSvg,
   SESSION_TYPES
-} from '../utils.js?v=20260627-questions-v1';
+} from '../utils.js';
 
 // ── Calendar Views ────────────────────────────────────────────────
 export function renderCalendar() {

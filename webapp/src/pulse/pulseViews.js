@@ -6,10 +6,10 @@ import {
   dataConfidenceSummary, getCompanyN, companyFav, favFromItem, unfavFromItem, mean
 } from "./pulseEngine.js";
 import { parsePulseWorkbook } from "./pulseUpload.js";
-import { renderCommitmentsBoard, bindCommitmentsEvents, getStatusLabel, createPulseCommitmentDraft } from "./pulseCommitments.js?v=20260620-operating-insights-v1";
+import { renderCommitmentsBoard, bindCommitmentsEvents, getStatusLabel, createPulseCommitmentDraft } from "./pulseCommitments.js";
 import { QUESTIONS } from "../config/questions.js";
 import { DOMAINS, THEMES } from "../config/domains.js";
-import { commitmentsCache, pulseCache } from "../state.js?v=20260627-state-singleton-v1";
+import { commitmentsCache, pulseCache } from "../state.js";
 
 const DEFAULT_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 

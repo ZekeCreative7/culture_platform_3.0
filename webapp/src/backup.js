@@ -1,6 +1,6 @@
 import {
   db, collection, doc, getDoc, getDocs, setDoc, writeBatch, query, where,
-} from './firebase.js?v=20260627-multitenant-v1';
+} from './firebase.js';
 
 function getCurrentOrgId() { return window.__currentOrgId || 'lina'; }
 

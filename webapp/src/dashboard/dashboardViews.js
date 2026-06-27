@@ -8,7 +8,7 @@ import {
   dashboardSupportOrgs,
   dashboardTeamPipeline,
   PIPELINE_STAGES
-} from './dashboardEngine.js?v=20260627-pipeline-v1';
+} from './dashboardEngine.js?v=20260627-pipeline-v2';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
 import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js?v=20260627-pipeline-v1';
 
@@ -780,6 +780,8 @@ export function bindHomeDashboard({ state, saveState, render }) {
 
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
+      } else {
+        render();
       }
     });
   });
@@ -816,6 +818,8 @@ export function bindHomeDashboard({ state, saveState, render }) {
       saveState();
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
+      } else {
+        render();
       }
     });
   });
@@ -825,6 +829,7 @@ export function bindHomeDashboard({ state, saveState, render }) {
     btn.addEventListener("click", () => {
       state.teamPipelineView = btn.dataset.pipelineView;
       saveState();
+      render();
     });
   });
 

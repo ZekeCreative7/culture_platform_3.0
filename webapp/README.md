@@ -11,6 +11,10 @@ python3 -m http.server 4173
 
 Open `http://localhost:4173`.
 
+## Structure
+
+See [APP_STRUCTURE.md](APP_STRUCTURE.md) for the current `app.js`, shared state, render/bind, and cache-bust rules.
+
 ## Deploy
 
 Deploy the `webapp` directory as a static site on Vercel, Netlify, or GitHub Pages.

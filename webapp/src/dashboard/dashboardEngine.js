@@ -11,7 +11,8 @@ import {
   hasRoundPassed,
   todayISO,
   isQualText,
-  normalizeSessionType
+  normalizeSessionType,
+  scoreOf
 } from '../utils.js';
 import { QUESTIONS } from '../config/questions.js';
 import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js?v=20260620-org-revert-v2';
@@ -451,19 +452,49 @@ export const PIPELINE_STAGES = [
 ];
 
 // Compute pipeline stage for a single team (based on their latest session)
+// quant 평균 계산 (q1~q10, null 제외)
+function quantAvg(rows, qIds) {
+  const scores = [];
+  for (const row of rows) {
+    for (const qid of qIds) {
+      const s = scoreOf(row[qid]);
+      if (s !== null) scores.push(s);
+    }
+  }
+  return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+}
+
+const QUANT_IDS = ["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10"];
+const CHANGE_THRESHOLD = 0.2; // 5점 척도 기준 +0.2 이상이면 변화 신호
+
 function teamPipelineStage({ session, responses, today }) {
   if (!session) return "세션없음";
+
+  // 수동 오버라이드가 있으면 우선
+  if (session.pipelineStageOverride) return session.pipelineStageOverride;
+
   const status = getSessionStatus(session);
   if (status === "진행중" || status === "시작전") return "진행중";
 
-  // session is "완료" — check post-survey
-  const hasPre = responses.some(r => r.sessionId === session.id && r.phase === "사전");
-  const hasPost = responses.some(r => r.sessionId === session.id && r.phase === "사후");
-  if (!hasPost) return "진행중"; // completed sessions without post survey still need it
+  const sessionResponses = responses.filter(r => r.sessionId === session.id);
+  const hasPost = sessionResponses.some(r => r.phase === "사후");
+  if (!hasPost) return "진행중";
 
-  // Find last session round date
-  const schedule = session.schedule || [];
-  const lastRoundDate = schedule
+  // 팔로우업 응답 있으면 자동 판정
+  const followupRows = sessionResponses.filter(r => r.phase === "팔로우업");
+  if (followupRows.length > 0) {
+    const preRows = sessionResponses.filter(r => r.phase === "사전");
+    const preAvg = quantAvg(preRows, QUANT_IDS);
+    const followupAvg = quantAvg(followupRows, QUANT_IDS);
+    if (preAvg !== null && followupAvg !== null) {
+      return (followupAvg - preAvg) >= CHANGE_THRESHOLD ? "변화신호확인" : "정체경고";
+    }
+    // 팔로우업 데이터는 있지만 사전 없으면 변화 확인으로 처리
+    return "변화신호확인";
+  }
+
+  // 팔로우업 없음 — 60일 경과 여부 확인
+  const lastRoundDate = (session.schedule || [])
     .filter(r => r.confirmed && r.date)
     .map(r => r.date)
     .sort()

@@ -731,7 +731,7 @@ function renderBottomSheet(teamId) {
           <div class="org-panel-team-name">${escapeHtml(d.team.name)}</div>
           <div class="org-panel-team-meta">${d.members.length}명${d.leader ? ` · 리더: ${escapeHtml(d.leader.name)}` : ""}</div>
         </div>
-        <button class="ghost compact" onclick="window.closeOrgTeamPanel()" style="font-size:18px; line-height:1; padding:2px 8px;">×</button>
+        <button class="org-bottomsheet-close" onclick="window.closeOrgTeamPanel()">×</button>
       </div>
       <div class="org-bottomsheet-actions">${d.actionsHtml}</div>
       <div class="org-bottomsheet-members">${memberRows}</div>

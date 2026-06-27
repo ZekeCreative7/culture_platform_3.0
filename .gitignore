@@ -5,3 +5,5 @@ __pycache__/
 .claude/
 .gemini/
 browser-data-backup-*.json
+node_portable/
+webapp/node_modules/

@@ -742,6 +742,17 @@ function bindOrg() {
     render();
   });
 
+  window.onOrgSearchInput = (value) => {
+    state.orgSearchQuery = value.trim();
+    render();
+  };
+
+  window.clearOrgSearch = () => {
+    state.orgSearchQuery = "";
+    render();
+    setTimeout(() => document.querySelector("#org-search-input")?.focus(), 50);
+  };
+
 
 }
 

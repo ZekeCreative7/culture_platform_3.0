@@ -832,6 +832,50 @@ function renderAccordionDivision(div, expandedIds, selectedTeamId) {
   `;
 }
 
+function renderOrgSearchResults(query) {
+  const q = query.toLowerCase();
+  const matches = state.orgMembers.filter(m =>
+    m.name?.toLowerCase().includes(q) ||
+    m.jobGrade?.toLowerCase().includes(q) ||
+    m.jobTitle?.toLowerCase().includes(q)
+  );
+  if (!matches.length) return `<div class="org-search-empty">일치하는 구성원이 없습니다.</div>`;
+
+  return `
+    <div class="org-search-count">${matches.length}명 검색됨</div>
+    <div class="org-search-list">
+      ${matches.map(m => {
+        const team = state.orgUnits.find(u => u.id === m.parentId);
+        const path = team?.level === "team" ? teamPath(team.id) : null;
+        const breadcrumb = path
+          ? [path.divisionName, path.hqName, path.teamName].filter(Boolean).join(" › ")
+          : (team?.name || "");
+        const isLeader = team?.leaderMemberId === m.id;
+        const grade = memberGrade(m);
+        const title = memberJobTitle(m);
+        const highlight = (text) => {
+          if (!text) return "";
+          const idx = text.toLowerCase().indexOf(q);
+          if (idx === -1) return escapeHtml(text);
+          return escapeHtml(text.slice(0, idx)) +
+            "<mark>" + escapeHtml(text.slice(idx, idx + q.length)) + "</mark>" +
+            escapeHtml(text.slice(idx + q.length));
+        };
+        return `
+          <div class="org-search-item" onclick="window.openOrgMemberEditor('${m.id}')">
+            <div class="org-search-item-main">
+              <span class="org-search-name">${highlight(m.name)}</span>
+              ${isLeader ? '<span class="org-panel-leader-badge">팀장</span>' : ""}
+              <span class="org-search-grade">${escapeHtml(grade)}${title ? ` · ${escapeHtml(title)}` : ""}</span>
+            </div>
+            <div class="org-search-breadcrumb">${escapeHtml(breadcrumb)}</div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 export function renderOrg() {
   const expandedIds = state.orgExpandedUnitIds || [];
   const selectedTeamId = state.orgSelectedTeamId || "";
@@ -839,6 +883,7 @@ export function renderOrg() {
   const divisions = company ? topLevelOrgUnits(company.id) : [];
   const totalMembers = state.orgMembers.length;
   const totalTeams = state.orgUnits.filter(u => u.level === "team").length;
+  const searchQuery = (state.orgSearchQuery || "").trim();
 
   return `
     <section class="page-head">
@@ -847,7 +892,7 @@ export function renderOrg() {
         <h1>조직 구조 및 인원 관리</h1>
         <p>전사 ${divisions.length}개 부문 · ${totalTeams}개 팀 · ${totalMembers}명</p>
       </div>
-      <div style="margin-left:auto; display:flex; gap:8px;" data-html2canvas-ignore="true">
+      <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;" data-html2canvas-ignore="true">
         <button class="primary compact" onclick="window.openOrgNodeEditor('${company?.id || ""}', 'add')">+ 부문 추가</button>
         ${renderOrgActionMenu(`
           <button type="button" onclick="window.triggerOrgUpload()">엑셀/CSV로 부서/멤버 일괄 업로드</button>
@@ -859,23 +904,42 @@ export function renderOrg() {
       </div>
     </section>
 
-    <div class="org-split-layout ${selectedTeamId ? "has-panel" : ""}">
-      <section class="panel org-accordion-panel">
-        ${divisions.length ? divisions.map(div => renderAccordionDivision(div, expandedIds, selectedTeamId)).join("") : `
-          <div class="empty" style="padding:48px 0;">
-            조직 구조가 없습니다. 위의 <strong>+ 부문 추가</strong>로 시작하세요.
-          </div>
-        `}
-      </section>
-
-      ${selectedTeamId ? `
-        <aside class="org-team-panel panel">
-          ${renderDesktopPanel(selectedTeamId)}
-        </aside>
-      ` : ""}
+    <div class="org-search-bar">
+      <input
+        type="search"
+        id="org-search-input"
+        class="input-text"
+        placeholder="이름, 직급, 직함으로 검색"
+        value="${escapeHtml(searchQuery)}"
+        oninput="window.onOrgSearchInput(this.value)"
+        style="flex:1; min-width:0;"
+      />
+      ${searchQuery ? `<button class="ghost compact" onclick="window.clearOrgSearch()">✕ 초기화</button>` : ""}
     </div>
 
-    ${renderBottomSheet(selectedTeamId)}
+    ${searchQuery ? `
+      <section class="panel org-accordion-panel">
+        ${renderOrgSearchResults(searchQuery)}
+      </section>
+    ` : `
+      <div class="org-split-layout ${selectedTeamId ? "has-panel" : ""}">
+        <section class="panel org-accordion-panel">
+          ${divisions.length ? divisions.map(div => renderAccordionDivision(div, expandedIds, selectedTeamId)).join("") : `
+            <div class="empty" style="padding:48px 0;">
+              조직 구조가 없습니다. 위의 <strong>+ 부문 추가</strong>로 시작하세요.
+            </div>
+          `}
+        </section>
+
+        ${selectedTeamId ? `
+          <aside class="org-team-panel panel">
+            ${renderDesktopPanel(selectedTeamId)}
+          </aside>
+        ` : ""}
+      </div>
+
+      ${renderBottomSheet(selectedTeamId)}
+    `}
 
     ${renderOrgEditorModal()}
   `;

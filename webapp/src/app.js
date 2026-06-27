@@ -2711,6 +2711,7 @@ window.openQualAnalysisModal = function(sessionId, phase) {
     responses: formattedResponses,
     onConfirm: async (qualSignal) => {
       await saveQualSignalToFirestore(qualSignal);
+      render();
     }
   });
 };

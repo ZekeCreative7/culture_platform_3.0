@@ -2963,6 +2963,8 @@ window.__vanillaRenderView = (view) => {
 window.__vanillaBindCanvas = () => {
   bindCanvasEvents();
 };
+// Full render — React pages intercept this to trigger syncFromVanilla instead
+window.__vanillaFullRender = render;
 
 if (LOCAL_PREVIEW) {
   document.body.classList.add('local-preview');

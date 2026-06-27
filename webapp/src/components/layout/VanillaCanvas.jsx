@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const VANILLA_VIEWS = ['sessions', 'org', 'report', 'survey', 'comm', 'pulse', 'dashboard'];
+// All views now have React page components — VanillaCanvas is no longer used
+// but kept here in case a future view needs the bridge pattern.
+const VANILLA_VIEWS = [];
 
 export function isVanillaView(view) {
   return VANILLA_VIEWS.includes(view);

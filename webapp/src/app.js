@@ -3778,8 +3778,23 @@ function bindSessions() {
     window.updateResponsesSubscription();
     render();
   });
-  document.querySelector("#btn-db-upload")?.addEventListener("click", uploadStateToDb);
-  document.querySelector("#btn-db-download")?.addEventListener("click", downloadStateFromDb);
+  document.querySelector("#btn-db-upload")?.addEventListener("click", () => {
+    document.getElementById("session-more-dropdown").style.display = "none";
+    uploadStateToDb();
+  });
+  document.querySelector("#btn-db-download")?.addEventListener("click", () => {
+    document.getElementById("session-more-dropdown").style.display = "none";
+    downloadStateFromDb();
+  });
+  document.getElementById("btn-session-more")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const dd = document.getElementById("session-more-dropdown");
+    dd.style.display = dd.style.display === "none" ? "block" : "none";
+  });
+  document.addEventListener("click", () => {
+    const dd = document.getElementById("session-more-dropdown");
+    if (dd) dd.style.display = "none";
+  }, { once: false });
 
   document.getElementById('btn-open-session-drawer')?.addEventListener('click', () => {
     state.sessionDrawerOpen = true;

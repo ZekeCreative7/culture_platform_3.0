@@ -527,9 +527,14 @@ export function renderSessions() {
         <span class="eyebrow">세션 운영</span>
         <h1>조직문화 세션 스케줄 및 운영 관리</h1>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button class="secondary" id="btn-db-download">DB 다운로드</button>
-        <button class="primary compact" id="btn-db-upload">DB 전송</button>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div class="session-more-menu" style="position:relative;">
+          <button class="ghost compact" id="btn-session-more" aria-label="더보기" title="DB 관리">⋯</button>
+          <div class="session-more-dropdown" id="session-more-dropdown" style="display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.10); min-width:140px; z-index:200; overflow:hidden;">
+            <button class="session-more-item" id="btn-db-download">DB 다운로드</button>
+            <button class="session-more-item" id="btn-db-upload">DB 전송</button>
+          </div>
+        </div>
         <button class="primary" id="btn-open-session-drawer">+ 새 세션</button>
       </div>
     </section>

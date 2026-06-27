@@ -1612,6 +1612,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: po
 
 .session-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 5px; color: var(--muted); font-size: 10px; font-weight: 600; }
 .session-alert-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.session-more-item { display: block; width: 100%; padding: 10px 16px; text-align: left; font-size: 13px; font-weight: 600; color: var(--ink); background: none; border: none; cursor: pointer; white-space: nowrap; }
+.session-more-item:hover { background: #f5f5f7; }
 .session-alert-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
 .session-alert-badge.amber { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
 

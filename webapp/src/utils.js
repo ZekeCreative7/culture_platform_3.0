@@ -1,4 +1,4 @@
-export const PHASES = ["사전", "사후", "팔로우업"];
+export const PHASES = ["사전", "사후", "팔로우업", "타운홀피드백"];
 
 export const QUANT_LABELS = {
   q1: "심리안전 1",

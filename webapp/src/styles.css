@@ -6179,3 +6179,134 @@ nav button.active,
   .session-drawer { max-height: 96vh; }
 }
 
+/* ══════════════════════════════════════════════
+   COMM VIEW
+   ══════════════════════════════════════════════ */
+.comm-wrapper { display: flex; flex-direction: column; gap: 24px; }
+.comm-wrapper .page-head p { font-size: 13px; color: var(--text-secondary); margin: 4px 0 0; }
+
+.comm-body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* 목록 사이드바 */
+.comm-list { padding: 16px; display: flex; flex-direction: column; gap: 0; }
+.comm-list-head { display: flex; align-items: center; gap: 8px; font-size: 13px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.comm-list-head .badge { background: var(--bg-subtle); color: var(--text-secondary); border-radius: 99px; font-size: 11px; padding: 1px 7px; }
+.comm-empty { font-size: 13px; color: var(--text-secondary); line-height: 1.6; padding: 8px 0; }
+
+.comm-list-item { padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.comm-list-item:last-child { border-bottom: none; }
+.comm-list-item:hover { opacity: 0.8; }
+.comm-list-item.active .comm-list-item-top strong { color: var(--blue); }
+.comm-list-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.comm-list-item-top strong { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.comm-list-date { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; }
+.comm-progress-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block; }
+
+.comm-progress-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.comm-progress-bar.wide { height: 4px; margin: 8px 0 4px; }
+.comm-progress-fill { height: 100%; background: var(--blue); border-radius: 2px; transition: width .3s; }
+
+/* 에디터 */
+.comm-placeholder { display: flex; align-items: center; justify-content: center; min-height: 220px; text-align: center; color: var(--text-secondary); font-size: 14px; line-height: 1.7; }
+.comm-editor-inner { display: flex; flex-direction: column; gap: 14px; }
+
+.comm-editor-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px !important; }
+.comm-title-input {
+  flex: 1; border: none; outline: none; font-size: 16px; font-weight: 600;
+  color: var(--text-primary); background: transparent;
+  font-family: inherit;
+}
+.comm-title-input::placeholder { color: var(--text-tertiary); }
+
+/* 5단계 기획 */
+.comm-steps { padding: 20px 22px; }
+.comm-steps-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
+.comm-step { margin-top: 18px; }
+.comm-step-label { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; font-size: 13px; }
+.step-num { font-size: 11px; color: var(--blue); font-weight: 700; }
+.step-hint { font-size: 11px; color: var(--text-secondary); margin-left: auto; }
+.comm-step-input {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; font-family: inherit;
+  color: var(--text-primary); background: var(--bg-subtle);
+  line-height: 1.6;
+}
+.comm-step-input:focus { outline: none; border-color: var(--blue); background: #fff; }
+.comm-step-select {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 12px; font-size: 13px; font-family: inherit;
+  color: var(--text-primary); background: var(--bg-subtle);
+  margin-bottom: 8px;
+}
+.comm-data-summary {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  background: #f0f7ff; border: 1px solid #b3d1f7; border-radius: 8px;
+  padding: 8px 12px; font-size: 12px; color: #1a55a3;
+}
+
+/* 포맷 옵션 */
+.comm-options { padding: 18px 22px; }
+.comm-type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.comm-type-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px 8px;
+  background: var(--bg-subtle); cursor: pointer; transition: all .15s;
+  font-family: inherit;
+}
+.comm-type-btn:hover { border-color: var(--blue); background: #f0f7ff; }
+.comm-type-btn.active { border-color: var(--blue); background: #e8f2ff; }
+.type-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.type-desc { font-size: 10px; color: var(--text-secondary); text-align: center; }
+
+.comm-length-group { display: flex; gap: 8px; margin-top: 8px; }
+.comm-length-btn {
+  flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;
+  background: var(--bg-subtle); cursor: pointer; font-family: inherit;
+  font-size: 13px; font-weight: 500; color: var(--text-primary); transition: all .15s;
+}
+.comm-length-btn:hover { border-color: var(--blue); background: #f0f7ff; }
+.comm-length-btn.active { border-color: var(--blue); background: #e8f2ff; color: var(--blue); }
+.length-hint { font-size: 11px; color: var(--text-secondary); display: block; margin-top: 2px; font-weight: 400; }
+
+/* 프롬프트 */
+.comm-prompt { padding: 18px 22px; }
+.comm-prompt.comm-locked { opacity: .55; pointer-events: none; }
+.comm-prompt-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 13px; }
+.comm-lock-msg { font-size: 11px; color: var(--text-secondary); }
+.comm-prompt-text {
+  width: 100%; box-sizing: border-box; height: 240px; resize: vertical;
+  border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
+  font-size: 12px; font-family: "SF Mono", "Fira Code", monospace;
+  color: var(--text-primary); background: #f8f9fa; line-height: 1.6;
+}
+.comm-prompt-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* 최종본 저장 */
+.comm-final { padding: 18px 22px; }
+.comm-final-text {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; font-size: 13px; font-family: inherit;
+  color: var(--text-primary); background: var(--bg-subtle); line-height: 1.7;
+}
+.comm-final-text:focus { outline: none; border-color: var(--blue); background: #fff; }
+.comm-final-actions { margin-top: 10px; }
+
+button.disabled { opacity: .45; pointer-events: none; }
+
+@media (max-width: 768px) {
+  .comm-body { grid-template-columns: 1fr; }
+  .comm-type-grid { grid-template-columns: repeat(2, 1fr); }
+}
+

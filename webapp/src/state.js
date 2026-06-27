@@ -150,6 +150,8 @@ export const blankState = () => ({
   dashboardSelectedDate: "",
   dashboardShowAllActions: false,
   dashboardExpandedActionGroups: {},
+  commDrafts: [],
+  commActiveDraftId: null,
 });
 
 export const state = {};
@@ -242,7 +244,8 @@ function persistState() {
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
-    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups
+    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups,
+    commDrafts, commActiveDraftId
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
@@ -255,7 +258,8 @@ function persistState() {
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
     sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
-    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups
+    dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups,
+    commDrafts, commActiveDraftId
   }));
 }
 

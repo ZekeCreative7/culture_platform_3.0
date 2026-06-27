@@ -17,7 +17,9 @@ import {
   dimAvg,
   dimSpread,
   ragInfo,
-  dimRecommendation
+  dimRecommendation,
+  cohortOptionsHtml,
+  scopedSessionOptions
 } from './views/report.js?v=20260627-bugfix-v1';
 import {
   renderCalendar,

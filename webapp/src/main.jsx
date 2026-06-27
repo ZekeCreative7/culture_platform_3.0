@@ -13,6 +13,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth.js';
 import { AppLayout } from './components/layout/index.js';
 import { UploadPage } from './pages/UploadPage.jsx';
+import { AnalyticsPage } from './pages/AnalyticsPage.jsx';
 
 const BASE = '/culture_platform_3.0';
 
@@ -72,7 +73,7 @@ function App() {
             <Route path="/sessions" element={<PlaceholderPage name="세션 관리" />} />
             <Route path="/org" element={<PlaceholderPage name="조직도" />} />
             <Route path="/upload" element={<UploadPage />} />
-            <Route path="/analytics" element={<PlaceholderPage name="분석" />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/report" element={<PlaceholderPage name="리포트" />} />
             <Route path="/survey" element={<PlaceholderPage name="설문 설계" />} />
             <Route path="/comm" element={<PlaceholderPage name="커뮤니케이션" />} />

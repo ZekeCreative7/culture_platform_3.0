@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const VANILLA_VIEWS = ['sessions', 'org', 'analytics', 'report', 'survey', 'comm', 'pulse', 'dashboard'];
+const VANILLA_VIEWS = ['sessions', 'org', 'report', 'survey', 'comm', 'pulse', 'dashboard'];
 
 export function isVanillaView(view) {
   return VANILLA_VIEWS.includes(view);

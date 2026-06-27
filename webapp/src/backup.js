@@ -1,7 +1,8 @@
 import {
   db, collection, doc, getDoc, getDocs, setDoc, writeBatch, query, where,
 } from './firebase.js?v=20260627-session-redesign-v1';
-import { getCurrentOrgId } from './state.js';
+
+function getCurrentOrgId() { return window.__currentOrgId || 'lina'; }
 
 const BACKUP_COLLECTIONS = ['sessions', 'surveys', 'responses', 'QualSignal'];
 

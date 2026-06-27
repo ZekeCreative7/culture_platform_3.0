@@ -249,17 +249,95 @@ export function renderQuantSection(sessionId, session, activePhase) {
   `;
 }
 
+export function qualQuestionLabel(qid, type, sessionId = "", phase = "") {
+  let survey = sessionId
+    ? (state.surveys || []).find(s => s.sessionId === sessionId && (!phase || s.phase === phase) && (s.questions || []).some(q => q.id === qid))
+    : null;
+  if (!survey) survey = (state.surveys || []).find(s => sameSessionType(s.sessionType, type) && (s.questions || []).some(q => q.id === qid));
+  const text = survey?.questions?.find(q => q.id === qid)?.text;
+  if (text) return text;
+  if (qid === 'q9')  return '세션 참여 전 기대하는 점';
+  if (qid === 'q10') return '세션 중 도움이 된 점';
+  if (qid === 'q11') return '운영진에게 전달하고 싶은 메시지';
+  return qid;
+}
+
+export function renderQualByQuestion(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
+  return qualIds.map((id) => {
+    const answers = rows.filter((r) => {
+      const rSurvey = (state.surveys || []).find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
+      const rQualIds = rSurvey?.questions?.length
+        ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+        : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+      return rQualIds.includes(id) && isQualText(r[id]);
+    }).map((r) => ({ phase: r.phase || '', answer: r[id] }));
+    if (!answers.length) return '';
+    return `
+      <div class="qual-group">
+        <div class="qual-group-head"><strong>${escapeHtml(qualQuestionLabel(id, type, sessionId, phase))}</strong><span>${answers.length}건</span></div>
+        ${answers.map((a) => `
+          <article class="qual-answer-row">
+            ${showPhase ? `<div class="qual-answer-meta"><span>${escapeHtml(a.phase)}</span></div>` : ''}
+            <p>${escapeHtml(a.answer)}</p>
+          </article>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+}
+
+export function renderQualByPerson(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
+  const peopleRows = rows.filter((row) => {
+    const rSurvey = (state.surveys || []).find(s => s.id === row.surveyId || (s.sessionId === row.sessionId && s.phase === row.phase));
+    const rQualIds = rSurvey?.questions?.length
+      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+      : defaultQuestions(row.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+    return rQualIds.some((id) => isQualText(row[id]));
+  });
+  return peopleRows.map((row, index) => {
+    const rSurvey = (state.surveys || []).find(s => s.id === row.surveyId || (s.sessionId === row.sessionId && s.phase === row.phase));
+    const rQualIds = rSurvey?.questions?.length
+      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
+      : defaultQuestions(row.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
+    const answers = qualIds.filter((id) => rQualIds.includes(id) && isQualText(row[id])).map((id) => ({
+      label: qualQuestionLabel(id, type, sessionId, row.phase || phase),
+      answer: row[id]
+    }));
+    if (!answers.length) return '';
+    return `
+      <div class="qual-group">
+        <div class="qual-group-head"><strong>응답자 ${index + 1}</strong>${showPhase ? `<span>${escapeHtml(row.phase || '')}</span>` : ''}</div>
+        ${answers.map((a) => `
+          <article class="qual-answer-row">
+            <div class="qual-answer-meta"><span>${escapeHtml(a.label)}</span></div>
+            <p>${escapeHtml(a.answer)}</p>
+          </article>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+}
+
 export function renderQualSection(cohort, type, sessionId, activePhase) {
-  const qObj = qualResponseRows(cohort, type, sessionId, activePhase);
-  if (!qObj.answers.length) return emptyCard("이 시점의 주관식 응답이 없습니다.");
+  const { qualIds, rows } = qualResponseRows(cohort, type, sessionId, activePhase);
+  const phases = [...new Set(rows.map(r => r.phase).filter(Boolean))];
+  const singlePhase = activePhase || (phases.length === 1 ? phases[0] : '');
+  const showPhase = !singlePhase;
+  const totalAnswers = rows.reduce((sum, row) => sum + qualIds.filter(id => isQualText(row[id])).length, 0);
+  const groupBy = state.qualAnswersGroupBy === 'person' ? 'person' : 'question';
+  const body = groupBy === 'person'
+    ? renderQualByPerson(rows, qualIds, type, showPhase, sessionId, activePhase)
+    : renderQualByQuestion(rows, qualIds, type, showPhase, sessionId, activePhase);
   return `
-    <div class="qual-responses-list">
-      ${qObj.answers.map((r) => `
-        <article class="qual-response-row">
-          <div class="qual-response-q">${escapeHtml(r.qText)}</div>
-          <p>${escapeHtml(r.text)}</p>
-        </article>
-      `).join("")}
+    <div class="qual-section-toolbar">
+      <span class="muted" style="font-size:12px;">${singlePhase ? `${escapeHtml(singlePhase)} 설문 · ` : ''}총 ${totalAnswers}건</span>
+      <div class="pulse-segmented" aria-label="보기 방식">
+        <button class="${groupBy === 'question' ? 'active' : ''}" onclick="window.setQualAnswersGroupBy('question')">질문으로 보기</button>
+        <button class="${groupBy === 'person' ? 'active' : ''}" onclick="window.setQualAnswersGroupBy('person')">사람으로 보기</button>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:16px; margin-top:14px;">
+      ${totalAnswers ? body : emptyCard("정성 응답이 없습니다.")}
     </div>
   `;
 }

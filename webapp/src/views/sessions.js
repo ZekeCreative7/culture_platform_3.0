@@ -35,7 +35,7 @@ import {
   renderDuplicateWarningModal, 
   renderCalendar 
 } from './survey.js?v=20260627-state-singleton-v1';
-import { qualResponseRows } from './analytics.js?v=20260627-state-singleton-v1';
+import { qualResponseRows } from './analytics.js?v=20260627-bugfix-v1';
 
 export function renderSessionOutcomeIntro(type) {
   const normalizedType = normalizeSessionType(type);

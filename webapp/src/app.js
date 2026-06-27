@@ -18,7 +18,7 @@ import {
   dimSpread,
   ragInfo,
   dimRecommendation
-} from './views/report.js?v=20260627-state-singleton-v1';
+} from './views/report.js?v=20260627-bugfix-v1';
 import {
   renderCalendar,
   renderMonthCalendar,
@@ -34,7 +34,7 @@ import {
   renderChart,
   renderStatsTable,
   qualResponseRows
-} from './views/analytics.js?v=20260627-state-singleton-v1';
+} from './views/analytics.js?v=20260627-bugfix-v1';
 import {
   renderSessions,
   renderOrgSelectRow,
@@ -57,7 +57,7 @@ import {
   sessionsByTypeGrouped,
   sessionCard,
   scheduleRow
-} from './views/sessions.js?v=20260627-state-singleton-v1';
+} from './views/sessions.js?v=20260627-bugfix-v1';
 import {
   validateAndRepairSelectedOrg,
   childUnits,

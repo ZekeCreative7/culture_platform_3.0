@@ -1879,6 +1879,18 @@ window.setOrgMemberSort = function(value) {
   render();
 };
 
+window.toggleOrgUnit = function(id) {
+  const ids = state.orgExpandedUnitIds || [];
+  const idx = ids.indexOf(id);
+  if (idx >= 0) {
+    state.orgExpandedUnitIds = ids.filter(x => x !== id);
+  } else {
+    state.orgExpandedUnitIds = [...ids, id];
+  }
+  saveState();
+  render();
+};
+
 window.showDirectMembers = function(unitId) {
   const unit = state.orgUnits.find((item) => item.id === unitId);
   if (!unit) return;

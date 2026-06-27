@@ -651,52 +651,123 @@ export function renderOrgEditorModal() {
   `;
 }
 
+function renderAccordionMembers(teamId) {
+  const members = sortedOrgMembers(state.orgMembers.filter(m => m.parentId === teamId));
+  if (!members.length) {
+    return `<div class="acc-members-empty">구성원이 없습니다.</div>`;
+  }
+  return members.map(m => {
+    const grade = memberGrade(m);
+    const title = memberJobTitle(m);
+    return `
+      <div class="acc-member-row">
+        <span class="acc-member-name">${escapeHtml(m.name)}</span>
+        <span class="acc-member-grade">${escapeHtml(grade)}${title ? ` · ${escapeHtml(title)}` : ""}</span>
+        <div class="acc-member-actions">
+          <button class="ghost compact" onclick="window.openOrgMemberEditor('${m.id}')" title="수정">수정</button>
+          <button class="ghost compact danger" onclick="window.deleteOrgMember('${m.id}')" title="삭제">삭제</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderAccordionTeam(team, expanded) {
+  const leader = unitLeaderDetails(team);
+  const memberCount = distinctDirectPeopleCount(team);
+  return `
+    <div class="acc-team ${expanded ? "is-open" : ""}">
+      <div class="acc-row acc-row--team" onclick="window.toggleOrgUnit('${team.id}')">
+        <span class="acc-chevron">${expanded ? "▾" : "▸"}</span>
+        <span class="acc-name">${escapeHtml(team.name)}</span>
+        <span class="acc-meta">${memberCount}명${leader ? ` · ${escapeHtml(leader.name)}` : ""}</span>
+        <div class="acc-actions" onclick="event.stopPropagation()">
+          <button class="ghost compact" onclick="window.openOrgMemberEditor('', '${team.id}')">+ 구성원</button>
+          <button class="ghost compact" onclick="window.openOrgNodeEditor('${team.id}', 'edit')">수정</button>
+          <button class="ghost compact danger" onclick="window.deleteOrgNode('${team.id}')">삭제</button>
+        </div>
+      </div>
+      ${expanded ? `
+        <div class="acc-members-panel">
+          ${renderAccordionMembers(team.id)}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderAccordionHq(hq, expandedIds) {
+  const isOpen = expandedIds.includes(hq.id);
+  const teams = childUnits(hq.id, "team");
+  const totalMembers = distinctPeopleCount(hq);
+  return `
+    <div class="acc-hq ${isOpen ? "is-open" : ""}">
+      <div class="acc-row acc-row--hq" onclick="window.toggleOrgUnit('${hq.id}')">
+        <span class="acc-chevron">${isOpen ? "▾" : "▸"}</span>
+        <span class="acc-name">${escapeHtml(hq.name)}</span>
+        <span class="acc-meta">${teams.length}팀 · ${totalMembers}명</span>
+        <div class="acc-actions" onclick="event.stopPropagation()">
+          <button class="ghost compact" onclick="window.openOrgNodeEditor('${hq.id}', 'add')">+ 팀</button>
+          <button class="ghost compact" onclick="window.openOrgNodeEditor('${hq.id}', 'edit')">수정</button>
+          <button class="ghost compact danger" onclick="window.deleteOrgNode('${hq.id}')">삭제</button>
+        </div>
+      </div>
+      ${isOpen ? `
+        <div class="acc-children">
+          ${teams.map(t => renderAccordionTeam(t, expandedIds.includes(t.id))).join("")}
+          ${!teams.length ? `<div class="acc-empty-children">팀이 없습니다. + 팀 버튼으로 추가하세요.</div>` : ""}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderAccordionDivision(div, expandedIds) {
+  const isOpen = expandedIds.includes(div.id);
+  const hqs = childUnits(div.id, "hq");
+  const directTeams = childUnits(div.id, "team");
+  const totalMembers = distinctPeopleCount(div);
+  const teamCount = descendantTeamIds(div.id).length;
+  return `
+    <div class="acc-division ${isOpen ? "is-open" : ""}">
+      <div class="acc-row acc-row--division" onclick="window.toggleOrgUnit('${div.id}')">
+        <span class="acc-chevron">${isOpen ? "▾" : "▸"}</span>
+        <span class="acc-name">${escapeHtml(div.name)}</span>
+        <span class="acc-meta">${teamCount}팀 · ${totalMembers}명</span>
+        <div class="acc-actions" onclick="event.stopPropagation()">
+          <button class="ghost compact" onclick="window.openOrgNodeEditor('${div.id}', 'add')">+ 본부/팀</button>
+          <button class="ghost compact" onclick="window.openOrgNodeEditor('${div.id}', 'edit')">수정</button>
+          <button class="ghost compact danger" onclick="window.deleteOrgNode('${div.id}')">삭제</button>
+        </div>
+      </div>
+      ${isOpen ? `
+        <div class="acc-children">
+          ${hqs.map(hq => renderAccordionHq(hq, expandedIds)).join("")}
+          ${directTeams.map(t => renderAccordionTeam(t, expandedIds.includes(t.id))).join("")}
+          ${(!hqs.length && !directTeams.length) ? `<div class="acc-empty-children">하위 조직이 없습니다. + 본부/팀 버튼으로 추가하세요.</div>` : ""}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
 export function renderOrg() {
-  validateAndRepairSelectedOrg();
-  ensureActiveOrgSelection();
+  const expandedIds = state.orgExpandedUnitIds || [];
+  const company = state.orgUnits.find(u => u.level === "company");
+  const divisions = company ? topLevelOrgUnits(company.id) : [];
 
-  const selectedUnit = state.orgUnits.find((unit) => unit.id === state.selectedDivision);
-  const activeUnitId = state.activeOrgViewUnitId || state.selectedDivision;
-  const activeUnit = state.orgUnits.find((unit) => unit.id === activeUnitId) || selectedUnit;
-
-  const searchQuery = String(state.orgSearchQuery || "").trim().toLowerCase();
-  const searchResults = searchQuery
-    ? state.orgMembers.filter(m => m.name.toLowerCase().includes(searchQuery) || orgPathLabel(m.parentId).toLowerCase().includes(searchQuery))
-    : [];
-
-  const matches = new Set(searchResults.map((m) => m.id));
-
-  const divisionList = topLevelOrgUnits(state.selectedCompany);
-  const hqList = hqUnitsForDivision(state.selectedDivision);
-  const teamList = teamUnitsForSelection(state.selectedDivision, state.selectedHq);
-
-  const displayList = state.activeOrgView === "tree" ? [activeUnit].filter(Boolean) : [];
-  const memberList = sortedOrgMembers(
-    state.orgMembers.filter((m) => {
-      if (searchQuery) return matches.has(m.id);
-      if (activeUnit) {
-        if (activeUnit.level === "team") return m.parentId === activeUnit.id;
-        const subIds = descendantUnitIds(activeUnit.id);
-        return m.parentId === activeUnit.id || subIds.includes(m.parentId);
-      }
-      return false;
-    })
-  );
+  const totalMembers = state.orgMembers.length;
+  const totalTeams = state.orgUnits.filter(u => u.level === "team").length;
 
   return `
     <section class="page-head">
       <div>
         <span class="eyebrow">조직 관리</span>
         <h1>조직 구조 및 인원 관리</h1>
-        <p>전사 부문, 본부, 팀 구조를 구성하고 소속 구성원의 프로필과 리더 배정을 관리합니다.</p>
+        <p>전사 ${divisions.length}개 부문 · ${totalTeams}개 팀 · ${totalMembers}명</p>
       </div>
       <div style="margin-left:auto; display:flex; gap:8px;" data-html2canvas-ignore="true">
-        <button class="primary compact" onclick="window.openOrgNodeEditor('${state.selectedCompany}', 'add')">
-          + 부서 추가
-        </button>
-        <button class="primary compact" onclick="window.openOrgMemberEditor('', '${activeUnitId}')">
-          + 구성원 추가
-        </button>
+        <button class="primary compact" onclick="window.openOrgNodeEditor('${company?.id || ""}', 'add')">+ 부문 추가</button>
         ${renderOrgActionMenu(`
           <button type="button" onclick="window.triggerOrgUpload()">엑셀/CSV로 부서/멤버 일괄 업로드</button>
           <button type="button" onclick="window.triggerOrgBackup()">조직 데이터 백업 다운로드</button>
@@ -707,144 +778,14 @@ export function renderOrg() {
       </div>
     </section>
 
-    <div class="org-layout-container" style="display:grid; grid-template-columns:260px 1fr; gap:20px; align-items:flex-start;">
-      <!-- Left: Org Hierarchy Sidebar Filter -->
-      <section class="panel org-hierarchy-sidebar" data-html2canvas-ignore="true">
-        ${sectionTitle("소속 필터", "부서 계층 구조 선택")}
-        <div class="form-grid compact" style="grid-template-columns:1fr; gap:12px; margin-top:14px;">
-          <label>부문 (Division)
-            <select id="org-division-select" class="input-text" onchange="window.selectOrgDivision(this.value)">
-              ${optionHtml(divisionList, state.selectedDivision, "-- 부문 선택 --")}
-            </select>
-          </label>
-          <label>본부 (HQ)
-            <select id="org-hq-select" class="input-text" onchange="window.selectOrgHq(this.value)" ${hqList.length ? "" : "disabled"}>
-              ${optionHtml(hqList, state.selectedHq, "-- 본부 선택 --")}
-            </select>
-          </label>
-          <label>팀 (Team)
-            <select id="org-team-select" class="input-text" onchange="window.selectOrgTeam(this.value)" ${teamList.length ? "" : "disabled"}>
-              ${optionHtml(teamList, state.selectedTeam, "-- 팀 선택 --")}
-            </select>
-          </label>
+    <section class="panel org-accordion-panel">
+      ${divisions.length ? divisions.map(div => renderAccordionDivision(div, expandedIds)).join("") : `
+        <div class="empty" style="padding:48px 0;">
+          조직 구조가 없습니다. 위의 <strong>+ 부문 추가</strong>로 시작하세요.
         </div>
+      `}
+    </section>
 
-        <div style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <span style="font-size:11px; font-weight:700; color:var(--muted);">조직도 보기 방식</span>
-          </div>
-          <div class="pulse-segmented" style="width:100%;">
-            <button class="${state.activeOrgView === 'list' ? 'active' : ''}" onclick="window.setOrgView('list')" style="flex:1;">리스트 뷰</button>
-            <button class="${state.activeOrgView === 'tree' ? 'active' : ''}" onclick="window.setOrgView('tree')" style="flex:1;">조직 마인드맵</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Right: Main Org Workspace Area -->
-      <div style="display:flex; flex-direction:column; gap:20px;">
-        <section class="panel org-main-workspace" style="position:relative; overflow:visible;">
-          <div class="org-workspace-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;" data-html2canvas-ignore="true">
-            <h3 style="margin:0; font-size:15px; font-weight:800; color:var(--ink);">
-              ${activeUnit ? `${escapeHtml(activeUnit.name)} 구조` : "선택된 부서 없음"}
-            </h3>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <input type="text" id="org-search-input" value="${escapeHtml(state.orgSearchQuery || "")}" placeholder="멤버 이름 또는 소속 검색" class="input-text compact" style="width:180px; font-size:12px; height:28px;" oninput="window.setOrgSearchQuery(this.value)" />
-              ${searchQuery ? `<button class="ghost compact" onclick="window.clearOrgSearch()" style="height:28px; font-size:11px;">지우기</button>` : ""}
-            </div>
-          </div>
-
-          <!-- Tree View (Mindmap Canvas) -->
-          ${state.activeOrgView === "tree" ? `
-            <div class="org-tree-canvas-wrap" style="position:relative; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; min-height:480px; overflow:auto;">
-              <div id="org-mindmap-canvas" class="org-mindmap-canvas" style="position:absolute; width:100%; height:100%;">
-                <!-- Dynamic SVG Lines will be drawn here -->
-              </div>
-              <div class="org-mindmap-nodes-container" style="padding:40px; min-width:800px; display:flex; flex-direction:column; gap:30px; align-items:center; justify-content:center; height:100%;">
-                ${displayList.map((unit) => {
-                  const subDivisions = childUnits(unit.id);
-                  return `
-                    <div class="mindmap-branch-root" style="display:flex; flex-direction:column; align-items:center; gap:24px;">
-                      ${renderOrgUnitCard(unit, activeUnitId, matches, "division")}
-                      <div class="mindmap-sub-branches" style="display:flex; gap:20px; align-items:flex-start;">
-                        ${subDivisions.map((sub) => {
-                          const teams = childUnits(sub.id, "team");
-                          return `
-                            <div class="mindmap-sub-branch" style="display:flex; flex-direction:column; align-items:center; gap:20px;">
-                              ${renderOrgUnitCard(sub, activeUnitId, matches)}
-                              ${teams.length ? `
-                                <div class="mindmap-teams-column" style="display:flex; flex-direction:column; gap:12px; border-top:2px dashed #cbd5e1; padding-top:14px; width:100%; align-items:center;">
-                                  ${teams.map((t) => renderOrgUnitCard(t, activeUnitId, matches)).join("")}
-                                </div>
-                              ` : ""}
-                            </div>
-                          `;
-                        }).join("")}
-                      </div>
-                    </div>
-                  `;
-                }).join("")}
-                ${!displayList.length ? `<div class="empty">마인드맵을 표시할 부문(Division)을 먼저 소속 필터에서 선택하세요.</div>` : ""}
-              </div>
-              ${renderOrgPopup()}
-            </div>
-          ` : ""}
-
-          <!-- List View (Flat cards layout) -->
-          ${state.activeOrgView === "list" ? `
-            <div class="org-list-wrap" style="display:flex; flex-direction:column; gap:16px;">
-              <!-- Unit details header card -->
-              ${activeUnit ? `
-                <div class="active-unit-hero-card" style="background:#f8fafc; border:1px solid #e2e8f0; padding:18px 24px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
-                  <div>
-                    <span class="badge ${activeUnit.level}" style="margin-bottom:6px;">${UNIT_LABELS[activeUnit.level]}</span>
-                    <h2 style="margin:0 0 4px; font-size:18px; font-weight:800; color:var(--ink);">${escapeHtml(activeUnit.name)}</h2>
-                    <p style="margin:0; font-size:12px; color:var(--muted); font-weight:600;">
-                      ${unitLeaderDetails(activeUnit) ? `리더: ${escapeHtml(unitLeaderDetails(activeUnit).name)} ${escapeHtml(unitLeaderDetails(activeUnit).grade)}` : "리더 미배정"} · 
-                      총 인원 ${distinctPeopleCount(activeUnit)}명 (직속 ${distinctDirectPeopleCount(activeUnit)}명)
-                    </p>
-                  </div>
-                  <div style="display:flex; gap:8px;" data-html2canvas-ignore="true">
-                    <button class="secondary compact" onclick="window.openOrgNodeEditor('${activeUnit.id}', 'edit')">이름 수정</button>
-                    ${activeUnit.level !== "team" ? `<button class="secondary compact" onclick="window.openOrgNodeEditor('${activeUnit.id}', 'add')">하위 부서 추가</button>` : ""}
-                    ${activeUnit.level !== "company" ? `<button class="ghost compact danger" onclick="window.deleteOrgNode('${activeUnit.id}')">삭제</button>` : ""}
-                  </div>
-                </div>
-              ` : ""}
-
-              <!-- Subdivisions & Teams cards -->
-              ${(activeUnit && activeUnit.level !== "team") ? `
-                <div class="sub-units-section">
-                  <h4 style="margin:0 0 10px; font-size:12px; color:var(--muted); font-weight:700;">하위 조직 (${childUnits(activeUnit.id).length}개)</h4>
-                  <div class="org-units-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px;">
-                    ${childUnits(activeUnit.id).map((sub) => renderOrgUnitCard(sub, activeUnitId, matches)).join("")}
-                  </div>
-                </div>
-              ` : ""}
-
-              <!-- Members section -->
-              <div class="members-section" style="margin-top:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                  <h4 style="margin:0; font-size:12px; color:var(--muted); font-weight:700;">
-                    소속 구성원 (${memberList.length}명)
-                  </h4>
-                  <div class="pulse-segmented compact" data-html2canvas-ignore="true" style="height:26px; padding:2px;">
-                    <button class="${state.orgMemberSort === 'rank-desc' ? 'active' : ''}" onclick="window.setOrgMemberSort('rank-desc')" style="font-size:10.5px; padding:0 8px;">직급높은순</button>
-                    <button class="${state.orgMemberSort === 'rank-asc' ? 'active' : ''}" onclick="window.setOrgMemberSort('rank-asc')" style="font-size:10.5px; padding:0 8px;">직급낮은순</button>
-                    <button class="${state.orgMemberSort === 'name' ? 'active' : ''}" onclick="window.setOrgMemberSort('name')" style="font-size:10.5px; padding:0 8px;">가나다순</button>
-                  </div>
-                </div>
-                <div class="org-members-drop-zone org-members-grid" 
-                     id="org-members-drop-zone" 
-                     style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px; min-height:100px; background:#f8fafc; border:2px dashed #cbd5e1; border-radius:12px; padding:12px;">
-                  ${memberList.map(m => renderMemberCard(m, matches)).join("")}
-                  ${!memberList.length ? `<div class="empty" style="grid-column:1/-1; border:none; background:none; padding:30px 0;">이 부서에 배정된 직속/하위 구성원이 없습니다. 오른쪽 위의 "구성원 추가"를 클릭하거나 다른 부서 멤버를 드래그 앤 드롭으로 배정하세요.</div>` : ""}
-                </div>
-              </div>
-            </div>
-          ` : ""}
-        </section>
-      </div>
-    </div>
     ${renderOrgEditorModal()}
   `;
 }

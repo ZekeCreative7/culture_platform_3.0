@@ -152,6 +152,7 @@ export const blankState = () => ({
   dashboardExpandedActionGroups: {},
   commDrafts: [],
   commActiveDraftId: null,
+  orgExpandedUnitIds: [],
 });
 
 export const state = {};

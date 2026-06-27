@@ -10,7 +10,7 @@ import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './r
 import { comparisonPair, pulseDiagnostics } from './pulse/pulseEngine.js';
 import { PULSE_DIV_MAP } from './config/pulseDivisionMap.js?v=20260620-org-revert-v2';
 import { initializeAuthGate, syncAuthControls } from './authGate.js?v=20260627-audit-log-v1';
-import { parseCSV } from './views/upload.js?v=20260627-module-split-v1';
+import { parseCSV } from './views/upload.js?v=20260627-ux-fix-v1';
 import {
   renderSessions,
   renderOrgSelectRow,
@@ -31,7 +31,7 @@ import {
   resetCrossDraft,
   getStatus,
   sessionsByTypeGrouped
-} from './views/sessions.js?v=20260627-session-fix-v2';
+} from './views/sessions.js?v=20260627-ux-fix-v1';
 import {
   validateAndRepairSelectedOrg,
   childUnits,
@@ -61,7 +61,7 @@ import {
   teamMemberCandidates,
   allMemberCandidates,
   positionRank
-} from './views/org.js?v=20260627-module-split-v1';
+} from './views/org.js?v=20260627-ux-fix-v1';
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,

@@ -28,13 +28,13 @@ import {
   ensureDraftOrgSelection, 
   optionHtml,
   renderOrgPopup
-} from './org.js?v=20260627-module-split-v1';
+} from './org.js?v=20260627-ux-fix-v1';
 import { 
   renderAttendanceModal, 
   renderDuplicateWarningModal, 
   renderCalendar 
-} from './survey.js?v=20260627-module-split-v1';
-import { qualResponseRows } from './analytics.js?v=20260627-session-fix-v1';
+} from './survey.js?v=20260627-ux-fix-v1';
+import { qualResponseRows } from './analytics.js?v=20260627-ux-fix-v1';
 
 export function renderSessionOutcomeIntro(type) {
   const normalizedType = normalizeSessionType(type);

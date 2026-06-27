@@ -21,7 +21,7 @@ import {
   isQualText, 
   fmt 
 } from '../utils.js?v=20260627-ux-fix-v1';
-import { renderQuantSection } from './report.js?v=20260627-session-fix-v1';
+import { renderQuantSection } from './report.js?v=20260627-ux-fix-v1';
 
 export function renderAnalytics() {
   const scope = ensureScopedSelection("analytics");

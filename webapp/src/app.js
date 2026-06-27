@@ -1,4 +1,4 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260627-session-redesign-v1';
+import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js?v=20260627-multitenant-v1';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js?v=20260627-state-singleton-v1';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js?v=20260619-respondent-tone';

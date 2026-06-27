@@ -318,6 +318,31 @@ export function renderQualByPerson(rows, qualIds, type, showPhase, sessionId = "
   }).join("");
 }
 
+function renderQualSignalSummary(sessionId, activePhase) {
+  if (!sessionId) return '';
+  const phaseKey = activePhase === '사전' ? 'pre' : activePhase === '사후' ? 'post' : null;
+  if (!phaseKey) return '';
+  const signal = (state.qualSignals || []).find(q =>
+    q.session_id === sessionId && q.phase === phaseKey && q.review?.status === 'confirmed'
+  );
+  if (!signal) return '';
+  const themes = (signal.themes || []).slice(0, 5);
+  const axes = Object.entries(signal.axis_signals || {}).filter(([, v]) => v?.mentioned);
+  return `
+    <div style="background:#f0f7ff;border:1px solid #bdd7f5;border-radius:8px;padding:12px 16px;margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:#0055b3;letter-spacing:0.05em;margin-bottom:8px;">AI 분석 결과 · ${escapeHtml(activePhase)} (확정)</div>
+      ${themes.length ? `
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+          ${themes.map(t => `<span style="background:white;border:1px solid #bdd7f5;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:600;color:#0055b3;">${escapeHtml(t.label)}</span>`).join('')}
+        </div>` : ''}
+      ${axes.length ? `
+        <div style="font-size:11px;color:#334;display:flex;flex-wrap:wrap;gap:8px;">
+          ${axes.map(([k, v]) => `<span>${escapeHtml(k)}: <b>${escapeHtml(v.direction || '')}</b></span>`).join('')}
+        </div>` : ''}
+    </div>
+  `;
+}
+
 export function renderQualSection(cohort, type, sessionId, activePhase) {
   const { qualIds, rows } = qualResponseRows(cohort, type, sessionId, activePhase);
   const phases = [...new Set(rows.map(r => r.phase).filter(Boolean))];
@@ -329,6 +354,7 @@ export function renderQualSection(cohort, type, sessionId, activePhase) {
     ? renderQualByPerson(rows, qualIds, type, showPhase, sessionId, activePhase)
     : renderQualByQuestion(rows, qualIds, type, showPhase, sessionId, activePhase);
   return `
+    ${renderQualSignalSummary(sessionId, activePhase)}
     <div class="qual-section-toolbar">
       <span class="muted" style="font-size:12px;">${singlePhase ? `${escapeHtml(singlePhase)} 설문 · ` : ''}총 ${totalAnswers}건</span>
       <div class="pulse-segmented" aria-label="보기 방식">
@@ -417,12 +443,12 @@ export function renderAnalytics() {
     <section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
         <label>세션 유형
-          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics')">
+          <select id="analytics-type-select" onchange="window.refreshScopedTypeSelect('analytics')">
             ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
           </select>
         </label>
         <label>대상 기수
-          <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics')">
+          <select id="analytics-cohort-select" onchange="window.refreshScopedSessionSelect('analytics')">
             ${cohortOptionsHtml(type, cohort, false)}
           </select>
         </label>
@@ -431,8 +457,8 @@ export function renderAnalytics() {
             ${scopedSessionOptions(type, cohort, sessionId, false)}
           </select>
         </label>
-        <label style="align-self:flex-end">
-          <button type="button" class="btn-primary" onclick="window.applyAnalyticsFilter()" style="width:100%;height:40px">결과 보기</button>
+        <label style="align-self:end">
+          <button type="button" class="primary" onclick="window.applyAnalyticsFilter()" style="width:100%;height:40px">결과 보기</button>
         </label>
       </div>
     </section>

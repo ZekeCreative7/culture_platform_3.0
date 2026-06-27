@@ -30,6 +30,7 @@ const PHASE_ORDER = ["사전", "중간", "사후", "팔로우업"];
 // A4 portrait has much less horizontal room than the desktop canvas. Keep the
 // cloned export document narrow enough that html2pdf does not shrink or crop it.
 const PDF_EXPORT_WIDTH_PX = 940;
+const PDF_CANVAS_SCALE = 1.15;
 
 function safeFilePart(value) {
   return String(value || "report")
@@ -225,6 +226,20 @@ export async function downloadReportPdf({ element, meta }) {
   }
   if (typeof window.html2pdf !== "function") throw new Error("PDF 내보내기 모듈을 불러오지 못했습니다.");
 
+  const margin = [8, 8, 10, 8];
+  const pdfOptions = { unit: "mm", format: "a4", orientation: "portrait", compress: true };
+  const imageOptions = { type: "jpeg", quality: 0.96 };
+  const html2canvasOptions = {
+    scale: PDF_CANVAS_SCALE,
+    useCORS: true,
+    backgroundColor: "#f7f7f7",
+    logging: false,
+    width: PDF_EXPORT_WIDTH_PX,
+    windowWidth: PDF_EXPORT_WIDTH_PX,
+    scrollX: 0,
+    scrollY: 0,
+  };
+
   const stage = document.createElement("div");
   stage.className = "report-export-stage";
   const clone = element.cloneNode(true);
@@ -240,70 +255,90 @@ export async function downloadReportPdf({ element, meta }) {
   stage.appendChild(clone);
   document.body.appendChild(stage);
 
-  // Measure the clone after fonts/layout settle. Use scrollWidth as the capture
-  // width so a wide chart/table cannot fall outside html2canvas' crop box.
   await document.fonts?.ready;
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  const docWidth = Math.ceil(Math.max(
-    PDF_EXPORT_WIDTH_PX,
-    clone.scrollWidth,
-    clone.getBoundingClientRect().width,
-  ));
 
   try {
-    await window.html2pdf()
-      .set({
-        margin: [8, 8, 10, 8],
-        filename: `${reportBaseName(meta)}.pdf`,
-        image: { type: "jpeg", quality: 0.96 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: "#f7f7f7",
-          logging: false,
-          width: docWidth,
-          windowWidth: docWidth,
-          scrollX: 0,
-          scrollY: 0,
-          onclone: (clonedDocument) => {
-            const clonedStage = clonedDocument.querySelector(".report-export-stage");
-            const clonedReport = clonedDocument.querySelector(".report-pdf-document");
-            if (!clonedReport) return;
-            if (clonedStage) {
-              clonedStage.style.position = "absolute";
-              clonedStage.style.left = "0";
-              clonedStage.style.top = "0";
-              clonedStage.style.width = `${docWidth}px`;
-              clonedStage.style.height = "auto";
-              clonedStage.style.overflow = "visible";
-            }
-            clonedReport.style.width = `${PDF_EXPORT_WIDTH_PX}px`;
-            clonedReport.style.maxWidth = "none";
-            clonedReport.style.boxSizing = "border-box";
-            clonedReport.style.overflow = "visible";
-            clonedReport.style.margin = "0";
-            clonedReport.style.position = "relative";
-            clonedReport.style.left = "0";
-            clonedReport.style.top = "0";
-            clonedReport.style.transform = "none";
-          },
-        },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait", compress: true },
-        pagebreak: {
-          mode: ["css", "legacy"],
-          avoid: [
-            ".report-radar-card",
-            ".report-dimension-grid > div",
-            ".report-recommendation-card",
-            ".report-change-grid",
-            ".report-change-card",
-            ".section-title",
-          ],
-        },
-      })
-      .from(clone)
-      .save();
+    const blocks = buildPdfBlocks(clone);
+    if (!blocks.length) throw new Error("PDF로 변환할 리포트 내용이 없습니다.");
+
+    const options = {
+      margin,
+      filename: `${reportBaseName(meta)}.pdf`,
+      image: imageOptions,
+      html2canvas: html2canvasOptions,
+      jsPDF: pdfOptions,
+    };
+
+    const firstWorker = window.html2pdf().set(options).from(blocks[0]).toPdf();
+    const pdf = await firstWorker.get("pdf");
+    const page = pdf.internal.pageSize;
+    const pageWidth = typeof page.getWidth === "function" ? page.getWidth() : page.width;
+    const pageHeight = typeof page.getHeight === "function" ? page.getHeight() : page.height;
+    const innerWidth = pageWidth - margin[1] - margin[3];
+    const innerHeight = pageHeight - margin[0] - margin[2];
+
+    for (const block of blocks.slice(1)) {
+      const canvas = await renderPdfBlockToCanvas(block, options);
+      appendCanvasToPdf(pdf, canvas, { margin, innerWidth, innerHeight, imageOptions });
+    }
+
+    pdf.save(`${reportBaseName(meta)}.pdf`);
   } finally {
     stage.remove();
+  }
+}
+
+function buildPdfBlocks(clone) {
+  return Array.from(clone.children)
+    .filter((child) => child.nodeType === Node.ELEMENT_NODE && child.getBoundingClientRect().height > 0)
+    .map((child) => {
+      const block = document.createElement("div");
+      block.className = "report-pdf-document report-pdf-block";
+      block.style.width = `${PDF_EXPORT_WIDTH_PX}px`;
+      block.style.maxWidth = "none";
+      block.style.boxSizing = "border-box";
+      block.style.overflow = "visible";
+      block.style.margin = "0";
+      block.style.position = "relative";
+      block.style.left = "0";
+      block.style.top = "0";
+      block.style.transform = "none";
+      block.appendChild(child.cloneNode(true));
+      return block;
+    });
+}
+
+async function renderPdfBlockToCanvas(block, options) {
+  return window.html2pdf()
+    .set(options)
+    .from(block)
+    .toCanvas()
+    .get("canvas");
+}
+
+function appendCanvasToPdf(pdf, canvas, { margin, innerWidth, innerHeight, imageOptions }) {
+  const sliceHeight = Math.floor(canvas.width * (innerHeight / innerWidth));
+  const pageCanvas = document.createElement("canvas");
+  const pageContext = pageCanvas.getContext("2d");
+  pageCanvas.width = canvas.width;
+
+  for (let y = 0; y < canvas.height; y += sliceHeight) {
+    const currentSliceHeight = Math.min(sliceHeight, canvas.height - y);
+    pageCanvas.height = currentSliceHeight;
+    pageContext.fillStyle = "#ffffff";
+    pageContext.fillRect(0, 0, pageCanvas.width, currentSliceHeight);
+    pageContext.drawImage(canvas, 0, y, canvas.width, currentSliceHeight, 0, 0, canvas.width, currentSliceHeight);
+
+    const imageHeight = (currentSliceHeight * innerWidth) / canvas.width;
+    pdf.addPage();
+    pdf.addImage(
+      pageCanvas.toDataURL(`image/${imageOptions.type}`, imageOptions.quality),
+      imageOptions.type,
+      margin[1],
+      margin[0],
+      innerWidth,
+      imageHeight,
+    );
   }
 }

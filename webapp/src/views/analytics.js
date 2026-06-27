@@ -7,7 +7,9 @@ import {
   isAnalyticsSectionCollapsed, 
   collapsibleSectionHeader,
   questionSetForSession,
-  getQuestionsForCohort
+  getQuestionsForCohort,
+  ensureScopedSelection,
+  statsForSession
 } from '../state.js?v=20260627-session-redesign-v1';
 import { 
   PHASES, 
@@ -19,84 +21,40 @@ import {
   defaultQuestions, 
   sameSessionType, 
   isQualText, 
-  fmt 
+  fmt,
+  scoreOf
 } from '../utils.js?v=20260627-questions-v1';
-import { renderQuantSection } from './report.js?v=20260627-session-redesign-v1';
 
-export function renderAnalytics() {
-  const scope = ensureScopedSelection("analytics");
-  const type = scope.type;
-  const cohort = scope.cohort;
-  const cohorts = scope.cohorts;
-  const session = scope.session;
-  const sessionId = session?.id || "";
-  const types = availableSessionTypes();
-
-  const successMsg = state.uploadSuccessMsg || "";
-  if (state.uploadSuccessMsg) state.uploadSuccessMsg = "";
-
-  return `
-    ${successMsg ? `<div class="upload-success-banner">${escapeHtml(successMsg)}</div>` : ""}
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">문항별 응답</span>
-        <h1>문항별 응답</h1>
-        <p>각 기수와 세션 유형을 선택하여 설문 문항별 객관식 응답 분포와 주관식 답변 원문을 확인합니다.</p>
-      </div>
-    </section>
+// ── Dropdowns / Filters Helpers ──────────────────────────────────
+function cohortOptionsHtml(type, selectedCohort, isReport = false) {
+  const sessions = state.sessions || [];
+  const typeSessions = sessions.filter(s => sameSessionType(s.type, type));
+  const cohorts = [...new Set(typeSessions.map(s => s.cohort).filter(Boolean))]
+    .sort((a,b) => Number(b) - Number(a));
     
-    <section class="panel filters-panel" data-html2canvas-ignore="true">
-      <div class="form-grid compact scoped-filter-grid">
-        <label>세션 유형
-          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics'); window.applyAnalyticsFilter()">
-            ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
-          </select>
-        </label>
-        <label>대상 기수
-          <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics'); window.applyAnalyticsFilter()">
-            ${cohortOptionsHtml(type, cohort, false)}
-          </select>
-        </label>
-        <label>세션 선택
-          <select id="analytics-session-select" onchange="window.applyAnalyticsFilter()">
-            ${scopedSessionOptions(type, cohort, sessionId, false)}
-          </select>
-        </label>
-      </div>
-    </section>
+  let html = isReport ? '<option value="">-- 기수 선택 --</option>' : '';
+  if (isReport) {
+    html += `<option value="all" ${selectedCohort === 'all' ? 'selected' : ''}>[전체 비교 분석]</option>`;
+  }
+  cohorts.forEach(c => {
+    html += `<option value="${c}" ${selectedCohort === String(c) ? 'selected' : ''}>${c}기</option>`;
+  });
+  return html;
+}
 
-    ${cohort ? (() => {
-      const phasesWithData = PHASES.filter((p) =>
-        (state.surveys || []).some((s) => s.sessionId === sessionId && s.phase === p)
-        || (state.responses || []).some((r) => r.sessionId === sessionId && r.phase === p)
-      );
-      const activePhase = (state.selectedAnalyticsPhase && PHASES.includes(state.selectedAnalyticsPhase))
-        ? state.selectedAnalyticsPhase
-        : (phasesWithData[0] || PHASES[0]);
-      const phaseMeta = session
-        ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)} · ${activePhase}`
-        : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 · ${activePhase}`;
-      return `
-        <div class="phase-tabs" role="tablist" aria-label="설문 시점">
-          ${PHASES.map((p) => {
-            const has = phasesWithData.includes(p);
-            const isActive = p === activePhase;
-            return `<button type="button" role="tab" aria-selected="${isActive}" class="phase-tab${isActive ? ' active' : ''}${has ? '' : ' empty'}" onclick="setAnalyticsPhase('${p}')" title="${has ? '' : '응답 없음'}">${p}${has ? '' : ' <span class="phase-tab-empty-dot">○</span>'}</button>`;
-          }).join('')}
-        </div>
-        <section class="analytics-split">
-          <div>
-            ${collapsibleSectionHeader("정량 응답", phaseMeta, "quant")}
-            ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session, activePhase)}
-          </div>
-          <div>
-            ${collapsibleSectionHeader("정성 응답", phaseMeta, "qual")}
-            ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId, activePhase)}
-          </div>
-        </section>
-      `;
-    })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
-  `;
+function scopedSessionOptions(type, cohort, selectedId, isReport = false) {
+  if (cohort === "all") {
+    return `<option value="all" selected>전체 세션 비교</option>`;
+  }
+  const sessions = sessionsForTypeCohort(type, cohort);
+  let html = isReport ? '<option value="">-- 세션 선택 --</option>' : '';
+  if (isReport && sessions.length > 0) {
+    html += `<option value="all" ${selectedId === 'all' ? 'selected' : ''}>[기수 전체 팀 비교]</option>`;
+  }
+  sessions.forEach(s => {
+    html += `<option value="${s.id}" ${selectedId === s.id ? 'selected' : ''}>${escapeHtml(sessionLabel(s))}</option>`;
+  });
+  return html;
 }
 
 // ── Radar Chart (4-axis SVG diamond) ────────────────────────────
@@ -114,7 +72,7 @@ export function renderRadarChart(dimScores) {
   ];
   const scorePts = dimScores.map((d, i) => ptAt(angles[i], d.score !== null ? d.score / 5 : 0));
   return `
-    <svg class="report-radar-chart" viewBox="0 0 220 220" width="220" height="220" style="overflow:visible; display:block;">
+    <svg class="report-radar-chart" viewBox="0 0 220 220" width="220" height="220" style="overflow:visible; display:block; margin: 0 auto;">
       ${gridLevels.map(f => `<path d="${pathOf(angles.map(a => ptAt(a, f)))}" fill="none" stroke="#e2e8f0" stroke-width="${f === 1 ? 1.5 : 1}" stroke-dasharray="${f < 1 ? '3 3' : ''}"/>`).join('')}
       ${angles.map(a => { const p = ptAt(a, 1); return `<line x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="#cbd5e1" stroke-width="1.2"/>`; }).join('')}
       <path d="${pathOf(scorePts)}" fill="rgba(0,82,255,0.16)" stroke="#0052ff" stroke-width="2.5" stroke-linejoin="round"/>
@@ -248,208 +206,186 @@ export function renderStatsTable(stats, masked, cohort, type, sessionId = "") {
   `;
 }
 
-export function qualResponseRows(cohort, type, sessionId = "", phase = "") {
-  const cohortNum = Number(cohort);
-  const sessionIds = new Set(sessionId
-    ? [sessionId]
-    : (state.sessions || []).filter((s) => sameSessionType(s.type, type)).map((s) => s.id));
-  const relevantSurveys = (state.surveys || []).filter(s =>
-    sessionIds.has(s.sessionId) || (Number(s.sessionCohort) === cohortNum && sameSessionType(s.sessionType, type))
-  );
-  const classifySurveys = phase ? relevantSurveys.filter(s => s.phase === phase) : relevantSurveys;
-  const configuredQualIds = [...new Set(classifySurveys.flatMap(s => (s.questions || []).filter(q => q.type === 'qual').map(q => q.id)))];
-  const hasExplicitConfig = classifySurveys.some(s => (s.questions || []).length > 0);
-  const qualIds = hasExplicitConfig ? configuredQualIds : ['q9', 'q10', 'q11'];
-  const phaseOk = (r) => !phase || r.phase === phase;
+// ── Quant & Qual sections ────────────────────────────────────────
+export function renderQuantSection(sessionId, session, activePhase) {
+  const responses = (state.responses || []).filter((r) => r.sessionId === sessionId && r.phase === activePhase);
+  const cohort = session ? session.cohort : "";
+  const type = session ? session.type : "";
+  const questions = session ? questionSetForSession(session.id) : getQuestionsForCohort(cohort, type);
+  const quantQs = questions.filter((q) => !isQualText(q.id));
 
-  const hasQualTextInSurvey = (r) => {
-    const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
-    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-      : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-    return rQualIds.some(id => isQualText(r[id]));
-  };
+  if (!responses.length) return emptyCard("이 시점의 정량 응답이 없습니다.");
 
-  let rows;
-  if (sessionId) {
-    rows = (state.responses || []).filter(r =>
-      sessionIds.has(r.sessionId) && phaseOk(r) && hasQualTextInSurvey(r)
-    );
-  } else {
-    rows = (state.responses || []).filter(r =>
-      r.cohort === cohortNum && sessionIds.has(r.sessionId) && phaseOk(r) && hasQualTextInSurvey(r)
-    );
-    if (!rows.length) {
-      rows = (state.responses || []).filter(r => {
-        if (r.cohort !== cohortNum || !phaseOk(r) || !hasQualTextInSurvey(r)) return false;
-        const survey = (state.surveys || []).find(s => s.id === r.surveyId);
-        return Boolean(survey && sameSessionType(survey.sessionType, type));
-      });
-    }
-  }
-  return { qualIds, rows };
-}
-
-export function qualQuestionLabel(qid, type, sessionId = "", phase = "") {
-  let survey = sessionId
-    ? (state.surveys || []).find(s => s.sessionId === sessionId && (!phase || s.phase === phase) && (s.questions || []).some(q => q.id === qid))
-    : null;
-  if (!survey) survey = (state.surveys || []).find(s => sameSessionType(s.sessionType, type) && (s.questions || []).some(q => q.id === qid));
-  const text = survey?.questions?.find(q => q.id === qid)?.text;
-  if (text) return text;
-  if (qid === 'q9')  return '세션 참여 전 기대하는 점';
-  if (qid === 'q10') return '세션 중 도움이 된 점';
-  if (qid === 'q11') return '운영진에게 전달하고 싶은 메시지';
-  return qid;
-}
-
-export function renderQualByQuestion(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
-  return qualIds.map((id) => {
-    const answers = rows.filter((r) => {
-      const rSurvey = state.surveys.find(s => s.id === r.surveyId || (s.sessionId === r.sessionId && s.phase === r.phase));
-      const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-        ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-        : defaultQuestions(r.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-      return rQualIds.includes(id) && isQualText(r[id]);
-    }).map((r) => ({ phase: r.phase || '', answer: r[id] }));
-
-    if (!answers.length) return '';
-    return `
-      <div class="qual-group">
-        <div class="qual-group-head"><strong>${escapeHtml(qualQuestionLabel(id, type, sessionId, phase))}</strong><span>${answers.length}건</span></div>
-        ${answers.map((a) => `
-          <article class="qual-answer-row">
-            ${showPhase ? `<div class="qual-answer-meta"><span>${escapeHtml(a.phase)}</span></div>` : ''}
-            <p>${escapeHtml(a.answer)}</p>
-          </article>
-        `).join("")}
-      </div>
-    `;
-  }).join("");
-}
-
-export function renderQualByPerson(rows, qualIds, type, showPhase, sessionId = "", phase = "") {
-  const peopleRows = rows.filter((row) => {
-    const rSurvey = state.surveys.find(s => s.id === row.surveyId || (s.sessionId === row.sessionId && s.phase === row.phase));
-    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-      : defaultQuestions(row.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-    return rQualIds.some((id) => isQualText(row[id]));
+  const rows = quantQs.map((q) => {
+    const counts = [5, 4, 3, 2, 1].map((score) => responses.filter((r) => scoreOf(r[q.id]) === score).length);
+    const total = counts.reduce((a, b) => a + b, 0);
+    const avg = total ? [5, 4, 3, 2, 1].reduce((sum, score, idx) => sum + score * counts[idx], 0) / total : null;
+    return { ...q, counts, total, avg };
   });
 
-  return peopleRows.map((row, index) => {
-    const rSurvey = state.surveys.find(s => s.id === row.surveyId || (s.sessionId === row.sessionId && s.phase === row.phase));
-    const rQualIds = rSurvey && rSurvey.questions && rSurvey.questions.length > 0
-      ? rSurvey.questions.filter(q => q.type === 'qual').map(q => q.id)
-      : defaultQuestions(row.phase || phase).filter(q => q.type === 'qual').map(q => q.id);
-
-    const answers = qualIds.filter((id) => rQualIds.includes(id) && isQualText(row[id])).map((id) => ({ 
-      label: qualQuestionLabel(id, type, sessionId, row.phase || phase), 
-      answer: row[id] 
-    }));
-
-    if (!answers.length) return '';
-    return `
-      <div class="qual-group">
-        <div class="qual-group-head"><strong>응답자 ${index + 1}</strong>${showPhase ? `<span>${escapeHtml(row.phase || '')}</span>` : ''}</div>
-        ${answers.map((a) => `
-          <article class="qual-answer-row">
-            <div class="qual-answer-meta"><span>${escapeHtml(a.label)}</span></div>
-            <p>${escapeHtml(a.answer)}</p>
-          </article>
-        `).join("")}
-      </div>
-    `;
-  }).join("");
-}
-
-export function renderQualSection(cohort, type, sessionId = "", phase = "") {
-  const { qualIds, rows } = qualResponseRows(cohort, type, sessionId, phase);
-  const phases = [...new Set(rows.map((r) => r.phase).filter(Boolean))];
-  const singlePhase = phase || (phases.length === 1 ? phases[0] : '');
-  const showPhase = !singlePhase;
-  const totalAnswers = rows.reduce((sum, row) => sum + qualIds.filter((id) => isQualText(row[id])).length, 0);
-  const groupBy = state.qualAnswersGroupBy === 'person' ? 'person' : 'question';
-  const body = groupBy === 'person'
-    ? renderQualByPerson(rows, qualIds, type, showPhase, sessionId, phase)
-    : renderQualByQuestion(rows, qualIds, type, showPhase, sessionId, phase);
-
-  let aiButtonHtml = '';
-  if (sessionId && (singlePhase === '사전' || singlePhase === '사후')) {
-    const dbPhase = singlePhase === '사전' ? 'pre' : 'post';
-    const hasSig = (state.qualSignals || []).some(q => q.session_id === sessionId && q.phase === dbPhase && q.review?.status === 'confirmed');
-    aiButtonHtml = `
-      <button class="secondary compact" onclick="window.openQualAnalysisModal('${sessionId}', '${dbPhase}')" style="font-size: 11.5px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; margin-left: 8px;">
-        AI 정성 분석 ${hasSig ? '수정 ✓' : '시작'}
-      </button>
-    `;
-  }
-
   return `
-    <div class="qual-section-toolbar">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="muted" style="font-size:12px;">${singlePhase ? `${escapeHtml(singlePhase)} 설문 · ` : ''}총 ${totalAnswers}건</span>
-        ${aiButtonHtml}
-      </div>
-      <div class="pulse-segmented" aria-label="보기 방식">
-        <button class="${groupBy === 'question' ? 'active' : ''}" data-qual-groupby="question" onclick="window.setQualAnswersGroupBy('question')">질문으로 보기</button>
-        <button class="${groupBy === 'person' ? 'active' : ''}" data-qual-groupby="person" onclick="window.setQualAnswersGroupBy('person')">사람으로 보기</button>
-      </div>
-    </div>
-    <div style="display:flex; flex-direction:column; gap:16px; margin-top:14px;">
-      ${totalAnswers ? body : emptyCard("정성 응답이 없습니다.")}
+    <div class="quant-grid">
+      ${rows.map((row) => `
+        <div class="quant-card">
+          <div class="quant-card-header">
+            <strong>${escapeHtml(row.text)}</strong>
+            <span>${row.avg !== null ? `${row.avg.toFixed(2)}` : "—"}</span>
+          </div>
+          <div class="quant-bars">
+            ${[5, 4, 3, 2, 1].map((score, index) => {
+              const val = row.counts[index];
+              const pct = row.total ? (val / row.total) * 100 : 0;
+              return `
+                <div class="quant-bar-row">
+                  <em>${score}</em>
+                  <div class="quant-bar-track"><i style="width:${pct}%"></i></div>
+                  <b>${val}</b>
+                </div>`;
+            }).join("")}
+          </div>
+        </div>
+      `).join("")}
     </div>
   `;
 }
 
-// ── Helpers ──
-function ensureScopedSelection(kind) {
-  const typeField    = kind === "analytics" ? "selectedAnalyticsType"     : "selectedReportType";
-  const cohortField  = kind === "analytics" ? "selectedAnalyticsCohort"   : "selectedReportCohort";
-  const sessionField = kind === "analytics" ? "selectedAnalyticsSessionId": "selectedReportSessionId";
-  const isReport = kind === "report";
+export function renderQualSection(cohort, type, sessionId, activePhase) {
+  const qObj = qualResponseRows(cohort, type, sessionId, activePhase);
+  if (!qObj.answers.length) return emptyCard("이 시점의 주관식 응답이 없습니다.");
+  return `
+    <div class="qual-responses-list">
+      ${qObj.answers.map((r) => `
+        <article class="qual-response-row">
+          <div class="qual-response-q">${escapeHtml(r.qText)}</div>
+          <p>${escapeHtml(r.text)}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
 
+export function qualResponseRows(cohort, type, sessionId, phase) {
+  const cohortNum = Number(cohort);
+  const sessionIds = new Set(sessionId
+    ? [sessionId]
+    : (state.sessions || []).filter((s) => sameSessionType(s.type, type)).map((s) => s.id));
+  const relevantSurveys = (state.surveys || []).filter((survey) =>
+    sessionIds.has(survey.sessionId)
+    || (Number(survey.sessionCohort) === cohortNum && sameSessionType(survey.sessionType, type))
+  );
+  const scopedSurveys = phase ? relevantSurveys.filter((survey) => survey.phase === phase) : relevantSurveys;
+  const configuredQualQuestions = scopedSurveys
+    .flatMap((survey) => survey.questions || [])
+    .filter((question) => question.type === "qual");
+  const fallbackQualQuestions = defaultQuestions(phase || "사후").filter((question) => question.type === "qual");
+  const qualQuestions = configuredQualQuestions.length ? configuredQualQuestions : fallbackQualQuestions;
+  const questionById = new Map();
+  qualQuestions.forEach((question) => {
+    if (!questionById.has(question.id)) questionById.set(question.id, question);
+  });
+  const qualIds = [...questionById.keys()];
+  const rowQualIds = (row) => {
+    const survey = (state.surveys || []).find((item) =>
+      item.id === row.surveyId || (item.sessionId === row.sessionId && item.phase === row.phase)
+    );
+    const questions = survey?.questions?.length
+      ? survey.questions.filter((question) => question.type === "qual")
+      : qualQuestions;
+    return questions.map((question) => question.id);
+  };
+  const hasQualText = (row) => rowQualIds(row).some((id) => isQualText(row[id]));
+  const phaseOk = (row) => !phase || row.phase === phase;
+  const rows = (state.responses || []).filter((row) => {
+    if (!phaseOk(row) || !hasQualText(row)) return false;
+    if (sessionId) return sessionIds.has(row.sessionId);
+    return Number(row.cohort) === cohortNum && sessionIds.has(row.sessionId);
+  });
+
+  const answers = [];
+  rows.forEach(row => {
+    rowQualIds(row).forEach((id) => {
+      const val = String(row[id] || '').trim();
+      if (val && val.length > 2) {
+        answers.push({ qText: questionById.get(id)?.text || id, text: val, phase: row.phase || "" });
+      }
+    });
+  });
+  return { qualIds, questions: [...questionById.values()], rows, answers };
+}
+
+// ── Main render entry ────────────────────────────────────────────
+export function renderAnalytics() {
+  const scope = ensureScopedSelection("analytics");
+  const type = scope.type;
+  const cohort = scope.cohort;
+  const cohorts = scope.cohorts;
+  const session = scope.session;
+  const sessionId = session?.id || "";
   const types = availableSessionTypes();
-  if (!types.includes(normalizeSessionType(state[typeField]))) {
-    state[typeField] = types[0] || normalizeSessionType(state[typeField] || "팀빌딩");
-  }
-  const type = normalizeSessionType(state[typeField]);
 
-  const cohorts = cohortsForType(type);
-  if (state[cohortField] !== "all") {
-    const cVal = Number(state[cohortField]);
-    if (!cohorts.includes(cVal)) {
-      state[cohortField] = cohorts[0] || "";
-    }
-  }
-  const cohort = state[cohortField] === "all" ? "all" : Number(state[cohortField] || 0);
+  const successMsg = state.uploadSuccessMsg || "";
+  if (state.uploadSuccessMsg) state.uploadSuccessMsg = "";
 
-  const sessions = sessionsForTypeCohort(type, cohort);
-  const sessIds = sessions.map(s => s.id);
-  if (state[sessionField] !== "all" || !isReport) {
-    if (!sessIds.includes(state[sessionField])) {
-      state[sessionField] = sessIds[0] || "";
-    }
-  }
-  return { type, cohort, cohorts, sessions, session: sessions.find(s => s.id === state[sessionField]) };
-}
+  return `
+    ${successMsg ? `<div class="upload-success-banner">${escapeHtml(successMsg)}</div>` : ""}
+    <section class="page-head">
+      <div>
+        <span class="eyebrow">문항별 응답</span>
+        <h1>문항별 응답</h1>
+        <p>각 기수와 세션 유형을 선택하여 설문 문항별 객관식 응답 분포와 주관식 답변 원문을 확인합니다.</p>
+      </div>
+    </section>
+    
+    <section class="panel filters-panel" data-html2canvas-ignore="true">
+      <div class="form-grid compact scoped-filter-grid">
+        <label>세션 유형
+          <select id="analytics-type-select" onchange="refreshScopedTypeSelect('analytics'); window.applyAnalyticsFilter()">
+            ${types.length ? types.map(t => `<option value="${t}" ${type === t ? "selected" : ""}>${sessionTypeLabel(t)}</option>`).join("") : `<option value="">세션 없음</option>`}
+          </select>
+        </label>
+        <label>대상 기수
+          <select id="analytics-cohort-select" onchange="refreshScopedSessionSelect('analytics'); window.applyAnalyticsFilter()">
+            ${cohortOptionsHtml(type, cohort, false)}
+          </select>
+        </label>
+        <label>세션 선택
+          <select id="analytics-session-select" onchange="window.applyAnalyticsFilter()">
+            ${scopedSessionOptions(type, cohort, sessionId, false)}
+          </select>
+        </label>
+      </div>
+    </section>
 
-function cohortOptionsHtml(type, selectedCohort, isReport = false) {
-  const cohorts = cohortsForType(type);
-  const allOption = isReport ? `<option value="all" ${selectedCohort === "all" ? "selected" : ""}>전체 기수</option>` : "";
-  const cohortOptions = cohorts.map((c) => {
-    const yl = yearForCohortType(c, type) ? `${yearForCohortType(c, type)}년 ` : "";
-    const count = sessionsForTypeCohort(type, c).length;
-    return `<option value="${c}" ${Number(selectedCohort) === c ? "selected" : ""}>${yl}${c}기 (${count}개 세션)</option>`;
-  }).join("");
-  return allOption + cohortOptions;
-}
-
-function scopedSessionOptions(type, cohort, selectedSessionId = "", isReport = false) {
-  const sessions = sessionsForTypeCohort(type, cohort);
-  const compareAllOption = isReport ? `<option value="all" ${selectedSessionId === "all" ? "selected" : ""}>전체 비교 분석</option>` : "";
-  const sessionOptions = sessions.map((session) => 
-    `<option value="${session.id}" ${selectedSessionId === session.id ? "selected" : ""}>${escapeHtml(sessionLabel(session))}</option>`
-  ).join("");
-  return compareAllOption + sessionOptions;
+    ${cohort ? (() => {
+      const phasesWithData = PHASES.filter((p) =>
+        (state.surveys || []).some((s) => s.sessionId === sessionId && s.phase === p)
+        || (state.responses || []).some((r) => r.sessionId === sessionId && r.phase === p)
+      );
+      const activePhase = (state.selectedAnalyticsPhase && PHASES.includes(state.selectedAnalyticsPhase))
+        ? state.selectedAnalyticsPhase
+        : (phasesWithData[0] || PHASES[0]);
+      const phaseMeta = session
+        ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)} · ${activePhase}`
+        : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기 · ${activePhase}`;
+      return `
+        <div class="phase-tabs" role="tablist" aria-label="설문 시점">
+          ${PHASES.map((p) => {
+            const has = phasesWithData.includes(p);
+            const isActive = p === activePhase;
+            return `<button type="button" role="tab" aria-selected="${isActive}" class="phase-tab${isActive ? ' active' : ''}${has ? '' : ' empty'}" onclick="setAnalyticsPhase('${p}')" title="${has ? '' : '응답 없음'}">${p}${has ? '' : ' <span class="phase-tab-empty-dot">○</span>'}</button>`;
+          }).join('')}
+        </div>
+        <section class="analytics-split">
+          <div>
+            ${collapsibleSectionHeader("정량 응답", phaseMeta, "quant")}
+            ${isAnalyticsSectionCollapsed("quant") ? "" : renderQuantSection(sessionId, session, activePhase)}
+          </div>
+          <div>
+            ${collapsibleSectionHeader("정성 응답", phaseMeta, "qual")}
+            ${isAnalyticsSectionCollapsed("qual") ? "" : renderQualSection(cohort, type, sessionId, activePhase)}
+          </div>
+        </section>
+      `;
+    })() : emptyCard("선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.")}
+  `;
 }

@@ -550,7 +550,7 @@ export function renderSessions() {
             <input type="file" id="backup-import-file" accept=".json" style="display:none;"  />
           </div>
         </div>
-        <button class="primary" id="btn-open-session-drawer">+ 새 세션</button>
+        <button class="primary" id="btn-open-session-drawer" onclick="window.openSessionDrawer()">+ 새 세션</button>
       </div>
     </section>
     <div class="tab-container">

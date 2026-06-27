@@ -1641,6 +1641,12 @@ window.deleteSurveyDraftQuestion = function(qid) {
   render();
 };
 
+// ── Session Drawer ───────────────────────────────────────────────
+window.openSessionDrawer = function() {
+  state.sessionDrawerOpen = true;
+  render();
+};
+
 // ── Session Edit / Delete ────────────────────────────────────────
 window.startEditSession = function(id) {
   const session = state.sessions.find(s => s.id === id);

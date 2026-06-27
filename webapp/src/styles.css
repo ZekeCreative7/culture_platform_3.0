@@ -6397,50 +6397,46 @@ button.disabled { opacity: .45; pointer-events: none; }
 .org-accordion-panel { padding: 0; overflow: hidden; }
 
 /* Division rows — strongest visual weight */
-.acc-division { border-bottom: 2px solid var(--border); }
-.acc-division:last-child { border-bottom: none; }
+.acc-division { border-bottom: 1px solid var(--border); }
 .acc-row--division {
   display: flex; align-items: center; gap: 10px;
   padding: 13px 20px;
   cursor: pointer; user-select: none;
-  background: var(--surface-1);
-  border-left: 3px solid #0071e3;
+  background: #eef2f7;
   font-weight: 700; font-size: 14px; color: var(--text-primary);
   transition: background 0.1s;
 }
-.acc-row--division:hover { background: #e8f0fb; }
+.acc-row--division:hover { background: #e2e8f2; }
 
 /* HQ rows — medium weight */
-.acc-div-children { background: white; }
+.acc-div-children {}
 .acc-hq { border-bottom: 1px solid var(--border); }
-.acc-hq:last-child { border-bottom: none; }
 .acc-row--hq {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 20px 10px 36px;
   cursor: pointer; user-select: none;
-  background: white;
-  border-left: 2px solid #c7d3e8;
+  background: #f7f9fc;
   font-weight: 600; font-size: 13px; color: var(--text-primary);
   transition: background 0.1s;
 }
-.acc-row--hq:hover { background: var(--surface-1); }
+.acc-row--hq:hover { background: #eef2f7; }
 
 /* Team rows — lightest */
-.acc-hq-teams { background: var(--surface-1); }
-.acc-team { border-bottom: 0.5px solid var(--border); }
+.acc-hq-teams {}
+.acc-team { border-bottom: 1px solid var(--border); }
 .acc-team:last-child { border-bottom: none; }
 .acc-row--team {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 16px 9px 52px;
   cursor: pointer; user-select: none;
-  background: var(--surface-1);
+  background: #ffffff;
   font-weight: 500; font-size: 13px; color: var(--text-primary);
   transition: background 0.1s;
 }
-.acc-row--team:hover { background: #e8f0fb; }
-.acc-team.is-selected .acc-row--team { background: #dceeff; color: #0071e3; font-weight: 600; }
+.acc-row--team:hover { background: #f0f5ff; }
+.acc-team.is-selected .acc-row--team { background: #dceeff; color: #0055b3; font-weight: 600; }
 .acc-team-arrow { font-size: 16px; color: var(--text-secondary); margin-left: auto; flex-shrink: 0; }
-.acc-team.is-selected .acc-team-arrow { color: #0071e3; }
+.acc-team.is-selected .acc-team-arrow { color: #0055b3; }
 
 /* Shared row parts */
 .acc-chevron { font-size: 11px; color: var(--text-secondary); width: 14px; flex-shrink: 0; }

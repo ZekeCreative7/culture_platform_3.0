@@ -385,8 +385,10 @@ export function subscribeSessionsFromFirestore(onChange = () => {}) {
 }
 
 export function subscribeQualSignalsFromFirestore() {
-  return onSnapshot(query(collection(db, 'QualSignal'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
-    state.qualSignals = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  return onSnapshot(collection(db, 'QualSignal'), (snap) => {
+    state.qualSignals = snap.docs
+      .map(d => ({ ...d.data(), id: d.id }))
+      .filter(q => !q.organizationId || q.organizationId === getCurrentOrgId());
     saveState();
     setDbStatus('connected');
   }, (e) => {

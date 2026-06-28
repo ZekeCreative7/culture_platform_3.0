@@ -141,6 +141,55 @@ function parseNSheet(workbook) {
   return result;
 }
 
+function splitOrgUnitIds(value) {
+  return asText(value)
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeDivisionId(value) {
+  const label = asText(value);
+  if (label === "고객경험혁신본부CE" || label === "고객혁신본부CE") return "고객혁신본부CE";
+  if (label === "고객경험혁신본부본사" || label === "고객혁신본부본사") return "고객혁신본부본사";
+  return label;
+}
+
+export function parseOrgMappingRows(rows, errors = []) {
+  const validDivisionIds = new Set(PULSE_DIVISIONS.map((item) => item.id));
+  const allowedConfidence = new Set(["high", "med", "medium", "low"]);
+  const orgMapping = {};
+
+  rows.slice(1).forEach((row, index) => {
+    const pulseDivisionId = normalizeDivisionId(row[0]);
+    if (!pulseDivisionId) return;
+    if (!validDivisionIds.has(pulseDivisionId)) {
+      errors.push(`조직매핑 시트 ${index + 2}행의 Pulse 본부 ID를 확인해 주세요: ${pulseDivisionId}`);
+      return;
+    }
+    const confidence = asText(row[3]) || "low";
+    if (!allowedConfidence.has(confidence)) {
+      errors.push(`조직매핑 시트 ${pulseDivisionId}의 신뢰도는 high, med, low 중 하나여야 합니다.`);
+    }
+    orgMapping[pulseDivisionId] = {
+      orgUnitIds: splitOrgUnitIds(row[1]),
+      relation: asText(row[2]) || "manual",
+      confidence: confidence === "medium" ? "med" : confidence,
+      effectiveYear: Number(row[4]) || null,
+      changeNote: asText(row[5]),
+      source: "upload",
+    };
+  });
+
+  return orgMapping;
+}
+
+function parseOrgMappingSheet(workbook, errors) {
+  const name = workbook.SheetNames.find((sheetName) => sheetName === "조직매핑");
+  if (!name) return {};
+  return parseOrgMappingRows(readRows(workbook, name), errors);
+}
+
 function parseEngagementScore(workbook, year, errors) {
   const name = workbook.SheetNames.find((sheetName) => sheetName === "EngagementScore(본사제공)");
   const output = {
@@ -217,6 +266,7 @@ export async function parsePulseWorkbook(file) {
   });
 
   const engagementScore = parseEngagementScore(workbook, pulseSheet.year, errors);
+  const orgMapping = parseOrgMappingSheet(workbook, errors);
   const now = new Date().toISOString();
   const meta = {
     reorgBaselineYears: [2025],
@@ -224,6 +274,11 @@ export async function parsePulseWorkbook(file) {
     sourceFile: file.name,
     parser: "Pulse template xlsx v1",
   };
+  if (Object.keys(orgMapping).length > 0) {
+    meta.orgMapping = orgMapping;
+    meta.orgMappingSource = "upload-template";
+    meta.orgMappingYear = pulseSheet.year;
+  }
   // 전사 행이 N 시트에 있으면 권위 있는 전체 응답 표본수로 사용한다 (본부별 N 합과 다를 수 있음).
   if (Number.isFinite(nByDivision["전사"])) {
     meta.companyN = nByDivision["전사"];
@@ -245,6 +300,8 @@ export async function parsePulseWorkbook(file) {
       divisionCount: Object.keys(divisions).length,
       nCount: Object.keys(nByDivision).length,
       engagementCompany: engagementScore.company[`y${pulseSheet.year}`] ?? null,
+      orgMappingCount: Object.values(orgMapping).filter((item) => item.orgUnitIds?.length).length,
+      orgMappingMissingCount: Object.values(orgMapping).filter((item) => !item.orgUnitIds?.length).length,
     },
   };
 }

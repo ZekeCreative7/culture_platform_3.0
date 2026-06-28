@@ -41,9 +41,10 @@ export function pulseDivisionMappingForOrgIds(orgUnitIds, currentDoc = null, div
   const targetIds = new Set((orgUnitIds || []).filter(Boolean));
   if (!targetIds.size) return null;
 
+  const effectiveMap = pulseDivisionMapForDoc(currentDoc, divMap);
   const confidenceRank = { high: 3, med: 2, medium: 2, low: 1 };
   const candidates = [];
-  for (const [pulseDivisionId, mapping] of Object.entries(divMap || {})) {
+  for (const [pulseDivisionId, mapping] of Object.entries(effectiveMap || {})) {
     const mappedIds = new Set(mapping.orgUnitIds || []);
     if ((!currentDoc || currentDoc.divisions?.[pulseDivisionId]) && [...targetIds].some((id) => mappedIds.has(id))) {
       candidates.push({
@@ -59,6 +60,24 @@ export function pulseDivisionMappingForOrgIds(orgUnitIds, currentDoc = null, div
   if (!candidates.length) return null;
   candidates.sort((a, b) => (confidenceRank[b.confidence] || 0) - (confidenceRank[a.confidence] || 0));
   return candidates[0];
+}
+
+export function pulseDivisionMapForDoc(currentDoc = null, baseMap = PULSE_DIV_MAP) {
+  const uploadedMap = currentDoc?.meta?.orgMapping || currentDoc?.orgMapping || null;
+  if (!uploadedMap || typeof uploadedMap !== "object") return baseMap || {};
+
+  const normalized = {};
+  Object.entries(uploadedMap).forEach(([pulseDivisionId, mapping]) => {
+    if (!pulseDivisionId || !mapping || typeof mapping !== "object") return;
+    normalized[pulseDivisionId] = {
+      orgUnitIds: Array.isArray(mapping.orgUnitIds) ? mapping.orgUnitIds.filter(Boolean) : [],
+      relation: mapping.relation || "manual",
+      confidence: mapping.confidence || "low",
+      changeNote: mapping.changeNote || "",
+      source: mapping.source || "upload",
+    };
+  });
+  return { ...(baseMap || {}), ...normalized };
 }
 
 function deltaLabel(delta) {

@@ -10,6 +10,7 @@ import { renderCommitmentsBoard, bindCommitmentsEvents, getStatusLabel, createPu
 import { QUESTIONS } from "../config/questions.js";
 import { DOMAINS, THEMES } from "../config/domains.js";
 import { commitmentsCache, pulseCache } from "../state.js";
+import { pulseDivisionMapForDoc } from "../report/pulseSessionInsight.js";
 
 const DEFAULT_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 
@@ -215,7 +216,52 @@ function renderPulseTabs(state) {
   `;
 }
 
-function renderUploadPanel(state) {
+function renderOrgMappingStatus(currentDoc) {
+  if (!currentDoc) return "";
+  const mapping = pulseDivisionMapForDoc(currentDoc);
+  const rows = PULSE_DIVISIONS.map((division) => {
+    const item = mapping[division.id] || {};
+    return {
+      id: division.id,
+      orgUnitIds: item.orgUnitIds || [],
+      relation: item.relation || "",
+      confidence: item.confidence || "low",
+      changeNote: item.changeNote || "",
+      source: currentDoc.meta?.orgMapping?.[division.id] ? "업로드" : "기본",
+    };
+  });
+  const mappedCount = rows.filter((row) => row.orgUnitIds.length).length;
+  const uploadCount = rows.filter((row) => row.source === "업로드").length;
+  const lowCount = rows.filter((row) => row.confidence === "low").length;
+
+  return `
+    <div class="pulse-mapping-status">
+      <div class="pulse-mapping-head">
+        <div>
+          <strong>조직 매핑 상태</strong>
+          <span>${currentDoc.year || ""}년 Pulse 본부를 현재 조직 ID에 연결합니다. 팀 화면은 이 본부 결과를 기준으로 표시됩니다.</span>
+        </div>
+        <div class="pulse-mapping-badges">
+          <span>${mappedCount}/${rows.length} 연결</span>
+          <span>${uploadCount ? `업로드 매핑 ${uploadCount}개` : "기본 매핑"}</span>
+          ${lowCount ? `<span class="warn">확인 필요 ${lowCount}개</span>` : ""}
+        </div>
+      </div>
+      <div class="pulse-mapping-table">
+        ${rows.map((row) => `
+          <div class="pulse-mapping-row">
+            <strong>${escapeHtml(row.id)}</strong>
+            <span>${row.orgUnitIds.length ? escapeHtml(row.orgUnitIds.join(", ")) : "연결 없음"}</span>
+            <em>${escapeHtml(row.source)} · ${escapeHtml(row.relation || "manual")} · ${escapeHtml(row.confidence)}</em>
+            ${row.changeNote ? `<small>${escapeHtml(row.changeNote)}</small>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderUploadPanel(state, currentDoc = null) {
   const upload = state.pulseUpload || {};
   const preview = upload.preview;
   const isExpanded = state.pulseUploadExpanded || false;
@@ -251,9 +297,12 @@ function renderUploadPanel(state) {
             <span>본부 ${preview.divisionCount}개</span>
             <span>N 입력 ${preview.nCount}개</span>
             <span>전사 Engagement ${pct(preview.engagementCompany)}</span>
+            <span>조직매핑 ${preview.orgMappingCount || 0}개</span>
+            ${preview.orgMappingMissingCount ? `<span>미연결 ${preview.orgMappingMissingCount}개</span>` : ""}
             <button class="primary compact" data-pulse-action="save-upload">DB에 저장</button>
           </div>
         ` : `<div class="pulse-upload-status muted">아직 선택한 Pulse 파일이 없습니다.</div>`}
+        ${renderOrgMappingStatus(currentDoc)}
       </div>
     </section>
   `;
@@ -450,7 +499,7 @@ function renderOverviewView({ state, cache }) {
         <strong>Pulse Survey는 조직의 상태를 1차 스크리닝하는 도구입니다.</strong><br>
         조직이나 구성원을 서열화하고 감점하는 평가표가 아니라, 구성원 경험에서 나타나는 신뢰·에너지·소속의 변화 신호를 조기에 발견해 <strong>어디의 이야기를 먼저 듣고 어떤 운영 질문을 더 확인할지 정하는 출발점</strong>입니다. 이 결과는 결론이 아니라 경청 대화와 추가 확인을 위한 가설로 사용합니다.
       </p>
-      ${renderUploadPanel(state)}
+      ${renderUploadPanel(state, currentDoc)}
     </article>
 
     <!-- 장면 0.5. 공식 보고 지표 (Engagement Score) -->

@@ -930,6 +930,95 @@ button:disabled { cursor: not-allowed; opacity: 0.42; transform: none !important
   display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0;
 }
 .pulse-upload-panel { display: grid; gap: 14px; }
+.pulse-mapping-status {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+.pulse-mapping-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.pulse-mapping-head > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+.pulse-mapping-head strong {
+  color: var(--ink);
+  font-size: 13.5px;
+}
+.pulse-mapping-head span {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.pulse-mapping-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.pulse-mapping-badges span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #dbe5ef;
+  color: #35536f;
+  font-size: 11px;
+  font-weight: 800;
+}
+.pulse-mapping-badges .warn {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+}
+.pulse-mapping-table {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+}
+.pulse-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.4fr) minmax(120px, .9fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e5edf5;
+  font-size: 11.5px;
+}
+.pulse-mapping-row strong,
+.pulse-mapping-row span,
+.pulse-mapping-row em,
+.pulse-mapping-row small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pulse-mapping-row strong {
+  color: var(--ink);
+}
+.pulse-mapping-row span {
+  color: #33536f;
+  font-weight: 800;
+}
+.pulse-mapping-row em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 700;
+}
+.pulse-mapping-row small {
+  grid-column: 1 / -1;
+  color: #8a5a00;
+  font-weight: 700;
+}
 .pulse-upload-main {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
 }

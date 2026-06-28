@@ -1,5 +1,6 @@
 import { QUESTIONS, QUESTION_BENCHMARKS } from "../config/questions.js";
 import { PULSE_DIVISIONS, ENGAGEMENT_SCORE_HISTORY } from "../config/pulseDivisions.js";
+import { PULSE_DIV_MAP } from "../config/pulseDivisionMap.js";
 
 const GROUP_COLUMNS = ["FAV", "5", "4", "3", "2", "1"];
 
@@ -33,6 +34,7 @@ function makeIntroSheet() {
     ["1. Pulse 시트의 5/4/3/2/1 비율을 0~1 또는 %로 입력합니다. FAV는 수식으로 자동 계산됩니다."],
     ["2. 응답자수(N) 시트에 본부별 응답자 수를 입력합니다. N<3은 플랫폼에서 마스킹됩니다."],
     ["3. Engagement Score는 본사 제공값만 입력합니다. 플랫폼은 이 값을 계산하지 않습니다."],
+    ["4. 조직매핑 시트에서 해당 연도 Pulse 본부가 현재 조직도의 어느 조직 ID에 연결되는지 확인합니다."],
     [""],
     ["가드레일"],
     ["개인 이름, 사번, 이메일, 전화번호 등 개인 식별 정보는 어떤 시트에도 넣지 마세요."],
@@ -40,6 +42,29 @@ function makeIntroSheet() {
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   setWidths(ws, [110]);
+  return ws;
+}
+
+function makeOrgMappingSheet(year) {
+  const XLSX = sheetjs();
+  const rows = [
+    ["Pulse본부ID", "조직ID목록(쉼표구분)", "관계", "신뢰도(high/med/low)", "적용연도", "변경메모"],
+    ...PULSE_DIVISIONS.map((item) => {
+      const mapping = PULSE_DIV_MAP[item.id] || {};
+      return [
+        item.id,
+        (mapping.orgUnitIds || []).join(", "),
+        mapping.relation || "",
+        mapping.confidence || "",
+        year,
+        "",
+      ];
+    }),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  setWidths(ws, [32, 48, 18, 18, 12, 46]);
+  addInputStyles(ws, { startRow: 1, startCol: 1 });
+  ws["A1"].c = [{ t: "조직개편이 있으면 조직ID목록과 변경메모를 수정하세요. 팀은 이 매핑된 본부 결과를 기준으로 표시됩니다." }];
   return ws;
 }
 
@@ -140,5 +165,6 @@ export function downloadPulseTemplate(year) {
   XLSX.utils.book_append_sheet(wb, makePulseSheet(targetYear), `Pulse_${targetYear}`);
   XLSX.utils.book_append_sheet(wb, makeNSheet(), "응답자수(N)");
   XLSX.utils.book_append_sheet(wb, makeEngagementSheet(targetYear), "EngagementScore(본사제공)");
+  XLSX.utils.book_append_sheet(wb, makeOrgMappingSheet(targetYear), "조직매핑");
   XLSX.writeFile(wb, `Pulse_Survey_${targetYear}_Upload_Template.xlsx`);
 }

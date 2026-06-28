@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPulseSessionInsight, pulseDivisionIdForSession, pulseDivisionMappingForOrgIds } from "../src/report/pulseSessionInsight.js";
+import { buildPulseSessionInsight, pulseDivisionIdForSession, pulseDivisionMappingForOrgIds, pulseDivisionMapForDoc } from "../src/report/pulseSessionInsight.js";
 
 function item(fav) {
   return { fav };
@@ -39,6 +39,28 @@ describe("pulseDivisionMappingForOrgIds", () => {
 
     expect(pulseDivisionMappingForOrgIds(["UW"], doc)?.id).toBe("고객솔루션본부UW");
     expect(pulseDivisionMappingForOrgIds(["고객솔루션본부UW"], doc)).toBeNull();
+  });
+
+  it("업로드된 연도별 조직 매핑을 기본 매핑보다 우선 적용한다", () => {
+    const doc = {
+      divisions: {
+        "고객솔루션본부UW": division(),
+      },
+      meta: {
+        orgMapping: {
+          "고객솔루션본부UW": {
+            orgUnitIds: ["UW_2027"],
+            relation: "manual",
+            confidence: "high",
+            changeNote: "2027 조직개편 반영",
+          },
+        },
+      },
+    };
+
+    expect(pulseDivisionMapForDoc(doc)["고객솔루션본부UW"].orgUnitIds).toEqual(["UW_2027"]);
+    expect(pulseDivisionMappingForOrgIds(["UW_2027"], doc)?.id).toBe("고객솔루션본부UW");
+    expect(pulseDivisionMappingForOrgIds(["UW"], doc)).toBeNull();
   });
 });
 

@@ -254,7 +254,10 @@ function render() {
   const orgScrollState = captureOrgScrollState();
   app.className = appShellClasses();
   const today = todayISO();
-  const todayActionCount = dashboardActionQueue({ state, today }).filter(a => a.group === 'today').length;
+  // commitmentsCache가 아직 로드 중이면 null로 표시(뱃지·KPI에서 로딩 처리)
+  const todayActionCount = commitmentsCache.loaded
+    ? dashboardActionQueue({ state, today }).filter(a => a.group === 'today').length
+    : null;
 
   const toggleIcon = state.sidebarCollapsed
     ? `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 0 1 0-1.414L10.586 10 7.293 6.707a1 1 0 0 1 1.414-1.414l4 4a1 1 0 0 1 0 1.414l-4 4a1 1 0 0 1-1.414 0Z" clip-rule="evenodd"/></svg>`
@@ -287,7 +290,7 @@ function render() {
           const oldBadge = iconSpan.querySelector(".nav-badge");
           if (oldBadge) oldBadge.remove();
 
-          if (todayActionCount > 0 && state.activeView !== 'dashboard') {
+          if (todayActionCount !== null && todayActionCount > 0 && state.activeView !== 'dashboard') {
             const badgeSpan = document.createElement('span');
             badgeSpan.className = 'nav-badge';
             badgeSpan.textContent = todayActionCount > 9 ? '9+' : todayActionCount;
@@ -316,14 +319,14 @@ function render() {
 
     const notifBtn = app.querySelector("#topbar-notif-btn");
     if (notifBtn) {
-      if (todayActionCount > 0) {
+      if (todayActionCount !== null && todayActionCount > 0) {
         notifBtn.classList.add("has-notif");
         if (!notifBtn.querySelector(".topbar-notif-dot")) {
           const dot = document.createElement("span");
           dot.className = "topbar-notif-dot";
           notifBtn.appendChild(dot);
         }
-      } else {
+      } else if (todayActionCount !== null) {
         notifBtn.classList.remove("has-notif");
         const dot = notifBtn.querySelector(".topbar-notif-dot");
         if (dot) dot.remove();
@@ -348,7 +351,7 @@ function render() {
         <nav>
           <span class="nav-label">메뉴</span>
           ${VIEWS.map(([id, en, ko]) => {
-            const badge = (id === 'dashboard' && todayActionCount > 0 && state.activeView !== 'dashboard')
+            const badge = (id === 'dashboard' && todayActionCount !== null && todayActionCount > 0 && state.activeView !== 'dashboard')
               ? `<span class="nav-badge">${todayActionCount > 9 ? '9+' : todayActionCount}</span>`
               : '';
             return `
@@ -380,9 +383,9 @@ function render() {
           <input type="search" class="searchbox" id="topbar-search" placeholder="세션, 조직, 설문 검색" autocomplete="off" onkeydown="if(event.key==='Enter')window.handleTopbarSearch(this.value)" />
           <div class="topbar-actions">
             ${LOCAL_PREVIEW ? `<div class="local-preview-badge" title="Firebase 로그인과 원격 저장을 사용하지 않는 로컬 확인 모드입니다."><span class="local-preview-dot"></span>로컬 미리보기</div>` : ''}
-            <button class="topbar-notif-btn ${todayActionCount > 0 ? 'has-notif' : ''}" id="topbar-notif-btn" data-view="dashboard" title="오늘 할 일">
+            <button class="topbar-notif-btn ${todayActionCount !== null && todayActionCount > 0 ? 'has-notif' : ''}" id="topbar-notif-btn" data-view="dashboard" title="오늘 할 일">
               <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" /></svg>
-              ${todayActionCount > 0 ? `<span class="topbar-notif-dot"></span>` : ''}
+              ${todayActionCount !== null && todayActionCount > 0 ? `<span class="topbar-notif-dot"></span>` : ''}
             </button>
             <button type="button" class="primary compact" id="topbar-new-session">+ 새 세션</button>
             <div class="topbar-user-menu" id="topbar-user-menu">

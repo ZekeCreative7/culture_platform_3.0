@@ -49,14 +49,23 @@ async function writeAuditLog({ action, targetId, targetType, detail = '' }) {
 
 export function subscribe(listener) {
   listeners.push(listener);
+  console.log('subscribe called! Current listeners count:', listeners.length);
   return () => {
     const idx = listeners.indexOf(listener);
     if (idx !== -1) listeners.splice(idx, 1);
+    console.log('unsubscribe called! Current listeners count:', listeners.length);
   };
 }
 
 export function notify() {
-  listeners.forEach(l => l());
+  console.log('notify called! Listeners count:', listeners.length);
+  listeners.forEach((l, i) => {
+    try {
+      l();
+    } catch (e) {
+      console.error(`Error in listener ${i}:`, e);
+    }
+  });
 }
 
 let _dbErrorTimer = null;
@@ -227,6 +236,7 @@ export function loadState() {
 }
 
 export function saveState() {
+  console.log('saveState called!');
   persistState();
   notify();
 }

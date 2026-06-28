@@ -243,6 +243,7 @@ function restoreOrgScrollState(scrollState) {
 }
 
 function render() {
+  console.log('render called in app.js! window.__reactMode:', window.__reactMode);
   // React 모드에서는 saveState() → notify() → subscribe 콜백이 각 Page를 갱신함
   if (window.__reactMode) { saveState(); return; }
   const app = document.querySelector("#app");

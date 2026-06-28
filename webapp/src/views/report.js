@@ -30,6 +30,7 @@ import {
 } from '../utils.js';
 import { assertNotQuantInput } from '../qual/qual-signal.js';
 import { renderSessionOutcomeIntro } from './sessions.js';
+import { qualResponseRows as analyticsQualResponseRows } from './analytics.js';
 import { buildPulseSessionInsight } from '../report/pulseSessionInsight.js';
 import { buildSessionOutcomeStory } from '../report/sessionOutcomeIndex.js';
 
@@ -1217,8 +1218,8 @@ export function renderReport() {
       const preSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
       const postSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
 
-      const preQual = qualResponseRows(session.cohort, session.type, session.id, "pre");
-      const postQual = qualResponseRows(session.cohort, session.type, session.id, "post");
+      const preQual = analyticsQualResponseRows(session.cohort, session.type, session.id, "사전");
+      const postQual = analyticsQualResponseRows(session.cohort, session.type, session.id, "사후");
 
       const hasPreQual = preQual.rows.length > 0;
       const hasPostQual = postQual.rows.length > 0;

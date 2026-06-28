@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { state as vanillaState, subscribe } from '../state.js';
 import { renderReport } from '../views/report.js';
+import { bindReportQualSignals } from '../app.js';
 
 export const ReportPage = memo(function ReportPage() {
   const divRef = useRef(null);
@@ -9,6 +10,7 @@ export const ReportPage = memo(function ReportPage() {
     function refresh() {
       if (divRef.current) {
         divRef.current.innerHTML = renderReport();
+        bindReportQualSignals();
       }
     }
     refresh();

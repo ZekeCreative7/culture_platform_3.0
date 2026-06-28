@@ -240,6 +240,8 @@ function restoreOrgScrollState(scrollState) {
 }
 
 function render() {
+  // React 모드에서는 saveState() → notify() → subscribe 콜백이 각 Page를 갱신함
+  if (window.__reactMode) { saveState(); return; }
   const app = document.querySelector("#app");
   const orgScrollState = captureOrgScrollState();
   app.className = appShellClasses();
@@ -2958,7 +2960,7 @@ window.updateResponsesSubscription = function() {
 };
 
 window.addEventListener('storage', (e) => {
-  if (e.key === STORE_KEY) {
+  if (e.key === STORE_KEY && !window.__reactMode) {
     reassignState(loadState());
     render();
   }
@@ -2975,13 +2977,18 @@ window.__vanillaBindCanvas = () => {
 // Full render — React pages intercept this to trigger syncFromVanilla instead
 window.__vanillaFullRender = render;
 
-if (LOCAL_PREVIEW) {
-  document.body.classList.add('local-preview');
-  document.body.classList.remove('auth-locked');
-  document.querySelector('#auth-gate')?.classList.add('is-hidden');
-  initApp({ localPreview: true }).catch((error) => {
-    console.error('로컬 미리보기 시작 실패:', error);
-  });
-} else {
-  initializeAuthGate({ onAccessGranted: initApp });
+// React 앱이 import할 때 사용하는 bind 함수 exports
+export { bindSessions, bindOrg, bindSurveyCreator, bindUpload, bindSessionDrawerControls, bindReportQualSignals };
+
+if (!window.__reactMode) {
+  if (LOCAL_PREVIEW) {
+    document.body.classList.add('local-preview');
+    document.body.classList.remove('auth-locked');
+    document.querySelector('#auth-gate')?.classList.add('is-hidden');
+    initApp({ localPreview: true }).catch((error) => {
+      console.error('로컬 미리보기 시작 실패:', error);
+    });
+  } else {
+    initializeAuthGate({ onAccessGranted: initApp });
+  }
 }

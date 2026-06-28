@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { state as vanillaState, subscribe } from '../state.js';
 import { renderOrg } from '../views/org.js';
+import { bindOrg } from '../app.js';
 
 export const OrgPage = memo(function OrgPage() {
   const divRef = useRef(null);
@@ -9,6 +10,7 @@ export const OrgPage = memo(function OrgPage() {
     function refresh() {
       if (divRef.current) {
         divRef.current.innerHTML = renderOrg();
+        bindOrg();
       }
     }
     refresh();

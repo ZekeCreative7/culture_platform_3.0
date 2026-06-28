@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { state as vanillaState, subscribe } from '../state.js';
 import { renderSurveyCreator } from '../views/survey.js';
+import { bindSurveyCreator } from '../app.js';
 
 export const SurveyPage = memo(function SurveyPage() {
   const divRef = useRef(null);
@@ -9,6 +10,7 @@ export const SurveyPage = memo(function SurveyPage() {
     function refresh() {
       if (divRef.current) {
         divRef.current.innerHTML = renderSurveyCreator();
+        bindSurveyCreator();
       }
     }
     refresh();

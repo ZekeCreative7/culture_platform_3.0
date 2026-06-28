@@ -2,6 +2,7 @@ import React, { useEffect, useRef, memo } from 'react';
 import { state as vanillaState, subscribe, saveState, deleteSessionFromFirestore } from '../state.js';
 import { normalizeSessionType } from '../utils.js';
 import { renderSessions } from '../views/sessions.js';
+import { bindSessions, bindSessionDrawerControls } from '../app.js';
 
 export const SessionsPage = memo(function SessionsPage() {
   const divRef = useRef(null);
@@ -58,6 +59,8 @@ export const SessionsPage = memo(function SessionsPage() {
     function refresh() {
       if (divRef.current) {
         divRef.current.innerHTML = renderSessions();
+        bindSessions();
+        bindSessionDrawerControls();
       }
     }
 

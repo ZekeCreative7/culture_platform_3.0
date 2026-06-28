@@ -50,8 +50,15 @@ export function useInitApp(isAuthenticated, orgId) {
       // 각 subscribe 함수는 내부적으로 saveState() → notify() 와
       // setDbStatus('connected') → notify() 를 호출하므로
       // Zustand 동기화 및 손오프 페이지 디바운스 refresh가 자동으로 트리거된다.
+      // 초기 로드 완료 후 responses 구독 시작
+      window.updateResponsesSubscription?.();
+
       unsubs.current = [
-        subscribeSessionsFromFirestore(() => { syncSurveysToSessions(); }),
+        subscribeSessionsFromFirestore(() => {
+          syncSurveysToSessions();
+          // 세션 목록 변경 시 responses 구독도 재설정 (세션 추가/삭제 반영)
+          window.updateResponsesSubscription?.();
+        }),
         subscribeOrganizationFromFirestore(),
         subscribePulseYearsFromFirestore(),
         subscribePulseCommitmentsFromFirestore(),

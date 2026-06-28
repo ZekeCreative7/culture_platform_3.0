@@ -17,6 +17,85 @@ import {
 import { QUESTIONS } from '../config/questions.js';
 import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js';
 
+const FOLLOWUP_DAYS_AFTER_SESSION = 60;
+const FOLLOWUP_CREATE_NOTICE_DAYS = 14;
+const FOLLOWUP_DISTRIBUTE_NOTICE_DAYS = 7;
+
+function addDaysISO(date, days) {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function daysBetweenISO(from, to) {
+  const fromTime = new Date(`${from}T00:00:00`).getTime();
+  const toTime = new Date(`${to}T00:00:00`).getTime();
+  return Math.floor((toTime - fromTime) / 86400000);
+}
+
+function sessionEndDate(session) {
+  return (session.schedule || [])
+    .filter(r => r.confirmed && r.date)
+    .map(r => r.date)
+    .sort()
+    .at(-1) || "";
+}
+
+function followupNoticeLabel(daysUntil) {
+  if (daysUntil > FOLLOWUP_DISTRIBUTE_NOTICE_DAYS) return "2주 전";
+  if (daysUntil > 0) return "1주 전";
+  return "기준일 도래";
+}
+
+export function followupSurveyState({ state, session, today }) {
+  const sessionResponses = (state.responses || []).filter(r => r.sessionId === session.id);
+  const hasPost = sessionResponses.some(r => r.phase === "사후");
+  if (getSessionStatus(session) !== "완료" || !hasPost) return null;
+
+  const endDate = sessionEndDate(session);
+  if (!endDate) return null;
+
+  const dueDate = addDaysISO(endDate, FOLLOWUP_DAYS_AFTER_SESSION);
+  const daysUntil = daysBetweenISO(today, dueDate);
+  if (daysUntil > FOLLOWUP_CREATE_NOTICE_DAYS) return null;
+
+  const hasFollowupResponse = sessionResponses.some(r => r.phase === "팔로우업");
+  if (hasFollowupResponse) return {
+    state: "complete",
+    endDate,
+    dueDate,
+    daysUntil,
+    noticeLabel: followupNoticeLabel(daysUntil),
+  };
+
+  const followupSurvey = (state.surveys || []).find(s =>
+    s.sessionId === session.id && s.phase === "팔로우업" && !s.deletedAt
+  );
+
+  if (!followupSurvey) return {
+    state: "needs_create",
+    endDate,
+    dueDate,
+    daysUntil,
+    noticeLabel: followupNoticeLabel(daysUntil),
+  };
+
+  if (daysUntil > FOLLOWUP_DISTRIBUTE_NOTICE_DAYS) return null;
+
+  return {
+    state: "needs_distribution",
+    endDate,
+    dueDate,
+    daysUntil,
+    noticeLabel: followupNoticeLabel(daysUntil),
+    surveyId: followupSurvey.id,
+    distributionActive: followupSurvey.distribution?.active ?? followupSurvey.distributionActive ?? followupSurvey.status !== "closed",
+  };
+}
+
 // Helper to calculate session status
 export function getSessionStatus(session) {
   const schedule = session.schedule || [];
@@ -199,27 +278,32 @@ export function dashboardActionQueue({ state, today }) {
       });
     }
 
-    // 7b. 60-day followup alert (session complete + post survey done + 60+ days since last round)
-    if (sessStatus === "완료" && hasPost) {
-      const lastRoundDate = (session.schedule || [])
-        .filter(r => r.confirmed && r.date)
-        .map(r => r.date)
-        .sort()
-        .at(-1);
-      if (lastRoundDate) {
-        const daysSince = Math.floor((new Date(today) - new Date(lastRoundDate)) / 86400000);
-        if (daysSince >= 60) {
-          actions.push({
-            type: "followup_needed",
-            group: "today",
-            priority: 5,
-            date: lastRoundDate,
-            title: `[60일 팔로우업] ${title} — 세션 종료 ${daysSince}일 경과. 변화 확인 CSV 업로드 필요`,
-            targetView: "upload",
-            sessionId: session.id
-          });
-        }
-      }
+    // 7b. 60-day follow-up workflow:
+    // final session day + 60 days, then create alert from D-14 and distribute/response alert from D-7.
+    const followup = followupSurveyState({ state, session, today });
+    if (followup?.state === "needs_create") {
+      actions.push({
+        type: "followup_survey_create",
+        group: "today",
+        priority: 5,
+        date: followup.dueDate,
+        title: `[60일 팔로우업 · ${followup.noticeLabel}] ${title} 팔로우업 설문 생성 필요 (기준일 ${followup.dueDate})`,
+        targetView: "survey",
+        sessionId: session.id,
+        dueDate: followup.dueDate,
+      });
+    } else if (followup?.state === "needs_distribution") {
+      actions.push({
+        type: "followup_survey_distribution",
+        group: "today",
+        priority: 5,
+        date: followup.dueDate,
+        title: `[60일 팔로우업 · ${followup.noticeLabel}] ${title} 팔로우업 설문 배포/응답 확인 필요 (응답 수집 시 자동 종료)`,
+        targetView: "survey",
+        sessionId: session.id,
+        surveyId: followup.surveyId,
+        dueDate: followup.dueDate,
+      });
     }
 
     // 7. Report ready
@@ -448,7 +532,7 @@ export const PIPELINE_STAGES = [
   { key: "사후설문완료",   label: "사후 설문 완료",   color: "#34c759" },
   { key: "팔로우업필요",   label: "60일 팔로우업",    color: "#ff9f0a" },
   { key: "변화신호확인",   label: "변화 신호 확인",   color: "#5856d6" },
-  { key: "정체경고",       label: "정체 경고",        color: "#ff3b30" },
+  { key: "정체경고",       label: "변화 확인 필요",   color: "#ff9f0a" },
 ];
 
 // Compute pipeline stage for a single team (based on their latest session)

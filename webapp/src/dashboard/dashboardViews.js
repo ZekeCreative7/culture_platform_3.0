@@ -9,7 +9,7 @@ import {
   dashboardTeamPipeline,
   PIPELINE_STAGES
 } from './dashboardEngine.js';
-import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
+import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES, defaultQuestions, normalizeSessionType, sessionLabel, sessionYear } from '../utils.js';
 import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js';
 
 // Helper to count week sessions
@@ -240,6 +240,8 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
     if (act.targetView === "sessions" && act.sessionId) return "수정하기 →";
     if (act.targetView === "report") return "보고서 보기 →";
     if (act.targetView === "upload") return "업로드 →";
+    if (act.type === "followup_survey_create") return "설문 만들기 →";
+    if (act.type === "followup_survey_distribution") return "배포 확인 →";
     return "바로가기 →";
   };
   const renderActionRows = (actions) => actions.map(act => `
@@ -711,7 +713,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
           <section class="panel dashboard-section">
             <div class="section-header">
               <h3>먼저 지원할 조직</h3>
-              <span class="section-subtitle">우선순위 리스크 분석 기준</span>
+              <span class="section-subtitle">Pulse Survey 기반 우선 지원 신호</span>
             </div>
             <div class="support-orgs-content">
               ${!pulseLoaded ? `
@@ -723,7 +725,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
                 `).join('')}
               ` : supportOrgs.length === 0 ? `
                 <div class="empty-state-card">
-                  <p>리스크 감지 조직이 아직 없습니다.</p>
+                  <p>우선 지원 신호가 아직 없습니다.</p>
                 </div>
               ` : `
                 <div class="support-orgs-grid">
@@ -814,6 +816,7 @@ export function bindHomeDashboard({ state, saveState, render }) {
   document.querySelectorAll(".queue-row").forEach(row => {
     row.addEventListener("click", () => {
       const targetView = row.dataset.actionView;
+      const actionType = row.dataset.actionType;
       const sessionId = row.dataset.sessionId;
       const commitmentId = row.dataset.commitmentId;
 
@@ -836,6 +839,21 @@ export function bindHomeDashboard({ state, saveState, render }) {
         state.activeView = "sessions";
         window.startEditSession(sessionId);
         return;
+      }
+
+      if (targetView === "survey" && sessionId) {
+        const targetSess = state.sessions.find(s => s.id === sessionId);
+        if (targetSess && actionType === "followup_survey_create") {
+          state.editingSurveyId = null;
+          state.draftSurveySessionType = normalizeSessionType(targetSess.type);
+          state.draftSurveyCohortKey = `${sessionYear(targetSess) || targetSess.year || ''}:${Number(targetSess.cohort) || ''}`;
+          state.draftSurveySessionId = sessionId;
+          state.draftSurveyPhase = "팔로우업";
+          state.draftSurveyTitle = `${sessionLabel(targetSess)} 팔로우업 설문`;
+          state.draftGoogleFormUrl = "";
+          state.draftSurveyQuestions = defaultQuestions("팔로우업", targetSess.type);
+          state.surveyCreatorStep = 1;
+        }
       }
 
       state.activeView = targetView;

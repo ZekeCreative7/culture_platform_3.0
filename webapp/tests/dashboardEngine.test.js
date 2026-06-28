@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSessionStatus, dashboardSnapshot, dashboardActionQueue } from '../src/dashboard/dashboardEngine.js';
+import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState } from '../src/dashboard/dashboardEngine.js';
 import { sampleState } from './fixtures/sampleState.js';
 
 describe('getSessionStatus', () => {
@@ -105,5 +105,79 @@ describe('dashboardActionQueue', () => {
     expect(reportReady).toBeDefined();
     expect(reportReady.group).toBe('ready');
     expect(reportReady.priority).toBe(7);
+  });
+
+  it('마지막 세션일 + 60일 기준 2주 전부터 팔로우업 설문 생성 알람을 표시해야 한다', () => {
+    const state = {
+      sessions: [{
+        id: 'session-followup',
+        type: '팀빌딩',
+        cohort: 1,
+        schedule: [{ id: 'r1', confirmed: true, date: '2026-04-01', startTime: '10:00', duration: 60 }]
+      }],
+      responses: [
+        { id: 'pre-1', sessionId: 'session-followup', phase: '사전', q1: 3 },
+        { id: 'post-1', sessionId: 'session-followup', phase: '사후', q1: 4 }
+      ],
+      surveys: [],
+      pulseCommitments: []
+    };
+
+    const actions = dashboardActionQueue({ state, today: '2026-05-18' });
+    const followup = actions.find(a => a.type === 'followup_survey_create');
+    expect(followup).toBeDefined();
+    expect(followup.targetView).toBe('survey');
+    expect(followup.date).toBe('2026-05-31');
+    expect(followup.title).toContain('2주 전');
+  });
+
+  it('팔로우업 설문이 생성되면 생성 알람을 끄고 1주 전부터 배포/응답 확인 알람을 표시해야 한다', () => {
+    const state = {
+      sessions: [{
+        id: 'session-followup',
+        type: '팀빌딩',
+        cohort: 1,
+        schedule: [{ id: 'r1', confirmed: true, date: '2026-04-01', startTime: '10:00', duration: 60 }]
+      }],
+      responses: [
+        { id: 'pre-1', sessionId: 'session-followup', phase: '사전', q1: 3 },
+        { id: 'post-1', sessionId: 'session-followup', phase: '사후', q1: 4 }
+      ],
+      surveys: [{ id: 'survey-followup', sessionId: 'session-followup', phase: '팔로우업', status: 'active', distribution: { active: true } }],
+      pulseCommitments: []
+    };
+
+    const earlyActions = dashboardActionQueue({ state, today: '2026-05-20' });
+    expect(earlyActions.find(a => a.type === 'followup_survey_create')).toBeUndefined();
+    expect(earlyActions.find(a => a.type === 'followup_survey_distribution')).toBeUndefined();
+
+    const weekActions = dashboardActionQueue({ state, today: '2026-05-24' });
+    const distribution = weekActions.find(a => a.type === 'followup_survey_distribution');
+    expect(distribution).toBeDefined();
+    expect(distribution.title).toContain('1주 전');
+  });
+
+  it('팔로우업 응답이 들어오면 팔로우업 알람을 자동 종료해야 한다', () => {
+    const session = {
+      id: 'session-followup',
+      type: '팀빌딩',
+      cohort: 1,
+      schedule: [{ id: 'r1', confirmed: true, date: '2026-04-01', startTime: '10:00', duration: 60 }]
+    };
+    const state = {
+      sessions: [session],
+      responses: [
+        { id: 'pre-1', sessionId: 'session-followup', phase: '사전', q1: 3 },
+        { id: 'post-1', sessionId: 'session-followup', phase: '사후', q1: 4 },
+        { id: 'fu-1', sessionId: 'session-followup', phase: '팔로우업', q1: 4 }
+      ],
+      surveys: [{ id: 'survey-followup', sessionId: 'session-followup', phase: '팔로우업', status: 'active', distribution: { active: true } }],
+      pulseCommitments: []
+    };
+
+    expect(followupSurveyState({ state, session, today: '2026-05-31' }).state).toBe('complete');
+    const actions = dashboardActionQueue({ state, today: '2026-05-31' });
+    expect(actions.find(a => a.type === 'followup_survey_create')).toBeUndefined();
+    expect(actions.find(a => a.type === 'followup_survey_distribution')).toBeUndefined();
   });
 });

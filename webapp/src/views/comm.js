@@ -1,4 +1,6 @@
 import { escapeHtml, uid, todayISO } from '../utils.js';
+import { pulseCache, statsForSession } from '../state.js';
+import { buildPulseSessionInsight } from '../report/pulseSessionInsight.js';
 
 // ── 옵션 상수 ─────────────────────────────────────────────
 export const COMM_TYPES = [
@@ -68,7 +70,36 @@ function sessionOptionLabel(s) {
 }
 
 // ── 프롬프트 생성 ─────────────────────────────────────────
-function buildInitialPrompt(draft, sessions, responses) {
+function commPulseInsightForSession(session, state) {
+  if (!session) return null;
+  return buildPulseSessionInsight({
+    session,
+    stats: statsForSession(session.cohort, session.id),
+    pulseYears: pulseCache.years,
+    selectedYear: state.pulseYear,
+  });
+}
+
+function commPulseInsightText(insight) {
+  if (!insight || insight.status !== "ready") return "";
+  const reaction = insight.reaction || {};
+  const postDelta = reaction.postDelta === null || reaction.postDelta === undefined
+    ? "사전/사후 변화 판단 보류"
+    : `${reaction.postDelta > 0 ? "+" : ""}${reaction.postDelta.toFixed(2)}점 (${reaction.postDeltaLabel})`;
+  const followup = reaction.followupScore === null || reaction.followupScore === undefined
+    ? "팔로우업 미확인"
+    : `${reaction.followupScore.toFixed(2)}점 (${reaction.followupDeltaLabel})`;
+  return [
+    `Pulse 기준: ${insight.year}년 ${insight.divisionId} 본부 결과(팀은 본부 결과 상속)`,
+    `본부 Pulse 신호: ${insight.pulse.focusDomain} 우선 확인 · ${insight.pulse.focusPointsText}`,
+    `팀 세션 반응: ${reaction.dim.label} 사전→사후 ${postDelta} · 팔로우업 ${followup}`,
+    `운영 액션: ${insight.actionText}`,
+  ].join("\n");
+}
+
+function buildInitialPrompt(draft, state) {
+  const sessions = state.sessions || [];
+  const responses = state.responses || [];
   const session = sessions.find(s => s.id === draft.dataRef);
   const typeOpt = COMM_TYPES.find(t => t.key === draft.commType) || COMM_TYPES[0];
   const lenOpt  = COMM_LENGTHS.find(l => l.key === draft.commLength) || COMM_LENGTHS[1];
@@ -82,6 +113,8 @@ function buildInitialPrompt(draft, sessions, responses) {
     if (preN)  dataSection += ` | 사전 ${preN}명`;
     if (postN) dataSection += ` | 사후 ${postN}명`;
     if (folN)  dataSection += ` | 팔로우업 ${folN}명`;
+    const pulseInsightText = commPulseInsightText(commPulseInsightForSession(session, state));
+    if (pulseInsightText) dataSection += `\n\n${pulseInsightText}`;
   }
 
   return `너는 대한민국 대기업의 조직문화를 총괄하는 임원의 커뮤니케이션 코치다.
@@ -107,11 +140,12 @@ ${draft.actionPlan || "(미입력)"}
 ${draft.feedbackAsk || "(미입력)"}
 
 [작성 원칙]
-1. 전략 방향이 왜 필요한지를 데이터와 구성원 목소리로 뒷받침한다.
+1. 전략 방향이 왜 필요한지를 본부 Pulse 신호, 팀 세션 설문 변화, 구성원 목소리로 뒷받침한다.
 2. 방어하거나 해명하지 않는다. 구성원의 감정을 먼저 인정한다.
 3. 약속은 실현 가능하고 구체적인 행동 단위로 표현한다.
-4. 피드백 요청은 진정성 있게 마무리한다.
-5. ${typeOpt.key === "ppt" ? "각 슬라이드 제목과 핵심 메시지 1~2줄로 구성한다." : "자연스럽고 따뜻한 구어체로 작성한다."}
+4. Pulse Survey는 본부 기준 결과임을 숨기지 말고, 팀 세션 결과와 구분해서 표현한다.
+5. 피드백 요청은 진정성 있게 마무리한다.
+6. ${typeOpt.key === "ppt" ? "각 슬라이드 제목과 핵심 메시지 1~2줄로 구성한다." : "자연스럽고 따뜻한 구어체로 작성한다."}
 
 위 지침에 따라 한국어로 메시지를 작성해라.`.trim();
 }
@@ -242,7 +276,7 @@ function renderCommEditor(draft, st) {
             <option value="__manual__" ${draft.dataRef === "__manual__" ? "selected" : ""}>직접 입력</option>
           </select>
           ${draft.dataRef === "__manual__" ? `<textarea class="comm-step-input" rows="2" placeholder="예: 2026년 팀빌딩 세션 사전→사후 심리적 안전감 +0.4점 향상" data-comm-field="dataRefManual">${esc(draft.dataRefManual || "")}</textarea>` : ""}
-          ${draft.dataRef && draft.dataRef !== "__manual__" ? renderDataSummary(draft.dataRef, sessions, responses) : ""}`)}
+          ${draft.dataRef && draft.dataRef !== "__manual__" ? renderDataSummary(draft.dataRef, st) : ""}`)}
 
         ${renderStep("③", "구성원 목소리", "자유응답에서 핵심 발췌 (직접 입력)",
           `<textarea class="comm-step-input" rows="3" placeholder="예: '팀 간 소통이 늘었으면 한다', '왜 이걸 해야 하는지 모르겠다', '변화가 느껴지긴 하지만 지속될지 모르겠다'"
@@ -351,18 +385,27 @@ function renderStep(num, title, hint, content) {
   `;
 }
 
-function renderDataSummary(sessionId, sessions, responses) {
+function renderDataSummary(sessionId, st) {
+  const sessions = st.sessions || [];
+  const responses = st.responses || [];
   const session = sessions.find(s => s.id === sessionId);
   if (!session) return "";
   const preN  = responses.filter(r => r.sessionId === sessionId && r.phase === "사전").length;
   const postN = responses.filter(r => r.sessionId === sessionId && r.phase === "사후").length;
   const folN  = responses.filter(r => r.sessionId === sessionId && r.phase === "팔로우업").length;
+  const insight = commPulseInsightForSession(session, st);
   return `
     <div class="comm-data-summary">
       <span>세션: <strong>${escapeHtml(sessionOptionLabel(session))}</strong></span>
       ${preN  ? `<span>사전 ${preN}명</span>` : ""}
       ${postN ? `<span>사후 ${postN}명</span>` : ""}
       ${folN  ? `<span>팔로우업 ${folN}명</span>` : ""}
+      ${insight?.status === "ready" ? `
+        <span>Pulse: <strong>${escapeHtml(insight.year)}년 ${escapeHtml(insight.divisionId)} 본부 기준</strong></span>
+        <span>신호: ${escapeHtml(insight.pulse.focusDomain)} · ${escapeHtml(insight.reaction.dim.label)} ${insight.reaction.postDelta === null ? "변화 확인 필요" : `${insight.reaction.postDelta > 0 ? "+" : ""}${insight.reaction.postDelta.toFixed(2)}`}</span>
+      ` : insight?.status === "no_mapping" ? `
+        <span>Pulse: 본부 매핑 필요</span>
+      ` : ""}
     </div>
   `;
 }
@@ -535,7 +578,7 @@ export function bindComm({ state, saveState, render }) {
   // 첫 프롬프트 생성
   document.querySelector("#btn-gen-comm-prompt")?.addEventListener("click", () => {
     const d = draft(); if (!d) return;
-    d.generatedPrompt = buildInitialPrompt(d, state.sessions || [], state.responses || []);
+    d.generatedPrompt = buildInitialPrompt(d, state);
     d.rounds = [];
     d.activeRound = -1;
     saveState(); render();
@@ -545,7 +588,7 @@ export function bindComm({ state, saveState, render }) {
   document.querySelector("#btn-regen-comm-prompt")?.addEventListener("click", () => {
     if (!confirm("프롬프트를 처음부터 재생성하면 기존 수정 히스토리가 초기화됩니다. 계속할까요?")) return;
     const d = draft(); if (!d) return;
-    d.generatedPrompt = buildInitialPrompt(d, state.sessions || [], state.responses || []);
+    d.generatedPrompt = buildInitialPrompt(d, state);
     d.rounds = [];
     d.activeRound = -1;
     saveState(); render();

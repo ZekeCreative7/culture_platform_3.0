@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPulseSessionInsight, pulseDivisionIdForSession } from "../src/report/pulseSessionInsight.js";
+import { buildPulseSessionInsight, pulseDivisionIdForSession, pulseDivisionMappingForOrgIds } from "../src/report/pulseSessionInsight.js";
 
 function item(fav) {
   return { fav };
@@ -26,6 +26,19 @@ describe("pulseDivisionIdForSession", () => {
 
     expect(result.id).toBe("고객솔루션본부UW");
     expect(result.source).toBe("orgUnitId");
+  });
+});
+
+describe("pulseDivisionMappingForOrgIds", () => {
+  it("조직 이름이 아니라 명시된 조직 ID 매핑만 사용한다", () => {
+    const doc = {
+      divisions: {
+        "고객솔루션본부UW": division(),
+      },
+    };
+
+    expect(pulseDivisionMappingForOrgIds(["UW"], doc)?.id).toBe("고객솔루션본부UW");
+    expect(pulseDivisionMappingForOrgIds(["고객솔루션본부UW"], doc)).toBeNull();
   });
 });
 

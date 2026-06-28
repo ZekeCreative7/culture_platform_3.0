@@ -34,21 +34,31 @@ export function pulseDivisionIdForSession(session, currentDoc = null, divMap = P
     };
   }
 
-  const orgUnitIds = [session.teamId, session.hqId, session.divisionId].filter(Boolean);
+  return pulseDivisionMappingForOrgIds([session.teamId, session.hqId, session.divisionId], currentDoc, divMap);
+}
+
+export function pulseDivisionMappingForOrgIds(orgUnitIds, currentDoc = null, divMap = PULSE_DIV_MAP) {
+  const targetIds = new Set((orgUnitIds || []).filter(Boolean));
+  if (!targetIds.size) return null;
+
+  const confidenceRank = { high: 3, med: 2, medium: 2, low: 1 };
+  const candidates = [];
   for (const [pulseDivisionId, mapping] of Object.entries(divMap || {})) {
     const mappedIds = new Set(mapping.orgUnitIds || []);
-    if (orgUnitIds.some((id) => mappedIds.has(id))) {
-      return {
+    if ((!currentDoc || currentDoc.divisions?.[pulseDivisionId]) && [...targetIds].some((id) => mappedIds.has(id))) {
+      candidates.push({
         id: pulseDivisionId,
         source: "orgUnitId",
         relation: mapping.relation || "",
         confidence: mapping.confidence || "",
         note: "조직 ID 기반 Pulse 본부 매핑",
-      };
+      });
     }
   }
 
-  return null;
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => (confidenceRank[b.confidence] || 0) - (confidenceRank[a.confidence] || 0));
+  return candidates[0];
 }
 
 function deltaLabel(delta) {

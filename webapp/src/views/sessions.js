@@ -19,7 +19,7 @@ import {
 } from '../utils.js';
 import { pulseDiagnostics, comparisonPair } from '../pulse/pulseEngine.js';
 import { pulseCache } from '../state.js';
-import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js';
+import { pulseDivisionMappingForOrgIds } from '../report/pulseSessionInsight.js';
 import { 
   unitLeaderDetails, 
   leaderCandidateForTeam, 
@@ -252,26 +252,21 @@ export function renderSessionPulseSummary() {
   const currentDoc = pulseCache.years?.[year];
   if (!currentDoc) return "";
   const diagnostics = pulseDiagnostics(currentDoc, pair.previousYear ? pulseCache.years?.[pair.previousYear] : null);
-  const selectedIds = new Set([state.draftDivisionId, state.draftHqId, state.draftTeamId].filter(Boolean));
-  const selectedNames = [state.draftDivision, state.draftHq, state.draftTeam].filter(Boolean).map(value => String(value).replace(/\s+/g, ""));
-  const row = diagnostics.rows.find(item => {
-    const mappedIds = PULSE_DIV_MAP[item.id]?.orgUnitIds || [];
-    if (mappedIds.some(id => selectedIds.has(id))) return true;
-    const pulseName = String(item.id).replace(/\s+/g, "");
-    return selectedNames.some(name => name === pulseName || name.includes(pulseName) || pulseName.includes(name));
-  });
+  const mapping = pulseDivisionMappingForOrgIds([state.draftTeamId, state.draftHqId, state.draftDivisionId], currentDoc);
+  const row = mapping?.id ? diagnostics.rows.find(item => item.id === mapping.id) : null;
 
   if (!row) {
-    return `<div class="session-pulse-summary muted"><strong>Pulse Survey</strong><span>선택 조직과 연결된 ${year}년 진단 데이터가 없습니다.</span></div>`;
+    return `<div class="session-pulse-summary muted"><strong>Pulse Survey</strong><span>선택 조직과 명시 연결된 ${year}년 본부 진단 데이터가 없습니다.</span></div>`;
   }
 
   const delta = row.delta;
   const deltaText = pair.previousYear && delta !== null
     ? `${pair.previousYear}년 대비 ${delta > 0 ? "+" : ""}${Math.round(delta * 100)}pp`
     : "비교 데이터 없음";
+  const mappingLabel = mapping.confidence === "low" ? "본부 기준 · 매핑 확인 필요" : "본부 기준";
   return `
     <div class="session-pulse-summary">
-      <div><strong>Pulse Survey · ${escapeHtml(row.id)}</strong><span>세션 설계 전 확인할 1차 스크리닝 정보</span></div>
+      <div><strong>Pulse Survey · ${escapeHtml(row.id)}</strong><span>${year}년 ${mappingLabel} · 선택 팀은 본부 결과를 기준으로 봅니다.</span></div>
       <span class="session-pulse-tag">${year} 긍정 ${row.overall !== null ? `${Math.round(row.overall * 100)}%` : "—"}</span>
       <span class="session-pulse-tag ${delta < 0 ? "risk" : ""}">${deltaText}</span>
       <span class="session-pulse-tag ${row.rag?.key === "R" ? "risk" : ""}">${escapeHtml(row.rag?.label || "상태 확인")}</span>

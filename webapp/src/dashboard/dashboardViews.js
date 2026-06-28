@@ -6,6 +6,7 @@ import {
   dashboardWeekSchedule,
   dashboardPulseSignals,
   dashboardSupportOrgs,
+  dashboardPulseTeamSupport,
   dashboardTeamPipeline,
   PIPELINE_STAGES
 } from './dashboardEngine.js';
@@ -219,6 +220,62 @@ function renderTeamPipelineSection({ state, today }) {
   `;
 }
 
+function renderPulseTeamSupportSection({ supportTeams, pulseLoaded }) {
+  const stageMap = Object.fromEntries(PIPELINE_STAGES.map((stage) => [stage.key, stage]));
+  return `
+    <section class="panel dashboard-section" id="dashboard-pulse-team-support">
+      <div class="section-header">
+        <div>
+          <h3>지원 후보 팀</h3>
+          <span class="section-subtitle">팀 선택 시 본부 Pulse 결과를 기준으로 현재 상태를 요약합니다.</span>
+        </div>
+        <span class="section-subtitle">본부 기준</span>
+      </div>
+      ${!pulseLoaded ? `
+        <div class="support-team-grid">
+          ${Array.from({ length: 3 }).map(() => `
+            <div class="skeleton-org-card">
+              <div class="skeleton-text medium"></div>
+              <div class="skeleton-text short"></div>
+            </div>
+          `).join('')}
+        </div>
+      ` : supportTeams.length === 0 ? `
+        <div class="empty-state-card compact">
+          <p>명시 매핑된 지원 후보 팀이 아직 없습니다.</p>
+        </div>
+      ` : `
+        <div class="support-team-grid">
+          ${supportTeams.map((team) => {
+            const stage = stageMap[team.stage] || stageMap["세션없음"];
+            const path = [team.divisionName, team.hqName].filter(Boolean).join(" · ");
+            return `
+              <div class="support-team-card cursor-pointer" data-nav="pulse" data-scope-id="${escapeHtml(team.pulseDivisionId)}">
+                <div class="support-team-head">
+                  <strong>${escapeHtml(team.teamName)}</strong>
+                  <span class="support-team-score">${team.pulseOverall !== null ? `${team.pulseOverall}%` : "—"}</span>
+                </div>
+                <div class="support-team-path">${escapeHtml(path || team.pulseDivisionId)}</div>
+                <div class="support-team-pulse">
+                  <span>${escapeHtml(team.pulseDivisionId)} 본부 기준</span>
+                  <b>${escapeHtml(team.focusDomain)}</b>
+                </div>
+                <div class="support-team-status">
+                  <span class="pipeline-stage-pill" style="background:${stage.color}18;color:${stage.color};border:1px solid ${stage.color}40">
+                    <span class="pipeline-stage-dot" style="background:${stage.color}"></span>
+                    ${stage.label}
+                  </span>
+                  ${team.mappingConfidence === "low" ? `<span class="support-team-note">매핑 확인 필요</span>` : ""}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `}
+    </section>
+  `;
+}
+
 export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
   const today = todayISO();
   const isLoading = state.dbStatus === 'connecting' || state.dbStatus === undefined;
@@ -306,6 +363,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
   const pulseYear = state.pulseYear || snapshot.latestPulseYear;
   const pulseSignals = dashboardPulseSignals(pulseCache, pulseYear);
   const supportOrgs = dashboardSupportOrgs(pulseCache, pulseYear, state.sessions);
+  const supportTeams = dashboardPulseTeamSupport({ state, pulseCache, selectedYear: pulseYear, today });
   const pulseLoaded = pulseCache?.loaded;
 
   return `
@@ -388,6 +446,8 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
 
       <!-- 팀 변화 파이프라인 트래커 -->
       ${renderTeamPipelineSection({ state, today })}
+
+      ${renderPulseTeamSupportSection({ supportTeams, pulseLoaded })}
 
       <!-- 2-Column Body Layout -->
       <div class="dashboard-body-layout">

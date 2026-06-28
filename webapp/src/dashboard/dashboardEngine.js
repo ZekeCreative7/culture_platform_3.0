@@ -16,6 +16,7 @@ import {
 } from '../utils.js';
 import { QUESTIONS } from '../config/questions.js';
 import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js';
+import { pulseDivisionMappingForOrgIds } from '../report/pulseSessionInsight.js';
 
 const FOLLOWUP_DAYS_AFTER_SESSION = 60;
 const FOLLOWUP_CREATE_NOTICE_DAYS = 14;
@@ -523,6 +524,117 @@ export function dashboardSupportOrgs(pulseCache, selectedYear, sessions) {
       sessionDetails
     };
   });
+}
+
+function orgIndex(orgUnits = []) {
+  return new Map((orgUnits || []).map((unit) => [unit.id, unit]));
+}
+
+function descendantTeams(orgUnits = [], rootIds = []) {
+  const unitsByParent = new Map();
+  for (const unit of orgUnits || []) {
+    if (!unitsByParent.has(unit.parentId)) unitsByParent.set(unit.parentId, []);
+    unitsByParent.get(unit.parentId).push(unit);
+  }
+
+  const teams = [];
+  const seen = new Set();
+  const visit = (unitId) => {
+    const unit = (orgUnits || []).find((item) => item.id === unitId);
+    if (unit?.level === "team" && !seen.has(unit.id)) {
+      seen.add(unit.id);
+      teams.push(unit);
+    }
+    for (const child of unitsByParent.get(unitId) || []) visit(child.id);
+  };
+
+  rootIds.filter(Boolean).forEach(visit);
+  return teams;
+}
+
+function orgPathForTeam(team, unitsById) {
+  const parent = unitsById.get(team.parentId);
+  const grandParent = parent ? unitsById.get(parent.parentId) : null;
+  const isDirectTopLevel = parent && grandParent?.level === "company";
+  const hq = parent?.level === "hq" && !isDirectTopLevel ? parent : null;
+  const division = isDirectTopLevel ? parent : (parent?.level === "division" ? parent : grandParent);
+  return {
+    divisionName: division?.name || "",
+    hqName: hq?.name || "",
+    teamName: team.name,
+  };
+}
+
+function orgIdsForUnit(unit, unitsById) {
+  const ids = [];
+  let cursor = unit;
+  while (cursor?.id) {
+    ids.push(cursor.id);
+    cursor = unitsById.get(cursor.parentId);
+  }
+  return ids;
+}
+
+function latestSessionForTeam(sessions = [], team) {
+  const matches = (sessions || []).filter((session) => {
+    if (session.teamId && session.teamId === team.id) return true;
+    return session.team === team.name || session.teamName === team.name;
+  });
+  if (!matches.length) return null;
+  return [...matches].sort((a, b) => {
+    const aDate = (a.schedule || []).filter(r => r.confirmed && r.date).map(r => r.date).sort().at(-1) || "";
+    const bDate = (b.schedule || []).filter(r => r.confirmed && r.date).map(r => r.date).sort().at(-1) || "";
+    return bDate.localeCompare(aDate);
+  })[0];
+}
+
+export function dashboardPulseTeamSupport({ state, pulseCache, selectedYear, today, limit = 6 }) {
+  if (!pulseCache?.loaded || !selectedYear) return [];
+  const doc = pulseCache.years?.[selectedYear];
+  if (!doc) return [];
+
+  const pair = comparisonPair(pulseCache.years, selectedYear);
+  const prevDoc = pair?.previousYear ? pulseCache.years[pair.previousYear] : null;
+  const diagnostics = pulseDiagnostics(doc, prevDoc);
+  if (!diagnostics?.ranked?.length) return [];
+
+  const orgUnits = state.orgUnits || [];
+  const unitsById = orgIndex(orgUnits);
+  const responses = state.responses || [];
+  const sessions = state.sessions || [];
+  const teamRows = [];
+  const seenTeams = new Set();
+
+  for (const row of diagnostics.ranked) {
+    const mappedIds = PULSE_DIV_MAP[row.id]?.orgUnitIds || [];
+    const mappedTeams = descendantTeams(orgUnits, mappedIds);
+    for (const team of mappedTeams) {
+      if (seenTeams.has(team.id)) continue;
+      const mapping = pulseDivisionMappingForOrgIds(orgIdsForUnit(team, unitsById), doc);
+      if (mapping?.id !== row.id) continue;
+      const latestSession = latestSessionForTeam(sessions, team);
+      const stageKey = latestSession ? teamPipelineStage({ session: latestSession, responses, today }) : "세션없음";
+      const path = orgPathForTeam(team, unitsById);
+      seenTeams.add(team.id);
+      teamRows.push({
+        id: team.id,
+        teamName: team.name,
+        divisionName: path.divisionName,
+        hqName: path.hqName,
+        pulseDivisionId: row.id,
+        pulseOverall: row.overall !== null ? Math.round(row.overall * 100) : null,
+        focusDomain: row.focusDomain || "경험 확인",
+        priority: row.priority,
+        mappingConfidence: mapping.confidence || "",
+        stage: stageKey,
+        latestSessionId: latestSession?.id || "",
+        latestSessionStatus: latestSession ? getSessionStatus(latestSession) : "세션없음",
+      });
+      if (teamRows.length >= limit) return teamRows;
+    }
+  }
+
+  return teamRows;
 }
 
 // PIPELINE_STAGES: ordered list used for team tracker

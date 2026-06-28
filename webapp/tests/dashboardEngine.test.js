@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState } from '../src/dashboard/dashboardEngine.js';
+import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState, dashboardPulseTeamSupport } from '../src/dashboard/dashboardEngine.js';
 import { sampleState } from './fixtures/sampleState.js';
 
 describe('getSessionStatus', () => {
@@ -179,5 +179,58 @@ describe('dashboardActionQueue', () => {
     const actions = dashboardActionQueue({ state, today: '2026-05-31' });
     expect(actions.find(a => a.type === 'followup_survey_create')).toBeUndefined();
     expect(actions.find(a => a.type === 'followup_survey_distribution')).toBeUndefined();
+  });
+});
+
+function pulseItem(fav) {
+  return { fav };
+}
+
+function pulseDivision(overrides = {}) {
+  const items = {};
+  for (let i = 1; i <= 22; i += 1) {
+    items[`Q${i}`] = pulseItem("60%");
+  }
+  Object.entries(overrides).forEach(([qid, fav]) => {
+    items[qid] = pulseItem(fav);
+  });
+  return { n: 30, items };
+}
+
+describe('dashboardPulseTeamSupport', () => {
+  it('본부 Pulse 우선 신호를 명시 매핑된 팀 후보로 보여준다', () => {
+    const pulseCache = {
+      loaded: true,
+      years: {
+        2026: {
+          year: 2026,
+          companywide: Object.fromEntries(Array.from({ length: 22 }, (_, i) => [`Q${i + 1}`, pulseItem("65%")])),
+          divisions: {
+            "고객솔루션본부UW": pulseDivision({ Q17: "28%", Q18: "32%", Q19: "30%" }),
+            "대면영업지원본부": pulseDivision(),
+          },
+        },
+      },
+    };
+    const state = {
+      orgUnits: [
+        { id: "CEO", level: "company", name: "라이나", parentId: "" },
+        { id: "SALES", level: "division", name: "영업부문", parentId: "CEO" },
+        { id: "CUSTOMER_SOLUTION", level: "hq", name: "고객솔루션본부", parentId: "SALES" },
+        { id: "UW", level: "team", name: "UW팀", parentId: "CUSTOMER_SOLUTION" },
+      ],
+      sessions: [],
+      responses: [],
+    };
+
+    const teams = dashboardPulseTeamSupport({ state, pulseCache, selectedYear: 2026, today: '2026-06-28' });
+
+    expect(teams).toHaveLength(1);
+    expect(teams[0]).toMatchObject({
+      id: "UW",
+      teamName: "UW팀",
+      pulseDivisionId: "고객솔루션본부UW",
+      stage: "세션없음",
+    });
   });
 });

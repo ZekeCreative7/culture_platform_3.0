@@ -49,6 +49,10 @@ async function writeAuditLog({ action, targetId, targetType, detail = '' }) {
 
 export function subscribe(listener) {
   listeners.push(listener);
+  return () => {
+    const idx = listeners.indexOf(listener);
+    if (idx !== -1) listeners.splice(idx, 1);
+  };
 }
 
 export function notify() {

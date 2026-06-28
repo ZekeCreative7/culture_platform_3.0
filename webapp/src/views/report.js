@@ -380,7 +380,7 @@ export function renderPriorityMatrixSVG(drivers) {
     <div class="priority-matrix-layout" style="display:flex; gap:20px; align-items:stretch; margin-top:20px; flex-wrap:wrap; margin-bottom: 20px;">
       <div class="priority-matrix-chart" style="background:#fff; padding:16px; border:1px solid #cbd5e1; border-radius:12px; flex:1.2; min-width:300px;">
         <h4 style="margin:0 0 12px; font-size:13px; font-weight:800; color:#0c2340; text-align:center;">Action Priority Matrix (우선순위 분석 매트릭스)</h4>
-        <svg viewBox="0 0 ${width} ${height}" width="100%" height="auto" style="overflow:visible; display:block;">
+        <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto; overflow:visible; display:block;">
           <!-- Quadrant Background colors -->
           <rect x="${padLeft}" y="${padTop}" width="${(midX - padLeft).toFixed(1)}" height="${(midY - padTop).toFixed(1)}" fill="rgba(227,0,59,0.015)" />
           <rect x="${midX.toFixed(1)}" y="${padTop}" width="${(width - padRight - midX).toFixed(1)}" height="${(midY - padTop).toFixed(1)}" fill="rgba(0,168,102,0.015)" />
@@ -563,18 +563,18 @@ function renderSlopeChart(dim, preScore, postScore, preN, postN, deltaColor, del
             ${[1.0, 2.0, 3.0, 4.0, 5.0].map(v => {
               const y = mapY(v);
               return `
-                <line x1="-5" y1="${y}" x2="calc(100% + 5)" y2="${y}" stroke="#e2e8f0" stroke-width="0.8" stroke-dasharray="2 2"></line>
+                <line x1="-5" y1="${y}" y2="${y}" style="x2: calc(100% + 5px);" stroke="#e2e8f0" stroke-width="0.8" stroke-dasharray="2 2"></line>
                 <text x="-15" y="${y + 3}" font-size="8" fill="#94a3b8" text-anchor="end">${v.toFixed(1)}</text>
               `;
             }).join('')}
             
             ${preScore !== null && postScore !== null ? `
               <!-- Slope Line -->
-              <line x1="10" y1="${yPre}" x2="calc(100% - 10)" y2="${yPost}" stroke="${deltaColor}" stroke-width="3.5" stroke-linecap="round"></line>
+              <line x1="10" y1="${yPre}" y2="${yPost}" style="x2: calc(100% - 10px);" stroke="${deltaColor}" stroke-width="3.5" stroke-linecap="round"></line>
               
               <!-- Points -->
               <circle cx="10" cy="${yPre}" r="5" fill="#94a3b8" stroke="#fff" stroke-width="2"></circle>
-              <circle cx="calc(100% - 10)" cy="${yPost}" r="7" fill="${dim.color}" stroke="#fff" stroke-width="2.5"></circle>
+              <circle cy="${yPost}" r="7" style="cx: calc(100% - 10px);" fill="${dim.color}" stroke="#fff" stroke-width="2.5"></circle>
             ` : ''}
           </svg>
         </div>

@@ -126,11 +126,14 @@ import {
   surveyDistributionActive, surveyQuestionsForDistribution
 } from './state.js';
 
-const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  || window.location.hostname.startsWith('192.168.')
-  || window.location.hostname.startsWith('10.')
-  || window.location.hostname.startsWith('172.')
-  || window.location.hostname.endsWith('.local');
+if (window.location.search.includes('preview=1')) {
+  sessionStorage.setItem('previewMode', 'true');
+} else if (window.location.search.includes('preview=0')) {
+  sessionStorage.removeItem('previewMode');
+}
+
+const LOCAL_PREVIEW = window.location.search.includes('preview=1')
+  || sessionStorage.getItem('previewMode') === 'true';
 
 const VIEWS = [
   ["dashboard", "홈", "홈"],

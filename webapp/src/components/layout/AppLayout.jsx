@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -7,89 +7,55 @@ import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { VanillaCanvas, isVanillaView } from './VanillaCanvas.jsx';
 
+const VALID_VIEWS = ['dashboard', 'sessions', 'org', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse'];
+
 export function AppLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated, orgId } = useAuth();
 
   useInitApp(isAuthenticated, orgId);
-  
-  const storeState = useAppStore();
-  const {
-    activeView,
-    setActiveView,
-    sidebarCollapsed,
-    setSidebarCollapsed,
-    mobileNavOpen,
-    setMobileNavOpen,
-    dbStatus,
-    setOrgSearchQuery
-  } = storeState;
 
-  // Two-way synchronization between URL path and Zustand activeView
-  // 1. Sync URL path -> Zustand activeView
-  useEffect(() => {
-    const path = location.pathname.replace(/^\//, ''); // removes leading slash
-    if (path && path !== activeView) {
-      // Validate that it matches one of our active views
-      const validViews = ['dashboard', 'sessions', 'org', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse'];
-      if (validViews.includes(path)) {
-        setActiveView(path);
-      }
-    }
-  }, [location.pathname, activeView, setActiveView]);
+  const { dbStatus, setOrgSearchQuery, mobileNavOpen, setMobileNavOpen, sidebarCollapsed, setSidebarCollapsed } = useAppStore();
 
-  // 2. Sync Zustand activeView -> URL path
-  useEffect(() => {
-    if (activeView) {
-      const path = `/${activeView}`;
-      if (location.pathname !== path) {
-        navigate(path);
-      }
-    }
-  }, [activeView, navigate, location.pathname]);
+  // URL이 라우팅의 단일 소스. Zustand activeView를 네비게이션에 쓰지 않음.
+  // 기존 두 방향 sync effect(URL↔Zustand)가 서로 경쟁해 루프를 만들었던 문제를 제거.
+  const activeView = useMemo(() => {
+    const path = location.pathname.slice(1);
+    return VALID_VIEWS.includes(path) ? path : 'dashboard';
+  }, [location.pathname]);
 
-  // Global search routing logic
   const handleSearch = (query) => {
     const q = query.trim().toLowerCase();
     if (!q) return;
-
     const orgKeywords = ['팀', '부문', '본부', '구성원', '조직'];
     const sessionKeywords = ['세션', '기수', '회차'];
     const surveyKeywords = ['설문', '질문', '문항'];
-
     if (orgKeywords.some(k => q.includes(k))) {
       setOrgSearchQuery(query.trim());
-      setActiveView('org');
+      navigate('/org');
     } else if (sessionKeywords.some(k => q.includes(k))) {
-      setActiveView('sessions');
+      navigate('/sessions');
     } else if (surveyKeywords.some(k => q.includes(k))) {
-      setActiveView('survey');
+      navigate('/survey');
     } else {
-      // Default: search in org
       setOrgSearchQuery(query.trim());
-      setActiveView('org');
+      navigate('/org');
     }
   };
 
-  // Build the app shell class list
-  const classes = [];
-  if (activeView === 'dashboard') {
-    classes.push('view-dashboard');
-  }
-  if (mobileNavOpen) {
-    classes.push('mobile-nav-open');
-  }
-  if (sidebarCollapsed) {
-    classes.push('sidebar-collapsed');
-  }
+  const classes = [
+    activeView === 'dashboard' ? 'view-dashboard' : '',
+    mobileNavOpen ? 'mobile-nav-open' : '',
+    sidebarCollapsed ? 'sidebar-collapsed' : '',
+  ].filter(Boolean);
 
   return (
     <div id="app" className={classes.join(' ')}>
       <Sidebar
         activeView={activeView}
         onNavigate={(view) => {
-          setActiveView(view);
+          navigate('/' + view);
           setMobileNavOpen(false);
         }}
         collapsed={sidebarCollapsed}

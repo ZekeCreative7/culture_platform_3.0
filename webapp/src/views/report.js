@@ -1217,8 +1217,8 @@ export function renderReport() {
       const preSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
       const postSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
 
-      const preQual = qualResponseRows(session.cohort, session.type, session.id, "사전");
-      const postQual = qualResponseRows(session.cohort, session.type, session.id, "사후");
+      const preQual = qualResponseRows(session.cohort, session.type, session.id, "pre");
+      const postQual = qualResponseRows(session.cohort, session.type, session.id, "post");
 
       const hasPreQual = preQual.rows.length > 0;
       const hasPostQual = postQual.rows.length > 0;

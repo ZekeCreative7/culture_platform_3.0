@@ -79,7 +79,7 @@ export function Sidebar({
     <>
       <aside className="sidebar">
         <div className="brand">
-          <img src="./assets/lina_logo_square.png" alt="" />
+          <img src={`${import.meta.env.BASE_URL}assets/lina_logo_square.png`} alt="" />
           <div className="brand-text">
             <strong>조직문화 플랫폼</strong>
             <span>운영 관리자</span>

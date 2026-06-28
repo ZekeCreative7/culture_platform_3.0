@@ -93,7 +93,7 @@ export function LoginPage() {
       <div className="auth-gate-backdrop" />
       <div className="auth-shell">
         <div className="auth-visual">
-          <img src="./assets/intro_img.png" alt="" />
+          <img src={`${import.meta.env.BASE_URL}assets/intro_img.png`} alt="" />
           <div className="auth-visual-caption">
             <span>조직문화 분석 플랫폼</span>
             <strong>조직의 변화를<br />데이터로 읽습니다</strong>
@@ -102,7 +102,7 @@ export function LoginPage() {
 
         <div className="auth-panel">
           <div className="auth-brand-row">
-            <img src="./assets/lina_logo_square.png" alt="" />
+            <img src={`${import.meta.env.BASE_URL}assets/lina_logo_square.png`} alt="" />
             <span>Lina Life Insurance</span>
           </div>
           <div className="auth-copy">

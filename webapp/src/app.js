@@ -529,7 +529,7 @@ function handleRealtimeOrganizationChange() {
 }
 
 function handleRealtimePulseChange() {
-  renderIfActive(["dashboard", "pulse"]);
+  renderIfActive(["dashboard", "pulse", "report"]);
 }
 
 function bindLayout() {
@@ -548,7 +548,7 @@ function bindLayout() {
       state.activeView = nextView;
       state.mobileNavOpen = false;
       saveState();
-      if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
+      if (["dashboard", "pulse", "report"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);
       } else {
         render();
@@ -2624,7 +2624,7 @@ async function initApp({ localPreview = false } = {}) {
   await Promise.all([loadSessionsFromFirestore(), loadSurveysFromFirestore(), loadSurveyTemplatesFromFirestore()]);
   syncSurveysToSessions();
   render();
-  if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
+  if (["dashboard", "pulse", "report"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
     Promise.all([loadPulseYears(), loadPulseCommitments()]).then(() => render());
   }
 

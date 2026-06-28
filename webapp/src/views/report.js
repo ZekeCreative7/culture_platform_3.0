@@ -1,5 +1,6 @@
 import { 
   state, 
+  pulseCache,
   availableSessionTypes, 
   cohortsForType, 
   sessionsForTypeCohort, 
@@ -27,9 +28,9 @@ import {
   scoreOf,
   targetCountForSession
 } from '../utils.js';
-import { comparisonPair } from '../pulse/pulseEngine.js';
 import { assertNotQuantInput } from '../qual/qual-signal.js';
 import { renderSessionOutcomeIntro } from './sessions.js';
+import { buildPulseSessionInsight } from '../report/pulseSessionInsight.js';
 
 // ── Report Analysis Helpers ──────────────────────────────────────
 export const REPORT_DIMS = [
@@ -99,6 +100,92 @@ export function dimRecommendation(key, score) {
   const list = recs[key] || [];
   const match = list.find(([t]) => score < t);
   return match ? match[1] : (list[list.length-1]?.[1] || '');
+}
+
+function pctText(value) {
+  return value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`;
+}
+
+function deltaPpText(value) {
+  if (value === null || value === undefined) return '';
+  const pp = Math.round(value * 100);
+  return `${pp > 0 ? '+' : ''}${pp}pp`;
+}
+
+function alignmentLabel(alignment) {
+  if (alignment === 'same') return { text: '같은 방향', color: '#e3003b', bg: 'rgba(227,0,59,0.07)' };
+  if (alignment === 'different') return { text: '다른 방향', color: '#008a54', bg: 'rgba(0,168,102,0.08)' };
+  if (alignment === 'mixed') return { text: '부분 연결', color: '#a46900', bg: 'rgba(244,176,0,0.10)' };
+  return { text: '판단 보류', color: '#64748b', bg: '#f8fafc' };
+}
+
+function renderPulseSessionInsightPanel({ session, insight }) {
+  if (!session) return '';
+  if (insight.status === 'no_pulse_data') {
+    return `
+      <section class="panel report-export-section" style="margin-bottom:28px;">
+        <div class="section-title" style="margin-bottom:12px;">
+          <h2>Pulse Survey 연결 인사이트</h2>
+          <span>본부 Pulse 결과와 세션 설문을 함께 읽습니다</span>
+        </div>
+        <div class="empty">Pulse Survey 데이터를 불러오면 본부 기준 신호와 세션 설문 변화가 함께 표시됩니다.</div>
+      </section>
+    `;
+  }
+  if (insight.status === 'no_mapping') {
+    return `
+      <section class="panel report-export-section" style="margin-bottom:28px;">
+        <div class="section-title" style="margin-bottom:12px;">
+          <h2>Pulse Survey 연결 인사이트</h2>
+          <span>${insight.year || '—'}년 Pulse 기준</span>
+        </div>
+        <div class="empty">이 팀과 연결된 Pulse 본부 매핑이 없습니다. 연도별 조직 매핑을 설정하면 본부 기준 Pulse 결과를 세션 분석에 연결할 수 있습니다.</div>
+      </section>
+    `;
+  }
+  if (insight.status !== 'ready') return '';
+
+  const teamLabel = session.team || session.teamName || sessionLabel(session);
+  const reaction = insight.reaction;
+  const align = alignmentLabel(reaction.alignment);
+  const pulseDelta = deltaPpText(insight.pulse.delta);
+  const postDelta = reaction.postDelta === null ? '확인 불가' : `${reaction.postDelta > 0 ? '+' : ''}${reaction.postDelta.toFixed(2)} · ${reaction.postDeltaLabel}`;
+  const followupText = reaction.followupScore === null
+    ? '팔로우업 미확인'
+    : `${reaction.followupScore.toFixed(2)}점 · ${reaction.followupDeltaLabel}`;
+
+  return `
+    <section class="panel report-export-section" style="margin-bottom:28px; border:1.5px solid rgba(0,82,255,0.18); background:linear-gradient(135deg,#ffffff 0%,#f8fbff 100%);">
+      <div class="section-title" style="margin-bottom:16px;">
+        <h2>Pulse Survey 연결 인사이트</h2>
+        <span>본부 맥락 → 팀 세션 반응 → 다음 운영 액션</span>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+        <span style="font-size:11.5px; font-weight:800; color:#0052ff; background:rgba(0,82,255,0.08); border:1px solid rgba(0,82,255,0.18); padding:4px 10px; border-radius:99px;">선택 팀: ${escapeHtml(teamLabel)}</span>
+        <span style="font-size:11.5px; font-weight:800; color:#475569; background:#fff; border:1px solid #e2e8f0; padding:4px 10px; border-radius:99px;">표시 데이터: ${escapeHtml(insight.year)}년 ${escapeHtml(insight.divisionId)} 본부 Pulse 결과</span>
+        <span style="font-size:11.5px; font-weight:800; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; padding:4px 10px; border-radius:99px;">본부 기준 · 팀은 본부 결과 상속</span>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:14px;">
+        <article style="background:#fff; border:1px solid #dbeafe; border-radius:12px; padding:16px;">
+          <div style="font-size:11px; font-weight:900; color:#0052ff; letter-spacing:0.04em; margin-bottom:8px;">1. 본부 Pulse 신호</div>
+          <strong style="display:block; font-size:15px; color:#0c2340; margin-bottom:8px;">${escapeHtml(insight.pulse.focusDomain)} 우선 확인</strong>
+          <p style="font-size:12.5px; line-height:1.7; color:#334155; margin:0 0 10px;">${escapeHtml(insight.divisionId)}의 전반 긍정률은 <strong>${pctText(insight.pulse.overall)}</strong>${pulseDelta ? ` (${pulseDelta})` : ''}입니다. 먼저 읽을 문항은 ${escapeHtml(insight.pulse.focusPointsText)}입니다.</p>
+          <span style="display:inline-block; font-size:10.5px; font-weight:800; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; padding:3px 8px; border-radius:99px;">Pulse 본부 기준</span>
+        </article>
+        <article style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px;">
+          <div style="font-size:11px; font-weight:900; color:#7b2cff; letter-spacing:0.04em; margin-bottom:8px;">2. 팀 세션 설문 반응</div>
+          <strong style="display:block; font-size:15px; color:#0c2340; margin-bottom:8px;">${escapeHtml(reaction.dim.label)} 변화 ${escapeHtml(postDelta)}</strong>
+          <p style="font-size:12.5px; line-height:1.7; color:#334155; margin:0 0 10px;">사전 ${reaction.preScore === null ? 'N<3 또는 데이터 없음' : `${reaction.preScore.toFixed(2)}점`} → 사후 ${reaction.postScore === null ? 'N<3 또는 데이터 없음' : `${reaction.postScore.toFixed(2)}점`}입니다. 팔로우업은 ${escapeHtml(followupText)}입니다.</p>
+          <span style="display:inline-block; font-size:10.5px; font-weight:800; color:${align.color}; background:${align.bg}; padding:3px 8px; border-radius:99px;">${align.text}</span>
+        </article>
+        <article style="background:#fff; border:1px solid #dcfce7; border-radius:12px; padding:16px;">
+          <div style="font-size:11px; font-weight:900; color:#008a54; letter-spacing:0.04em; margin-bottom:8px;">3. 다음 운영 액션</div>
+          <strong style="display:block; font-size:15px; color:#0c2340; margin-bottom:8px;">팔로우업에서 확인할 것</strong>
+          <p style="font-size:12.5px; line-height:1.7; color:#334155; margin:0;">${escapeHtml(insight.actionText)}</p>
+        </article>
+      </div>
+    </section>
+  `;
 }
 
 // ── Action Priority Matrix Helpers ──────────────────────────────
@@ -762,6 +849,14 @@ export function renderReport() {
   const hasDiagnosisData = Boolean(diagnosis?.n >= 1);
   const diagnosisTarget = session ? targetCountForSession(session) : 0;
   const diagnosisResponseRate = diagnosis && diagnosisTarget ? Math.round((diagnosis.n / diagnosisTarget) * 100) : null;
+  const pulseSessionInsight = session
+    ? buildPulseSessionInsight({
+        session,
+        stats,
+        pulseYears: pulseCache.years,
+        selectedYear: state.pulseYear,
+      })
+    : null;
 
   // 1. Executive Summary Board (요약 보드 계산)
   let execSummaryHtml = '';
@@ -859,6 +954,7 @@ export function renderReport() {
     
     <!-- 경영진 요약 카드 (Executive Summary Board) -->
     ${execSummaryHtml}
+    ${pulseSessionInsight ? renderPulseSessionInsightPanel({ session, insight: pulseSessionInsight }) : ''}
 
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
 

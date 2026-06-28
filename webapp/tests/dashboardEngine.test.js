@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState, dashboardPulseTeamSupport } from '../src/dashboard/dashboardEngine.js';
+import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState, dashboardPulseTeamSupport, dashboardOutcomeSnapshot } from '../src/dashboard/dashboardEngine.js';
 import { sampleState } from './fixtures/sampleState.js';
 
 describe('getSessionStatus', () => {
@@ -232,5 +232,44 @@ describe('dashboardPulseTeamSupport', () => {
       pulseDivisionId: "고객솔루션본부UW",
       stage: "세션없음",
     });
+  });
+});
+
+describe('dashboardOutcomeSnapshot', () => {
+  it('사전·사후·팔로우업 응답 기반으로 홈 변화 요약을 만든다', () => {
+    const makeRow = (phase, value, index) => ({
+      id: `${phase}-${index}`,
+      sessionId: 'session-outcome',
+      phase,
+      q1: value,
+      q2: value,
+      q3: value,
+      q4: value,
+      q5: value,
+      q6: value,
+      q7: value,
+      q8: value,
+    });
+    const state = {
+      sessions: [{
+        id: 'session-outcome',
+        type: '팀빌딩',
+        team: '고객경험팀',
+        members: ['a', 'b', 'c'],
+      }],
+      responses: [
+        ...[0, 1, 2].map((i) => makeRow('사전', 3, i)),
+        ...[0, 1, 2].map((i) => makeRow('사후', 4, i)),
+        ...[0, 1, 2].map((i) => makeRow('팔로우업', 4, i)),
+      ],
+    };
+
+    const snapshot = dashboardOutcomeSnapshot({ state });
+
+    expect(snapshot.total).toBe(1);
+    expect(snapshot.improved).toBe(1);
+    expect(snapshot.sustained).toBe(1);
+    expect(snapshot.needsFollowup).toBe(0);
+    expect(snapshot.avgMomentumIndex).toBeGreaterThan(50);
   });
 });

@@ -3,6 +3,7 @@ import {
   dashboardActionQueue,
   dashboardTrustFunnel,
   dashboardOperatingLoop,
+  dashboardOutcomeSnapshot,
   dashboardWeekSchedule,
   dashboardPulseSignals,
   dashboardSupportOrgs,
@@ -276,6 +277,60 @@ function renderPulseTeamSupportSection({ supportTeams, pulseLoaded }) {
   `;
 }
 
+function renderOutcomeSnapshotSection(outcome) {
+  const valueText = (value) => value === null || value === undefined ? "—" : value;
+  return `
+    <section class="panel dashboard-section" id="dashboard-outcome-snapshot">
+      <div class="section-header">
+        <div>
+          <h3>변화 확인 보드</h3>
+          <span class="section-subtitle">사후와 팔로우업 설문으로 개선이 보이는지 확인합니다.</span>
+        </div>
+        <span class="section-subtitle">세션 설문 기준</span>
+      </div>
+      ${outcome.total === 0 ? `
+        <div class="empty-state-card compact">
+          <p>사전·사후 응답이 각각 3건 이상인 세션이 생기면 변화 지수가 표시됩니다.</p>
+        </div>
+      ` : `
+        <div class="outcome-snapshot-grid">
+          <article class="outcome-snapshot-card">
+            <span>변화 모멘텀</span>
+            <strong>${valueText(outcome.avgMomentumIndex)}</strong>
+            <small>${outcome.improved}/${outcome.total}개 세션 개선</small>
+          </article>
+          <article class="outcome-snapshot-card">
+            <span>개선 유지</span>
+            <strong>${valueText(outcome.avgSustainIndex)}</strong>
+            <small>${outcome.sustained}개 세션 유지 확인</small>
+          </article>
+          <article class="outcome-snapshot-card">
+            <span>팔로우업 대기</span>
+            <strong>${outcome.needsFollowup}</strong>
+            <small>개선 후 유지 확인 필요</small>
+          </article>
+          <article class="outcome-snapshot-card">
+            <span>응답 신뢰</span>
+            <strong>${valueText(outcome.avgConfidenceIndex)}</strong>
+            <small>응답 수와 단계 충족도</small>
+          </article>
+        </div>
+        <div class="outcome-snapshot-list">
+          ${outcome.ranked.map((item) => `
+            <div class="outcome-snapshot-row cursor-pointer" data-nav="report" data-session-id="${escapeHtml(item.sessionId)}">
+              <div>
+                <strong>${escapeHtml(item.label)}</strong>
+                <span>${escapeHtml(item.type)} · ${escapeHtml(item.story.immediateLabel)} · ${escapeHtml(item.story.sustainLabel)}</span>
+              </div>
+              <b>${item.story.momentumIndex ?? "—"}</b>
+            </div>
+          `).join("")}
+        </div>
+      `}
+    </section>
+  `;
+}
+
 export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
   const today = todayISO();
   const isLoading = state.dbStatus === 'connecting' || state.dbStatus === undefined;
@@ -346,6 +401,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
 
   const funnel = dashboardTrustFunnel(state.pulseCommitments);
   const loop = dashboardOperatingLoop({ state, pulseCache });
+  const outcome = dashboardOutcomeSnapshot({ state });
 
   const weekOffset = state.dashboardWeekOffset || 0;
   const startDay = new Date(today);
@@ -448,6 +504,8 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
       ${renderTeamPipelineSection({ state, today })}
 
       ${renderPulseTeamSupportSection({ supportTeams, pulseLoaded })}
+
+      ${renderOutcomeSnapshotSection(outcome)}
 
       <!-- 2-Column Body Layout -->
       <div class="dashboard-body-layout">
@@ -848,6 +906,8 @@ export function bindHomeDashboard({ state, saveState, render }) {
         if (targetSess) {
           state.selectedReportType = targetSess.type;
           state.selectedAnalyticsType = targetSess.type;
+          state.selectedReportCohort = String(targetSess.cohort || 1);
+          state.selectedAnalyticsCohort = String(targetSess.cohort || 1);
         }
       }
 

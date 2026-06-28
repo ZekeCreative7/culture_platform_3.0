@@ -12,11 +12,13 @@ import {
   todayISO,
   isQualText,
   normalizeSessionType,
-  scoreOf
+  scoreOf,
+  targetCountForSession
 } from '../utils.js';
 import { QUESTIONS } from '../config/questions.js';
 import { PULSE_DIV_MAP } from '../config/pulseDivisionMap.js';
 import { pulseDivisionMappingForOrgIds } from '../report/pulseSessionInsight.js';
+import { buildSessionOutcomeStoryFromResponses } from '../report/sessionOutcomeIndex.js';
 
 const FOLLOWUP_DAYS_AFTER_SESSION = 60;
 const FOLLOWUP_CREATE_NOTICE_DAYS = 14;
@@ -392,6 +394,47 @@ export function dashboardOperatingLoop({ state, pulseCache }) {
     activeSessionsCount,
     completedSessionsCount,
     hasRedDot
+  };
+}
+
+export function dashboardOutcomeSnapshot({ state }) {
+  const stories = (state.sessions || [])
+    .map((session) => {
+      const story = buildSessionOutcomeStoryFromResponses({
+        responses: state.responses || [],
+        sessionId: session.id,
+        targetCount: targetCountForSession(session),
+      });
+      return {
+        sessionId: session.id,
+        label: session.team || session.teamName || session.participatingTeams || sessionLabel(session),
+        type: normalizeSessionType(session.type),
+        story,
+      };
+    })
+    .filter((item) => item.story.status === "ready");
+
+  const improved = stories.filter((item) => (item.story.immediateDelta || 0) >= 0.2);
+  const sustained = stories.filter((item) => item.story.sustainKey === "sustained");
+  const needsFollowup = stories.filter((item) => (item.story.immediateDelta || 0) >= 0.2 && item.story.sustainKey === "no_followup");
+  const average = (values) => {
+    const valid = values.filter((value) => typeof value === "number");
+    return valid.length ? Math.round(valid.reduce((sum, value) => sum + value, 0) / valid.length) : null;
+  };
+
+  const ranked = [...stories]
+    .sort((a, b) => (b.story.momentumIndex || 0) - (a.story.momentumIndex || 0))
+    .slice(0, 3);
+
+  return {
+    total: stories.length,
+    improved: improved.length,
+    sustained: sustained.length,
+    needsFollowup: needsFollowup.length,
+    avgMomentumIndex: average(stories.map((item) => item.story.momentumIndex)),
+    avgSustainIndex: average(stories.map((item) => item.story.sustainIndex)),
+    avgConfidenceIndex: average(stories.map((item) => item.story.confidenceIndex)),
+    ranked,
   };
 }
 

@@ -31,6 +31,7 @@ import {
 import { assertNotQuantInput } from '../qual/qual-signal.js';
 import { renderSessionOutcomeIntro } from './sessions.js';
 import { buildPulseSessionInsight } from '../report/pulseSessionInsight.js';
+import { buildSessionOutcomeStory } from '../report/sessionOutcomeIndex.js';
 
 // ── Report Analysis Helpers ──────────────────────────────────────
 export const REPORT_DIMS = [
@@ -117,6 +118,76 @@ function alignmentLabel(alignment) {
   if (alignment === 'different') return { text: '다른 방향', color: '#008a54', bg: 'rgba(0,168,102,0.08)' };
   if (alignment === 'mixed') return { text: '부분 연결', color: '#a46900', bg: 'rgba(244,176,0,0.10)' };
   return { text: '판단 보류', color: '#64748b', bg: '#f8fafc' };
+}
+
+function indexTone(value) {
+  if (value === null || value === undefined) return { label: "대기", className: "neutral" };
+  if (value >= 70) return { label: "강함", className: "good" };
+  if (value >= 50) return { label: "보통", className: "watch" };
+  return { label: "확인 필요", className: "risk" };
+}
+
+function deltaScoreText(value) {
+  if (value === null || value === undefined) return "확인 불가";
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}점`;
+}
+
+function renderOutcomeStoryPanel(story) {
+  if (!story || story.status === "insufficient") {
+    return `
+      <section class="panel report-export-section report-outcome-story" style="margin-bottom:28px;">
+        <div class="section-title" style="margin-bottom:12px;">
+          <h2>변화 스토리 지수</h2>
+          <span>사전·사후·팔로우업 설문으로 개선 여부를 확인합니다</span>
+        </div>
+        <div class="empty">사전과 사후 설문 응답이 각각 3건 이상 쌓이면 변화 지수를 계산합니다.</div>
+      </section>
+    `;
+  }
+
+  const momentumTone = indexTone(story.momentumIndex);
+  const sustainTone = indexTone(story.sustainIndex);
+  const confidenceTone = indexTone(story.confidenceIndex);
+  const sustainValue = story.sustainIndex === null ? "대기" : story.sustainIndex;
+  const weakest = story.weakestDim?.label || "확인 대기";
+  const strongest = story.strongestDim?.label || "확인 대기";
+
+  return `
+    <section class="panel report-export-section report-outcome-story" style="margin-bottom:28px;">
+      <div class="section-title" style="margin-bottom:16px;">
+        <h2>변화 스토리 지수</h2>
+        <span>사후 개선과 팔로우업 유지 여부를 분리해서 봅니다</span>
+      </div>
+      <div class="outcome-index-grid">
+        <article class="outcome-index-card ${momentumTone.className}">
+          <span>즉시 변화</span>
+          <strong>${story.momentumIndex ?? "—"}</strong>
+          <small>${story.immediateLabel} · ${deltaScoreText(story.immediateDelta)}</small>
+        </article>
+        <article class="outcome-index-card ${sustainTone.className}">
+          <span>개선 유지</span>
+          <strong>${sustainValue}</strong>
+          <small>${story.sustainLabel}${story.sustainedDelta !== null ? ` · ${deltaScoreText(story.sustainedDelta)}` : ""}</small>
+        </article>
+        <article class="outcome-index-card ${confidenceTone.className}">
+          <span>응답 신뢰</span>
+          <strong>${story.confidenceIndex}</strong>
+          <small>사전 ${story.preN} · 사후 ${story.postN}${story.followupN ? ` · 팔로우업 ${story.followupN}` : ""}</small>
+        </article>
+        <article class="outcome-index-card neutral">
+          <span>다음 초점</span>
+          <strong>${escapeHtml(story.actionFocus)}</strong>
+          <small>강점 ${escapeHtml(strongest)} · 취약 ${escapeHtml(weakest)}</small>
+        </article>
+      </div>
+      <div class="outcome-story-line">
+        <b>${escapeHtml(story.immediateLabel)}</b>
+        <span>세션 직후 평균 변화는 ${deltaScoreText(story.immediateDelta)}입니다.</span>
+        <b>${escapeHtml(story.sustainLabel)}</b>
+        <span>${story.followupN ? `팔로우업 기준 변화는 ${deltaScoreText(story.sustainedDelta)}입니다.` : "팔로우업 설문으로 유지 여부를 확인해야 합니다."}</span>
+      </div>
+    </section>
+  `;
 }
 
 function renderPulseSessionInsightPanel({ session, insight }) {
@@ -857,6 +928,7 @@ export function renderReport() {
         selectedYear: state.pulseYear,
       })
     : null;
+  const outcomeStory = session ? buildSessionOutcomeStory({ stats, targetCount: diagnosisTarget }) : null;
 
   // 1. Executive Summary Board (요약 보드 계산)
   let execSummaryHtml = '';
@@ -954,6 +1026,7 @@ export function renderReport() {
     
     <!-- 경영진 요약 카드 (Executive Summary Board) -->
     ${execSummaryHtml}
+    ${session ? renderOutcomeStoryPanel(outcomeStory) : ''}
     ${pulseSessionInsight ? renderPulseSessionInsightPanel({ session, insight: pulseSessionInsight }) : ''}
 
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `

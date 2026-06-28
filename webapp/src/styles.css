@@ -4005,6 +4005,130 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
   font-weight: 800;
 }
 
+.outcome-snapshot-grid,
+.outcome-index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.outcome-snapshot-card,
+.outcome-index-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: var(--shadow-low);
+}
+
+.outcome-snapshot-card span,
+.outcome-index-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.outcome-snapshot-card strong,
+.outcome-index-card strong {
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1.05;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.outcome-snapshot-card small,
+.outcome-index-card small {
+  color: #66778e;
+  font-size: 11.5px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.outcome-index-card.good { border-color: #bbf7d0; background: #f0fdf4; }
+.outcome-index-card.watch { border-color: #fde68a; background: #fffbeb; }
+.outcome-index-card.risk { border-color: #fecdd3; background: #fff1f2; }
+.outcome-index-card.neutral { border-color: #dbeafe; background: #f8fbff; }
+
+.outcome-index-card.good strong { color: #047857; }
+.outcome-index-card.watch strong { color: #a16207; }
+.outcome-index-card.risk strong { color: #be123c; }
+.outcome-index-card.neutral strong { color: #1d4ed8; font-size: 16px; line-height: 1.35; }
+
+.outcome-snapshot-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.outcome-snapshot-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.outcome-snapshot-row > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.outcome-snapshot-row strong,
+.outcome-snapshot-row span {
+  overflow-wrap: anywhere;
+}
+
+.outcome-snapshot-row strong {
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+.outcome-snapshot-row span {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.outcome-snapshot-row b {
+  flex: 0 0 auto;
+  min-width: 38px;
+  text-align: center;
+  color: #0ea5e9;
+  font-size: 18px;
+}
+
+.outcome-story-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.outcome-story-line b {
+  color: #0052ff;
+  font-size: 12px;
+}
+
+.outcome-story-line span {
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .org-card-head {
   display: flex;
   justify-content: space-between;

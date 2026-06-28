@@ -18,6 +18,7 @@ import {
   subscribeOrganizationFromFirestore,
   subscribePulseYearsFromFirestore,
   subscribePulseCommitmentsFromFirestore,
+  subscribeQualSignalsFromFirestore,
   syncSurveysToSessions,
   setDbStatus,
 } from '../state.js';
@@ -100,6 +101,7 @@ export function useInitApp(isAuthenticated, orgId) {
         subscribeOrganizationFromFirestore(),
         subscribePulseYearsFromFirestore(),
         subscribePulseCommitmentsFromFirestore(),
+        subscribeQualSignalsFromFirestore(),
       ].filter(Boolean);
     })();
 

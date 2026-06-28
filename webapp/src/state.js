@@ -384,6 +384,17 @@ export function subscribeSessionsFromFirestore(onChange = () => {}) {
   });
 }
 
+export function subscribeQualSignalsFromFirestore() {
+  return onSnapshot(query(collection(db, 'QualSignal'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
+    state.qualSignals = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    saveState();
+    setDbStatus('connected');
+  }, (e) => {
+    console.error('Firestore QualSignal 실시간 갱신 오류:', e);
+    setDbStatus('error');
+  });
+}
+
 export async function saveSessionToFirestore(session) {
   try {
     const { id, ...data } = session;

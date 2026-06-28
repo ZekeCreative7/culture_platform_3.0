@@ -181,6 +181,7 @@ function applyLeaderSelection(unit, value) {
 // notify during the same frame; rendering each notification made the Home canvas flash.
 let scheduledRenderFrame = 0;
 subscribe(() => {
+  if (window.__reactMode) return;
   if (scheduledRenderFrame) return;
   scheduledRenderFrame = window.requestAnimationFrame(() => {
     scheduledRenderFrame = 0;

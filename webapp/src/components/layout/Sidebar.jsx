@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore.js';
-import { dashboardActionQueue } from '../../dashboard/dashboardEngine.js';
+import { dashboardActionDataReady, dashboardActionQueue } from '../../dashboard/dashboardEngine.js';
+import { commitmentsCache } from '../../state.js';
 import { todayISO } from '../../utils.js';
 import { StatusDot } from '../ui/index.js';
 
@@ -52,9 +53,10 @@ export function Sidebar({
   // Calculate today action count for badge on Dashboard
   const todayActionCount = React.useMemo(() => {
     try {
+      if (!dashboardActionDataReady({ state: storeState, commitmentsCache })) return null;
       return dashboardActionQueue({ state: storeState, today }).filter(a => a.group === 'today').length;
     } catch (e) {
-      return 0;
+      return null;
     }
   }, [storeState, today]);
 
@@ -97,7 +99,7 @@ export function Sidebar({
         <nav>
           <span className="nav-label">메뉴</span>
           {VIEWS.map(([id, en, ko]) => {
-            const hasBadge = id === 'dashboard' && todayActionCount > 0 && activeView !== 'dashboard';
+            const hasBadge = id === 'dashboard' && todayActionCount !== null && todayActionCount > 0 && activeView !== 'dashboard';
             const badgeElement = hasBadge ? (
               <span className="nav-badge">
                 {todayActionCount > 9 ? '9+' : todayActionCount}

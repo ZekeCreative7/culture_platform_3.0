@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState, dashboardPulseTeamSupport, dashboardOutcomeSnapshot } from '../src/dashboard/dashboardEngine.js';
+import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState, dashboardPulseTeamSupport, dashboardOutcomeSnapshot, dashboardActionDataReady } from '../src/dashboard/dashboardEngine.js';
 import { applyDashboardNavigationState } from '../src/dashboard/dashboardNavigation.js';
 import { sampleState } from './fixtures/sampleState.js';
 
@@ -60,6 +60,25 @@ describe('dashboardSnapshot', () => {
 });
 
 describe('dashboardActionQueue', () => {
+  it('오늘 할 일은 약속과 응답 데이터가 모두 준비된 뒤 계산해야 한다', () => {
+    expect(dashboardActionDataReady({
+      state: { sessionsLoaded: true, surveysLoaded: true, responsesLoaded: false },
+      commitmentsCache: { loaded: true },
+    })).toBe(false);
+    expect(dashboardActionDataReady({
+      state: { sessionsLoaded: true, surveysLoaded: true, responsesLoaded: true },
+      commitmentsCache: { loaded: false },
+    })).toBe(false);
+    expect(dashboardActionDataReady({
+      state: { sessionsLoaded: true, surveysLoaded: false, responsesLoaded: true },
+      commitmentsCache: { loaded: true },
+    })).toBe(false);
+    expect(dashboardActionDataReady({
+      state: { sessionsLoaded: true, surveysLoaded: true, responsesLoaded: true },
+      commitmentsCache: { loaded: true },
+    })).toBe(true);
+  });
+
   it('기한이 지난 리더 약속(overdue commitment)을 today 그룹에 배치해야 한다', () => {
     const actions = dashboardActionQueue({
       state: sampleState,

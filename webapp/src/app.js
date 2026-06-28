@@ -249,7 +249,6 @@ function restoreOrgScrollState(scrollState) {
 }
 
 function render() {
-  console.log('render called in app.js! window.__reactMode:', window.__reactMode);
   // React 모드에서는 saveState() → notify() → subscribe 콜백이 각 Page를 갱신함
   if (window.__reactMode) { saveState(); return; }
   const app = document.querySelector("#app");
@@ -429,7 +428,7 @@ function renderView() {
   if (state.activeView === "report") return renderReport();
   if (state.activeView === "pulse") return renderPulse({ state, pulseCache });
   if (state.activeView === "comm") return renderComm({ state });
-  return renderHomeDashboard({ state, pulseCache, commitmentsCache: state.pulseCommitments });
+  return renderHomeDashboard({ state, pulseCache, commitmentsCache });
 }
 
 function openSessionDrawer({ switchToSessions = false } = {}) {
@@ -662,7 +661,7 @@ function bindCanvasEvents() {
       saveState,
       render,
       pulseCache,
-      commitmentsCache: state.pulseCommitments
+      commitmentsCache
     });
   } else if (state.activeView === "comm") {
     bindComm({ state, saveState, render });
@@ -2645,6 +2644,9 @@ async function initApp({ localPreview = false } = {}) {
   // Local preview is intentionally read-mostly: use the cached/local seed data and
   // do not require Firebase Auth, App Check debug tokens, or Firestore listeners.
   if (localPreview) {
+    state.sessionsLoaded = true;
+    state.surveysLoaded = true;
+    state.responsesLoaded = true;
     setDbStatus('connected');
     return;
   }
@@ -2851,6 +2853,8 @@ let responseUnsubscribes = [];
 window.updateResponsesSubscription = function() {
   responseUnsubscribes.forEach(unsub => unsub());
   responseUnsubscribes = [];
+  state.responsesLoaded = false;
+  saveState();
 
   // A survey's responses must stay reachable even if the session it was created
   // under was later deleted (e.g. a recovered orphan survey) — union both id sets
@@ -2861,6 +2865,8 @@ window.updateResponsesSubscription = function() {
   ].filter(Boolean)));
   if (sessionIds.length === 0) {
     state.responses = [];
+    state.responsesLoaded = true;
+    saveState();
     return;
   }
 
@@ -2871,6 +2877,7 @@ window.updateResponsesSubscription = function() {
   }
 
   const chunkResponses = {};
+  const chunkReady = {};
 
   chunks.forEach((chunk, chunkIdx) => {
     const q = query(collection(db, 'responses'), where('sessionId', 'in', chunk));
@@ -2889,6 +2896,7 @@ window.updateResponsesSubscription = function() {
         }
         return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || "" };
       });
+      chunkReady[chunkIdx] = true;
 
       // Merge all chunks
       let allResponses = [];
@@ -2926,6 +2934,7 @@ window.updateResponsesSubscription = function() {
       });
 
       state.responses = allResponses;
+      state.responsesLoaded = Object.keys(chunkReady).length === chunks.length;
 
       const shouldRender = ["dashboard", "sessions", "survey", "analytics", "report"].includes(state.activeView);
       if (shouldRender) {

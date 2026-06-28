@@ -66,6 +66,9 @@ export function useInitApp(isAuthenticated, orgId) {
             console.error('[useInitApp] 로컬 데이터 시딩 실패:', e);
           }
         }
+        vanillaState.sessionsLoaded = true;
+        vanillaState.surveysLoaded = true;
+        vanillaState.responsesLoaded = true;
         setDbStatus('connected');
         return;
       }

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { state as vanillaState, pulseCache, subscribe, saveState } from '../state.js';
+import { state as vanillaState, pulseCache, commitmentsCache, subscribe, saveState } from '../state.js';
 import { renderHomeDashboard } from '../dashboard/dashboardViews.js';
 
 export const DashboardPage = memo(function DashboardPage() {
@@ -88,7 +88,7 @@ export const DashboardPage = memo(function DashboardPage() {
         divRef.current.innerHTML = renderHomeDashboard({
           state: vanillaState,
           pulseCache,
-          commitmentsCache: vanillaState.pulseCommitments,
+          commitmentsCache,
         });
         bindNavHandlers();
       }

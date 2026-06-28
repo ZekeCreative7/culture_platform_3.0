@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore.js';
 import { useAuth } from '../../hooks/useAuth.js';
-import { dashboardActionQueue } from '../../dashboard/dashboardEngine.js';
+import { dashboardActionDataReady, dashboardActionQueue } from '../../dashboard/dashboardEngine.js';
+import { commitmentsCache } from '../../state.js';
 import { todayISO } from '../../utils.js';
 import { Button, SearchInput } from '../ui/index.js';
 
@@ -34,9 +35,10 @@ export function Topbar({
   // Calculate today action count for notification badge
   const todayActionCount = useMemo(() => {
     try {
+      if (!dashboardActionDataReady({ state: storeState, commitmentsCache })) return null;
       return dashboardActionQueue({ state: storeState, today }).filter(a => a.group === 'today').length;
     } catch (e) {
-      return 0;
+      return null;
     }
   }, [storeState, today]);
 
@@ -97,7 +99,7 @@ export function Topbar({
         {/* Notifications Button */}
         <button
           type="button"
-          className={`topbar-notif-btn ${todayActionCount > 0 ? 'has-notif' : ''}`}
+          className={`topbar-notif-btn ${todayActionCount !== null && todayActionCount > 0 ? 'has-notif' : ''}`}
           id="topbar-notif-btn"
           title="오늘 할 일"
           onClick={handleNotifClick}
@@ -105,7 +107,7 @@ export function Topbar({
           <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
             <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
           </svg>
-          {todayActionCount > 0 && <span className="topbar-notif-dot"></span>}
+          {todayActionCount !== null && todayActionCount > 0 && <span className="topbar-notif-dot"></span>}
         </button>
 
         {/* + 새 세션 Action Button */}

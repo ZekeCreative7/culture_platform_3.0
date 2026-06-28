@@ -85,7 +85,9 @@ export const blankState = () => ({
   dbStatus: 'connecting',
   sessionDrawerOpen: false,
   sessions: [],
+  sessionsLoaded: false,
   responses: [],
+  responsesLoaded: false,
   qualSignals: [],
   draftType: "리더십",
   draftSchedule: makeSchedule("리더십"),
@@ -105,6 +107,7 @@ export const blankState = () => ({
   orgMembers: [],
   orgDataVersion: 0,
   surveys: [],
+  surveysLoaded: false,
   surveyTemplates: [],
   selectedCompany: "CEO",
   selectedDivision: "",
@@ -278,7 +281,11 @@ function persistState() {
 
 export function normalizeAppState(nextState) {
   nextState.sessions = (nextState.sessions || []).map(normalizeSessionRecord);
+  nextState.sessionsLoaded = Boolean(nextState.sessionsLoaded);
   nextState.surveys = (nextState.surveys || []).map(normalizeSurveyRecord);
+  nextState.surveysLoaded = Boolean(nextState.surveysLoaded);
+  nextState.responses = nextState.responses || [];
+  nextState.responsesLoaded = Boolean(nextState.responsesLoaded);
   nextState.orgMembers = (nextState.orgMembers || []).map((member) => {
     const jobGrade = normalizePosition(member.jobGrade || member.position);
     return {
@@ -344,6 +351,7 @@ export async function loadSurveysFromFirestore() {
   try {
     const snap = await getDocs(query(collection(db, 'surveys'), where('organizationId', '==', getCurrentOrgId())));
     state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
+    state.surveysLoaded = true;
     syncSurveysToSessions();
     saveState();
   } catch (e) {
@@ -354,6 +362,7 @@ export async function loadSurveysFromFirestore() {
 export function subscribeSurveysFromFirestore(onChange = () => {}) {
   return onSnapshot(query(collection(db, 'surveys'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
     state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
+    state.surveysLoaded = true;
     syncSurveysToSessions();
     saveState();
     setDbStatus('connected');
@@ -372,8 +381,9 @@ export async function loadSessionsFromFirestore() {
       const firestoreIds = new Set(firestoreSessions.map(s => s.id));
       const localOnly = (state.sessions || []).filter(s => !firestoreIds.has(s.id));
       state.sessions = [...firestoreSessions, ...localOnly];
-      saveState();
     }
+    state.sessionsLoaded = true;
+    saveState();
     setDbStatus('connected');
   } catch (e) {
     console.error('Firestore 세션 로드 실패:', e);
@@ -384,6 +394,7 @@ export async function loadSessionsFromFirestore() {
 export function subscribeSessionsFromFirestore(onChange = () => {}) {
   return onSnapshot(query(collection(db, 'sessions'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
     state.sessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
+    state.sessionsLoaded = true;
     syncSurveysToSessions();
     saveState();
     setDbStatus('connected');

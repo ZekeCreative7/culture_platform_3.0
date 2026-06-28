@@ -337,6 +337,15 @@ export function dashboardActionQueue({ state, today }) {
   return actions;
 }
 
+export function dashboardActionDataReady({ state, commitmentsCache }) {
+  return Boolean(
+    commitmentsCache?.loaded
+    && state?.sessionsLoaded === true
+    && state?.surveysLoaded === true
+    && state?.responsesLoaded === true
+  );
+}
+
 // 5.4: Trust funnel
 export function dashboardTrustFunnel(commitments) {
   const youSaid = (commitments || []).filter(c => c.employeeVoice).length;

@@ -1,6 +1,7 @@
 import {
   dashboardSnapshot,
   dashboardActionQueue,
+  dashboardActionDataReady,
   dashboardTrustFunnel,
   dashboardOperatingLoop,
   dashboardOutcomeSnapshot,
@@ -335,8 +336,9 @@ function renderOutcomeSnapshotSection(outcome) {
 export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
   const today = todayISO();
   const isLoading = state.dbStatus === 'connecting' || state.dbStatus === undefined;
+  const actionsReady = dashboardActionDataReady({ state, commitmentsCache });
   const snapshot = dashboardSnapshot({ state, pulseCache, today });
-  const allActions = dashboardActionQueue({ state, today });
+  const allActions = actionsReady ? dashboardActionQueue({ state, today }) : [];
   const todayActions = allActions.filter((act) => act.group === "today");
   const upcomingActions = allActions.filter((act) => act.group === "upcoming");
   const readyActions = allActions.filter((act) => act.group === "ready");
@@ -472,7 +474,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
             <span class="kpi-label">오늘 할 일</span>
             <button type="button" class="tooltip-icon" aria-label="오늘 할 일 설명" aria-expanded="false" data-help-text="기한 초과 약속, 오늘 세션, 사후설문 대기, 미정 회차처럼 오늘 직접 처리해야 하는 작업 개수입니다. 예정 알림과 보고 준비 완료는 제외합니다.">?</button>
           </div>
-          <div class="kpi-value">${isLoading ? '<span class="kpi-skeleton"></span>' : todayActions.length}</div>
+          <div class="kpi-value">${isLoading || !actionsReady ? '<span class="kpi-skeleton"></span>' : todayActions.length}</div>
           <div class="kpi-desc">즉시 조치 필요</div>
         </div>
         <div class="kpi-card highlight-purple cursor-pointer" data-nav="pulse" data-pulse-view="listening">
@@ -586,7 +588,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
             <div class="section-header">
               <div class="title-with-badge">
                 <h3>지금 할 일</h3>
-                <span class="badge red">${todayActions.length}</span>
+                <span class="badge red">${actionsReady ? todayActions.length : '—'}</span>
               </div>
             </div>
             <div class="action-queue-list">
@@ -596,7 +598,7 @@ export function renderHomeDashboard({ state, pulseCache, commitmentsCache }) {
                 countClass: "red",
                 actions: todayActions,
                 limit: 5,
-                emptyText: "오늘 직접 처리해야 할 할 일이 없습니다."
+                emptyText: actionsReady ? "오늘 직접 처리해야 할 할 일이 없습니다." : "오늘 할 일을 불러오는 중입니다."
               })}
               ${renderActionGroup({
                 key: "upcoming",

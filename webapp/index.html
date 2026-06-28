@@ -3,105 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Culture Platform 3.0 session operations cockpit" />
-    <!-- 진입점(index.html)을 항상 재검증하도록 한다. 정적 서버가 ?v= 쿼리를 무시하기 때문에
-         index.html이 캐시되면 오래된 app.js를 최신 state.js와 섞어 import 오류가 난다. -->
-    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
     <title>Culture Platform 3.0</title>
     <link rel="icon" href="./assets/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./src/styles.css?v=20260627-report-pdf-blocks-v2" />
-    <script>
-      window.addEventListener('error', function(e) {
-        const errDiv = document.createElement('div');
-        errDiv.style.position = 'fixed';
-        errDiv.style.top = '10px';
-        errDiv.style.left = '10px';
-        errDiv.style.right = '10px';
-        errDiv.style.background = '#fee2e2';
-        errDiv.style.color = '#991b1b';
-        errDiv.style.border = '2px solid #f87171';
-        errDiv.style.padding = '20px';
-        errDiv.style.borderRadius = '8px';
-        errDiv.style.zIndex = '99999';
-        errDiv.style.fontFamily = 'monospace';
-        errDiv.style.whiteSpace = 'pre-wrap';
-        errDiv.innerHTML = '<h3>JS Error Caught:</h3>' + e.message + '\n at ' + e.filename + ':' + e.lineno + ':' + e.colno + '\n\nStack:\n' + (e.error ? e.error.stack : 'No stack');
-        document.body.appendChild(errDiv);
-      });
-      window.addEventListener('unhandledrejection', function(e) {
-        const errDiv = document.createElement('div');
-        errDiv.style.position = 'fixed';
-        errDiv.style.top = '10px';
-        errDiv.style.left = '10px';
-        errDiv.style.right = '10px';
-        errDiv.style.background = '#fee2e2';
-        errDiv.style.color = '#991b1b';
-        errDiv.style.border = '2px solid #f87171';
-        errDiv.style.padding = '20px';
-        errDiv.style.borderRadius = '8px';
-        errDiv.style.zIndex = '99999';
-        errDiv.style.fontFamily = 'monospace';
-        errDiv.style.whiteSpace = 'pre-wrap';
-        errDiv.innerHTML = '<h3>Unhandled Promise Rejection:</h3>' + e.reason + '\n\nStack:\n' + (e.reason && e.reason.stack ? e.reason.stack : 'No stack');
-        document.body.appendChild(errDiv);
-      });
-    </script>
+    <link rel="stylesheet" href="./src/styles.css" />
   </head>
-  <body class="auth-locked">
-    <div id="auth-gate" class="auth-gate" aria-live="polite">
-      <div class="auth-gate-backdrop" aria-hidden="true"></div>
-      <section class="auth-shell" aria-label="Lina Culture Platform 로그인">
-        <div class="auth-visual">
-          <img src="./assets/intro_img.png" alt="구성원이 함께 대화하며 협업하는 모습" />
-          <div class="auth-visual-caption">
-            <span>Culture starts with listening</span>
-            <strong>듣고, 연결하고, 함께 실행합니다.</strong>
-          </div>
-        </div>
-        <div class="auth-panel">
-          <div class="auth-brand-row">
-            <img src="./assets/lina_logo.png" alt="Lina" />
-            <span>Culture Workspace</span>
-          </div>
-
-          <div class="auth-copy">
-            <span class="auth-eyebrow">Welcome to</span>
-            <h1>Lina Culture Platform</h1>
-            <p>승인된 구성원만 조직문화 운영 화면과 내부 데이터에 접속할 수 있습니다.</p>
-          </div>
-
-          <div id="auth-form" class="auth-form">
-            <label for="auth-email">이메일</label>
-            <input id="auth-email" type="email" autocomplete="username" inputmode="email" placeholder="you@example.com" />
-            <label for="auth-password">비밀번호</label>
-            <div class="auth-password-field">
-              <input id="auth-password" type="password" autocomplete="current-password" placeholder="8자 이상" />
-              <button type="button" id="auth-password-toggle" aria-label="비밀번호 보기">보기</button>
-            </div>
-            <div id="auth-actions" class="auth-actions">
-              <button type="button" id="auth-login" class="auth-primary">로그인</button>
-              <button type="button" id="auth-signup" class="auth-secondary">회원가입</button>
-            </div>
-          </div>
-
-          <div id="auth-status" class="auth-status checking">
-            <span class="auth-spinner" aria-hidden="true"></span>
-            <div><strong>접속 정보를 확인하고 있습니다.</strong><span>네트워크 상태에 따라 잠시 시간이 걸릴 수 있습니다.</span></div>
-          </div>
-          <button type="button" id="auth-switch-account" class="auth-switch-account" hidden>다른 계정으로 로그인</button>
-          <p class="auth-footnote">처음 접속한다면 회원가입 후 관리자의 승인을 기다려 주세요. 비밀번호는 Firebase 인증에만 보관되며 플랫폼 데이터에는 저장되지 않습니다.</p>
-        </div>
-      </section>
-    </div>
-    <div id="access-admin-root"></div>
-    <div class="bg-glow-container" aria-hidden="true">
-    </div>
-    <div id="app"></div>
-    <script src="./qrcode.min.js"></script>
-    <script type="module" src="./src/app.js"></script>
+  <body>
+    <div id="react-root"></div>
+    <script type="module" src="./src/main.jsx"></script>
   </body>
 </html>

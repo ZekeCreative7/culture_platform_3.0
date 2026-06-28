@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth.js';
 import { AppLayout } from './components/layout/index.js';
+import { LoginPage } from './pages/LoginPage.jsx';
 import { UploadPage } from './pages/UploadPage.jsx';
 import { AnalyticsPage } from './pages/AnalyticsPage.jsx';
 import { SessionsPage } from './pages/SessionsPage.jsx';
@@ -27,20 +28,16 @@ function AuthGuard({ children }) {
   }
 
   if (status === 'unauthenticated') {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui, sans-serif', color: '#1d1d1f' }}>
-        <div style={{ textAlign: 'center' }}>
-          <p>로그인이 필요합니다.</p>
-          <p style={{ fontSize: 13, color: '#6e6e73' }}>기존 로그인 화면을 이용해 주세요.</p>
-        </div>
-      </div>
-    );
+    return <LoginPage />;
   }
 
   if (status === 'pending') {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui, sans-serif', color: '#1d1d1f' }}>
-        <p>관리자 승인 대기 중입니다.</p>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontWeight: 500 }}>관리자 승인 대기 중입니다.</p>
+          <p style={{ fontSize: 13, color: '#6e6e73' }}>승인되면 자동으로 접속됩니다.</p>
+        </div>
       </div>
     );
   }

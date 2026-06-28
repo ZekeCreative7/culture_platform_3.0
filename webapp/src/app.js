@@ -126,7 +126,11 @@ import {
   surveyDistributionActive, surveyQuestionsForDistribution
 } from './state.js';
 
-const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  || window.location.hostname.startsWith('192.168.')
+  || window.location.hostname.startsWith('10.')
+  || window.location.hostname.startsWith('172.')
+  || window.location.hostname.endsWith('.local');
 
 const VIEWS = [
   ["dashboard", "홈", "홈"],
@@ -646,7 +650,9 @@ function bindCanvasEvents() {
     bindHomeDashboard({
       state,
       saveState,
-      render
+      render,
+      pulseCache,
+      commitmentsCache: state.pulseCommitments
     });
   } else if (state.activeView === "comm") {
     bindComm({ state, saveState, render });
@@ -997,8 +1003,8 @@ function bindSessions() {
   });
 
   const typeSelect = document.querySelector("#session-type");
-  if (!typeSelect) return;
-  typeSelect.addEventListener("change", () => {
+  if (typeSelect) {
+    typeSelect.addEventListener("change", () => {
     state.draftType = normalizeSessionType(typeSelect.value);
     state.draftSchedule = makeSchedule(state.draftType);
     if (!sameSessionType(state.draftType, "협업")) {
@@ -1307,6 +1313,7 @@ function bindSessions() {
     window.updateResponsesSubscription();
     render();
   });
+  } // END if (typeSelect)
   document.querySelector("#btn-db-upload")?.addEventListener("click", () => {
     document.getElementById("session-more-dropdown").style.display = "none";
     uploadStateToDb();

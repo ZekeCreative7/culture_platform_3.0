@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore.js';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -17,6 +17,10 @@ export function AppLayout({ children }) {
   useInitApp(isAuthenticated, orgId);
 
   const { dbStatus, setOrgSearchQuery, mobileNavOpen, setMobileNavOpen, sidebarCollapsed, setSidebarCollapsed } = useAppStore();
+
+  // 앱 진입 시 mobileNavOpen을 항상 false로 초기화.
+  // localStorage에 true가 저장돼 있으면 syncFromVanilla가 backdrop을 활성화해 콘텐츠 클릭을 막음.
+  useEffect(() => { setMobileNavOpen(false); }, []);
 
   // URL이 라우팅의 단일 소스. Zustand activeView를 네비게이션에 쓰지 않음.
   // 기존 두 방향 sync effect(URL↔Zustand)가 서로 경쟁해 루프를 만들었던 문제를 제거.
@@ -53,11 +57,6 @@ export function AppLayout({ children }) {
   return (
     <div id="app" className={classes.join(' ')}>
       <Sidebar
-        activeView={activeView}
-        onNavigate={(view) => {
-          navigate('/' + view);
-          setMobileNavOpen(false);
-        }}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         dbStatus={dbStatus}

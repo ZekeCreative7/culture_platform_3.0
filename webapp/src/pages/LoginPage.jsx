@@ -92,10 +92,8 @@ export function LoginPage() {
     <div className="auth-gate">
       <div className="auth-gate-backdrop" />
       <div className="auth-shell">
-        <div
-          className="auth-visual"
-          style={{ background: 'linear-gradient(170deg, #060f26 0%, #0a2252 55%, #0d3a82 100%)' }}
-        >
+        <div className="auth-visual">
+          <img src="./assets/intro_img.png" alt="" />
           <div className="auth-visual-caption">
             <span>조직문화 분석 플랫폼</span>
             <strong>조직의 변화를<br />데이터로 읽습니다</strong>

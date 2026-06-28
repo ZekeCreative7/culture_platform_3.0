@@ -1,8 +1,11 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore.js';
 import { dashboardActionQueue } from '../../dashboard/dashboardEngine.js';
 import { todayISO } from '../../utils.js';
 import { StatusDot } from '../ui/index.js';
+
+const VALID_VIEWS = ['dashboard', 'sessions', 'org', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse'];
 
 const VIEWS = [
   ['dashboard', 'Dashboard', '대시보드'],
@@ -29,17 +32,23 @@ const NAV_ICONS = {
 };
 
 export function Sidebar({
-  activeView,
-  onNavigate,
   collapsed,
   onToggleCollapse,
   dbStatus,
   mobileOpen,
   onCloseMobile
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const storeState = useAppStore();
+  const { setMobileNavOpen } = storeState;
   const today = todayISO();
-  
+
+  const activeView = React.useMemo(() => {
+    const path = location.pathname.slice(1);
+    return VALID_VIEWS.includes(path) ? path : 'dashboard';
+  }, [location.pathname]);
+
   // Calculate today action count for badge on Dashboard
   const todayActionCount = React.useMemo(() => {
     try {
@@ -48,6 +57,11 @@ export function Sidebar({
       return 0;
     }
   }, [storeState, today]);
+
+  function handleNav(id) {
+    navigate('/' + id);
+    setMobileNavOpen(false);
+  }
 
   const toggleIcon = collapsed ? (
     <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
@@ -95,7 +109,7 @@ export function Sidebar({
                 key={id}
                 type="button"
                 className={activeView === id ? 'active' : ''}
-                onClick={() => onNavigate(id)}
+                onClick={() => handleNav(id)}
                 title={ko}
               >
                 <span className="nav-icon">

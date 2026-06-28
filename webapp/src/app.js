@@ -1035,6 +1035,15 @@ function bindSessions() {
     saveState();
     render();
   });
+  document.querySelector("#copy-session-survey-prompt")?.addEventListener("click", (event) => {
+    const text = document.querySelector("#session-survey-prompt-text")?.value || "";
+    if (!text.trim()) return;
+    navigator.clipboard.writeText(text).then(() => {
+      const original = event.currentTarget.textContent;
+      event.currentTarget.textContent = "복사됨";
+      setTimeout(() => { event.currentTarget.textContent = original; }, 1600);
+    });
+  });
   document.querySelector("#add-team-leader")?.addEventListener("click", () => {
     const leader = leaderCandidateForTeam(state.draftTeamId);
     if (!leader) {

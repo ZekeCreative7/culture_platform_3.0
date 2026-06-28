@@ -20,6 +20,7 @@ import {
 import { pulseDiagnostics, comparisonPair } from '../pulse/pulseEngine.js';
 import { pulseCache } from '../state.js';
 import { pulseDivisionMappingForOrgIds } from '../report/pulseSessionInsight.js';
+import { buildSessionSurveyQuestionPrompt, pulseContextForSurveyPrompt } from '../survey/surveyPrompt.js';
 import { 
   unitLeaderDetails, 
   leaderCandidateForTeam, 
@@ -274,6 +275,72 @@ export function renderSessionPulseSummary() {
     </div>`;
 }
 
+function draftSessionLike() {
+  const type = normalizeSessionType(state.draftType);
+  const base = {
+    type,
+    cohort: state.draftCohort,
+    year: state.draftYear,
+    divisionId: state.draftDivisionId,
+    hqId: state.draftHqId,
+    teamId: state.draftTeamId,
+    division: state.draftDivision,
+    hq: state.draftHq,
+    team: state.draftTeam,
+  };
+  if (type === "팀빌딩") {
+    return { ...base, members: state.draftMembers || [] };
+  }
+  if (type === "리더십") {
+    return {
+      ...base,
+      participatingTeams: (state.draftLeaderGroup || []).map((leader) => leader.teamName).join(", "),
+      members: (state.draftLeaderGroup || []).map((leader) => ({ id: leader.id, name: leader.name })),
+    };
+  }
+  if (type === "협업") {
+    const members = selectedCrossMembers();
+    return {
+      ...base,
+      participatingTeams: [...new Set(members.map((member) => member.teamName))].join(", "),
+      members,
+    };
+  }
+  return base;
+}
+
+function renderSessionSurveyPromptCard() {
+  const draftSession = draftSessionLike();
+  const prompt = buildSessionSurveyQuestionPrompt({
+    session: draftSession,
+    pulseYears: pulseCache.years || {},
+    selectedYear: state.pulseYear,
+  });
+  const pulse = pulseContextForSurveyPrompt({
+    session: draftSession,
+    pulseYears: pulseCache.years || {},
+    selectedYear: state.pulseYear,
+  });
+  const pulseText = pulse.status === "ready"
+    ? `${pulse.year}년 ${pulse.divisionId} 본부 기준 · ${pulse.focusDomain}`
+    : "Pulse 매핑 없음 · 기본 세션 목적 기준";
+
+  return `
+    <div class="session-survey-prompt-card">
+      <div class="session-survey-prompt-head">
+        <div>
+          <strong>설문 질문 생성 프롬프트</strong>
+          <span>${escapeHtml(pulseText)} · 사전/사후/팔로우업 질문을 한 번에 설계합니다.</span>
+        </div>
+        <div class="session-survey-prompt-actions">
+          <button type="button" class="secondary compact" id="copy-session-survey-prompt">프롬프트 복사</button>
+        </div>
+      </div>
+      <textarea class="session-survey-prompt-text" id="session-survey-prompt-text" readonly>${escapeHtml(prompt)}</textarea>
+    </div>
+  `;
+}
+
 export function renderTeamBuildingPanel(divisionList, hqList, teamList) {
   return `
     <div class="session-config-panel">
@@ -282,6 +349,7 @@ export function renderTeamBuildingPanel(divisionList, hqList, teamList) {
         <span>한 팀을 선택하면 팀장과 팀원 데이터를 불러옵니다.</span>
       </div>
       ${renderOrgSelectRow(divisionList, hqList, teamList)}
+      ${renderSessionSurveyPromptCard()}
       ${state.draftTeamId ? (() => {
           const divUnit = state.orgUnits.find(u => u.id === state.draftDivisionId);
           const hqUnit  = state.orgUnits.find(u => u.id === state.draftHqId);
@@ -350,6 +418,7 @@ export function renderLeaderSessionPanel(divisionList, hqList, teamList) {
           `).join("")}
         </div>
       ` : `<div class="empty compact">아직 추가된 리더가 없습니다.</div>`}
+      ${renderSessionSurveyPromptCard()}
     </div>
   `;
 }
@@ -409,6 +478,7 @@ export function renderCrossFunctionalPanel() {
         <p class="config-note">팀장 직급은 제외하고 전체 조직 구성원 풀에서 중복 없이 뽑습니다.</p>
         ${renderSelectedCrossMembers(selectedMembers)}
       `}
+      ${renderSessionSurveyPromptCard()}
     </div>
   `;
 }

@@ -1570,6 +1570,51 @@ button:disabled { cursor: not-allowed; opacity: 0.42; transform: none !important
 .session-pulse-tag.risk { background: #fff3f2; color: #b53c3c; border-color: #f2cccc; }
 .session-pulse-tag.focus { background: #edf7ff; color: #126db5; }
 .session-pulse-summary.muted { background: #f8fafc; border-color: #e2e8f0; }
+.session-survey-prompt-card {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+.session-survey-prompt-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.session-survey-prompt-head > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.session-survey-prompt-head strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+.session-survey-prompt-head span {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.session-survey-prompt-actions {
+  flex: 0 0 auto;
+}
+.session-survey-prompt-text {
+  width: 100%;
+  min-height: 210px;
+  resize: vertical;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2f46;
+  padding: 12px;
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  box-sizing: border-box;
+}
 .selected-team-wrap { margin: 8px 0 0; min-width: 0; }
 
 label { display: grid; gap: 8px; color: var(--muted); font-size: 12.5px; font-weight: 700; }

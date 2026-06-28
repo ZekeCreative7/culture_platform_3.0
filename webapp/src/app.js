@@ -110,11 +110,13 @@ import {
 import {
   STORE_KEY, ORG_STORE_KEY, PULSE_YEARS, pulseCache, commitmentsCache, dbStatus, subscribe, notify, setDbStatus,
   blankState, state, reassignState, loadOrgData, saveOrgData, loadState, saveState, saveStateQuiet, normalizeAppState,
-  syncSurveysToSessions, loadSurveysFromFirestore, loadSessionsFromFirestore, saveSessionToFirestore,
-  subscribeSessionsFromFirestore, subscribeOrganizationFromFirestore, subscribePulseYearsFromFirestore, subscribePulseCommitmentsFromFirestore,
+  syncSurveysToSessions, saveSessionToFirestore,
+  subscribeSessionsFromFirestore, subscribeSurveysFromFirestore, subscribeSurveyTemplatesFromFirestore,
+  subscribeOrganizationFromFirestore, subscribePulseYearsFromFirestore, subscribePulseCommitmentsFromFirestore,
+  subscribeQualSignalsFromFirestore,
   deleteSessionFromFirestore, deleteResponseFromFirestore, saveResponsesToFirestore, fetchAllResponsesFromFirestore,
   setSurveyDistributionActiveInFirestore, updateSurveyInFirestore, deleteSurveyDocFromFirestore, normalizeSurveyRecord, loadPulseYears,
-  loadSurveyTemplatesFromFirestore, saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
+  saveSurveyTemplateToFirestore, deleteSurveyTemplateFromFirestore,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore, fetchRecentAuditLogs,
   migrateOrganizationId,
@@ -2647,60 +2649,20 @@ async function initApp({ localPreview = false } = {}) {
     return;
   }
 
-  // Load sessions and surveys BEFORE wiring the response listener: the session is the source of
-  // truth for each response's 기수, so the map below needs sessions in place to resolve it.
-  await Promise.all([loadSessionsFromFirestore(), loadSurveysFromFirestore(), loadSurveyTemplatesFromFirestore()]);
-  syncSurveysToSessions();
-  render();
-  if (["dashboard", "sessions", "pulse", "report", "comm"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
-    Promise.all([loadPulseYears(), loadPulseCommitments()]).then(() => render());
-  }
-
   subscribeSessionsFromFirestore(handleRealtimeSessionChange);
+  subscribeSurveysFromFirestore(() => {
+    syncSurveysToSessions();
+    window.updateResponsesSubscription?.();
+    renderIfActive(["dashboard", "sessions", "survey", "analytics", "report"]);
+  });
+  subscribeSurveyTemplatesFromFirestore(() => renderIfActive(["survey"]));
   subscribeOrganizationFromFirestore(handleRealtimeOrganizationChange);
   subscribePulseYearsFromFirestore(handleRealtimePulseChange);
   subscribePulseCommitmentsFromFirestore(handleRealtimePulseChange);
-
-  // Survey configuration can be repaired or reassigned while another operator tab is already open.
-  // Keep it live just like responses so newly linked qualitative question IDs become visible without
-  // requiring a hard refresh (otherwise the tab keeps falling back to the legacy q9~q11 set).
-  onSnapshot(collection(db, 'surveys'), (snap) => {
-    state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
-    syncSurveysToSessions();
-    window.updateResponsesSubscription?.();
-    saveState();
-    const shouldRender = ["dashboard", "sessions", "survey", "analytics", "report"].includes(state.activeView);
-    if (shouldRender) {
-      render();
-    }
-  }, (err) => {
-    console.error('Firestore 설문 실시간 갱신 오류:', err);
-  });
-
-  onSnapshot(collection(db, 'surveyTemplates'), (snap) => {
-    state.surveyTemplates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    saveState();
-    if (state.activeView === "survey") {
-      render();
-    }
-  }, (err) => {
-    console.error('Firestore 설문 템플릿 실시간 갱신 오류:', err);
-  });
+  subscribeQualSignalsFromFirestore(() => renderIfActive(["analytics", "report"]));
 
   // Real-time listener for responses — scoped to active sessions
   window.updateResponsesSubscription();
-
-  // Real-time listener for QualSignal — updates report and session status
-  onSnapshot(collection(db, 'QualSignal'), (snap) => {
-    state.qualSignals = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    const shouldRender = ["analytics", "report"].includes(state.activeView);
-    if (shouldRender) {
-      saveState();
-      render();
-    }
-  }, (err) => {
-    console.error('Firestore QualSignal 실시간 리스너 오류:', err);
-  });
 }
 
 function qualQuestionLabel(qid, type, sessionId = "", phase = "") {

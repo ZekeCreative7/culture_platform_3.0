@@ -49,16 +49,13 @@ async function writeAuditLog({ action, targetId, targetType, detail = '' }) {
 
 export function subscribe(listener) {
   listeners.push(listener);
-  console.log('subscribe called! Current listeners count:', listeners.length);
   return () => {
     const idx = listeners.indexOf(listener);
     if (idx !== -1) listeners.splice(idx, 1);
-    console.log('unsubscribe called! Current listeners count:', listeners.length);
   };
 }
 
 export function notify() {
-  console.log('notify called! Listeners count:', listeners.length);
   listeners.forEach((l, i) => {
     try {
       l();
@@ -354,6 +351,19 @@ export async function loadSurveysFromFirestore() {
   }
 }
 
+export function subscribeSurveysFromFirestore(onChange = () => {}) {
+  return onSnapshot(query(collection(db, 'surveys'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
+    state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
+    syncSurveysToSessions();
+    saveState();
+    setDbStatus('connected');
+    onChange();
+  }, (e) => {
+    console.error('Firestore 설문 실시간 갱신 오류:', e);
+    setDbStatus('error');
+  });
+}
+
 export async function loadSessionsFromFirestore() {
   try {
     const snap = await getDocs(query(collection(db, 'sessions'), where('organizationId', '==', getCurrentOrgId())));
@@ -384,13 +394,14 @@ export function subscribeSessionsFromFirestore(onChange = () => {}) {
   });
 }
 
-export function subscribeQualSignalsFromFirestore() {
+export function subscribeQualSignalsFromFirestore(onChange = () => {}) {
   return onSnapshot(collection(db, 'QualSignal'), (snap) => {
     state.qualSignals = snap.docs
       .map(d => ({ ...d.data(), id: d.id }))
       .filter(q => !q.organizationId || q.organizationId === getCurrentOrgId());
     saveState();
     setDbStatus('connected');
+    onChange();
   }, (e) => {
     console.error('Firestore QualSignal 실시간 갱신 오류:', e);
     setDbStatus('error');
@@ -525,6 +536,18 @@ export async function loadSurveyTemplatesFromFirestore() {
   } catch (e) {
     console.error('Firestore 설문 템플릿 로드 실패:', e);
   }
+}
+
+export function subscribeSurveyTemplatesFromFirestore(onChange = () => {}) {
+  return onSnapshot(query(collection(db, 'surveyTemplates'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
+    state.surveyTemplates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    saveState();
+    setDbStatus('connected');
+    onChange();
+  }, (e) => {
+    console.error('Firestore 설문 템플릿 실시간 갱신 오류:', e);
+    setDbStatus('error');
+  });
 }
 
 export async function saveSurveyTemplateToFirestore(id, data) {

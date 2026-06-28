@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { dashboardActionQueue } from '../../dashboard/dashboardEngine.js';
@@ -11,13 +12,13 @@ export function Topbar({
   userEmail,
   onLogout
 }) {
+  const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const storeState = useAppStore();
   const today = todayISO();
   const { isMaster } = useAuth();
 
   const {
-    setActiveView,
     setSessionDrawerOpen,
     setEditingSessionId,
     setActiveSessionTab,
@@ -41,22 +42,22 @@ export function Topbar({
 
   const handleNewSession = (e) => {
     e.preventDefault();
-    setActiveView('sessions');
     setActiveSessionTab('list');
     setEditingSessionId(null);
     setSessionDrawerOpen(true);
     setMobileNavOpen(false);
+    navigate('/sessions');
   };
 
   const handleNotifClick = (e) => {
     e.preventDefault();
-    setActiveView('dashboard');
     setMobileNavOpen(false);
+    navigate('/dashboard');
   };
 
   const handleDropdownNavigate = (view) => {
-    setActiveView(view);
     setDropdownOpen(false);
+    navigate('/' + view);
   };
 
   return (

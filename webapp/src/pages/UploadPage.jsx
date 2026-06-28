@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore.js';
 import { parseCSV } from '../views/upload.js';
 import { ensureXlsxLoaded } from '../report/reportExport.js';
@@ -85,6 +86,7 @@ function PreviewTable({ rows, uploadPiiDropped, sessions, selectedSessionId, sel
 }
 
 export function UploadPage() {
+  const navigate = useNavigate();
   const {
     sessions,
     uploadRows,
@@ -93,7 +95,6 @@ export function UploadPage() {
     setUploadRows,
     setUploadErrors,
     setUploadFileName,
-    setActiveView,
     setSelectedAnalyticsType,
     setSelectedAnalyticsCohort,
     setSelectedAnalyticsSessionId,
@@ -162,11 +163,11 @@ export function UploadPage() {
 
       saveState();
       saveResponsesToFirestore(rowsToSave).catch(e => console.error('Firestore 응답 저장 실패:', e));
-      setActiveView('analytics');
+      navigate('/analytics');
     } finally {
       setSaving(false);
     }
-  }, [uploadRows, saving, sessions, setUploadRows, setUploadErrors, setActiveView,
+  }, [uploadRows, saving, sessions, setUploadRows, setUploadErrors, navigate,
       setSelectedAnalyticsType, setSelectedAnalyticsCohort, setSelectedAnalyticsSessionId, setSelectedAnalyticsPhase]);
 
   return (

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { useInitApp } from '../../hooks/useInitApp.js';
 import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { VanillaCanvas, isVanillaView } from './VanillaCanvas.jsx';
@@ -9,7 +10,9 @@ import { VanillaCanvas, isVanillaView } from './VanillaCanvas.jsx';
 export function AppLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, orgId } = useAuth();
+
+  useInitApp(isAuthenticated, orgId);
   
   const storeState = useAppStore();
   const {

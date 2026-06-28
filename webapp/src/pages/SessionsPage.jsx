@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, memo } from 'react';
-import { state as vanillaState } from '../state.js';
+import { state as vanillaState, subscribe } from '../state.js';
 import { renderSessions } from '../views/sessions.js';
 
 export const SessionsPage = memo(function SessionsPage() {
@@ -7,10 +7,25 @@ export const SessionsPage = memo(function SessionsPage() {
 
   useEffect(() => {
     vanillaState.activeView = 'sessions';
-    if (divRef.current) {
-      divRef.current.innerHTML = renderSessions();
-      requestAnimationFrame(() => { window.__vanillaBindCanvas?.(); });
+
+    function refresh() {
+      if (divRef.current) {
+        divRef.current.innerHTML = renderSessions();
+      }
     }
+
+    refresh();
+
+    let timer = null;
+    const unsub = subscribe(() => {
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 150);
+    });
+
+    return () => {
+      clearTimeout(timer);
+      unsub();
+    };
   }, []);
 
   return <div ref={divRef} />;

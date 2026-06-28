@@ -20,7 +20,7 @@ export const PULSE_DIV_MAP = {
   "재무관리회계투자본부": { orgUnitIds: ["FINANCE_MGMT", "INVESTMENT"], relation: "merge", confidence: "low" },
   "법무/준법/감사/대외협력": { orgUnitIds: ["LEGAL_PRIVACY", "EXTERNAL_COOPERATION", "AUDIT_EXECUTIVE"], relation: "merge", confidence: "low" },
 
-  "DT운영본부": { orgUnitIds: ["INFRA_SERVICE", "OPERATION", "DT_PLANNING"], relation: "unclear", confidence: "low" },
-  "DT혁신본부/CISO": { orgUnitIds: ["CISO", "INSURANCE_DEV"], relation: "unclear", confidence: "low" },
-  "계약서비스본부": { orgUnitIds: [], relation: "missing", confidence: "low" },
+  "DT운영본부": { orgUnitIds: ["INSURANCE_DEV", "SALES_DEV"], relation: "merge", confidence: "med" },
+  "DT혁신본부/CISO": { orgUnitIds: ["INFRA_SERVICE", "CISO"], relation: "merge", confidence: "med" },
+  "계약서비스본부": { orgUnitIds: ["CONSUMER_PROTECTION"], relation: "merge", confidence: "low" },
 };

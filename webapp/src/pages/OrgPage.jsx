@@ -8,6 +8,7 @@ export const OrgPage = memo(function OrgPage() {
   useEffect(() => {
     vanillaState.activeView = 'org';
     function refresh() {
+      console.log('OrgPage refresh called! state.orgEditor is:', vanillaState.orgEditor);
       if (divRef.current) {
         divRef.current.innerHTML = renderOrg();
         bindOrg();

@@ -1901,11 +1901,13 @@ window.selectOrgNode = function(level, id) {
 };
 
 window.addOrgNode = function(level, parentId) {
+  console.log('addOrgNode called with:', level, parentId);
   state.orgEditor = { kind: "unit", mode: "add", level, parentId };
   render();
 };
 
 window.renameOrgNode = function(id) {
+  console.log('renameOrgNode called with:', id);
   const unit = state.orgUnits.find(u => u.id === id);
   if (!unit) return;
   state.orgEditor = { kind: "unit", mode: "edit", id, level: unit.level, parentId: unit.parentId };
@@ -2028,6 +2030,7 @@ window.deleteMember = function(id) {
 };
 
 window.openOrgNodeEditor = function(id, mode) {
+  console.log('openOrgNodeEditor called with:', id, mode);
   if (mode === "edit") {
     window.renameOrgNode(id);
   } else {

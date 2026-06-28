@@ -40,7 +40,11 @@ const firebaseConfig = {
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
-const isLocalDevelopment = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const isLocalDevelopment = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  || window.location.hostname.startsWith('192.168.')
+  || window.location.hostname.startsWith('10.')
+  || window.location.hostname.startsWith('172.')
+  || window.location.hostname.endsWith('.local');
 if (isLocalDevelopment) {
   // A literal `true` here makes the SDK mint a brand-new random debug token on every
   // page load, which then 403s against App Check until that exact token is registered
@@ -55,7 +59,7 @@ if (isLocalDevelopment) {
   self.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
   console.info('[App Check] local debug token (등록 필요 시 1회만):', debugToken);
 }
-export const appCheck = initializeAppCheck(firebaseApp, {
+export const appCheck = isLocalDevelopment ? null : initializeAppCheck(firebaseApp, {
   provider: new ReCaptchaEnterpriseProvider('6LfuSSktAAAAANg8W3c0tVOUp6_aH99ZlZX8nbMg'),
   isTokenAutoRefreshEnabled: true
 });

@@ -381,7 +381,10 @@ function render() {
             <span></span>
             <span></span>
           </button>
-          <input type="search" class="searchbox" id="topbar-search" placeholder="세션, 조직, 설문 검색" autocomplete="off" onkeydown="if(event.key==='Enter')window.handleTopbarSearch(this.value)" />
+          <div class="searchbox-wrap">
+            <svg class="searchbox-icon" viewBox="0 0 16 16" fill="none" width="15" height="15"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <input type="search" class="searchbox" id="topbar-search" placeholder="세션, 조직, 설문 검색" autocomplete="off" onkeydown="if(event.key==='Enter')window.handleTopbarSearch(this.value)" />
+          </div>
           <div class="topbar-actions">
             ${LOCAL_PREVIEW ? `<div class="local-preview-badge" title="Firebase 로그인과 원격 저장을 사용하지 않는 로컬 확인 모드입니다."><span class="local-preview-dot"></span>로컬 미리보기</div>` : ''}
             <button class="topbar-notif-btn ${todayActionCount !== null && todayActionCount > 0 ? 'has-notif' : ''}" id="topbar-notif-btn" data-view="dashboard" title="오늘 할 일">

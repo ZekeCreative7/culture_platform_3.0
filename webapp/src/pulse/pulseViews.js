@@ -499,7 +499,7 @@ function renderOverviewView({ state, cache }) {
         <strong>Pulse Survey는 조직의 상태를 1차 스크리닝하는 도구입니다.</strong><br>
         조직이나 구성원을 서열화하고 감점하는 평가표가 아니라, 구성원 경험에서 나타나는 신뢰·에너지·소속의 변화 신호를 조기에 발견해 <strong>어디의 이야기를 먼저 듣고 어떤 운영 질문을 더 확인할지 정하는 출발점</strong>입니다. 이 결과는 결론이 아니라 경청 대화와 추가 확인을 위한 가설로 사용합니다.
       </p>
-      ${renderUploadPanel(state, currentDoc)}
+      ${renderUploadPanel(state, doc)}
     </article>
 
     <!-- 장면 0.5. 공식 보고 지표 (Engagement Score) -->

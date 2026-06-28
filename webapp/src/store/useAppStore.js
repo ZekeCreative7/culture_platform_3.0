@@ -155,7 +155,10 @@ export const useAppStore = create((set) => ({
   },
 
   // ── vanilla state 전체 동기화 (notify() 호출 시 사용) ────────────
-  syncFromVanilla: () => set(snapshot()),
+  // React 앱에서 URL(React Router)이 라우팅의 source of truth.
+  // notify()로 vanilla state가 동기화될 때 activeView는 덮어쓰지 않는다.
+  // activeView는 URL sync useEffect와 setActiveView()를 통해서만 변경된다.
+  syncFromVanilla: () => set((prev) => ({ ...snapshot(), activeView: prev.activeView })),
 }));
 
 // vanilla state가 notify()를 호출하면 Zustand store도 동기화

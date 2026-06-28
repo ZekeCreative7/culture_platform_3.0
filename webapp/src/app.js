@@ -126,8 +126,7 @@ import {
   surveyDistributionActive, surveyQuestionsForDistribution
 } from './state.js';
 
-const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  && new URLSearchParams(window.location.search).get('preview') === '1';
+const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 const VIEWS = [
   ["dashboard", "홈", "홈"],

@@ -6,9 +6,11 @@
  *
  * 바닐라 app.js의 initApp()에 해당하는 역할이지만 render()를 호출하지 않는다.
  */
-
 import { useEffect, useRef } from 'react';
 import {
+  state as vanillaState,
+  saveOrgData,
+  saveState,
   loadSessionsFromFirestore,
   loadSurveysFromFirestore,
   loadSurveyTemplatesFromFirestore,
@@ -19,6 +21,8 @@ import {
   syncSurveysToSessions,
   setDbStatus,
 } from '../state.js';
+
+const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 export function useInitApp(isAuthenticated, orgId) {
   const initialized = useRef(false);
@@ -32,6 +36,33 @@ export function useInitApp(isAuthenticated, orgId) {
     if (orgId) window.__currentOrgId = orgId;
 
     (async () => {
+      if (LOCAL_PREVIEW) {
+        // 로컬 미리보기 모드: Firebase 호출 우회 및 로컬 데이터 시딩
+        const ORG_DATA_VERSION = 5;
+        const orgNeedsSeed = !vanillaState.orgUnits || vanillaState.orgUnits.length < 10
+          || !vanillaState.orgMembers || vanillaState.orgMembers.length < 10
+          || (vanillaState.orgDataVersion || 0) < ORG_DATA_VERSION;
+        if (orgNeedsSeed) {
+          try {
+            const response = await fetch('./src/org_data.json');
+            const data = await response.json();
+            vanillaState.orgUnits = data.units;
+            vanillaState.orgMembers = data.members;
+            vanillaState.orgDataVersion = data.version || ORG_DATA_VERSION;
+            const ceo = vanillaState.orgUnits.find(u => u.level === 'company');
+            if (ceo) {
+              vanillaState.selectedCompany = ceo.id;
+            }
+            saveOrgData();
+            saveState();
+          } catch (e) {
+            console.error('[useInitApp] 로컬 데이터 시딩 실패:', e);
+          }
+        }
+        setDbStatus('connected');
+        return;
+      }
+
       try {
         // 초기 일괄 로드 (sessions + surveys + templates)
         await Promise.all([

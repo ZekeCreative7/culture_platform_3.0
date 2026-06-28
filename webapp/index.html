@@ -9,6 +9,42 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./src/styles.css" />
+    <script>
+      window.addEventListener('error', function(e) {
+        const errDiv = document.createElement('div');
+        errDiv.style.position = 'fixed';
+        errDiv.style.top = '10px';
+        errDiv.style.left = '10px';
+        errDiv.style.right = '10px';
+        errDiv.style.background = '#fee2e2';
+        errDiv.style.color = '#991b1b';
+        errDiv.style.border = '2px solid #f87171';
+        errDiv.style.padding = '20px';
+        errDiv.style.borderRadius = '8px';
+        errDiv.style.zIndex = '99999';
+        errDiv.style.fontFamily = 'monospace';
+        errDiv.style.whiteSpace = 'pre-wrap';
+        errDiv.innerHTML = '<h3>JS Error Caught:</h3>' + e.message + '\n at ' + e.filename + ':' + e.lineno + ':' + e.colno + '\n\nStack:\n' + (e.error ? e.error.stack : 'No stack');
+        document.body.appendChild(errDiv);
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        const errDiv = document.createElement('div');
+        errDiv.style.position = 'fixed';
+        errDiv.style.top = '10px';
+        errDiv.style.left = '10px';
+        errDiv.style.right = '10px';
+        errDiv.style.background = '#fee2e2';
+        errDiv.style.color = '#991b1b';
+        errDiv.style.border = '2px solid #f87171';
+        errDiv.style.padding = '20px';
+        errDiv.style.borderRadius = '8px';
+        errDiv.style.zIndex = '99999';
+        errDiv.style.fontFamily = 'monospace';
+        errDiv.style.whiteSpace = 'pre-wrap';
+        errDiv.innerHTML = '<h3>Unhandled Promise Rejection:</h3>' + e.reason + '\n\nStack:\n' + (e.reason && e.reason.stack ? e.reason.stack : 'No stack');
+        document.body.appendChild(errDiv);
+      });
+    </script>
   </head>
   <body>
     <div id="react-root"></div>

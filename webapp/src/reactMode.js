@@ -1,0 +1,1 @@
+window.__reactMode = true;

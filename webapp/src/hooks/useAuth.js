@@ -26,12 +26,21 @@ const MASTER_EMAIL = 'rhokoo7@naver.com';
  *   logout: () => Promise<void>,
  * }}
  */
+const LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [status, setStatus] = useState('loading');
   const [orgId, setOrgId] = useState('lina');
 
   useEffect(() => {
+    if (LOCAL_PREVIEW) {
+      setUser({ email: 'local-preview@example.com', uid: 'local-preview-uid' });
+      setStatus('granted');
+      setOrgId('lina');
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
         setUser(null);

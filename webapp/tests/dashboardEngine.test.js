@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState, dashboardPulseTeamSupport, dashboardOutcomeSnapshot, dashboardActionDataReady } from '../src/dashboard/dashboardEngine.js';
-import { applyDashboardNavigationState } from '../src/dashboard/dashboardNavigation.js';
+import { applyDashboardActionState, applyDashboardNavigationState } from '../src/dashboard/dashboardNavigation.js';
 import { sampleState } from './fixtures/sampleState.js';
 
 describe('getSessionStatus', () => {
@@ -336,5 +336,45 @@ describe('applyDashboardNavigationState', () => {
     expect(state.selectedReportCohort).toBe('3');
     expect(state.selectedAnalyticsType).toBe('협업');
     expect(state.selectedAnalyticsCohort).toBe('3');
+  });
+
+  it('첫 약속 등록 카드는 Pulse 약속 등록 폼을 자동으로 열도록 표시해야 한다', () => {
+    const state = {
+      activeView: 'dashboard',
+      pulseView: 'overview',
+      pulseScopeId: 'company',
+      sessions: [],
+    };
+
+    applyDashboardNavigationState(state, {
+      targetView: 'pulse',
+      pulseView: 'listening',
+      openCommitmentForm: true,
+    });
+
+    expect(state.activeView).toBe('pulse');
+    expect(state.pulseView).toBe('listening');
+    expect(state.pulseAutoOpenCommitmentForm).toBe(true);
+  });
+
+  it('팔로우업 설문 생성 액션은 설문 초안을 해당 세션 기준으로 준비해야 한다', () => {
+    const state = {
+      activeView: 'dashboard',
+      sessions: [
+        { id: 'session-tb-2', type: '팀빌딩', cohort: 2, year: 2026, team: 'DT기획팀' },
+      ],
+    };
+
+    applyDashboardActionState(state, {
+      targetView: 'survey',
+      actionType: 'followup_survey_create',
+      sessionId: 'session-tb-2',
+    });
+
+    expect(state.activeView).toBe('survey');
+    expect(state.draftSurveySessionId).toBe('session-tb-2');
+    expect(state.draftSurveyPhase).toBe('팔로우업');
+    expect(state.draftSurveyTitle).toContain('팔로우업 설문');
+    expect(state.draftSurveyQuestions.length).toBeGreaterThan(0);
   });
 });

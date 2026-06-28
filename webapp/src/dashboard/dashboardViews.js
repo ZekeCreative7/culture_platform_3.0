@@ -12,9 +12,9 @@ import {
   dashboardTeamPipeline,
   PIPELINE_STAGES
 } from './dashboardEngine.js';
-import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES, defaultQuestions, normalizeSessionType, sessionLabel, sessionYear } from '../utils.js';
+import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES } from '../utils.js';
 import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js';
-import { applyDashboardNavigationState } from './dashboardNavigation.js';
+import { applyDashboardActionState, applyDashboardNavigationState } from './dashboardNavigation.js';
 
 // Helper to count week sessions
 function displayWeekSessionsCount(state, today) {
@@ -927,32 +927,12 @@ export function bindHomeDashboard({ state, saveState, render }) {
       const sessionId = row.dataset.sessionId;
       const commitmentId = row.dataset.commitmentId;
 
-      applyDashboardNavigationState(state, { targetView, sessionId });
-
-      if (commitmentId) {
-        state.editingCommitmentId = commitmentId;
-        state.pulseView = "listening"; // Go to commitments list tab
-      }
+      applyDashboardActionState(state, { targetView, actionType, sessionId, commitmentId });
 
       if (targetView === "sessions" && sessionId && typeof window.startEditSession === "function") {
         state.activeView = "sessions";
         window.startEditSession(sessionId);
         return;
-      }
-
-      if (targetView === "survey" && sessionId) {
-        const targetSess = state.sessions.find(s => s.id === sessionId);
-        if (targetSess && actionType === "followup_survey_create") {
-          state.editingSurveyId = null;
-          state.draftSurveySessionType = normalizeSessionType(targetSess.type);
-          state.draftSurveyCohortKey = `${sessionYear(targetSess) || targetSess.year || ''}:${Number(targetSess.cohort) || ''}`;
-          state.draftSurveySessionId = sessionId;
-          state.draftSurveyPhase = "팔로우업";
-          state.draftSurveyTitle = `${sessionLabel(targetSess)} 팔로우업 설문`;
-          state.draftGoogleFormUrl = "";
-          state.draftSurveyQuestions = defaultQuestions("팔로우업", targetSess.type);
-          state.surveyCreatorStep = 1;
-        }
       }
 
       saveState();

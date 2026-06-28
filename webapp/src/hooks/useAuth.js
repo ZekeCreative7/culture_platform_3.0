@@ -9,7 +9,7 @@
  * authGate.js 내부 로직을 이 훅 안으로 흡수합니다.
  */
 
-import { useState, useEffect } from 'react';
+import { createContext, createElement, useContext, useEffect, useState } from 'react';
 import { auth, onAuthStateChanged, signOut } from '../firebase.js';
 import { getDoc, doc, db } from '../firebase.js';
 
@@ -35,14 +35,19 @@ if (window.location.search.includes('preview=1')) {
 const LOCAL_PREVIEW = window.location.search.includes('preview=1')
   || sessionStorage.getItem('previewMode') === 'true';
 
-export function useAuth() {
+const AuthContext = createContext(null);
+
+function useAuthState() {
   const [user, setUser] = useState(null);
   const [status, setStatus] = useState('loading');
   const [orgId, setOrgId] = useState('lina');
 
   useEffect(() => {
     if (LOCAL_PREVIEW) {
-      setUser({ email: 'local-preview@example.com', uid: 'local-preview-uid' });
+      const previewUser = { email: 'local-preview@example.com', uid: 'local-preview-uid' };
+      window.__currentUserEmail = previewUser.email;
+      window.__currentOrgId = 'lina';
+      setUser(previewUser);
       setStatus('granted');
       setOrgId('lina');
       return;
@@ -50,15 +55,18 @@ export function useAuth() {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
+        window.__currentUserEmail = '';
         setUser(null);
         setStatus('unauthenticated');
         return;
       }
 
+      window.__currentUserEmail = firebaseUser.email || '';
       setUser(firebaseUser);
 
       // 마스터 계정은 즉시 승인
       if (firebaseUser.email?.toLowerCase() === MASTER_EMAIL) {
+        window.__currentOrgId = window.__currentOrgId || 'lina';
         setStatus('granted');
         setOrgId(window.__currentOrgId || 'lina');
         return;
@@ -69,7 +77,9 @@ export function useAuth() {
         const snap = await getDoc(doc(db, 'accessRequests', firebaseUser.uid));
         const data = snap.data();
         if (data?.status === 'approved') {
-          setOrgId(data.organizationId || 'lina');
+          const nextOrgId = data.organizationId || 'lina';
+          window.__currentOrgId = nextOrgId;
+          setOrgId(nextOrgId);
           setStatus('granted');
         } else {
           setStatus('pending');
@@ -91,4 +101,17 @@ export function useAuth() {
     orgId,
     logout: () => signOut(auth),
   };
+}
+
+export function AuthProvider({ children }) {
+  const value = useAuthState();
+  return createElement(AuthContext.Provider, { value }, children);
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used inside AuthProvider.');
+  }
+  return context;
 }

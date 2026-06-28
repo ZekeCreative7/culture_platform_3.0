@@ -2,6 +2,7 @@ import React, { useEffect, useRef, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { state as vanillaState, pulseCache, commitmentsCache, subscribe, saveState } from '../state.js';
 import { renderHomeDashboard } from '../dashboard/dashboardViews.js';
+import { applyDashboardActionState, applyDashboardNavigationState } from '../dashboard/dashboardNavigation.js';
 
 export const DashboardPage = memo(function DashboardPage() {
   const divRef = useRef(null);
@@ -17,25 +18,42 @@ export const DashboardPage = memo(function DashboardPage() {
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           const view = el.dataset.nav;
-          if (view) navigate('/' + view);
+          applyDashboardNavigationState(vanillaState, {
+            targetView: view,
+            sessionId: el.dataset.sessionId || "",
+            scopeId: el.dataset.scopeId || "",
+            pulseView: el.dataset.pulseView || "",
+            openCommitmentForm: el.dataset.openCommitmentForm === "true",
+          });
+          saveState();
+          if (vanillaState.activeView) navigate('/' + vanillaState.activeView);
         });
       });
       // Action queue rows → navigate to target view
       divRef.current.querySelectorAll('.queue-row[data-action-view]').forEach(row => {
         row.addEventListener('click', () => {
           const view = row.dataset.actionView;
-          const sessionId = row.dataset.sessionId;
-          if (sessionId) {
-            vanillaState.selectedReportSessionId = sessionId;
-            vanillaState.selectedAnalyticsSessionId = sessionId;
-          }
-          if (view) navigate('/' + view);
+          applyDashboardActionState(vanillaState, {
+            targetView: view,
+            actionType: row.dataset.actionType || "",
+            sessionId: row.dataset.sessionId || "",
+            commitmentId: row.dataset.commitmentId || "",
+          });
+          saveState();
+          if (vanillaState.activeView) navigate('/' + vanillaState.activeView);
         });
       });
       // Pipeline team card → navigate to sessions
       divRef.current.querySelectorAll('.team-pipeline-card[data-session-id]').forEach(card => {
         card.style.cursor = 'pointer';
-        card.addEventListener('click', () => navigate('/sessions'));
+        card.addEventListener('click', () => {
+          applyDashboardNavigationState(vanillaState, {
+            targetView: 'sessions',
+            sessionId: card.dataset.sessionId || "",
+          });
+          saveState();
+          navigate('/sessions');
+        });
       });
       // Pipeline view toggle (team / division)
       divRef.current.querySelectorAll('.pipeline-toggle-btn').forEach(btn => {

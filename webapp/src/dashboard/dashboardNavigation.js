@@ -1,3 +1,10 @@
+import {
+  defaultQuestions,
+  normalizeSessionType,
+  sessionLabel,
+  sessionYear
+} from '../utils.js';
+
 export function applyDashboardNavigationState(state, { targetView, sessionId = "", scopeId = "", pulseView = "", openCommitmentForm = false } = {}) {
   if (sessionId) {
     state.selectedReportSessionId = sessionId;
@@ -24,5 +31,29 @@ export function applyDashboardNavigationState(state, { targetView, sessionId = "
 
   if (targetView) {
     state.activeView = targetView;
+  }
+}
+
+export function applyDashboardActionState(state, { targetView, actionType = "", sessionId = "", commitmentId = "" } = {}) {
+  applyDashboardNavigationState(state, { targetView, sessionId });
+
+  if (commitmentId) {
+    state.editingCommitmentId = commitmentId;
+    state.pulseView = "listening";
+  }
+
+  if (targetView === "survey" && sessionId) {
+    const targetSess = (state.sessions || []).find(s => s.id === sessionId);
+    if (targetSess && actionType === "followup_survey_create") {
+      state.editingSurveyId = null;
+      state.draftSurveySessionType = normalizeSessionType(targetSess.type);
+      state.draftSurveyCohortKey = `${sessionYear(targetSess) || targetSess.year || ''}:${Number(targetSess.cohort) || ''}`;
+      state.draftSurveySessionId = sessionId;
+      state.draftSurveyPhase = "팔로우업";
+      state.draftSurveyTitle = `${sessionLabel(targetSess)} 팔로우업 설문`;
+      state.draftGoogleFormUrl = "";
+      state.draftSurveyQuestions = defaultQuestions("팔로우업", targetSess.type);
+      state.surveyCreatorStep = 1;
+    }
   }
 }

@@ -6,7 +6,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 // 이 import가 평가되면 render()는 saveState() 샤임으로 동작하고
 // initializeAuthGate/initApp은 호출되지 않는다.
 import './app.js';
-import { useAuth } from './hooks/useAuth.js';
+import { AuthProvider, useAuth } from './hooks/useAuth.js';
 import { AppLayout } from './components/layout/index.js';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { UploadPage } from './pages/UploadPage.jsx';
@@ -53,23 +53,25 @@ function AuthGuard({ children }) {
 function App() {
   return (
     <HashRouter>
-      <AuthGuard>
-        <AppLayout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/sessions" element={<SessionsPage />} />
-            <Route path="/org" element={<OrgPage />} />
-            <Route path="/upload" element={<UploadPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/report" element={<ReportPage />} />
-            <Route path="/survey" element={<SurveyPage />} />
-            <Route path="/comm" element={<CommPage />} />
-            <Route path="/pulse" element={<PulsePage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </AppLayout>
-      </AuthGuard>
+      <AuthProvider>
+        <AuthGuard>
+          <AppLayout>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/sessions" element={<SessionsPage />} />
+              <Route path="/org" element={<OrgPage />} />
+              <Route path="/upload" element={<UploadPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/report" element={<ReportPage />} />
+              <Route path="/survey" element={<SurveyPage />} />
+              <Route path="/comm" element={<CommPage />} />
+              <Route path="/pulse" element={<PulsePage />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </AppLayout>
+        </AuthGuard>
+      </AuthProvider>
     </HashRouter>
   );
 }

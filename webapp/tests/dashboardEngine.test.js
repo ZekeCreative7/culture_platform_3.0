@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState, dashboardPulseTeamSupport, dashboardOutcomeSnapshot } from '../src/dashboard/dashboardEngine.js';
+import { applyDashboardNavigationState } from '../src/dashboard/dashboardNavigation.js';
 import { sampleState } from './fixtures/sampleState.js';
 
 describe('getSessionStatus', () => {
@@ -271,5 +272,50 @@ describe('dashboardOutcomeSnapshot', () => {
     expect(snapshot.sustained).toBe(1);
     expect(snapshot.needsFollowup).toBe(0);
     expect(snapshot.avgMomentumIndex).toBeGreaterThan(50);
+  });
+});
+
+describe('applyDashboardNavigationState', () => {
+  it('지원 후보 팀 카드는 본부 Pulse 상세 분석으로 바로 이동해야 한다', () => {
+    const state = {
+      activeView: 'dashboard',
+      pulseView: 'overview',
+      pulseScopeId: 'company',
+      sessions: [],
+    };
+
+    applyDashboardNavigationState(state, {
+      targetView: 'pulse',
+      scopeId: '고객솔루션본부UW',
+    });
+
+    expect(state.activeView).toBe('pulse');
+    expect(state.pulseScopeId).toBe('고객솔루션본부UW');
+    expect(state.pulseView).toBe('listening');
+  });
+
+  it('보고 준비 완료 카드는 선택 세션의 유형과 기수까지 맞춰야 한다', () => {
+    const state = {
+      activeView: 'dashboard',
+      selectedReportType: '팀빌딩',
+      selectedReportCohort: '1',
+      selectedAnalyticsType: '팀빌딩',
+      selectedAnalyticsCohort: '1',
+      sessions: [
+        { id: 'session-comm-3', type: '협업', cohort: 3 },
+      ],
+    };
+
+    applyDashboardNavigationState(state, {
+      targetView: 'report',
+      sessionId: 'session-comm-3',
+    });
+
+    expect(state.activeView).toBe('report');
+    expect(state.selectedReportSessionId).toBe('session-comm-3');
+    expect(state.selectedReportType).toBe('협업');
+    expect(state.selectedReportCohort).toBe('3');
+    expect(state.selectedAnalyticsType).toBe('협업');
+    expect(state.selectedAnalyticsCohort).toBe('3');
   });
 });

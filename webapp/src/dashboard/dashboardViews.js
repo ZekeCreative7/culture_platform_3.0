@@ -13,6 +13,7 @@ import {
 } from './dashboardEngine.js';
 import { todayISO, escapeHtml, sessionTypeLabel, SESSION_TYPES, defaultQuestions, normalizeSessionType, sessionLabel, sessionYear } from '../utils.js';
 import { loadPulseYears, loadPulseCommitments, pulseCache, commitmentsCache } from '../state.js';
+import { applyDashboardNavigationState } from './dashboardNavigation.js';
 
 // Helper to count week sessions
 function displayWeekSessionsCount(state, today) {
@@ -899,29 +900,13 @@ export function bindHomeDashboard({ state, saveState, render }) {
       const scopeId = btn.dataset.scopeId;
       const pulseView = btn.dataset.pulseView;
 
-      if (sessionId) {
-        state.selectedReportSessionId = sessionId;
-        state.selectedAnalyticsSessionId = sessionId;
-        const targetSess = state.sessions.find(s => s.id === sessionId);
-        if (targetSess) {
-          state.selectedReportType = targetSess.type;
-          state.selectedAnalyticsType = targetSess.type;
-          state.selectedReportCohort = String(targetSess.cohort || 1);
-          state.selectedAnalyticsCohort = String(targetSess.cohort || 1);
-        }
-      }
-
-      if (scopeId) {
-        state.pulseScopeId = scopeId;
-        state.pulseView = "overview";
-      }
-
-      if (pulseView) state.pulseView = pulseView;
-      if (btn.dataset.openCommitmentForm === "true") {
-        state.pulseAutoOpenCommitmentForm = true;
-      }
-
-      state.activeView = targetView;
+      applyDashboardNavigationState(state, {
+        targetView,
+        sessionId,
+        scopeId,
+        pulseView,
+        openCommitmentForm: btn.dataset.openCommitmentForm === "true",
+      });
       saveState();
 
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
@@ -940,15 +925,7 @@ export function bindHomeDashboard({ state, saveState, render }) {
       const sessionId = row.dataset.sessionId;
       const commitmentId = row.dataset.commitmentId;
 
-      if (sessionId) {
-        state.selectedReportSessionId = sessionId;
-        state.selectedAnalyticsSessionId = sessionId;
-        const targetSess = state.sessions.find(s => s.id === sessionId);
-        if (targetSess) {
-          state.selectedReportType = targetSess.type;
-          state.selectedAnalyticsType = targetSess.type;
-        }
-      }
+      applyDashboardNavigationState(state, { targetView, sessionId });
 
       if (commitmentId) {
         state.editingCommitmentId = commitmentId;
@@ -976,7 +953,6 @@ export function bindHomeDashboard({ state, saveState, render }) {
         }
       }
 
-      state.activeView = targetView;
       saveState();
       if (["dashboard", "pulse"].includes(state.activeView) && (!pulseCache.loaded || !commitmentsCache.loaded)) {
         Promise.all([loadPulseYears(), loadPulseCommitments()]).then(render);

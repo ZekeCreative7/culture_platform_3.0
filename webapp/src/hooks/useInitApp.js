@@ -71,8 +71,21 @@ export function useInitApp(isAuthenticated, orgId) {
         return;
       }
 
+      unsubs.current = [
+        subscribeSessionsFromFirestore(() => {
+          syncSurveysToSessions();
+          // 세션 목록 변경 시 responses 구독도 재설정 (세션 추가/삭제 반영)
+          window.updateResponsesSubscription?.();
+        }),
+        subscribeOrganizationFromFirestore(),
+        subscribePulseYearsFromFirestore(),
+        subscribePulseCommitmentsFromFirestore(),
+        subscribeQualSignalsFromFirestore(),
+      ].filter(Boolean);
+
       try {
-        // 초기 일괄 로드 (sessions + surveys + templates)
+        // 초기 일괄 로드는 설문/템플릿 보강 용도다.
+        // 대시보드 핵심 데이터(Pulse/약속/조직/세션)는 위의 실시간 구독이 먼저 받는다.
         await Promise.all([
           loadSessionsFromFirestore(),
           loadSurveysFromFirestore(),
@@ -91,18 +104,6 @@ export function useInitApp(isAuthenticated, orgId) {
       // Zustand 동기화 및 손오프 페이지 디바운스 refresh가 자동으로 트리거된다.
       // 초기 로드 완료 후 responses 구독 시작
       window.updateResponsesSubscription?.();
-
-      unsubs.current = [
-        subscribeSessionsFromFirestore(() => {
-          syncSurveysToSessions();
-          // 세션 목록 변경 시 responses 구독도 재설정 (세션 추가/삭제 반영)
-          window.updateResponsesSubscription?.();
-        }),
-        subscribeOrganizationFromFirestore(),
-        subscribePulseYearsFromFirestore(),
-        subscribePulseCommitmentsFromFirestore(),
-        subscribeQualSignalsFromFirestore(),
-      ].filter(Boolean);
     })();
 
     return () => {

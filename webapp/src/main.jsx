@@ -78,7 +78,3 @@ const container = document.getElementById('react-root');
 if (container) {
   createRoot(container).render(<App />);
 }
-
-document.addEventListener('click', (e) => {
-  console.log('Global Click:', e.target, 'Pointer Events Style:', window.getComputedStyle(e.target).pointerEvents);
-}, true);

@@ -51,7 +51,7 @@ export function AppLayout({ children }) {
   const classes = [
     activeView === 'dashboard' ? 'view-dashboard' : '',
     mobileNavOpen ? 'mobile-nav-open' : '',
-    sidebarCollapsed ? 'sidebar-collapsed' : '',
+    sidebarCollapsed && window.innerWidth > 767 ? 'sidebar-collapsed' : '',
   ].filter(Boolean);
 
   return (

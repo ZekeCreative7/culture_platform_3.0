@@ -392,9 +392,8 @@ export function qualResponseRows(cohort, type, sessionId, phase) {
     const survey = (state.surveys || []).find((item) =>
       item.id === row.surveyId || (item.sessionId === row.sessionId && item.phase === row.phase)
     );
-    const questions = survey?.questions?.length
-      ? survey.questions.filter((question) => question.type === "qual")
-      : qualQuestions;
+    const surveyQuals = survey?.questions?.filter((question) => question.type === "qual") || [];
+    const questions = surveyQuals.length ? surveyQuals : qualQuestions;
     return questions.map((question) => question.id);
   };
   const hasQualText = (row) => rowQualIds(row).some((id) => isQualText(row[id]));

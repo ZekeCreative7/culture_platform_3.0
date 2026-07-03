@@ -372,3 +372,18 @@ Completed:
 Next recommended Sessions commit:
 
 - Item 2 of the Step 4 sequence: convert session list cards (`sessionsByTypeGrouped()`'s card rendering in `views/sessions.js`) to real React components, following the same `ActiveSurveysSection`/`SurveyCard` pattern from Survey. The drawer, schedule/round editor, org picker, and leader/cross-functional builders stay legacy-rendered for now (items 3-4).
+
+### 2026-07-04 - Step 4, Item 2 Complete
+
+Grilled the split architecture before implementing, since `renderSessions()` produces page-head + tab buttons + calendar-or-list + drawer + 3 modals as one HTML string, and `bindSessions()`/`bindSessionDrawerControls()` (both still deferred to items 3-4) need to keep finding the tab buttons/DB-menu/drawer controls via `document.querySelectorAll` regardless of how the render output gets split. Confirmed: 3-way legacy split (shell / calendar / overlays) with zero changes to `bindSessions()`/`bindSessionDrawerControls()`, rather than also converting the tab buttons and DB-menu to React now (which would have touched that same large deferred function).
+
+Completed:
+
+- Split `renderSessions()` into `renderSessionsShell()` (page-head + tab header) and `renderSessionsOverlays()` (drawer + org popup + attendance modal + duplicate-warning modal). Kept `getStatus()` (pure logic, no HTML) as a reusable export; removed the now-fully-superseded `sessionsByTypeGrouped()`/`sessionCard()`.
+- New `webapp/src/sessions/SessionsListSection.jsx` + `SessionCard.jsx`: real React, importing `toggleSessionTypeGroup`/`startEditSession`/`deleteSession` directly from `sessionActions.js` (item 1) — no `window.*` needed for these three; `window.openQualAnalysisModal` stays `window.*` since it's not a session action and out of scope.
+- New `webapp/src/sessions/SessionsBridge.js`: three independent `mountLegacyFragment`-based mounts (shell, calendar, overlays). `SessionsPage.jsx` mounts shell and overlays unconditionally, and conditionally mounts either the calendar bridge or `<SessionsListSection />` based on `activeSessionTab` (read via `useVanillaStateTick`) — the calendar mount's `useEffect` is keyed on `[activeTab]` rather than run-once, since it's the one fragment that isn't always present and needs to (re-)mount correctly whenever its ref newly appears.
+- Verified: `npm run check`, full `vitest run` (47 tests, 4 new), `npm run build` all pass. Browser-verified thoroughly given the mount-timing complexity: full page layout matches the original exactly; calendar tab switch renders the real month grid with correct highlighting and zero console errors (confirming the conditional-mount timing works); calendar prev/next navigation (still bound by the untouched `bindSessions()`) correctly advances months; switching back to list view works cleanly; with an injected real session, confirmed the type-group header/count, status badge computation (진행중, matching `getStatus()`'s logic), meta counts, and alert badge all render correctly; collapse/expand toggle, edit button (opens drawer pre-filled, card shows the editing indicator), and delete button (removes from list, Firestore call fails with expected permission-denied, caught internally) all verified working.
+
+Next recommended Sessions commit:
+
+- Item 3 of the Step 4 sequence: convert the session drawer and draft form (type/cohort/year fields, org config panel, leader-group/cross-functional builders) to real React — the biggest remaining piece of `bindSessions()`'s ~53 still-deferred listeners.

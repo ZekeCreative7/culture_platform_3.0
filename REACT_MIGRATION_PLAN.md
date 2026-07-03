@@ -338,3 +338,18 @@ Completed:
 Next recommended Survey commit:
 
 - Item 9 of the Step 3 sequence: remove `SurveyCreatorBridge.js` and the last of `views/survey.js` from the live route by converting the orphan-scan and templates sections to React, then verify the full live QR, edit, create, delete, upload, and response page paths end-to-end.
+
+### 2026-07-03 - Step 3, Item 9 Complete
+
+Completed:
+
+- Converted the last legacy-rendered fragment into real React: `webapp/src/survey/OrphanScanSection.jsx` (scan button, loading/error states, recover-all button, result cards) and `TemplatesSection.jsx` (template card list). Both use the established `useVanillaStateTick` pattern and import directly from `surveyResponseActions.js` — no `window.*` needed since item 8 already extracted every action these sections call.
+- Deleted `SurveyCreatorBridge.js` entirely (nothing left to bridge) and removed `renderSurveyOrphanAndTemplates()`/`bindSurveyCreator()` from `views/survey.js` (the latter was already a no-op stub).
+- Fixed `app.js`'s three remaining dead-code references (import list, the unreachable `renderView()` branch, the unreachable `bindCanvasEvents()` branch) and removed `bindSurveyCreator` from the bind-export list at the bottom of `app.js`.
+- `views/survey.js` now only serves calendar views, `surveySessionCohortKey`/`surveySessionTargetLabel`, and `renderSurveyResponsePanel` — the latter still deliberately used by `SurveyCard.jsx` via `dangerouslySetInnerHTML`, per the item-4 decision to treat the response panel as a separate future item, not "card chrome."
+- Verified: `npm run check`, full `vitest run` (43 tests, rewritten to check the bridge file no longer exists and every section uses `useVanillaStateTick`), `npm run build` all pass. Browser-verified the full page layout end-to-end (all 4 right-column sections in correct order/spacing, matching the original design exactly), and — critically — got a full real round-trip on two actions rather than just guard-clause checks: clicked "DB에서 연결 끊긴 응답 찾기" and watched the complete flow execute (click → async Firestore call → real permission-denied response in this unauthenticated preview env → caught by the function's own error handler → state updated → re-render showing "스캔 실패: ..." in the UI); injected a real template, clicked its delete button, and confirmed it disappeared from the list (local state round-trip fully verified; the Firestore delete call failed with the same expected permission error, caught correctly, not a regression).
+- Survey's screen shell is now fully React-native — only `bindOrg`/`bindSessions`/`bindUpload`/`bindReportQualSignals` bridges remain for the other, not-yet-converted screens.
+
+This completes Step 3 (Survey → React-native) as scoped by the tiny commit sequence, other than item 10's already-ongoing verification (folded into each item's own browser verification throughout items 4-9 rather than deferred to the end, since deferring it would have violated migration principle #7).
+
+Next recommended step: Step 4, Convert Sessions — starting with extracting session actions from `SessionsPage.jsx` and `app.js` (`views/sessions.js` still renders session cards/drawer as legacy HTML strings, similar starting point to where Survey was before this sequence began).

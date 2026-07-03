@@ -387,3 +387,20 @@ Completed:
 Next recommended Sessions commit:
 
 - Item 3 of the Step 4 sequence: convert the session drawer and draft form (type/cohort/year fields, org config panel, leader-group/cross-functional builders) to real React — the biggest remaining piece of `bindSessions()`'s ~53 still-deferred listeners.
+
+### 2026-07-04 - Step 4, Item 3 Complete (scoped to the drawer's outer shell)
+
+Grilled the sub-scope before implementing, since "drawer and draft form" alone — even excluding schedule editing (item 4) and calendar nav — still covered 3 peripheral modals, session metadata, org hierarchy, a leadership group builder, a 7-listener cross-functional builder, and a ~140-line 3-way branching `#create-session` handler. Confirmed: start with just the drawer's outer chrome (header, type/cohort/year, footer buttons + create/update logic), keeping the type-specific config panel and schedule table exactly as legacy-rendered content inside the new component (not a separate bridge — computed inline via `dangerouslySetInnerHTML` on every render, so no orphaning risk), deferring the 3 peripheral modals and the config-panel/schedule internals to later sub-items.
+
+Completed:
+
+- New `webapp/src/sessions/SessionDrawer.jsx`: real React for the drawer shell. Calls `bindSessions()` in a dependency-less `useEffect` (runs after every render) so the still-legacy config-panel/schedule content stays interactive.
+- New `webapp/src/sessions/sessionDraftActions.js`: `updateSessionType`, `updateSessionCohort`, `updateSessionYear`, `cancelEditSession`, `createOrUpdateSession` (the full 팀빌딩/리더십/협업 create/update branching, unchanged).
+- Discovered and applied the same typing-lag lesson from Survey: the legacy `#cohort`/`#cohort-year` handlers used `saveState()` (not `saveStateQuiet()`), but `saveState()` still calls `notify()` — so these inputs are uncontrolled (`defaultValue`, keyed on `editingSessionId`) in React too, not fully controlled. The session-type select stays fully controlled since it's a discrete choice.
+- `views/sessions.js`: added `renderSessionDrawerBody(divisionList, hqList, teamList)` (config panel + schedule head/table, still legacy), removed the drawer markup from `renderSessionsOverlays()` (now just org popup + attendance + duplicate-warning modals).
+- Necessarily touched `bindSessions()` in `app.js`: removed the now-converted listeners and un-nested the remaining ones (org hierarchy, leader-group, cross-functional, schedule row editing, calendar nav, DB menu) from the now-invalid `if (typeSelect) {...}` guard, since `#session-type` no longer exists in the legacy fragment. Removed several now-unused imports as a result (`canCreateDraftSession`, `selectedCrossMembers`, `resetCrossDraft`, `makeSchedule` from `app.js`).
+- Verified: `npm run check`, full `vitest run` (48 tests, 5 new), `npm run build` all pass. Browser-verified extensively given the risk: full drawer layout matches the original exactly for the default 리더십 type; switching the type select to 팀빌딩 correctly swapped the config panel content, regenerated the schedule template, and re-evaluated the create button's enabled state; **created a real 팀빌딩 session end-to-end** (type/cohort/team/schedule all correct, drawer closed, session appeared in the list); **edited that session and updated it** (confirmed count stayed at 1, not duplicated); cancel-edit button and overlay-click-to-close both verified (after accounting for the 150ms tick debounce in test timing, not a real issue). Firestore `세션 저장 실패`/`responses 실시간 리스너 오류` permission-denied errors appeared as expected in this unauthenticated preview environment, each caught by existing error handlers — not regressions.
+
+Next recommended Sessions commit:
+
+- Continue Step 4's drawer breakdown: convert the 3 peripheral modals (org picker, duplicate-warning, attendance) to React next, or move to item 4 (schedule/round editor) — both are reasonable next slices; the config panel (org hierarchy/leader-group/cross-functional builders) is the largest remaining piece and should probably come last given its size.

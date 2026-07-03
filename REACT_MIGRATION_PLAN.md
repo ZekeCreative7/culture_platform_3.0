@@ -248,3 +248,17 @@ Completed:
 Next recommended Survey commit:
 
 - Item 3 of the Step 3 sequence: move QR preview/download action while keeping `getQrCodeFactory()`.
+
+### 2026-07-03 - Step 3, Item 3 Complete
+
+Completed:
+
+- Moved `window.downloadQrCode` from `app.js` into `surveyActions.js`, unchanged (`getQrCodeFactory()`, canvas render, PNG download).
+- QR preview (the `<img>` in the survey card) was already owned by `views/survey.js`, not `app.js` — nothing to move there.
+- Removed the now-unused `getQrCodeFactory` import from `app.js`.
+- Updated `tests/surveyRuntimeWiring.test.js` to assert the QR download call site lives in `surveyActions.js` instead of `app.js`.
+- Verified: `npm run check`, full `vitest run` (39 tests), `npm run build` all pass. Browser-verified no console errors on Survey page load and that `downloadQrCode`'s guard-clause path runs without throwing. Did not click-test the full canvas→PNG success path — local-preview mode did not persist a test session to attach a survey to (pre-existing behavior, unrelated to this change).
+
+Next recommended Survey commit:
+
+- Item 4 of the Step 3 sequence: build the active Survey card React component.

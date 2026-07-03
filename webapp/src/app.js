@@ -3,7 +3,6 @@ import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
-import { getQrCodeFactory } from './qrCode.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
 import { renderComm, bindComm } from './views/comm.js';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js';
@@ -1613,50 +1612,6 @@ window.addSurveyDraftQuestion = function() {
   current.push({ id: `q${maxNum + 1}`, type: "quant", text: "" });
   saveState();
   render();
-};
-
-window.downloadQrCode = function(surveyId) {
-  const survey = (state.surveys || []).find(s => s.id === surveyId);
-  if (!survey) return;
-  const link = survey.googleFormUrl
-    ? survey.googleFormUrl
-    : `${(state.qrBaseUrl || '').replace(/\/$/, '')}/survey.html?surveyId=${survey.id}`;
-
-  try {
-    const qr = getQrCodeFactory()(0, 'M');
-    qr.addData(link);
-    qr.make();
-
-    const cellSize = 14;
-    const margin = 4;
-    const n = qr.getModuleCount();
-    const size = (n + margin * 2) * cellSize;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = '#000000';
-    for (let row = 0; row < n; row++) {
-      for (let col = 0; col < n; col++) {
-        if (qr.isDark(row, col)) {
-          ctx.fillRect((col + margin) * cellSize, (row + margin) * cellSize, cellSize, cellSize);
-        }
-      }
-    }
-
-    const a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
-    a.download = `QR_${survey.title.replace(/[^\w가-힣]/g, '_')}_${survey.phase}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } catch (err) {
-    alert('QR 다운로드 실패: ' + (err?.message || err));
-  }
 };
 
 window.uploadSurveyResults = function(surveyId) {

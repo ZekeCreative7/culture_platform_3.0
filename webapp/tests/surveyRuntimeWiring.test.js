@@ -12,11 +12,11 @@ describe("Survey runtime wiring", () => {
   });
 
   it("uses the QR factory from Survey render and QR download paths", () => {
-    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const surveyActionsSource = readFileSync(new URL("../src/survey/surveyActions.js", import.meta.url), "utf8");
     const surveySource = readFileSync(new URL("../src/views/survey.js", import.meta.url), "utf8");
     const viteConfigSource = readFileSync(new URL("../vite.config.js", import.meta.url), "utf8");
 
-    expect(appSource).toContain("getQrCodeFactory()(0, 'M')");
+    expect(surveyActionsSource).toContain("getQrCodeFactory()(0, 'M')");
     expect(surveySource).toContain("getQrCodeFactory()(0, 'L')");
     expect(existsSync(new URL("../public/qrcode.min.js", import.meta.url))).toBe(true);
     expect(existsSync(new URL("../survey.html", import.meta.url))).toBe(true);

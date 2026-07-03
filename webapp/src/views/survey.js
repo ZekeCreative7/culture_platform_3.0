@@ -23,6 +23,7 @@ import {
   lockSvg,
   SESSION_TYPES
 } from '../utils.js';
+import { getQrCodeFactory } from '../qrCode.js';
 
 // ── Calendar Views ────────────────────────────────────────────────
 export function renderCalendar() {
@@ -352,7 +353,12 @@ export function renderSurveyResponsePanel(survey, session, showReset = true) {
   `;
 }
 
-function surveySessionCohortKey(session) {
+export function bindSurveyCreator() {
+  // Current Survey controls still use inline window.* handlers from app.js.
+  // Keep this bridge explicit so React pages do not import app.js directly.
+}
+
+export function surveySessionCohortKey(session) {
   return `${sessionYear(session) || session.year || ''}:${Number(session.cohort) || ''}`;
 }
 
@@ -612,7 +618,7 @@ export function renderSurveyCreator() {
 
             let qrUrl = "";
             try {
-              const qr = qrcode(0, 'L');
+              const qr = getQrCodeFactory()(0, 'L');
               qr.addData(surveyLink);
               qr.make();
               qrUrl = qr.createDataURL(4);

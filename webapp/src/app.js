@@ -3,6 +3,7 @@ import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js';
 import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
+import { getQrCodeFactory } from './qrCode.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
 import { renderComm, bindComm } from './views/comm.js';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js';
@@ -29,7 +30,9 @@ import {
   renderAttendanceModal,
   renderDuplicateWarningModal,
   renderSurveyResponsePanel,
-  renderSurveyCreator
+  renderSurveyCreator,
+  bindSurveyCreator,
+  surveySessionCohortKey
 } from './views/survey.js';
 import {
   renderAnalytics,
@@ -795,13 +798,6 @@ function bindOrg() {
     document.querySelector('#topbar-search')?.blur();
   };
 
-}
-
-// 설문 설계 화면("survey" 뷰)의 버튼 바인딩. 이 화면은 bindSessions()가 아니라
-// 여기서 바인딩한다(과거에는 bindSessions 안에 있어 "survey" 뷰에서는 호출되지 않아
-// "배포 및 QR 생성" 버튼이 동작하지 않았다).
-function bindSurveyCreator() {
-  // 이 화면의 버튼 동작은 renderSurveyCreator() 내부 인라인 onclick으로 바인딩됩니다.
 }
 
 function draftSessionType() {
@@ -1627,7 +1623,7 @@ window.downloadQrCode = function(surveyId) {
     : `${(state.qrBaseUrl || '').replace(/\/$/, '')}/survey.html?surveyId=${survey.id}`;
 
   try {
-    const qr = qrcode(0, 'M');
+    const qr = getQrCodeFactory()(0, 'M');
     qr.addData(link);
     qr.make();
 
@@ -1659,7 +1655,7 @@ window.downloadQrCode = function(surveyId) {
     a.click();
     document.body.removeChild(a);
   } catch (err) {
-    alert('QR 다운로드 실패: ' + err.message);
+    alert('QR 다운로드 실패: ' + (err?.message || err));
   }
 };
 

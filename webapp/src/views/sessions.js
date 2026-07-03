@@ -1,15 +1,11 @@
-import { 
-  state, 
-  phasesForSession, 
-  sessionsSortedByStart 
+import {
+  state
 } from '../state.js';
 import {
   escapeHtml,
   sessionTypeLabel,
   sessionLabel,
   sessionTypeDef,
-  emptyCard,
-  sectionTitle,
   sessionYear,
   sameSessionType,
   normalizeSessionType,
@@ -21,22 +17,20 @@ import { pulseDiagnostics, comparisonPair } from '../pulse/pulseEngine.js';
 import { pulseCache } from '../state.js';
 import { pulseDivisionMappingForOrgIds } from '../report/pulseSessionInsight.js';
 import { buildSessionSurveyQuestionPrompt, pulseContextForSurveyPrompt } from '../survey/surveyPrompt.js';
-import { 
-  unitLeaderDetails, 
-  leaderCandidateForTeam, 
-  teamPath, 
-  teamMemberCandidates, 
-  allMemberCandidates, 
-  ensureDraftOrgSelection, 
+import {
+  unitLeaderDetails,
+  leaderCandidateForTeam,
+  teamPath,
+  teamMemberCandidates,
+  allMemberCandidates,
+  ensureDraftOrgSelection,
   optionHtml,
   renderOrgPopup
 } from './org.js';
-import { 
-  renderAttendanceModal, 
-  renderDuplicateWarningModal, 
-  renderCalendar 
+import {
+  renderAttendanceModal,
+  renderDuplicateWarningModal
 } from './survey.js';
-import { qualResponseRows } from './analytics.js';
 
 export function renderSessionOutcomeIntro(type) {
   const normalizedType = normalizeSessionType(type);
@@ -116,86 +110,6 @@ export function getStatus(session) {
   if (!past.length) return ["시작전", "amber"];
   if (future.length || pending.length) return ["진행중", "blue"];
   return ["완료", "green"];
-}
-
-export function sessionsByTypeGrouped() {
-  const sorted = sessionsSortedByStart();
-  return Object.keys(SESSION_TYPES).map((type) => {
-    const group = sorted.filter((s) => sameSessionType(s.type, type));
-    if (!group.length) return "";
-    const collapsed = (state.collapsedSessionTypeGroups || []).includes(type);
-    return `
-      <div class="session-type-group">
-        <button type="button" class="session-type-group-head" style="--accent:${SESSION_TYPES[type].accent}" onclick="toggleSessionTypeGroup('${type}')">
-          <span class="session-type-group-chevron">${collapsed ? "▸" : "▾"}</span>
-          <strong>${escapeHtml(sessionTypeLabel(type))}</strong>
-          <span>${group.length}개</span>
-        </button>
-        ${collapsed ? "" : `<div class="session-card-grid">${group.map(sessionCard).join("")}</div>`}
-      </div>
-    `;
-  }).join("");
-}
-
-export function sessionCard(session) {
-  const [status, tone] = getStatus(session);
-  const confirmed = session.schedule.filter((item) => item.confirmed && item.date).length;
-  const total     = session.schedule.length;
-  const uploadedPhases = phasesForSession(session.id);
-  const uploadCount = uploadedPhases.length;
-  const hasFollowup = uploadedPhases.includes("팔로우업");
-  const uploadTotal = hasFollowup ? 3 : 2;
-  const isEditing = state.editingSessionId === session.id;
-
-  const noDataWhileActive = uploadCount === 0 && status !== "시작전";
-  const incompleteAfterDone = uploadCount > 0 && uploadCount < 2 && status === "완료";
-
-  const preQual = qualResponseRows(session.cohort, session.type, session.id, "사전");
-  const postQual = qualResponseRows(session.cohort, session.type, session.id, "사후");
-
-  const hasPreQual = preQual.rows.length > 0;
-  const hasPostQual = postQual.rows.length > 0;
-
-  let qualButtons = '';
-  if (hasPreQual || hasPostQual) {
-    const hasPreSig = (state.qualSignals || []).some(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
-    const hasPostSig = (state.qualSignals || []).some(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
-
-    qualButtons = `
-      <div class="session-qual-actions" style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; border-top: 0.5px solid var(--color-border-tertiary,#eee); padding-top: 10px;">
-        ${hasPreQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'pre')" style="font-size: 11px; padding: 4px 8px;">${hasPreSig ? '정성 분석 수정 (사전) ✓' : '정성 분석 (사전)'}</button>` : ''}
-        ${hasPostQual ? `<button class="secondary compact" onclick="window.openQualAnalysisModal('${session.id}', 'post')" style="font-size: 11px; padding: 4px 8px;">${hasPostSig ? '정성 분석 수정 (사후) ✓' : '정성 분석 (사후)'}</button>` : ''}
-      </div>
-    `;
-  }
-
-  return `
-    <article class="session-card compact${isEditing ? ' editing' : ''}">
-      <div class="session-card-actions">
-        <b class="status ${tone}">${status}</b>
-        <button class="icon-btn" onclick="startEditSession('${session.id}')" title="${isEditing ? '편집 중' : '수정'}" aria-label="${isEditing ? '편집 중' : '세션 수정'}">${isEditing ? '●' : '✎'}</button>
-        <button class="icon-btn danger" onclick="deleteSession('${session.id}')" title="삭제" aria-label="세션 삭제">×</button>
-      </div>
-      <div class="session-top">
-        <div>
-          <span>${escapeHtml(sessionTypeLabel(session.type))}</span>
-          <h3>${escapeHtml(sessionLabel(session))}</h3>
-        </div>
-      </div>
-      <div class="session-meta">
-        <span title="일정이 확정된 회차 수">일정 확정 ${confirmed}/${total}회차</span>
-        <span title="날짜 미정 또는 미확정 회차">⏳ 미확정 ${total - confirmed}회차</span>
-        <span title="사전/사후/팔로우업 설문 CSV 업로드 완료 단계">설문 응답 업로드 ${uploadCount}/${uploadTotal}단계</span>
-      </div>
-      ${noDataWhileActive || incompleteAfterDone ? `
-        <div class="session-alert-badges">
-          ${noDataWhileActive ? `<span class="session-alert-badge amber">설문 데이터 없음</span>` : ""}
-          ${incompleteAfterDone ? `<span class="session-alert-badge amber">사전/사후 중 ${2 - uploadCount}단계 미업로드</span>` : ""}
-        </div>
-      ` : ""}
-      ${qualButtons}
-    </article>
-  `;
 }
 
 export function scheduleRow(item) {
@@ -535,24 +449,47 @@ export function canCreateDraftSession() {
   return false;
 }
 
-export function renderSessions() {
+// ── Sessions page shell (page-head + tab header) ──────────────────
+// The session-list card grid itself is now real React
+// (webapp/src/sessions/SessionsListSection.jsx) — this fragment stops
+// at the empty tab-content container so bindSessions() still finds the
+// tab buttons/DB-menu it binds regardless of which tab is active.
+export function renderSessionsShell() {
+  return `
+    <section class="page-head">
+      <div>
+        <span class="eyebrow">세션 운영</span>
+        <h1>조직문화 세션 스케줄 및 운영 관리</h1>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div class="session-more-menu" style="position:relative;">
+          <button class="ghost compact" id="btn-session-more" aria-label="더보기" title="DB 관리">⋯</button>
+          <div class="session-more-dropdown" id="session-more-dropdown" style="display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.10); min-width:140px; z-index:200; overflow:hidden;">
+            <button class="session-more-item" id="btn-db-download">DB 다운로드</button>
+            <button class="session-more-item" id="btn-db-upload">DB 전송</button>
+            <div style="border-top:1px solid #e2e8f0; margin:4px 0;"></div>
+            <button class="session-more-item" id="btn-backup-export">JSON 백업 내보내기</button>
+            <button class="session-more-item" id="btn-backup-import">JSON 백업 복원...</button>
+            <input type="file" id="backup-import-file" accept=".json" style="display:none;"  />
+          </div>
+        </div>
+        <button type="button" class="primary" id="btn-open-session-drawer">+ 새 세션</button>
+      </div>
+    </section>
+    <div class="tab-header">
+      <button class="tab-btn ${state.activeSessionTab === 'list' ? 'active' : ''}" id="btn-session-list">목록</button>
+      <button class="tab-btn ${state.activeSessionTab === 'calendar' ? 'active' : ''}" id="btn-session-calendar">일정 캘린더</button>
+    </div>
+  `;
+}
+
+// ── Drawer + org popup + attendance modal + duplicate-warning modal ──
+export function renderSessionsOverlays() {
   const orgPopupHtml = state.showOrgPopup ? renderOrgPopup() : "";
   const attendanceModalHtml = state.showAttendanceModal ? renderAttendanceModal() : "";
   const duplicateWarningHtml = state.duplicateSessionWarning ? renderDuplicateWarningModal() : "";
   const { divisionList, hqList, teamList } = ensureDraftOrgSelection();
   const isDrawerOpen = state.sessionDrawerOpen || Boolean(state.editingSessionId);
-
-  let mainContentHtml = "";
-  if (state.activeSessionTab === "calendar") {
-    mainContentHtml = renderCalendar();
-  } else {
-    mainContentHtml = `
-      <section>
-        ${sectionTitle("등록된 세션", `${state.sessions.length}개`)}
-        ${state.sessions.length ? sessionsByTypeGrouped() : emptyCard("아직 등록된 세션이 없습니다. 우측 상단 '새 세션'을 눌러 시작하세요.")}
-      </section>
-    `;
-  }
 
   const drawerHtml = `
     <div class="session-drawer-overlay ${isDrawerOpen ? 'open' : ''}" id="session-drawer-overlay"></div>
@@ -598,35 +535,6 @@ export function renderSessions() {
   `;
 
   return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">세션 운영</span>
-        <h1>조직문화 세션 스케줄 및 운영 관리</h1>
-      </div>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <div class="session-more-menu" style="position:relative;">
-          <button class="ghost compact" id="btn-session-more" aria-label="더보기" title="DB 관리">⋯</button>
-          <div class="session-more-dropdown" id="session-more-dropdown" style="display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.10); min-width:140px; z-index:200; overflow:hidden;">
-            <button class="session-more-item" id="btn-db-download">DB 다운로드</button>
-            <button class="session-more-item" id="btn-db-upload">DB 전송</button>
-            <div style="border-top:1px solid #e2e8f0; margin:4px 0;"></div>
-            <button class="session-more-item" id="btn-backup-export">JSON 백업 내보내기</button>
-            <button class="session-more-item" id="btn-backup-import">JSON 백업 복원...</button>
-            <input type="file" id="backup-import-file" accept=".json" style="display:none;"  />
-          </div>
-        </div>
-        <button type="button" class="primary" id="btn-open-session-drawer">+ 새 세션</button>
-      </div>
-    </section>
-    <div class="tab-container">
-      <div class="tab-header">
-        <button class="tab-btn ${state.activeSessionTab === 'list' ? 'active' : ''}" id="btn-session-list">목록</button>
-        <button class="tab-btn ${state.activeSessionTab === 'calendar' ? 'active' : ''}" id="btn-session-calendar">일정 캘린더</button>
-      </div>
-      <div class="tab-content">
-        ${mainContentHtml}
-      </div>
-    </div>
     ${drawerHtml}
     ${orgPopupHtml}
     ${attendanceModalHtml}

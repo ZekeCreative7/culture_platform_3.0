@@ -38,7 +38,8 @@ import {
   qualResponseRows
 } from './views/analytics.js';
 import {
-  renderSessions,
+  renderSessionsShell,
+  renderSessionsOverlays,
   renderOrgSelectRow,
   renderSessionPulseSummary,
   renderTeamBuildingPanel,
@@ -55,9 +56,6 @@ import {
   crossMemberPool,
   selectedCrossMembers,
   resetCrossDraft,
-  getStatus,
-  sessionsByTypeGrouped,
-  sessionCard,
   scheduleRow
 } from './views/sessions.js';
 import {
@@ -420,7 +418,7 @@ function render() {
 }
 
 function renderView() {
-  if (state.activeView === "sessions") return renderSessions();
+  if (state.activeView === "sessions") return renderSessionsShell() + renderSessionsOverlays();
   if (state.activeView === "org") return renderOrg();
   if (state.activeView === "survey") return "";
   if (state.activeView === "upload") return renderUpload();

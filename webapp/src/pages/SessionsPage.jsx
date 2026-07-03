@@ -1,36 +1,33 @@
 import React, { useEffect, useRef, memo } from 'react';
-import { state as vanillaState, subscribe } from '../state.js';
-import { renderSessions } from '../views/sessions.js';
-import { bindSessions, bindSessionDrawerControls } from '../app.js';
+import { state as vanillaState } from '../state.js';
+import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
+import { mountSessionsShell, mountSessionsCalendar, mountSessionsOverlays } from '../sessions/SessionsBridge.js';
+import { SessionsListSection } from '../sessions/SessionsListSection.jsx';
 import '../sessions/sessionActions.js';
 
 export const SessionsPage = memo(function SessionsPage() {
-  const divRef = useRef(null);
+  useVanillaStateTick();
+  const shellRef = useRef(null);
+  const calendarRef = useRef(null);
+  const overlaysRef = useRef(null);
+  const activeTab = vanillaState.activeSessionTab || 'list';
+
+  useEffect(() => { vanillaState.activeView = 'sessions'; }, []);
+  useEffect(() => mountSessionsShell(shellRef.current), []);
+  useEffect(() => mountSessionsOverlays(overlaysRef.current), []);
 
   useEffect(() => {
-    vanillaState.activeView = 'sessions';
+    if (activeTab !== 'calendar') return undefined;
+    return mountSessionsCalendar(calendarRef.current);
+  }, [activeTab]);
 
-    function refresh() {
-      if (divRef.current) {
-        divRef.current.innerHTML = renderSessions();
-        bindSessions();
-        bindSessionDrawerControls();
-      }
-    }
-
-    refresh();
-
-    let timer = null;
-    const unsub = subscribe(() => {
-      clearTimeout(timer);
-      timer = setTimeout(refresh, 150);
-    });
-
-    return () => {
-      clearTimeout(timer);
-      unsub();
-    };
-  }, []);
-
-  return <div ref={divRef} />;
+  return (
+    <>
+      <div ref={shellRef} />
+      <div className="tab-container tab-content">
+        {activeTab === 'list' ? <SessionsListSection /> : <div ref={calendarRef} />}
+      </div>
+      <div ref={overlaysRef} />
+    </>
+  );
 }, () => true);

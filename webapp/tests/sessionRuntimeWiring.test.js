@@ -44,4 +44,32 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).not.toContain("function openSessionDrawer(");
     expect(appSource).not.toContain("function closeSessionDrawer(");
   });
+
+  it("renders the session list/cards as real React, not a legacy HTML string, while calendar/drawer stay legacy", () => {
+    const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
+    const listSectionSource = readFileSync(new URL("../src/sessions/SessionsListSection.jsx", import.meta.url), "utf8");
+    const cardSource = readFileSync(new URL("../src/sessions/SessionCard.jsx", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
+    const bridgeSource = readFileSync(new URL("../src/sessions/SessionsBridge.js", import.meta.url), "utf8");
+
+    expect(sessionsSource).not.toContain("export function renderSessions()");
+    expect(sessionsSource).not.toContain("export function sessionsByTypeGrouped");
+    expect(sessionsSource).not.toContain("export function sessionCard");
+    expect(sessionsSource).toContain("export function getStatus");
+    expect(sessionsSource).toContain("export function renderSessionsShell");
+    expect(sessionsSource).toContain("export function renderSessionsOverlays");
+
+    expect(listSectionSource).toContain("SessionCard");
+    expect(listSectionSource).toContain("useVanillaStateTick");
+    expect(cardSource).toContain("startEditSession");
+    expect(cardSource).toContain("deleteSession");
+    expect(cardSource).toContain("getStatus");
+
+    expect(pageSource).toContain("SessionsListSection");
+    expect(pageSource).toContain("mountSessionsShell");
+    expect(pageSource).toContain("mountSessionsCalendar");
+    expect(pageSource).toContain("mountSessionsOverlays");
+    expect(bridgeSource).toContain("renderCalendar");
+    expect(bridgeSource).toContain("renderSessionsOverlays");
+  });
 });

@@ -440,3 +440,21 @@ Completed:
 Next recommended Sessions commit:
 
 - The config panel (org hierarchy/leader-group/cross-functional builders) is now the only legacy-rendered piece left inside the drawer, and the biggest remaining chunk of `bindSessions()`. Recommend breaking it into its own sub-sequence — e.g. one item per session type (팀빌딩 org hierarchy, 리더십 leader-group builder, 협업 cross-functional builder) — rather than converting it in one large slice, given how item 3's scoping discussion went.
+
+### 2026-07-04 - Step 4, Item 4a Complete (팀빌딩 config panel — org hierarchy)
+
+First slice of the config-panel breakdown, split by session type as recommended above. Chose 팀빌딩 first since it's the simplest panel (just the org-select-row + a selected-team summary, no add/remove builder UI) and its org-select-row is shared with 리더십.
+
+Completed:
+
+- New `webapp/src/sessions/sessionOrgActions.js`: `updateSessionDivision`, `updateSessionHq`, `updateSessionTeam`, moved verbatim from the legacy `#session-division`/`#session-hq`/`#session-team` listeners in `bindSessions()`.
+- New `webapp/src/sessions/OrgSelectRow.jsx`: real React division/hq/team `<select>`s (fully controlled — discrete choices, same as the session-type select). Pulse summary sub-panel stays as `dangerouslySetInnerHTML` around the existing `renderSessionPulseSummary()` (pure display, no listeners, so no risk in leaving it legacy).
+- New `webapp/src/sessions/TeamBuildingPanel.jsx`: real React for the 팀빌딩 config panel (org select row + selected-team badge), replacing `renderTeamBuildingPanel()`. The survey-prompt card stays `dangerouslySetInnerHTML` (shared across all 3 panel types, deferred); exported `renderSessionSurveyPromptCard` from `views/sessions.js` (was previously module-private) so the new component can call it.
+- `views/sessions.js`: deleted `renderTeamBuildingPanel()` and `renderSessionDrawerBody()` (the latter's wrapper role is now handled directly inside `SessionDrawer.jsx`, since it needs to branch between the React 팀빌딩 panel and the legacy `renderSessionConfigPanel()` string for 리더십/협업); `renderSessionConfigPanel()` now only handles those two remaining types.
+- `SessionDrawer.jsx`: renders `<TeamBuildingPanel />` when `draftType === '팀빌딩'`, otherwise falls back to `dangerouslySetInnerHTML` on `renderSessionConfigPanel(...)` for 리더십/협업, same as before.
+- `app.js`: guarded the `#session-division`/`#session-hq`/`#session-team` listeners in `bindSessions()` behind `if (normalizeSessionType(state.draftType) !== "팀빌딩")`, since 리더십 still renders the same element ids via the legacy `renderOrgSelectRow()` HTML string — without the guard, the React version would get a duplicate vanilla listener stacked on top of its own `onChange` whenever 팀빌딩 was active. Removed the now-unused `renderTeamBuildingPanel` import.
+- Verified: `npm run check`, full `vitest run` (52 tests, 1 new), `npm run build` all pass (one fix needed mid-way: `renderSessionSurveyPromptCard` had to be exported since it was module-private, only caught by `npm run build`, not `check`/`vitest`, same known gap as before). Browser-verified live: 팀빌딩 panel renders pixel-identical to the original (org selects pre-filled, pulse summary, survey-prompt card, selected-team badge with 부문장/본부장/팀장/팀원); switching division correctly cascaded to reset+auto-fill hq/team exactly as before (confirmed via `ensureDraftOrgSelection()`'s existing auto-select-first-option behavior, unchanged); switched to 리더십 and confirmed its legacy org-select-row still works correctly with no duplicate-listener side effects and no console errors.
+
+Next recommended Sessions commit:
+
+- Continue the config-panel breakdown: 리더십's leader-group builder (org-select-row reuse + `#add-team-leader`/`[data-remove-leader]`) is the next-simplest remaining piece; 협업's cross-functional builder (mode switch, parent-session select, team/member checkboxes, random-generate) is the largest and most complex, and should probably come last.

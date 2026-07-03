@@ -1,6 +1,6 @@
 import './surveyActions.js';
-import { state as vanillaState, subscribe } from '../state.js';
-import { bindSurveyCreator, renderSurveyWizardPanel, renderSurveyOrphanAndTemplates } from '../views/survey.js';
+import { subscribe } from '../state.js';
+import { renderSurveyOrphanAndTemplates } from '../views/survey.js';
 
 function mountLegacyFragment(element, renderFragment, { debounceMs = 150, afterRefresh } = {}) {
   if (!element) return () => {};
@@ -26,11 +26,6 @@ function mountLegacyFragment(element, renderFragment, { debounceMs = 150, afterR
     unsubscribe();
     element.innerHTML = '';
   };
-}
-
-export function mountSurveyWizard(element, options) {
-  vanillaState.activeView = 'survey';
-  return mountLegacyFragment(element, renderSurveyWizardPanel, { ...options, afterRefresh: bindSurveyCreator });
 }
 
 export function mountSurveyOrphanAndTemplates(element, options) {

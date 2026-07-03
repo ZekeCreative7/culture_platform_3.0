@@ -4,23 +4,20 @@ import {
   surveyQuestionsForDistribution,
   rowMatchesSurvey
 } from '../state.js';
-import { 
-  PHASES, 
-  escapeHtml, 
-  sessionTypeLabel, 
-  sessionLabel, 
-  sessionTypeDef, 
-  defaultQuestions, 
-  emptyCard, 
-  todayISO, 
-  scoreOf, 
-  normalizeSessionType, 
-  targetCountForSession, 
-  sectionTitle, 
-  sessionYear, 
-  sameSessionType,
-  lockSvg,
-  SESSION_TYPES
+import {
+  PHASES,
+  escapeHtml,
+  sessionLabel,
+  sessionTypeDef,
+  defaultQuestions,
+  emptyCard,
+  todayISO,
+  scoreOf,
+  normalizeSessionType,
+  targetCountForSession,
+  sectionTitle,
+  sessionYear,
+  lockSvg
 } from '../utils.js';
 // ── Calendar Views ────────────────────────────────────────────────
 export function renderCalendar() {
@@ -359,231 +356,12 @@ export function surveySessionCohortKey(session) {
   return `${sessionYear(session) || session.year || ''}:${Number(session.cohort) || ''}`;
 }
 
-function surveySessionTargetLabel(session) {
+export function surveySessionTargetLabel(session) {
   const type = normalizeSessionType(session.type);
   if (type === '팀빌딩') return session.team || session.teamName || sessionLabel(session);
   const teams = session.participatingTeams
     || [...new Set((session.members || []).map((member) => member.teamName).filter(Boolean))].join(', ');
   return teams || sessionLabel(session);
-}
-
-// ── Main view: renderSurveyWizardPanel() + renderSurveyRightColumnRest() ──
-// Split from a single renderSurveyCreator() so the active-survey-card list
-// can be owned by real React (ActiveSurveysSection.jsx / SurveyCard.jsx)
-// while the wizard and the not-yet-converted sections stay legacy-rendered.
-export function renderSurveyWizardPanel() {
-  const activeSessions = state.sessions || [];
-  const draftQuestions = state.draftSurveyQuestions || [];
-  const currentStep = state.surveyCreatorStep || 1;
-  const selectedDraftSession = activeSessions.find((session) => session.id === state.draftSurveySessionId);
-  const requestedSessionType = state.draftSurveySessionType || selectedDraftSession?.type || '';
-  const draftSessionType = requestedSessionType ? normalizeSessionType(requestedSessionType) : '';
-  const sessionsForType = draftSessionType
-    ? activeSessions.filter((session) => sameSessionType(session.type, draftSessionType))
-    : [];
-  const cohortOptions = [...new Map(sessionsForType.map((session) => {
-    const key = surveySessionCohortKey(session);
-    return [key, { key, year: sessionYear(session) || session.year || '', cohort: Number(session.cohort) || '' }];
-  })).values()].sort((a, b) => Number(b.year || 0) - Number(a.year || 0) || Number(a.cohort || 0) - Number(b.cohort || 0));
-  const draftCohortKey = state.draftSurveyCohortKey || (selectedDraftSession ? surveySessionCohortKey(selectedDraftSession) : '');
-  const sessionsForCohort = draftCohortKey
-    ? sessionsForType.filter((session) => surveySessionCohortKey(session) === draftCohortKey)
-    : [];
-  const availableSessionTypes = Object.keys(SESSION_TYPES).filter((type) => activeSessions.some((session) => sameSessionType(session.type, type)));
-
-  const hasTitle = Boolean((state.draftSurveyTitle || "").trim());
-  const hasSession = Boolean(state.draftSurveySessionId);
-  const hasSource = Boolean((state.draftGoogleFormUrl || "").trim() || draftQuestions.length > 0);
-  const isValid = hasTitle && hasSession && hasSource;
-
-  const stepperHtml = `
-    <div class="stepper-bar" style="display:flex; justify-content:space-between; margin-bottom:24px; position:relative; padding:0 24px;">
-      <div style="position:absolute; top:15px; left:24px; right:24px; height:3px; background:#e2e8f0; z-index:1; border-radius:2px;"></div>
-      <div style="position:absolute; top:15px; left:24px; width:calc(${(currentStep - 1) * 50}% - ${(currentStep - 1) * 12}px); height:3px; background:var(--neon-blue); z-index:2; transition:width 0.3s ease; border-radius:2px;"></div>
-      
-      <div onclick="window.setSurveyCreatorStep(1)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
-        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 1 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 1 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 1 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">1</div>
-        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 1 ? 'var(--ink)' : 'var(--muted)'};">기본 정보</span>
-      </div>
-      
-      <div onclick="window.setSurveyCreatorStep(2)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
-        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 2 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 2 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 2 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">2</div>
-        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 2 ? 'var(--ink)' : 'var(--muted)'};">설문 설계</span>
-      </div>
-
-      <div onclick="window.setSurveyCreatorStep(3)" style="z-index:3; display:flex; flex-direction:column; align-items:center; cursor:pointer;">
-        <div style="width:32px; height:32px; border-radius:50%; background:${currentStep >= 3 ? 'var(--neon-blue)' : '#ffffff'}; color:${currentStep >= 3 ? '#ffffff' : '#94a3b8'}; display:flex; align-items:center; justify-content:center; font-weight:700; border:2px solid ${currentStep >= 3 ? 'var(--neon-blue)' : '#cbd5e1'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size:13px; transition:all 0.2s;">3</div>
-        <span style="font-size:11.5px; font-weight:700; margin-top:6px; color:${currentStep === 3 ? 'var(--ink)' : 'var(--muted)'};">검증 및 배포</span>
-      </div>
-    </div>
-  `;
-
-  const step1Html = `
-    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
-      <label>설문 제목
-        <input id="survey-title-input" value="${escapeHtml(state.draftSurveyTitle)}" placeholder="예: 리더십 세션 2026년 1기 사전 설문" oninput="updateSurveyDraftField('draftSurveyTitle', this.value)" />
-      </label>
-      <div class="survey-session-cascade">
-        <label>세션 종류
-          <select id="survey-session-type-select" onchange="updateSurveyDraftSessionType(this.value)">
-            <option value="">-- 종류 선택 --</option>
-            ${availableSessionTypes.map((type) => `<option value="${escapeHtml(type)}" ${draftSessionType === type ? 'selected' : ''}>${escapeHtml(sessionTypeLabel(type))}</option>`).join('')}
-          </select>
-        </label>
-        <label>기수
-          <select id="survey-session-cohort-select" onchange="updateSurveyDraftCohort(this.value)" ${draftSessionType ? '' : 'disabled'}>
-            <option value="">-- 기수 선택 --</option>
-            ${cohortOptions.map((item) => `<option value="${escapeHtml(item.key)}" ${draftCohortKey === item.key ? 'selected' : ''}>${item.year ? `${escapeHtml(item.year)}년 ` : ''}${escapeHtml(item.cohort)}기</option>`).join('')}
-          </select>
-        </label>
-        <label>팀 / 대상 세션
-          <select id="survey-session-select" onchange="updateSurveyDraftField('draftSurveySessionId', this.value)" ${draftCohortKey ? '' : 'disabled'}>
-            <option value="">-- 팀 선택 --</option>
-            ${sessionsForCohort.map((session) => `<option value="${escapeHtml(session.id)}" ${state.draftSurveySessionId === session.id ? 'selected' : ''}>${escapeHtml(surveySessionTargetLabel(session))}</option>`).join('')}
-          </select>
-        </label>
-      </div>
-      <label>설문 시점
-        <select id="survey-phase-select" onchange="updateSurveyDraftPhase(this.value)">
-          <option value="사전" ${state.draftSurveyPhase === "사전" ? "selected" : ""}>사전</option>
-          <option value="사후" ${state.draftSurveyPhase === "사후" ? "selected" : ""}>사후</option>
-          <option value="팔로우업" ${state.draftSurveyPhase === "팔로우업" ? "selected" : ""}>팔로우업 (60일)</option>
-        </select>
-      </label>
-      
-      <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-        <button class="primary" type="button" onclick="window.setSurveyCreatorStep(2)" style="width:120px;">다음 단계 ➔</button>
-      </div>
-    </div>
-  `;
-
-  const step2Html = `
-    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
-      <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #bae6fd; border-radius:10px; padding:16px;">
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-          <span style="font-size:11px;font-weight:800;color:var(--blue-mid);">URL</span>
-          <strong style="font-size:13px; color:var(--ink);">구글 폼 URL 연결 (권장)</strong>
-        </div>
-        <p style="font-size:11.5px; color:var(--muted); margin:0 0 10px 0; line-height:1.6;">구글 폼에서 설문을 직접 만들고 배포용 링크를 붙여넣으세요. 해당 링크로 QR 코드가 생성됩니다.</p>
-        <label style="font-size:12px; font-weight:700; color:var(--ink-2);">구글 폼 URL
-          <input id="survey-google-form-url" value="${escapeHtml(state.draftGoogleFormUrl)}" placeholder="https://forms.gle/... 또는 https://docs.google.com/forms/..." oninput="updateSurveyDraftField('draftGoogleFormUrl', this.value)" style="margin-top:6px;" />
-        </label>
-      </div>
-
-      <div style="display:flex; align-items:center; gap:10px; color:var(--muted); font-size:11px; font-weight:700;">
-        <div style="flex:1; height:1px; background:var(--line);"></div>
-        또는 자체 설문 직접 설계
-        <div style="flex:1; height:1px; background:var(--line);"></div>
-      </div>
-
-      ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length > 0 || (state.surveyTemplates || []).length > 0 ? `
-      <div style="display:flex; gap:8px; align-items:flex-end;">
-        <label style="flex:1; font-size:12px; font-weight:700; color:var(--ink-2);">기존 설문/템플릿에서 질문 불러오기
-          <select id="survey-template-select" style="margin-top:4px;">
-            <option value="">-- 템플릿 선택 --</option>
-            ${(state.surveyTemplates || []).length ? `<optgroup label="템플릿">${state.surveyTemplates.map(t => `<option value="tpl:${t.id}">${escapeHtml(t.title)} (${(t.questions || []).length}문항${t.phase ? ` · ${t.phase}` : ''})</option>`).join('')}</optgroup>` : ''}
-            ${(state.surveys || []).filter(s => s.questions && s.questions.length > 0).length ? `<optgroup label="배포 중인 설문">${state.surveys.filter(s => s.questions && s.questions.length > 0).map(s => `<option value="${s.id}">${escapeHtml(s.title)} (${s.questions.length}문항 · ${s.phase})</option>`).join('')}</optgroup>` : ''}
-          </select>
-        </label>
-        <button class="secondary compact" style="white-space:nowrap; flex-shrink:0;" onclick="loadSurveyTemplate()">불러오기</button>
-      </div>
-      ` : ''}
-
-      <div class="survey-questions-preview" style="background:var(--surface-soft); border-radius:8px; padding:16px; border:1px solid var(--line); ${state.draftGoogleFormUrl ? 'opacity:0.45; pointer-events:none;' : ''}">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <h4 style="margin:0;">설문지 질문 구성 (${draftQuestions.length}문항)</h4>
-          <button class="secondary small compact" onclick="addSurveyDraftQuestion()">+ 질문 추가</button>
-        </div>
-
-        <div class="draft-questions-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:10px;">
-          ${draftQuestions.map((q, idx) => `
-            <div class="draft-q-row">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <span style="font-size:11px; font-weight:800; color:var(--cyan); text-transform:uppercase; letter-spacing:0.04em;">${q.id.toUpperCase()} · ${q.type === 'quant' ? '5점 척도' : '주관식 텍스트'}</span>
-                <button onclick="deleteSurveyDraftQuestion('${q.id}')" style="background:transparent; border:none; padding:3px 8px; font-size:12px; color:var(--muted); cursor:pointer; border-radius:4px; transition:all 0.15s; font-weight:700;">&times; 삭제</button>
-              </div>
-              <input style="min-height:38px; font-size:13px; width:100%; border:1.5px solid #e5e7eb; border-radius:var(--radius-sm); background:#ffffff; color:var(--ink); padding:8px 12px; outline:none; box-sizing:border-box;" value="${escapeHtml(q.text)}" placeholder="질문 내용을 입력하세요." oninput="updateSurveyDraftQuestionText('${q.id}', this.value)" />
-              <div style="display:inline-flex; gap:4px; background:#f3f4f6; padding:3px; border-radius:8px; border:1px solid #e5e7eb; margin-top:2px;">
-                <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'quant' ? '#fff' : 'var(--muted)'}; background:${q.type === 'quant' ? 'var(--neon-blue)' : 'transparent'};">
-                  <input type="radio" name="qtype-${q.id}" value="quant" ${q.type === 'quant' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'quant')" style="display:none;" /> 5점 척도
-                </label>
-                <label style="display:flex; align-items:center; justify-content:center; padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11.5px; font-weight:700; transition:all 0.2s; user-select:none; color:${q.type === 'qual' ? '#fff' : 'var(--muted)'}; background:${q.type === 'qual' ? 'var(--neon-blue)' : 'transparent'};">
-                  <input type="radio" name="qtype-${q.id}" value="qual" ${q.type === 'qual' ? 'checked' : ''} onchange="updateSurveyDraftQuestionType('${q.id}', 'qual')" style="display:none;" /> 주관식
-                </label>
-              </div>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-      
-      <div style="display:flex; justify-content:space-between; margin-top:10px;">
-        <button class="secondary" type="button" onclick="window.setSurveyCreatorStep(1)" style="width:120px;">➔ 이전 단계</button>
-        <button class="primary" type="button" onclick="window.setSurveyCreatorStep(3)" style="width:120px;">다음 단계 ➔</button>
-      </div>
-    </div>
-  `;
-
-  const checkIcon = (valid) => valid 
-    ? `<span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#e6f4ea; color:#137333; font-weight:800; font-size:12px;">✓</span>`
-    : `<span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#fce8e6; color:#c5221f; font-weight:800; font-size:12px;">✗</span>`;
-
-  const step3Html = `
-    <div class="form-grid compact" style="grid-template-columns: 1fr; gap:16px; margin-top:14px;">
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-        <h4 style="margin:0 0 14px 0; font-size:14px; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">배포 활성 조건 검증 체크리스트</h4>
-        
-        <div style="display:flex; flex-direction:column; gap:12px;">
-          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasTitle ? '#1e293b' : '#64748b'};">
-            ${checkIcon(hasTitle)}
-            <span>설문 제목 입력</span>
-            ${state.draftSurveyTitle ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${escapeHtml(state.draftSurveyTitle)})</small>` : ''}
-          </div>
-          
-          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasSession ? '#1e293b' : '#64748b'};">
-            ${checkIcon(hasSession)}
-            <span>대상 세션 선택</span>
-            ${hasSession && activeSessions.find(s => s.id === state.draftSurveySessionId) ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${escapeHtml(activeSessions.find(s => s.id === state.draftSurveySessionId).type)})</small>` : ''}
-          </div>
-          
-          <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:600; color:${hasSource ? '#1e293b' : '#64748b'};">
-            ${checkIcon(hasSource)}
-            <span>설문 소스 구성 (구글 폼 또는 자체 질문)</span>
-            ${hasSource ? `<small style="font-weight:400; color:var(--muted); margin-left:auto;">(${state.draftGoogleFormUrl ? '구글 폼 URL' : `${draftQuestions.length}개 질문`})</small>` : ''}
-          </div>
-        </div>
-      </div>
-
-      ${(state.qrBaseUrl || '').includes('localhost') || (state.qrBaseUrl || '').includes('127.0.0.1') ? `
-      <div style="background:#fef3c7; border:1.5px solid #fbbf24; border-radius:8px; padding:12px 14px; font-size:12px; color:#92400e; line-height:1.6;">
-        <strong>주의</strong> · QR 베이스 주소가 <strong>localhost</strong>로 설정되어 있어 모바일에서 열리지 않습니다.<br/>
-        배포 설문은 <strong>GitHub Pages URL</strong>을 사용하세요:<br/>
-        <code style="font-size:11px; word-break:break-all;">https://zekecreative7.github.io/culture_platform_3.0/webapp</code>
-      </div>
-      ` : ''}
-
-      <div style="display:flex; gap:8px; margin-top:10px;">
-        <button class="secondary" type="button" onclick="window.setSurveyCreatorStep(2)" style="width:120px;">➔ 이전 단계</button>
-        ${state.editingSurveyId ? `<button class="ghost" id="cancel-edit-survey" type="button" onclick="window.cancelSurveyEdit()">취소</button>` : ''}
-        <button class="primary" id="btn-create-survey-submit" style="flex:1;" onclick="window.submitSurveyDraft()" ${isValid ? '' : 'disabled'}>
-          ${state.editingSurveyId ? '수정 완료' : '배포 및 QR 생성'}
-        </button>
-      </div>
-    </div>
-  `;
-
-  return `
-    <div class="panel">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <h3 style="margin:0;">${state.editingSurveyId ? '설문 수정' : '새 설문 조사 설계'}</h3>
-        ${state.editingSurveyId ? `
-          <span style="font-size:12px;color:#0ea5e9;font-weight:700;">설문 수정 중</span>
-        ` : ''}
-      </div>
-
-      ${stepperHtml}
-      ${currentStep === 1 ? step1Html : currentStep === 2 ? step2Html : step3Html}
-    </div>
-  `;
 }
 
 export function renderSurveyOrphanAndTemplates() {

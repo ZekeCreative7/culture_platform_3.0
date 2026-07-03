@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, memo } from 'react';
-import { mountSurveyWizard, mountSurveyOrphanAndTemplates } from '../survey/SurveyCreatorBridge.js';
+import { state as vanillaState } from '../state.js';
+import { mountSurveyOrphanAndTemplates } from '../survey/SurveyCreatorBridge.js';
 import { PageHead } from '../components/layout/index.js';
 import { ActiveSurveysSection } from '../survey/ActiveSurveysSection.jsx';
 import { ClosedSurveysSection } from '../survey/ClosedSurveysSection.jsx';
+import { SurveyWizardPanel } from '../survey/SurveyWizardPanel.jsx';
 
 export const SurveyPage = memo(function SurveyPage() {
-  const wizardRef = useRef(null);
   const restRef = useRef(null);
 
-  useEffect(() => mountSurveyWizard(wizardRef.current), []);
+  useEffect(() => { vanillaState.activeView = 'survey'; }, []);
   useEffect(() => mountSurveyOrphanAndTemplates(restRef.current), []);
 
   return (
@@ -19,7 +20,7 @@ export const SurveyPage = memo(function SurveyPage() {
         description="세션 및 회차별 모바일 설문을 설계하고, 자동 생성된 QR 코드로 구성원들의 응답을 실시간으로 적재합니다."
       />
       <div className="workspace-grid">
-        <div ref={wizardRef} />
+        <SurveyWizardPanel />
         <div>
           <ActiveSurveysSection />
           <ClosedSurveysSection />

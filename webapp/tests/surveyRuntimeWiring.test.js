@@ -28,14 +28,12 @@ describe("Survey runtime wiring", () => {
     const pageSource = readFileSync(new URL("../src/pages/SurveyPage.jsx", import.meta.url), "utf8");
     const bridgeSource = readFileSync(new URL("../src/survey/SurveyCreatorBridge.js", import.meta.url), "utf8");
 
-    expect(pageSource).toContain("mountSurveyWizard");
     expect(pageSource).toContain("mountSurveyOrphanAndTemplates");
+    expect(pageSource).toContain("SurveyWizardPanel");
     expect(pageSource).toContain("ActiveSurveysSection");
     expect(pageSource).toContain("ClosedSurveysSection");
     expect(pageSource).not.toContain("../app.js");
-    expect(bridgeSource).toContain("renderSurveyWizardPanel");
     expect(bridgeSource).toContain("renderSurveyOrphanAndTemplates");
-    expect(bridgeSource).toContain("bindSurveyCreator");
     expect(bridgeSource).toContain("subscribe");
   });
 
@@ -44,19 +42,35 @@ describe("Survey runtime wiring", () => {
     const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
     const closedSurveysSectionSource = readFileSync(new URL("../src/survey/ClosedSurveysSection.jsx", import.meta.url), "utf8");
     const closedSurveyCardSource = readFileSync(new URL("../src/survey/ClosedSurveyCard.jsx", import.meta.url), "utf8");
+    const tickHookSource = readFileSync(new URL("../src/hooks/useVanillaStateTick.js", import.meta.url), "utf8");
     const surveySource = readFileSync(new URL("../src/views/survey.js", import.meta.url), "utf8");
 
     expect(activeSurveysSectionSource).toContain("SurveyCard");
-    expect(activeSurveysSectionSource).toContain("subscribe");
+    expect(activeSurveysSectionSource).toContain("useVanillaStateTick");
     expect(surveyCardSource).toContain("renderSurveyResponsePanel");
     expect(closedSurveysSectionSource).toContain("ClosedSurveyCard");
-    expect(closedSurveysSectionSource).toContain("subscribe");
+    expect(closedSurveysSectionSource).toContain("useVanillaStateTick");
     expect(closedSurveyCardSource).toContain("reopenSurveyDistribution");
-    expect(surveySource).toContain("export function renderSurveyWizardPanel");
+    expect(tickHookSource).toContain("subscribe");
     expect(surveySource).toContain("export function renderSurveyOrphanAndTemplates");
     expect(surveySource).not.toContain("export function renderSurveyCreator");
+    expect(surveySource).not.toContain("export function renderSurveyWizardPanel");
     expect(surveySource).not.toContain("export function renderSurveyRightColumnRest");
     expect(surveySource).not.toContain("activeSurveys.map");
     expect(surveySource).not.toContain("closedSurveys.map");
+  });
+
+  it("keeps free-text draft inputs uncontrolled to avoid the one-character-typed regression", () => {
+    const wizardSource = readFileSync(new URL("../src/survey/SurveyWizardPanel.jsx", import.meta.url), "utf8");
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+
+    // These must stay saveStateQuiet()-based (no re-render on every keystroke);
+    // the wizard's text inputs and question-type radios must be uncontrolled
+    // (defaultValue/defaultChecked) to match, not fully controlled.
+    expect(appSource).toContain("saveStateQuiet");
+    expect(wizardSource).toContain("defaultValue={vanillaState.draftSurveyTitle}");
+    expect(wizardSource).toContain("defaultValue={vanillaState.draftGoogleFormUrl}");
+    expect(wizardSource).toContain("defaultChecked={q.type === 'quant'}");
+    expect(wizardSource).not.toContain("value={vanillaState.draftSurveyTitle}");
   });
 });

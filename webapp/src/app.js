@@ -1,4 +1,5 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js';
+import { openSessionDrawer, closeSessionDrawer, startEditSession } from './sessions/sessionActions.js';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
 import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js';
@@ -113,7 +114,7 @@ import {
   subscribeSessionsFromFirestore, subscribeSurveysFromFirestore, subscribeSurveyTemplatesFromFirestore,
   subscribeOrganizationFromFirestore, subscribePulseYearsFromFirestore, subscribePulseCommitmentsFromFirestore,
   subscribeQualSignalsFromFirestore,
-  deleteSessionFromFirestore, saveResponsesToFirestore, fetchAllResponsesFromFirestore, loadPulseYears,
+  saveResponsesToFirestore, fetchAllResponsesFromFirestore, loadPulseYears,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore, fetchRecentAuditLogs,
   migrateOrganizationId,
@@ -428,24 +429,6 @@ function renderView() {
   if (state.activeView === "pulse") return renderPulse({ state, pulseCache });
   if (state.activeView === "comm") return renderComm({ state });
   return renderHomeDashboard({ state, pulseCache, commitmentsCache });
-}
-
-function openSessionDrawer({ switchToSessions = false } = {}) {
-  if (switchToSessions) {
-    state.activeView = "sessions";
-    state.activeSessionTab = "list";
-    state.mobileNavOpen = false;
-  }
-  state.editingSessionId = null;
-  state.sessionDrawerOpen = true;
-  saveState();
-  render();
-}
-
-function closeSessionDrawer() {
-  state.sessionDrawerOpen = false;
-  state.editingSessionId = null;
-  render();
 }
 
 function bindSessionDrawerControls() {
@@ -1408,51 +1391,6 @@ window.loadDefaultQuestionsToDraft = function(phase) {
   render();
 };
 
-// ── Session Drawer ───────────────────────────────────────────────
-window.openSessionDrawer = function() {
-  openSessionDrawer();
-};
-
-// ── Session Edit / Delete ────────────────────────────────────────
-window.startEditSession = function(id) {
-  const session = state.sessions.find(s => s.id === id);
-  if (!session) return;
-  state.editingSessionId = id;
-  state.sessionDrawerOpen = true;
-  state.activeSessionTab = 'list';
-  state.draftType = normalizeSessionType(session.type);
-  state.draftSchedule = JSON.parse(JSON.stringify(session.schedule));
-  state.draftCohort = session.cohort || 1;
-  state.draftYear = session.year || new Date().getFullYear();
-  state.draftDivisionId  = session.divisionId  || '';
-  state.draftHqId        = session.hqId        || '';
-  state.draftTeamId      = session.teamId      || '';
-  state.draftDivision    = session.division    || '';
-  state.draftHq          = session.hq          || '';
-  state.draftTeam        = session.team        || '';
-  state.draftLeader      = session.leader      || '';
-  state.draftLeaderTitle = session.leaderTitle || '';
-  state.draftMembers     = session.members     || [];
-  state.draftLeaderGroup = session.leaderGroup || [];
-  state.draftCrossTeams  = session.crossTeams  || [];
-  saveState();
-  render();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-};
-
-window.deleteSession = function(id) {
-  if (!confirm('이 세션을 삭제하시겠습니까?\n세션에 연결된 설문 및 응답 데이터는 유지됩니다.')) return;
-  state.sessions = state.sessions.filter(s => s.id !== id);
-  if (state.editingSessionId === id) {
-    state.editingSessionId = null;
-    state.sessionDrawerOpen = false;
-  }
-  saveState();
-  deleteSessionFromFirestore(id);
-  window.updateResponsesSubscription();
-  render();
-};
-
 // ── Global Window Handlers for DnD and Org ──────────────────────
 window.handleDragStart = function(event, id, type) {
   event.dataTransfer.setData("text/plain", id);
@@ -1965,15 +1903,6 @@ window.toggleAnalyticsSection = function(key) {
 
 window.setAnalyticsPhase = function(phase) {
   state.selectedAnalyticsPhase = PHASES.includes(phase) ? phase : "";
-  saveState();
-  render();
-};
-
-window.toggleSessionTypeGroup = function(type) {
-  state.collapsedSessionTypeGroups = state.collapsedSessionTypeGroups || [];
-  const idx = state.collapsedSessionTypeGroups.indexOf(type);
-  if (idx >= 0) state.collapsedSessionTypeGroups.splice(idx, 1);
-  else state.collapsedSessionTypeGroups.push(type);
   saveState();
   render();
 };

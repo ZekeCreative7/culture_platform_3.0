@@ -20,6 +20,7 @@ describe("Survey runtime wiring", () => {
     expect(surveySource).toContain("getQrCodeFactory()(0, 'L')");
     expect(existsSync(new URL("../public/qrcode.min.js", import.meta.url))).toBe(true);
     expect(existsSync(new URL("../survey.html", import.meta.url))).toBe(true);
+    expect(existsSync(new URL("../public/webapp/survey.html", import.meta.url))).toBe(true);
     expect(viteConfigSource).toContain("survey.html");
   });
 

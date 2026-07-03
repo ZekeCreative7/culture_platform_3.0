@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Survey Redirect</title>
+    <script>
+      const target = new URL("../survey.html", window.location.href);
+      target.search = window.location.search;
+      target.hash = window.location.hash;
+      window.location.replace(target.toString());
+    </script>
+  </head>
+  <body>
+    <p>설문 페이지로 이동 중입니다.</p>
+  </body>
+</html>

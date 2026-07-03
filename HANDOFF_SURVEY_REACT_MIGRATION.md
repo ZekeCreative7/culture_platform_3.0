@@ -45,6 +45,10 @@ The Survey page is not fully React-native yet. It is a React page that mounts th
   - This is required because Survey QR codes point to `/culture_platform_3.0/survey.html?surveyId=...`.
   - Without this input, GitHub Pages serves 404 for QR scans even when the QR image itself is valid.
 
+- `webapp/public/webapp/survey.html`
+  - Legacy redirect for older QR codes that point to `/culture_platform_3.0/webapp/survey.html?surveyId=...`.
+  - Preserves query string and hash, then redirects to `/culture_platform_3.0/survey.html?surveyId=...`.
+
 ## Verified Flows
 
 Run from `webapp/` with the portable Node path available:
@@ -63,6 +67,7 @@ Browser-verified:
 - Clicking a Survey `수정` button opens edit mode without the `surveySessionCohortKey is not defined` error overlay.
 - Build output includes `dist/survey.html`.
 - Local build preview returns `200 OK` for `/culture_platform_3.0/survey.html?surveyId=test`.
+- Local build preview returns `200 OK` for `/culture_platform_3.0/webapp/survey.html?surveyId=test` and redirects it to the canonical survey page.
 
 ## QR Troubleshooting Note
 
@@ -70,9 +75,10 @@ If a team-specific QR such as "디지털세일즈팀 Final" does not open:
 
 1. First check whether the encoded URL opens:
    `https://zekecreative7.github.io/culture_platform_3.0/survey.html?surveyId=<id>`
-2. If the URL is 404, do not recreate the survey. Fix deployment/build output for `survey.html`.
-3. If the URL opens but says the survey is missing or closed, then inspect the specific Firestore survey record.
-4. Recreating a survey changes the `surveyId` and can split responses across old/new survey cards, so prefer regenerating the QR from the existing survey after the page path is fixed.
+2. If an older QR points to `/culture_platform_3.0/webapp/survey.html?surveyId=<id>`, the redirect file should preserve it.
+3. If the URL is 404, do not recreate the survey. Fix deployment/build output for `survey.html` or the legacy redirect.
+4. If the URL opens but says the survey is missing or closed, then inspect the specific Firestore survey record.
+5. Recreating a survey changes the `surveyId` and can split responses across old/new survey cards, so prefer regenerating the QR from the existing survey after the page path is fixed.
 
 ## Parallel Work Rules
 

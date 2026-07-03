@@ -1,3 +1,4 @@
+import './surveyActions.js';
 import { state as vanillaState, subscribe } from '../state.js';
 import { bindSurveyCreator, renderSurveyCreator } from '../views/survey.js';
 

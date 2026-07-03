@@ -1782,16 +1782,6 @@ window.downloadSurveyTemplate = function(surveyId) {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 };
 
-window.copySurveyLink = function(link) {
-  const tempInput = document.createElement("input");
-  tempInput.value = link;
-  document.body.appendChild(tempInput);
-  tempInput.select();
-  document.execCommand("copy");
-  document.body.removeChild(tempInput);
-  alert("설문 링크가 복사되었습니다!");
-};
-
 // ── Global Window Handlers for DnD and Org ──────────────────────
 window.handleDragStart = function(event, id, type) {
   event.dataTransfer.setData("text/plain", id);
@@ -2543,12 +2533,6 @@ window.deleteRecoveredSurveyCard = function(id) {
   });
 };
 
-window.toggleClosedSurveysSection = function() {
-  state.closedSurveysCollapsed = !state.closedSurveysCollapsed;
-  saveState();
-  render();
-};
-
 window.toggleAnalyticsSection = function(key) {
   state.collapsedAnalyticsSections = state.collapsedAnalyticsSections || [];
   const idx = state.collapsedAnalyticsSections.indexOf(key);
@@ -2572,24 +2556,6 @@ window.toggleSessionTypeGroup = function(type) {
   saveState();
   render();
 };
-
-window.toggleSurveyCard = function(id) {
-  state.collapsedSurveyIds = state.collapsedSurveyIds || [];
-  const idx = state.collapsedSurveyIds.indexOf(id);
-  if (idx >= 0) state.collapsedSurveyIds.splice(idx, 1);
-  else state.collapsedSurveyIds.push(id);
-  saveState();
-  render();
-};
-
-window.collapseAllSurveys = function(collapse) {
-  const ids = (state.surveys || []).map(s => s.id);
-  state.collapsedSurveyIds = collapse ? ids : [];
-  saveState();
-  render();
-};
-
-
 
 // ── Async Startup Initializer ───────────────────────────────────
 function computeQrBaseUrl() {

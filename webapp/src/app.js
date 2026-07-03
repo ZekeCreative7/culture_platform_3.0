@@ -37,13 +37,9 @@ import {
 } from './views/analytics.js';
 import {
   renderSessionsShell,
-  renderOrgSelectRow,
-  renderSessionPulseSummary,
-  renderLeaderSessionPanel,
   renderCrossFunctionalPanel,
   renderCrossMemberSelector,
   renderSelectedCrossMembers,
-  renderSessionConfigPanel,
   renderSessionOutcomeIntro,
   leaderSessions,
   selectedLeaderSession,
@@ -69,12 +65,10 @@ import {
   distinctPeopleCount,
   distinctDirectPeopleCount,
   orgMemberOptionsForUnit,
-  optionHtml,
   syncDraftOrgFromTeam,
   ensureDraftOrgSelection,
   ensureActiveOrgSelection,
   teamPath,
-  leaderCandidateForTeam,
   orgMemberCandidate,
   teamMemberCandidates,
   allMemberCandidates,
@@ -811,35 +805,11 @@ function bindSessions() {
     render();
   });
 
-  // The 팀빌딩 org-select-row is real React now (OrgSelectRow.jsx via
-  // sessionOrgActions.js) and already owns #session-division/#session-hq/
-  // #session-team's onChange there. 리더십 still renders the same ids via
-  // the legacy renderOrgSelectRow() HTML string, so these listeners must
-  // stay for that type only, or the React version would get a duplicate
-  // vanilla listener alongside its own React handler.
-  if (normalizeSessionType(state.draftType) !== "팀빌딩") {
-    document.querySelector("#session-division")?.addEventListener("change", (event) => {
-      state.draftDivisionId = event.target.value;
-      state.draftHqId = "";
-      state.draftTeamId = "";
-      ensureDraftOrgSelection();
-      saveState();
-      render();
-    });
-    document.querySelector("#session-hq")?.addEventListener("change", (event) => {
-      state.draftHqId = event.target.value;
-      state.draftTeamId = "";
-      ensureDraftOrgSelection();
-      saveState();
-      render();
-    });
-    document.querySelector("#session-team")?.addEventListener("change", (event) => {
-      state.draftTeamId = event.target.value;
-      syncDraftOrgFromTeam(state.draftTeamId);
-      saveState();
-      render();
-    });
-  }
+  // 팀빌딩/리더십's org-select-rows are both real React now (OrgSelectRow.jsx
+  // via sessionOrgActions.js), and 팀빌딩/리더십's own add/remove-leader
+  // actions are real React too (sessionLeaderGroupActions.js). Only 협업
+  // remains legacy-rendered here, and it has no #session-division/#add-team-leader
+  // elements of its own, so none of those listeners are needed anymore.
   document.querySelector("#copy-session-survey-prompt")?.addEventListener("click", (event) => {
     const text = document.querySelector("#session-survey-prompt-text")?.value || "";
     if (!text.trim()) return;
@@ -847,25 +817,6 @@ function bindSessions() {
       const original = event.currentTarget.textContent;
       event.currentTarget.textContent = "복사됨";
       setTimeout(() => { event.currentTarget.textContent = original; }, 1600);
-    });
-  });
-  document.querySelector("#add-team-leader")?.addEventListener("click", () => {
-    const leader = leaderCandidateForTeam(state.draftTeamId);
-    if (!leader) {
-      alert("선택한 팀에 등록된 팀장이 없습니다.");
-      return;
-    }
-    if (!state.draftLeaderGroup.some((item) => item.teamId === leader.teamId)) {
-      state.draftLeaderGroup.push(leader);
-    }
-    saveState();
-    render();
-  });
-  document.querySelectorAll("[data-remove-leader]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.draftLeaderGroup = state.draftLeaderGroup.filter((item) => item.teamId !== button.dataset.removeLeader);
-      saveState();
-      render();
     });
   });
   document.querySelectorAll("input[name='cross-mode']").forEach((input) => {

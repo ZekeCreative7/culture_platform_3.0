@@ -16,12 +16,9 @@ import { pulseCache } from '../state.js';
 import { pulseDivisionMappingForOrgIds } from '../report/pulseSessionInsight.js';
 import { buildSessionSurveyQuestionPrompt, pulseContextForSurveyPrompt } from '../survey/surveyPrompt.js';
 import {
-  unitLeaderDetails,
-  leaderCandidateForTeam,
   teamPath,
   teamMemberCandidates,
-  allMemberCandidates,
-  optionHtml
+  allMemberCandidates
 } from './org.js';
 
 export function renderSessionOutcomeIntro(type) {
@@ -102,29 +99,6 @@ export function getStatus(session) {
   if (!past.length) return ["시작전", "amber"];
   if (future.length || pending.length) return ["진행중", "blue"];
   return ["완료", "green"];
-}
-
-export function renderOrgSelectRow(divisionList, hqList, teamList) {
-  return `
-    <div class="session-org-row">
-      <label>부문명
-        <select id="session-division">
-          ${optionHtml(divisionList, state.draftDivisionId, "부문 선택")}
-        </select>
-      </label>
-      <label>본부명
-        <select id="session-hq" ${hqList.length ? "" : "disabled"}>
-          ${optionHtml(hqList, state.draftHqId, hqList.length ? "본부 선택" : "본부 없음/직속")}
-        </select>
-      </label>
-      <label>팀명
-        <select id="session-team" ${state.draftDivisionId ? "" : "disabled"}>
-          ${optionHtml(teamList, state.draftTeamId, "팀 선택")}
-        </select>
-      </label>
-    </div>
-    ${renderSessionPulseSummary()}
-  `;
 }
 
 export function renderSessionPulseSummary() {
@@ -226,46 +200,6 @@ export function renderSessionSurveyPromptCard() {
   `;
 }
 
-export function renderLeaderSessionPanel(divisionList, hqList, teamList) {
-  const leader = leaderCandidateForTeam(state.draftTeamId);
-  const group = state.draftLeaderGroup || [];
-  const alreadyAdded = leader && group.some((item) => item.teamId === leader.teamId);
-  return `
-      <div class="session-config-panel">
-        <div class="session-config-head">
-        <strong>리더십 그룹 구성</strong>
-        <span>부문/본부/팀을 선택하고 리더를 추가합니다. 권장 인원은 6명입니다.</span>
-      </div>
-      ${renderOrgSelectRow(divisionList, hqList, teamList)}
-      <div class="session-picker-actions">
-        <div>
-          <strong>${leader ? `${escapeHtml(leader.name)} · ${escapeHtml(leader.teamName)}` : "리더를 선택해 주세요"}</strong>
-          <span>${leader ? `${escapeHtml(leader.divisionName)} > ${escapeHtml(leader.hqName)}` : "팀에 등록된 팀장 정보가 있어야 추가할 수 있습니다."}</span>
-        </div>
-        <button type="button" class="primary compact" id="add-team-leader" ${!leader || alreadyAdded ? "disabled" : ""}>리더 추가</button>
-      </div>
-      <div class="selection-summary">
-        <strong>선택된 리더 ${group.length}명</strong>
-        <span>${group.length < 6 ? `권장 인원까지 ${6 - group.length}명 남음` : "권장 인원 충족"}</span>
-      </div>
-      ${group.length ? `
-        <div class="selection-chip-grid">
-          ${group.map((item) => `
-            <div class="selection-chip">
-              <div>
-                <strong>${escapeHtml(item.name)}</strong>
-                <span>${escapeHtml(item.teamName)} · ${escapeHtml(item.position || "팀장")}</span>
-              </div>
-              <button type="button" data-remove-leader="${escapeHtml(item.teamId)}" aria-label="리더 제거">삭제</button>
-            </div>
-          `).join("")}
-        </div>
-      ` : `<div class="empty compact">아직 추가된 리더가 없습니다.</div>`}
-      ${renderSessionSurveyPromptCard()}
-    </div>
-  `;
-}
-
 export function renderCrossFunctionalPanel() {
   const mode = state.draftCrossMode || "leader-session";
   const sessions = leaderSessions();
@@ -361,14 +295,6 @@ export function renderSelectedCrossMembers(selectedMembers) {
       `).join("")}
     </div>
   ` : `<div class="empty compact">아직 구성원이 선택되지 않았습니다.</div>`;
-}
-
-// 팀빌딩 panel is real React now (webapp/src/sessions/TeamBuildingPanel.jsx),
-// so this only covers the still-legacy 리더십/협업 panels.
-export function renderSessionConfigPanel(divisionList, hqList, teamList) {
-  const type = normalizeSessionType(state.draftType);
-  if (type === "리더십") return renderLeaderSessionPanel(divisionList, hqList, teamList);
-  return renderCrossFunctionalPanel();
 }
 
 export function canCreateDraftSession() {

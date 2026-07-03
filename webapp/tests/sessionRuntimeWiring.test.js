@@ -78,22 +78,22 @@ describe("Sessions runtime wiring", () => {
     const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
 
     // The type/cohort/year/cancel/create-session bindings must be gone from
-    // bindSessions() (converted to React), but the org-hierarchy/leader-group/
-    // cross-functional/schedule-row bindings it still owns must not have been
-    // caught in the same removal, since renderSessionDrawerBody() still
-    // legacy-renders that content inside the new React drawer.
+    // bindSessions() (converted to React), but the cross-functional/
+    // schedule-row bindings it still owns must not have been caught in the
+    // same removal. (org-hierarchy/leader-group bindings were also legacy
+    // at the time this test was written, but items 4a/4b later converted
+    // those to React too — see the dedicated tests below.)
     expect(appSource).not.toContain('document.querySelector("#session-type")');
     expect(appSource).not.toContain('document.querySelector("#cohort")');
     expect(appSource).not.toContain('document.querySelector("#cancel-edit-session")');
     expect(appSource).not.toContain('document.querySelector("#create-session")');
-    expect(appSource).toContain('document.querySelector("#session-division")');
     expect(appSource).toContain('document.querySelectorAll("[data-cross-team]")');
     expect(appSource).not.toContain("if (typeSelect)");
 
-    expect(sessionsSource).toContain("export function renderSessionConfigPanel");
+    expect(sessionsSource).toContain("export function renderCrossFunctionalPanel");
     expect(sessionsSource).toContain("export function canCreateDraftSession");
 
-    expect(drawerSource).toContain("renderSessionConfigPanel");
+    expect(drawerSource).toContain("renderCrossFunctionalPanel");
     expect(drawerSource).toContain("dangerouslySetInnerHTML");
     expect(drawerSource).toContain("bindSessions()");
     expect(drawerSource).toContain("defaultValue={vanillaState.draftCohort}");
@@ -162,10 +162,9 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).not.toContain('document.querySelectorAll(".schedule-row")');
     expect(appSource).not.toContain('document.querySelectorAll("[data-delete-round]")');
     expect(appSource).not.toContain('document.querySelector("#add-round")');
-    // The org-hierarchy/leader-group/cross-functional listeners bindSessions()
-    // still owns must be untouched by this removal.
-    expect(appSource).toContain('document.querySelector("#session-division")');
-    expect(appSource).toContain('document.querySelector("#add-team-leader")');
+    // The cross-functional listeners bindSessions() still owns must be
+    // untouched by this removal.
+    expect(appSource).toContain("input[name='cross-mode']");
 
     expect(sessionsSource).not.toContain("export function scheduleRow");
     expect(sessionsSource).not.toContain("schedule-head");
@@ -191,7 +190,6 @@ describe("Sessions runtime wiring", () => {
   });
 
   it("converts the 팀빌딩 config panel (org hierarchy) to React while 리더십/협업 stay legacy", () => {
-    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
     const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
     const drawerSource = readFileSync(new URL("../src/sessions/SessionDrawer.jsx", import.meta.url), "utf8");
     const orgActionsSource = readFileSync(new URL("../src/sessions/sessionOrgActions.js", import.meta.url), "utf8");
@@ -200,18 +198,7 @@ describe("Sessions runtime wiring", () => {
 
     expect(sessionsSource).not.toContain("export function renderTeamBuildingPanel");
     expect(sessionsSource).not.toContain("export function renderSessionDrawerBody");
-    // renderOrgSelectRow/renderLeaderSessionPanel/renderCrossFunctionalPanel
-    // must stay: 리더십 still uses the legacy org-select-row HTML string.
-    expect(sessionsSource).toContain("export function renderOrgSelectRow");
-    expect(sessionsSource).toContain("export function renderLeaderSessionPanel");
     expect(sessionsSource).toContain("export function renderCrossFunctionalPanel");
-
-    // The React org-select-row and the legacy one share the same
-    // #session-division/#session-hq/#session-team ids (리더십 still renders
-    // the legacy version), so bindSessions() must not double-attach vanilla
-    // listeners on top of React's own onChange when 팀빌딩 is active.
-    expect(appSource).toContain('normalizeSessionType(state.draftType) !== "팀빌딩"');
-    expect(appSource).toContain('document.querySelector("#session-division")');
 
     expect(orgActionsSource).toContain("export function updateSessionDivision");
     expect(orgActionsSource).toContain("export function updateSessionHq");
@@ -225,5 +212,42 @@ describe("Sessions runtime wiring", () => {
 
     expect(drawerSource).toContain("TeamBuildingPanel");
     expect(drawerSource).toContain("draftType === '팀빌딩'");
+  });
+
+  it("converts the 리더십 leader-group builder to React, retiring the shared legacy org-select-row entirely", () => {
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
+    const drawerSource = readFileSync(new URL("../src/sessions/SessionDrawer.jsx", import.meta.url), "utf8");
+    const leaderActionsSource = readFileSync(new URL("../src/sessions/sessionLeaderGroupActions.js", import.meta.url), "utf8");
+    const leaderPanelSource = readFileSync(new URL("../src/sessions/LeaderGroupPanel.jsx", import.meta.url), "utf8");
+
+    // renderOrgSelectRow/renderLeaderSessionPanel were only used by the now-
+    // fully-React 팀빌딩/리더십 panels; 협업 (the only remaining legacy panel)
+    // never called either, so both are dead and should be gone, along with
+    // the #session-division/#add-team-leader/[data-remove-leader] listeners
+    // bindSessions() used to guard for 리더십 specifically.
+    expect(sessionsSource).not.toContain("export function renderOrgSelectRow");
+    expect(sessionsSource).not.toContain("export function renderLeaderSessionPanel");
+    expect(appSource).not.toContain('document.querySelector("#session-division")');
+    expect(appSource).not.toContain('document.querySelector("#add-team-leader")');
+    expect(appSource).not.toContain('document.querySelectorAll("[data-remove-leader]")');
+    expect(appSource).not.toContain("renderOrgSelectRow");
+    expect(appSource).not.toContain("renderLeaderSessionPanel");
+    expect(appSource).not.toContain("renderSessionConfigPanel");
+    // The 협업 mode-switch/cross-team/cross-member listeners bindSessions()
+    // still owns must be untouched by this removal.
+    expect(appSource).toContain("input[name='cross-mode']");
+
+    expect(leaderActionsSource).toContain("export function addTeamLeader");
+    expect(leaderActionsSource).toContain("export function removeTeamLeader");
+
+    expect(leaderPanelSource).toContain("OrgSelectRow");
+    expect(leaderPanelSource).toContain("useVanillaStateTick");
+    expect(leaderPanelSource).toContain("addTeamLeader");
+    expect(leaderPanelSource).toContain("removeTeamLeader");
+
+    expect(drawerSource).toContain("LeaderGroupPanel");
+    expect(drawerSource).toContain("draftType === '리더십'");
+    expect(drawerSource).toContain("renderCrossFunctionalPanel");
   });
 });

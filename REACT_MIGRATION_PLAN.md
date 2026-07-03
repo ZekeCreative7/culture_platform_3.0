@@ -353,3 +353,22 @@ Completed:
 This completes Step 3 (Survey → React-native) as scoped by the tiny commit sequence, other than item 10's already-ongoing verification (folded into each item's own browser verification throughout items 4-9 rather than deferred to the end, since deferring it would have violated migration principle #7).
 
 Next recommended step: Step 4, Convert Sessions — starting with extracting session actions from `SessionsPage.jsx` and `app.js` (`views/sessions.js` still renders session cards/drawer as legacy HTML strings, similar starting point to where Survey was before this sequence began).
+
+### 2026-07-03 - Step 4, Item 1 Complete (Sessions actions extracted, scoped down)
+
+Before starting, spawned an Explore agent to map Sessions' architecture, since it's meaningfully bigger/riskier than Survey was: `bindSessions()` in `app.js` is 421 lines with ~57 `addEventListener` bindings across 32 state fields (drawer form, schedule/round editor, org picker, leader-group builder, cross-functional builder, calendar nav, attendance modal), plus 3-way type branching (팀빌딩/리더십/협업). Grilled two decisions before touching anything:
+
+1. **Scope for item 1**: confirmed to stay to just the 4-5 simple list/drawer actions (mirroring Survey's smallest-first approach), deferring `bindSessions()`'s other ~53 listeners to items 3-4.
+2. **A discovered duplicate-implementation + latent bug**: `SessionsPage.jsx` already had its own local re-implementation of `toggleSessionTypeGroup`/`startEditSession`/`deleteSession` (registered as `window.*` on mount, `delete`d on unmount) — separate from `app.js`'s own copies of the same functions. Confirmed via `dashboard/dashboardViews.js:932-965` that Dashboard's queue-row/pipeline-card click handlers call `window.startEditSession(sessionId)` synchronously and expect it pre-registered — meaning after a user visited Sessions once and left, Dashboard's "open this session" quick-actions would silently stop opening the specific session (navigation still worked, the edit drawer just never opened). Confirmed fixing this now rather than preserving the bug.
+
+Completed:
+
+- Moved `toggleSessionTypeGroup`, `startEditSession`, `deleteSession`, `openSessionDrawer`, `closeSessionDrawer` into `webapp/src/sessions/sessionActions.js`, unchanged in logic — consolidating the app.js/SessionsPage.jsx duplicate into one canonical module.
+- Registered `startEditSession`/`deleteSession`/`toggleSessionTypeGroup` permanently at module load (not scoped to `SessionsPage`'s mount/unmount), fixing the Dashboard cross-page bug described above.
+- `app.js`'s `bindSessionDrawerControls()` and the `#edit-existing-session` duplicate-warning handler now import `openSessionDrawer`/`closeSessionDrawer`/`startEditSession` from the new module instead of local copies or an implicit `window.*` global lookup.
+- Removed the now-unused `deleteSessionFromFirestore` import from `app.js`.
+- Verified: `npm run check`, full `vitest run` (46 tests, 3 new in `sessionRuntimeWiring.test.js`), `npm run build` all pass. Browser-verified the bug fix directly: confirmed `window.startEditSession` survives navigating from Sessions to Dashboard (previously would be `undefined`), across two navigation cycles. Got a full real-data round trip: injected a session, called `window.startEditSession(id)` while on Dashboard (simulating the exact click-handler scenario), then navigated to Sessions and confirmed the drawer auto-opened in edit mode with the correct type/cohort/year/schedule pre-filled — this is exactly the item-5 checkpoint ("verify Dashboard-to-Sessions navigation still opens the intended session"), already validated here even though item 5 comes later. Also confirmed `deleteSession`'s full round trip (local filter + Firestore attempt, expected permission-denied caught correctly) and `toggleSessionTypeGroup`'s no-throw behavior.
+
+Next recommended Sessions commit:
+
+- Item 2 of the Step 4 sequence: convert session list cards (`sessionsByTypeGrouped()`'s card rendering in `views/sessions.js`) to real React components, following the same `ActiveSurveysSection`/`SurveyCard` pattern from Survey. The drawer, schedule/round editor, org picker, and leader/cross-functional builders stay legacy-rendered for now (items 3-4).

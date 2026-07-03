@@ -22,13 +22,8 @@ import {
   teamPath,
   teamMemberCandidates,
   allMemberCandidates,
-  optionHtml,
-  renderOrgPopup
+  optionHtml
 } from './org.js';
-import {
-  renderAttendanceModal,
-  renderDuplicateWarningModal
-} from './survey.js';
 
 export function renderSessionOutcomeIntro(type) {
   const normalizedType = normalizeSessionType(type);
@@ -281,14 +276,11 @@ export function renderTeamBuildingPanel(divisionList, hqList, teamList) {
                 <span><span style="color:var(--muted); font-weight:700;">팀원</span> &nbsp;${state.draftMembers.length}명</span>
               </div>
             </div>
-            <button type="button" id="open-org-picker" style="flex-shrink:0; padding:5px 11px; border:1px solid var(--line-strong); border-radius:7px; background:rgba(255,255,255,0.7); color:var(--muted); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all 0.15s;" onmouseover="this.style.color='var(--blue)';this.style.borderColor='var(--blue)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--line-strong)'">
-              팀 변경
-            </button>
           </div>
         </div>`;
         })() : `
         <div class="selected-team-wrap">
-          <button type="button" class="primary" id="open-org-picker">조직도에서 팀 선택</button>
+          <p style="font-size:11.5px; color:var(--muted); margin:0;">위 부문/본부/팀 선택에서 팀을 골라주세요.</p>
         </div>
       `}
     </div>
@@ -481,7 +473,6 @@ export function renderSessionsShell() {
   `;
 }
 
-// ── Drawer + org popup + attendance modal + duplicate-warning modal ──
 // ── Drawer body: config panel (org hierarchy / leader-group / cross-
 // functional builders) + schedule head/table ──────────────────────
 // Still legacy-rendered (dangerouslySetInnerHTML inside the real React
@@ -506,14 +497,3 @@ export function renderSessionDrawerBody(divisionList, hqList, teamList) {
   `;
 }
 
-export function renderSessionsOverlays() {
-  const orgPopupHtml = state.showOrgPopup ? renderOrgPopup() : "";
-  const attendanceModalHtml = state.showAttendanceModal ? renderAttendanceModal() : "";
-  const duplicateWarningHtml = state.duplicateSessionWarning ? renderDuplicateWarningModal() : "";
-
-  return `
-    ${orgPopupHtml}
-    ${attendanceModalHtml}
-    ${duplicateWarningHtml}
-  `;
-}

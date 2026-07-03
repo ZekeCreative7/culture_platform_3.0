@@ -1,6 +1,6 @@
 import { subscribe } from '../state.js';
 import { bindSessions, bindSessionDrawerControls } from '../app.js';
-import { renderSessionsShell, renderSessionsOverlays } from '../views/sessions.js';
+import { renderSessionsShell } from '../views/sessions.js';
 import { renderCalendar } from '../views/survey.js';
 
 function mountLegacyFragment(element, renderFragment, { debounceMs = 150 } = {}) {
@@ -12,8 +12,8 @@ function mountLegacyFragment(element, renderFragment, { debounceMs = 150 } = {})
     if (disposed || !element) return;
     element.innerHTML = renderFragment();
     // bindSessions()/bindSessionDrawerControls() search the whole document,
-    // not just this fragment, so calling both after any one of the three
-    // legacy fragments refreshes keeps every button across all three bound.
+    // not just this fragment, so calling both after either of the two
+    // legacy fragments refreshes keeps every button across both bound.
     bindSessions();
     bindSessionDrawerControls();
   }
@@ -39,8 +39,4 @@ export function mountSessionsShell(element, options) {
 
 export function mountSessionsCalendar(element, options) {
   return mountLegacyFragment(element, renderCalendar, options);
-}
-
-export function mountSessionsOverlays(element, options) {
-  return mountLegacyFragment(element, renderSessionsOverlays, options);
 }

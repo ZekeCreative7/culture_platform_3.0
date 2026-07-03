@@ -57,7 +57,6 @@ describe("Sessions runtime wiring", () => {
     expect(sessionsSource).not.toContain("export function sessionCard");
     expect(sessionsSource).toContain("export function getStatus");
     expect(sessionsSource).toContain("export function renderSessionsShell");
-    expect(sessionsSource).toContain("export function renderSessionsOverlays");
 
     expect(listSectionSource).toContain("SessionCard");
     expect(listSectionSource).toContain("useVanillaStateTick");
@@ -68,9 +67,7 @@ describe("Sessions runtime wiring", () => {
     expect(pageSource).toContain("SessionsListSection");
     expect(pageSource).toContain("mountSessionsShell");
     expect(pageSource).toContain("mountSessionsCalendar");
-    expect(pageSource).toContain("mountSessionsOverlays");
     expect(bridgeSource).toContain("renderCalendar");
-    expect(bridgeSource).toContain("renderSessionsOverlays");
   });
 
   it("converts the drawer's outer shell to React while the config panel/schedule editor stay legacy inside it", () => {
@@ -107,5 +104,52 @@ describe("Sessions runtime wiring", () => {
     expect(draftActionsSource).toContain("canCreateDraftSession()");
 
     expect(pageSource).toContain("SessionDrawer");
+  });
+
+  it("removes the dead org-picker flow and fixes the two broken modals (duplicate-warning crash, silent attendance modal)", () => {
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
+    const bridgeSource = readFileSync(new URL("../src/sessions/SessionsBridge.js", import.meta.url), "utf8");
+    const modalActionsSource = readFileSync(new URL("../src/sessions/sessionModalActions.js", import.meta.url), "utf8");
+    const duplicateModalSource = readFileSync(new URL("../src/sessions/DuplicateWarningModal.jsx", import.meta.url), "utf8");
+    const attendanceModalSource = readFileSync(new URL("../src/sessions/AttendanceModal.jsx", import.meta.url), "utf8");
+
+    // Org picker: state.showOrgPopup set by "조직도에서 팀 선택"/"팀 변경" never
+    // matched what renderOrgPopup() actually checks (activeOrgPopupUnitId, an
+    // unrelated Org-page field) — confirmed live (no popup ever appeared).
+    // renderOrgSelectRow's division/hq/team selects already provide full team
+    // selection, so the button was fully redundant, not just broken.
+    expect(appSource).not.toContain("#open-org-picker");
+    expect(appSource).not.toContain("#confirm-org-picker");
+    expect(sessionsSource).not.toContain("open-org-picker");
+    expect(sessionsSource).not.toContain("renderOrgPopup");
+
+    // Duplicate-warning: the old call site invoked renderDuplicateWarningModal()
+    // with no arguments, but that function is actually Survey's CSV-upload
+    // date-conflict modal (renderDuplicateWarningModal(survey, matches)) —
+    // confirmed live to throw (matches.length on undefined), crashing the
+    // whole Sessions page with no error boundary to catch it.
+    expect(sessionsSource).not.toContain("renderDuplicateWarningModal");
+    expect(duplicateModalSource).toContain("dismissDuplicateWarning");
+    expect(duplicateModalSource).toContain("editDuplicateSession");
+
+    // Attendance: the old call site also passed no arguments to
+    // renderAttendanceModal(sessionId, roundId), and even with arguments fixed
+    // that function's own onclick handlers (closeAttendance, toggleMemberAttendance)
+    // were never defined anywhere — a second, independent bug in the same
+    // dead code. Rebuilt to match what bindSessions()'s already-working
+    // #save-attendance handler actually expects (absences array, completed
+    // status, note), using real local React state instead of DOM queries.
+    expect(sessionsSource).not.toContain("renderAttendanceModal");
+    expect(appSource).not.toContain("window.openAttendance = function");
+    expect(modalActionsSource).toContain("window.openAttendance = openAttendance");
+    expect(attendanceModalSource).toContain("saveAttendance");
+    expect(attendanceModalSource).not.toContain("document.querySelector");
+
+    expect(pageSource).toContain("AttendanceModal");
+    expect(pageSource).toContain("DuplicateWarningModal");
+    expect(pageSource).not.toContain("mountSessionsOverlays");
+    expect(bridgeSource).not.toContain("mountSessionsOverlays");
   });
 });

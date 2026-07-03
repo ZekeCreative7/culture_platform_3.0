@@ -27,8 +27,6 @@ import {
   renderMonthCalendar,
   renderWeekCalendar,
   renderDayCalendar,
-  renderAttendanceModal,
-  renderDuplicateWarningModal,
   renderSurveyResponsePanel
 } from './views/survey.js';
 import {
@@ -39,7 +37,6 @@ import {
 } from './views/analytics.js';
 import {
   renderSessionsShell,
-  renderSessionsOverlays,
   renderOrgSelectRow,
   renderSessionPulseSummary,
   renderTeamBuildingPanel,
@@ -85,7 +82,6 @@ import {
   allMemberCandidates,
   positionRank,
   renderOrg,
-  renderOrgPopup,
   renderOrgActionMenu,
   renderOrgUnitCard,
   renderMemberCard,
@@ -415,7 +411,7 @@ function render() {
 }
 
 function renderView() {
-  if (state.activeView === "sessions") return renderSessionsShell() + renderSessionsOverlays();
+  if (state.activeView === "sessions") return renderSessionsShell();
   if (state.activeView === "org") return renderOrg();
   if (state.activeView === "survey") return "";
   if (state.activeView === "upload") return renderUpload();
@@ -784,73 +780,6 @@ function bindSessions() {
     state.activeSessionTab = "calendar";
     saveState();
     render();
-  });
-
-  document.querySelector("#open-org-picker")?.addEventListener("click", () => {
-    state.showOrgPopup = true;
-    render();
-  });
-  document.querySelector("#close-org-picker")?.addEventListener("click", () => {
-    state.showOrgPopup = false;
-    render();
-  });
-  document.querySelector("#cancel-org-picker")?.addEventListener("click", () => {
-    state.showOrgPopup = false;
-    render();
-  });
-  document.querySelector("#confirm-org-picker")?.addEventListener("click", () => {
-    const team = state.orgUnits.find(u => u.id === state.selectedTeam);
-    if (team) {
-      state.draftTeamId = team.id;
-      syncDraftOrgFromTeam(team.id);
-    }
-    state.showOrgPopup = false;
-    saveState();
-    render();
-  });
-
-  document.querySelector("#close-duplicate-warning")?.addEventListener("click", () => {
-    state.duplicateSessionWarning = null;
-    render();
-  });
-  document.querySelector("#cancel-duplicate-warning")?.addEventListener("click", () => {
-    state.duplicateSessionWarning = null;
-    render();
-  });
-  document.querySelector("#edit-existing-session")?.addEventListener("click", () => {
-    const id = state.duplicateSessionWarning;
-    state.duplicateSessionWarning = null;
-    startEditSession(id);
-  });
-
-  document.querySelector("#close-attendance")?.addEventListener("click", () => {
-    state.showAttendanceModal = false;
-    render();
-  });
-  document.querySelector("#cancel-attendance")?.addEventListener("click", () => {
-    state.showAttendanceModal = false;
-    render();
-  });
-  document.querySelector("#save-attendance")?.addEventListener("click", () => {
-    const session = state.sessions.find(s => s.id === state.activeAttendanceSessionId);
-    const item = session ? session.schedule.find(i => i.id === state.activeAttendanceItemId) : null;
-    if (item) {
-      const absences = [];
-      document.querySelectorAll(".attendance-members-grid input[type='checkbox']").forEach(input => {
-        if (input.checked) {
-          absences.push(input.dataset.memberId);
-        }
-      });
-      item.absences = absences;
-      
-      const completed = document.querySelector("#round-completed").checked;
-      item.status = completed ? 'completed' : (item.date ? 'confirmed' : 'planned');
-      item.note = document.querySelector("#attendance-note").value.trim();
-      
-      saveState();
-      state.showAttendanceModal = false;
-      render();
-    }
   });
 
   document.querySelector("#cal-prev-btn")?.addEventListener("click", () => {
@@ -1693,13 +1622,6 @@ window.deleteTeamLeader = function(teamId) {
     team.leaderMemberId = "";
   }
   persistOrganization();
-  render();
-};
-
-window.openAttendance = function(sessionId, itemId) {
-  state.showAttendanceModal = true;
-  state.activeAttendanceSessionId = sessionId;
-  state.activeAttendanceItemId = itemId;
   render();
 };
 

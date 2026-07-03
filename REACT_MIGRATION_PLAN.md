@@ -494,3 +494,20 @@ With this, all 3 session-type config panels (팀빌딩/리더십/협업) are rea
 Next recommended Sessions commit:
 
 - The calendar view (`#/sessions` "일정 캘린더" tab) is now the last significant legacy-rendered piece of the Sessions screen, still mounted via `SessionsBridge.js`'s `mountSessionsCalendar`. Converting it to React would be the natural next step to finish the Sessions screen's migration, or the plan could move on to Step 5 (Upload/Analytics/Report) instead and return to the calendar later.
+
+### 2026-07-04 - Sessions Calendar Complete — Sessions Screen Migration Finished
+
+Completed:
+
+- New `webapp/src/sessions/sessionCalendarActions.js`: `goToPrevMonth`, `goToNextMonth`, `setCalendarView`, moved verbatim from the legacy `#cal-prev-btn`/`#cal-next-btn`/`#cal-view-month`/`#cal-view-week`/`#cal-view-day` listeners in `bindSessions()`.
+- New `webapp/src/sessions/SessionsCalendar.jsx`: real React with `MonthCalendar`/`WeekCalendar`/`DayCalendar`/`EventPill` as local sub-components, replacing `renderCalendar()`/`renderMonthCalendar()`/`renderWeekCalendar()`/`renderDayCalendar()`. These 4 functions had historically lived in `views/survey.js`, not `views/sessions.js` — a naming quirk from early in the project, cleaned up as part of this deletion.
+- Removed `mountSessionsCalendar` from `SessionsBridge.js` and the `calendarRef`/`useEffect` mounting indirection in `SessionsPage.jsx`; the calendar tab now renders `<SessionsCalendar />` directly, same as the list tab already did with `<SessionsListSection />`.
+- **Bug found and fixed during conversion**: the legacy day view read `item.time`/`item.topic`, but the real schedule data model (established in item 4's `scheduleActions.js`/`ScheduleEditor.jsx`) uses `item.startTime`/`item.content` — those two fields never existed on any schedule item, so the day view always displayed "시간 미정"/"세션 내용 없음" placeholder text for every session's every round, regardless of the actual date/time/content entered. Fixed to read the real field names; confirmed live (see below).
+- Removed the now-dead `#cal-prev-btn`/`#cal-next-btn`/`#cal-view-month`/`#cal-view-week`/`#cal-view-day` listeners from `bindSessions()`, and cleaned up imports left dangling by the deleted render functions (`renderCalendar` family from `app.js`'s import of `views/survey.js`, plus `todayISO`/`emptyCard`/`sessionTypeDef` which became unused in `views/survey.js` itself).
+- Verified: `npm run check`, full `vitest run` (54 tests, 1 new + 1 retitled for staleness), `npm run build` all pass. Browser-verified live: month view renders pixel-identical to the original with correct event pills and "today" cell highlighting; prev/next month navigation advances correctly; switched to day view on the date of a freshly-created test session and confirmed the bug fix live — the event card showed the real "10:00 (60분)"/"WOW세션" instead of the old placeholder text; clicked the event card and confirmed `openAttendance()` (already a real export from the peripheral-modals fix) still opens the attendance modal correctly from this new entry point; no console errors beyond the known unauthenticated-preview Firestore permission errors.
+
+With this, the entire Sessions screen — list, drawer, all 3 config panels (팀빌딩/리더십/협업), schedule editor, calendar, peripheral modals — is real React. `bindSessions()` is down to the tab-switch buttons (`#btn-session-list`/`#btn-session-calendar`, part of the still-legacy `renderSessionsShell()` fragment), the shared `#copy-session-survey-prompt` button, org-hierarchy/leader-group listeners the shell doesn't yet own, and the DB-menu buttons.
+
+Next recommended commit:
+
+- Step 4 (Sessions) is functionally complete. The plan's Step 5 (Upload/Analytics/Report) is the next major screen per the original sequencing — see the "Convert Upload, Analytics, And Report" section above for its sub-items (move `parseCSV` out of `views/upload.js`; replace `renderQuantSection`/`renderQualSection` in Analytics; move report filter controls/export buttons to React). Alternatively, `renderSessionsShell()` itself (page-head + tab-header) could be converted first to fully close out Sessions before moving on.

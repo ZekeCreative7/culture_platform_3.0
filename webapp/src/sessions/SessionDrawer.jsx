@@ -3,11 +3,12 @@ import { state as vanillaState } from '../state.js';
 import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
 import { SESSION_TYPES, sessionTypeLabel, normalizeSessionType } from '../utils.js';
 import { ensureDraftOrgSelection } from '../views/org.js';
-import { renderSessionDrawerBody, canCreateDraftSession } from '../views/sessions.js';
+import { renderSessionConfigPanel, canCreateDraftSession } from '../views/sessions.js';
 import { bindSessions } from '../app.js';
 import { closeSessionDrawer } from './sessionActions.js';
 import { updateSessionType, updateSessionCohort, updateSessionYear, cancelEditSession, createOrUpdateSession } from './sessionDraftActions.js';
 import { ScheduleEditor } from './ScheduleEditor.jsx';
+import { TeamBuildingPanel } from './TeamBuildingPanel.jsx';
 
 export function SessionDrawer() {
   useVanillaStateTick();
@@ -17,11 +18,13 @@ export function SessionDrawer() {
   const editingSessionId = vanillaState.editingSessionId;
   const draftType = normalizeSessionType(vanillaState.draftType);
 
-  // The config panel inside bodyRef is still legacy-rendered
-  // (dangerouslySetInnerHTML) and its internal buttons/selects/inputs are
+  // The 리더십/협업 config panels inside bodyRef are still legacy-rendered
+  // (dangerouslySetInnerHTML) and their internal buttons/selects/inputs are
   // bound by bindSessions() via document.querySelectorAll, so it needs to be
-  // re-invoked after every render this component produces. The schedule
-  // editor is real React now (ScheduleEditor.jsx) and doesn't need this.
+  // re-invoked after every render this component produces. 팀빌딩's config
+  // panel and the schedule editor are real React now and don't need this,
+  // but bindSessions() is harmless to call regardless of type since it
+  // guards its 팀빌딩-only listeners internally.
   useEffect(() => {
     bindSessions();
   });
@@ -64,7 +67,11 @@ export function SessionDrawer() {
               />
             </label>
           </div>
-          <div ref={bodyRef} dangerouslySetInnerHTML={{ __html: renderSessionDrawerBody(divisionList, hqList, teamList) }} />
+          <div className="session-form">
+            {draftType === '팀빌딩'
+              ? <TeamBuildingPanel divisionList={divisionList} hqList={hqList} teamList={teamList} />
+              : <div ref={bodyRef} dangerouslySetInnerHTML={{ __html: renderSessionConfigPanel(divisionList, hqList, teamList) }} />}
+          </div>
           <ScheduleEditor />
         </div>
         <div className="session-drawer-footer">

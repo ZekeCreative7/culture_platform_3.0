@@ -39,7 +39,6 @@ import {
   renderSessionsShell,
   renderOrgSelectRow,
   renderSessionPulseSummary,
-  renderTeamBuildingPanel,
   renderLeaderSessionPanel,
   renderCrossFunctionalPanel,
   renderCrossMemberSelector,
@@ -812,27 +811,35 @@ function bindSessions() {
     render();
   });
 
-  document.querySelector("#session-division")?.addEventListener("change", (event) => {
-    state.draftDivisionId = event.target.value;
-    state.draftHqId = "";
-    state.draftTeamId = "";
-    ensureDraftOrgSelection();
-    saveState();
-    render();
-  });
-  document.querySelector("#session-hq")?.addEventListener("change", (event) => {
-    state.draftHqId = event.target.value;
-    state.draftTeamId = "";
-    ensureDraftOrgSelection();
-    saveState();
-    render();
-  });
-  document.querySelector("#session-team")?.addEventListener("change", (event) => {
-    state.draftTeamId = event.target.value;
-    syncDraftOrgFromTeam(state.draftTeamId);
-    saveState();
-    render();
-  });
+  // The 팀빌딩 org-select-row is real React now (OrgSelectRow.jsx via
+  // sessionOrgActions.js) and already owns #session-division/#session-hq/
+  // #session-team's onChange there. 리더십 still renders the same ids via
+  // the legacy renderOrgSelectRow() HTML string, so these listeners must
+  // stay for that type only, or the React version would get a duplicate
+  // vanilla listener alongside its own React handler.
+  if (normalizeSessionType(state.draftType) !== "팀빌딩") {
+    document.querySelector("#session-division")?.addEventListener("change", (event) => {
+      state.draftDivisionId = event.target.value;
+      state.draftHqId = "";
+      state.draftTeamId = "";
+      ensureDraftOrgSelection();
+      saveState();
+      render();
+    });
+    document.querySelector("#session-hq")?.addEventListener("change", (event) => {
+      state.draftHqId = event.target.value;
+      state.draftTeamId = "";
+      ensureDraftOrgSelection();
+      saveState();
+      render();
+    });
+    document.querySelector("#session-team")?.addEventListener("change", (event) => {
+      state.draftTeamId = event.target.value;
+      syncDraftOrgFromTeam(state.draftTeamId);
+      saveState();
+      render();
+    });
+  }
   document.querySelector("#copy-session-survey-prompt")?.addEventListener("click", (event) => {
     const text = document.querySelector("#session-survey-prompt-text")?.value || "";
     if (!text.trim()) return;

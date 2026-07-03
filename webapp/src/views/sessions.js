@@ -194,7 +194,7 @@ function draftSessionLike() {
   return base;
 }
 
-function renderSessionSurveyPromptCard() {
+export function renderSessionSurveyPromptCard() {
   const draftSession = draftSessionLike();
   const prompt = buildSessionSurveyQuestionPrompt({
     session: draftSession,
@@ -222,45 +222,6 @@ function renderSessionSurveyPromptCard() {
         </div>
       </div>
       <textarea class="session-survey-prompt-text" id="session-survey-prompt-text" readonly>${escapeHtml(prompt)}</textarea>
-    </div>
-  `;
-}
-
-export function renderTeamBuildingPanel(divisionList, hqList, teamList) {
-  return `
-    <div class="session-config-panel">
-      <div class="session-config-head">
-        <strong>팀 전체 참여</strong>
-        <span>한 팀을 선택하면 팀장과 팀원 데이터를 불러옵니다.</span>
-      </div>
-      ${renderOrgSelectRow(divisionList, hqList, teamList)}
-      ${renderSessionSurveyPromptCard()}
-      ${state.draftTeamId ? (() => {
-          const divUnit = state.orgUnits.find(u => u.id === state.draftDivisionId);
-          const hqUnit  = state.orgUnits.find(u => u.id === state.draftHqId);
-          const divLeader = unitLeaderDetails(divUnit);
-          const hqLeader  = unitLeaderDetails(hqUnit);
-          return `
-        <div class="selected-team-wrap">
-          <div class="selected-team-badge" style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-            <div>
-              <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
-                ${escapeHtml(state.draftDivision)} &rsaquo; ${escapeHtml(state.draftHq)} &rsaquo; <strong style="color:var(--ink);">${escapeHtml(state.draftTeam)}</strong>
-              </div>
-              <div style="display:flex; flex-wrap:wrap; gap:14px; font-size:12.5px; color:var(--ink);">
-                <span><span style="color:var(--muted); font-weight:700;">부문장</span> &nbsp;${divLeader ? `${escapeHtml(divLeader.name)} ${escapeHtml(divLeader.grade)}` : '미지정'}</span>
-                <span><span style="color:var(--muted); font-weight:700;">본부장</span> &nbsp;${hqLeader ? `${escapeHtml(hqLeader.name)} ${escapeHtml(hqLeader.grade)}` : '미지정'}</span>
-                <span><span style="color:var(--muted); font-weight:700;">팀장</span> &nbsp;${escapeHtml(state.draftLeader || '미지정')} ${state.draftLeaderTitle ? `(${escapeHtml(state.draftLeaderTitle)})` : ''}</span>
-                <span><span style="color:var(--muted); font-weight:700;">팀원</span> &nbsp;${state.draftMembers.length}명</span>
-              </div>
-            </div>
-          </div>
-        </div>`;
-        })() : `
-        <div class="selected-team-wrap">
-          <p style="font-size:11.5px; color:var(--muted); margin:0;">위 부문/본부/팀 선택에서 팀을 골라주세요.</p>
-        </div>
-      `}
     </div>
   `;
 }
@@ -402,9 +363,10 @@ export function renderSelectedCrossMembers(selectedMembers) {
   ` : `<div class="empty compact">아직 구성원이 선택되지 않았습니다.</div>`;
 }
 
+// 팀빌딩 panel is real React now (webapp/src/sessions/TeamBuildingPanel.jsx),
+// so this only covers the still-legacy 리더십/협업 panels.
 export function renderSessionConfigPanel(divisionList, hqList, teamList) {
   const type = normalizeSessionType(state.draftType);
-  if (type === "팀빌딩") return renderTeamBuildingPanel(divisionList, hqList, teamList);
   if (type === "리더십") return renderLeaderSessionPanel(divisionList, hqList, teamList);
   return renderCrossFunctionalPanel();
 }
@@ -452,16 +414,8 @@ export function renderSessionsShell() {
 }
 
 // ── Drawer body: config panel (org hierarchy / leader-group / cross-
-// functional builders) + schedule head/table ──────────────────────
-// Still legacy-rendered (dangerouslySetInnerHTML inside the real React
-// SessionDrawer.jsx) — the config panel's internal pieces and the
-// schedule editor are deferred to later Step 4 sub-items; only the
-// drawer's outer shell (header, type/cohort/year, footer) is React now.
-export function renderSessionDrawerBody(divisionList, hqList, teamList) {
-  return `
-    <div class="session-form">
-      ${renderSessionConfigPanel(divisionList, hqList, teamList)}
-    </div>
-  `;
-}
+// functional builders) ────────────────────────────────────────────
+// 팀빌딩 is real React (TeamBuildingPanel.jsx); 리더십/협업 still render
+// via renderSessionConfigPanel() as a legacy HTML string, composed
+// directly inside SessionDrawer.jsx rather than through a shared wrapper.
 

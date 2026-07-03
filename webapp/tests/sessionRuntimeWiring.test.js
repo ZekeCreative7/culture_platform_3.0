@@ -90,10 +90,10 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).toContain('document.querySelectorAll("[data-cross-team]")');
     expect(appSource).not.toContain("if (typeSelect)");
 
-    expect(sessionsSource).toContain("export function renderSessionDrawerBody");
+    expect(sessionsSource).toContain("export function renderSessionConfigPanel");
     expect(sessionsSource).toContain("export function canCreateDraftSession");
 
-    expect(drawerSource).toContain("renderSessionDrawerBody");
+    expect(drawerSource).toContain("renderSessionConfigPanel");
     expect(drawerSource).toContain("dangerouslySetInnerHTML");
     expect(drawerSource).toContain("bindSessions()");
     expect(drawerSource).toContain("defaultValue={vanillaState.draftCohort}");
@@ -188,5 +188,42 @@ describe("Sessions runtime wiring", () => {
     expect(scheduleEditorSource).toContain("defaultValue={item.date}");
     expect(scheduleEditorSource).not.toContain("value={item.date}");
     expect(drawerSource).toContain("ScheduleEditor");
+  });
+
+  it("converts the 팀빌딩 config panel (org hierarchy) to React while 리더십/협업 stay legacy", () => {
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
+    const drawerSource = readFileSync(new URL("../src/sessions/SessionDrawer.jsx", import.meta.url), "utf8");
+    const orgActionsSource = readFileSync(new URL("../src/sessions/sessionOrgActions.js", import.meta.url), "utf8");
+    const orgRowSource = readFileSync(new URL("../src/sessions/OrgSelectRow.jsx", import.meta.url), "utf8");
+    const teamBuildingSource = readFileSync(new URL("../src/sessions/TeamBuildingPanel.jsx", import.meta.url), "utf8");
+
+    expect(sessionsSource).not.toContain("export function renderTeamBuildingPanel");
+    expect(sessionsSource).not.toContain("export function renderSessionDrawerBody");
+    // renderOrgSelectRow/renderLeaderSessionPanel/renderCrossFunctionalPanel
+    // must stay: 리더십 still uses the legacy org-select-row HTML string.
+    expect(sessionsSource).toContain("export function renderOrgSelectRow");
+    expect(sessionsSource).toContain("export function renderLeaderSessionPanel");
+    expect(sessionsSource).toContain("export function renderCrossFunctionalPanel");
+
+    // The React org-select-row and the legacy one share the same
+    // #session-division/#session-hq/#session-team ids (리더십 still renders
+    // the legacy version), so bindSessions() must not double-attach vanilla
+    // listeners on top of React's own onChange when 팀빌딩 is active.
+    expect(appSource).toContain('normalizeSessionType(state.draftType) !== "팀빌딩"');
+    expect(appSource).toContain('document.querySelector("#session-division")');
+
+    expect(orgActionsSource).toContain("export function updateSessionDivision");
+    expect(orgActionsSource).toContain("export function updateSessionHq");
+    expect(orgActionsSource).toContain("export function updateSessionTeam");
+
+    expect(orgRowSource).toContain("updateSessionDivision");
+    expect(orgRowSource).toContain('value={state.draftDivisionId');
+
+    expect(teamBuildingSource).toContain("OrgSelectRow");
+    expect(teamBuildingSource).toContain("useVanillaStateTick");
+
+    expect(drawerSource).toContain("TeamBuildingPanel");
+    expect(drawerSource).toContain("draftType === '팀빌딩'");
   });
 });

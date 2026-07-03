@@ -404,3 +404,24 @@ Completed:
 Next recommended Sessions commit:
 
 - Continue Step 4's drawer breakdown: convert the 3 peripheral modals (org picker, duplicate-warning, attendance) to React next, or move to item 4 (schedule/round editor) — both are reasonable next slices; the config panel (org hierarchy/leader-group/cross-functional builders) is the largest remaining piece and should probably come last given its size.
+
+### 2026-07-04 - Sessions Peripheral Modals: 3 Pre-Existing Bugs Found And Fixed
+
+Before converting, investigated all 3 modals and found they were **all already broken**, unrelated to the migration:
+
+1. **Org picker** (`#open-org-picker`, `state.showOrgPopup`): the render check called `renderOrgPopup()`, which actually checks `activeOrgPopupUnitId` — an unrelated field only set by the Org page's own tree-click handler. Confirmed live: clicking "조직도에서 팀 선택"/"팀 변경" did nothing visible. `renderOrgSelectRow`'s division/hq/team selects (already in the same panel) fully cover team selection, so the button was redundant — removed it and the dead `showOrgPopup` state/listeners rather than building a picker.
+2. **Duplicate-warning modal** (`state.duplicateSessionWarning`): called `renderDuplicateWarningModal()` with zero arguments, but that function is actually **Survey's** CSV-upload date-conflict modal (`renderDuplicateWarningModal(survey, matches)`, imported from `views/survey.js`) — reused by name collision. Confirmed live: this **crashed the entire Sessions page** (`matches.length` on undefined, no error boundary). This was an active, reachable bug — any user creating a session with a duplicate cohort+type+team would hit it.
+3. **Attendance modal** (`state.showAttendanceModal`): same missing-arguments bug, plus independently, that function's own onclick handlers (`closeAttendance`, `toggleMemberAttendance`) were never defined anywhere, and its markup didn't match what `bindSessions()`'s already-working `#save-attendance` handler expects (`.attendance-members-grid`, `#round-completed`, `#attendance-note`) — a second, unrelated defect in the same dead code.
+
+Completed:
+
+- Removed the org-picker button/state/listeners entirely (no replacement needed).
+- Built a real session-duplicate-warning modal (`webapp/src/sessions/DuplicateWarningModal.jsx`) and a real attendance modal (`AttendanceModal.jsx`, rebuilt to match `#save-attendance`'s data model — absences array, completed status, note — using local React state instead of DOM queries).
+- New `webapp/src/sessions/sessionModalActions.js`: `openAttendance` (still `window.*`-attached, since legacy calendar rendering calls it via an onclick string), `closeAttendanceModal`, `saveAttendance`, `dismissDuplicateWarning`, `editDuplicateSession`.
+- Discovered mid-fix: `.modal-backdrop`/`.modal-box` (copied from the broken original markup) have **no CSS anywhere in styles.css** — they rendered as unstyled, non-overlay blocks pushed into normal document flow, confirmed via `getComputedStyle` showing `position: static` and the modal 1100px down the page. Switched both new modals to the existing `Modal` UI component (`components/ui/Modal.jsx` — portal-rendered, ESC-key support, `.modal-overlay`/`.modal-card` classes which **do** have real CSS) — built during an earlier design-system pass but never wired into any feature until now.
+- With org-popup/attendance/duplicate-warning all removed or converted, `renderSessionsOverlays()` had nothing left — deleted it, `mountSessionsOverlays` (`SessionsBridge.js`), and its `overlaysRef` mount point (`SessionsPage.jsx`).
+- Verified end-to-end: creating a duplicate session no longer crashes, shows correct existing-session info, and both cancel/edit-existing buttons work (edit-existing correctly loads the conflicting session without duplicating); the attendance modal opens via its real entry point (`window.openAttendance`, called from calendar event clicks) and now renders as a proper centered overlay (not pushed 1100px down the page); checked 2 members absent, marked the round completed, added a note, saved, and confirmed all three persisted correctly to the right schedule item with the modal closing automatically. `npm run check`/`vitest run` (49 tests) passed throughout, but initially missed a stale `renderSessionsOverlays` import in `app.js`'s dead code — only `npm run build` (Rollup's static analysis) caught it; check-imports.js doesn't verify every cross-file export.
+
+Next recommended Sessions commit:
+
+- Item 4 of the Step 4 sequence: convert the schedule/round editor (add/delete-round, per-round field editing) to React — the last "small" piece before the config panel (org hierarchy/leader-group/cross-functional builders), which is the biggest remaining chunk of `bindSessions()` and should likely be broken into its own sub-sequence (e.g. one item per session type) given how items 3's scoping went.

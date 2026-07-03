@@ -458,3 +458,20 @@ Completed:
 Next recommended Sessions commit:
 
 - Continue the config-panel breakdown: 리더십's leader-group builder (org-select-row reuse + `#add-team-leader`/`[data-remove-leader]`) is the next-simplest remaining piece; 협업's cross-functional builder (mode switch, parent-session select, team/member checkboxes, random-generate) is the largest and most complex, and should probably come last.
+
+### 2026-07-04 - Step 4, Item 4b Complete (리더십 leader-group builder)
+
+Second slice of the config-panel breakdown, per the prior item's recommendation.
+
+Completed:
+
+- New `webapp/src/sessions/sessionLeaderGroupActions.js`: `addTeamLeader`, `removeTeamLeader`, moved verbatim from the legacy `#add-team-leader`/`[data-remove-leader]` listeners in `bindSessions()`.
+- New `webapp/src/sessions/LeaderGroupPanel.jsx`: real React for the 리더십 config panel (org select row + leader picker + selection summary + chip grid), replacing `renderLeaderSessionPanel()`. Reuses `OrgSelectRow.jsx` from item 4a. Survey-prompt card stays `dangerouslySetInnerHTML` (shared, deferred).
+- With both 팀빌딩 and 리더십 now fully React, `renderOrgSelectRow()` (the legacy org-select-row HTML string, shared `#session-division`/`#session-hq`/`#session-team` ids) became fully dead — 협업 never called it. Deleted it along with `renderLeaderSessionPanel()`, and removed the now-unused `#session-division`/`#session-hq`/`#session-team`/`#add-team-leader`/`[data-remove-leader]` listeners from `bindSessions()` entirely — no type guard needed anymore since 협업 has no elements with those ids.
+- `SessionDrawer.jsx` now branches three ways: 팀빌딩 → `TeamBuildingPanel`, 리더십 → `LeaderGroupPanel`, else (협업) → legacy `renderCrossFunctionalPanel()` via `dangerouslySetInnerHTML`. `renderSessionConfigPanel()`'s dispatcher role is gone since there's no branching left to do in `views/sessions.js`.
+- Cleaned up several now-dead imports along the way that were left over from item 4a but only surfaced once this item's changes made them fully unreachable (`unitLeaderDetails`, `leaderCandidateForTeam`, `optionHtml` in both `app.js` and `views/sessions.js`) — none of these were caught by `npm run check`/`vitest`, only by `npm run build`, the same known gap flagged in earlier items.
+- Verified: `npm run check`, full `vitest run` (52 tests, 1 new + 3 assertions fixed for staleness across 2 earlier items' tests), `npm run build` all pass. Browser-verified live: 리더십 panel renders pixel-identical to the original; added a leader (chip appeared, "리더 추가" button correctly disabled once added) and removed it (chip cleared, empty state returned); switched division and confirmed the cascade reset+auto-filled hq/team exactly as before; switched to 협업 and confirmed it renders correctly and is fully unaffected (mode-switch, empty state, schedule editor), with no console errors at any point.
+
+Next recommended Sessions commit:
+
+- The config-panel breakdown's last piece: 협업's cross-functional builder (mode switch between "리더십 세션 기반"/"전체 조직 무작위", parent-session select, team/member checkbox grids, random-count input + generate button, member removal chips). This is the largest and most complex remaining piece of `bindSessions()` — once it's done, `bindSessions()` should be down to just the calendar-nav/tab/DB-menu listeners, and the Sessions screen will be essentially all-React except for the calendar itself.

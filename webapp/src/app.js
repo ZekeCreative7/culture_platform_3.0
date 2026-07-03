@@ -49,8 +49,7 @@ import {
   leaderSessions,
   selectedLeaderSession,
   crossSourceTeams,
-  crossMemberPool,
-  scheduleRow
+  crossMemberPool
 } from './views/sessions.js';
 import {
   validateAndRepairSelectedOrg,
@@ -92,7 +91,7 @@ import {
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, ROUND_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
   UNIT_LABELS, UNIT_LEADER_LABELS, isQualText, todayISO,
-  uid, escapeHtml, normalizeSessionType, sessionTypeLabel, sessionTypeDef, sameSessionType,
+  escapeHtml, normalizeSessionType, sessionTypeLabel, sameSessionType,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear,
   sessionLabel,
   emptyCard
@@ -925,32 +924,6 @@ function bindSessions() {
       saveState();
       render();
     });
-  });
-  document.querySelectorAll(".schedule-row").forEach((rowEl) => {
-    const updateField = (el) => {
-      const item = state.draftSchedule.find((entry) => entry.id === rowEl.dataset.id);
-      if (!item) return;
-      const field = el.dataset.field;
-      item[field] = el.type === "checkbox" ? el.checked : el.type === "number" ? Number(el.value) : el.value;
-    };
-    rowEl.querySelectorAll("input").forEach((input) => input.addEventListener("input", () => updateField(input)));
-    rowEl.querySelectorAll("select").forEach((sel) => sel.addEventListener("change", () => updateField(sel)));
-  });
-  document.querySelectorAll("[data-delete-round]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.deleteRound;
-      if (state.draftSchedule.length <= 1) { alert("최소 1회차는 있어야 합니다."); return; }
-      state.draftSchedule = state.draftSchedule.filter(r => r.id !== id)
-        .map((r, i) => ({ ...r, seq: i + 1 }));
-      saveState();
-      render();
-    });
-  });
-  document.querySelector("#add-round")?.addEventListener("click", () => {
-    const next = state.draftSchedule.length + 1;
-    state.draftSchedule.push({ id: uid(), seq: next, confirmed: false, date: todayISO(), startTime: "10:00", duration: sessionTypeDef(state.draftType).duration, content: "", roundType: "기타", note: "", status: "planned", absences: [] });
-    saveState();
-    render();
   });
   document.querySelector("#btn-db-upload")?.addEventListener("click", () => {
     document.getElementById("session-more-dropdown").style.display = "none";

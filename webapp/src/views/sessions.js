@@ -9,8 +9,7 @@ import {
   sessionYear,
   sameSessionType,
   normalizeSessionType,
-  hasRoundPassed,
-  ROUND_TYPES
+  hasRoundPassed
 } from '../utils.js';
 import { pulseDiagnostics, comparisonPair } from '../pulse/pulseEngine.js';
 import { pulseCache } from '../state.js';
@@ -103,27 +102,6 @@ export function getStatus(session) {
   if (!past.length) return ["시작전", "amber"];
   if (future.length || pending.length) return ["진행중", "blue"];
   return ["완료", "green"];
-}
-
-export function scheduleRow(item) {
-  const roundTypeOptions = Object.entries(ROUND_TYPES).map(([val, def]) =>
-    `<option value="${val}" ${item.roundType === val ? 'selected' : ''}>${def.label}</option>`
-  ).join('');
-  return `
-    <div class="schedule-row" data-id="${item.id}">
-      <strong class="round-seq">${item.seq}회</strong>
-      <label class="check"><input type="checkbox" data-field="confirmed" ${item.confirmed ? "checked" : ""} />확정</label>
-      <input type="date" data-field="date" value="${item.date}" />
-      <input data-field="startTime" value="${item.startTime}" placeholder="10:00" />
-      <input data-field="content" value="${escapeHtml(item.content)}" placeholder="내용" />
-      <select data-field="roundType" class="round-type-select" title="회차 유형">
-        ${roundTypeOptions}
-      </select>
-      <input type="number" data-field="duration" value="${item.duration}" min="30" step="30" />
-      <input data-field="note" value="${escapeHtml(item.note)}" placeholder="메모" />
-      <button class="icon-btn danger" data-delete-round="${item.id}" title="회차 삭제" aria-label="회차 삭제">×</button>
-    </div>
-  `;
 }
 
 export function renderOrgSelectRow(divisionList, hqList, teamList) {
@@ -483,16 +461,6 @@ export function renderSessionDrawerBody(divisionList, hqList, teamList) {
   return `
     <div class="session-form">
       ${renderSessionConfigPanel(divisionList, hqList, teamList)}
-    </div>
-    <div class="schedule-head">
-      <div>
-        <strong>${sessionTypeLabel(state.draftType)}</strong>
-        <span>${sessionTypeDef(state.draftType).desc}</span>
-      </div>
-      <button class="secondary small" id="add-round">회차 추가</button>
-    </div>
-    <div class="schedule-table">
-      ${state.draftSchedule.map(scheduleRow).join("")}
     </div>
   `;
 }

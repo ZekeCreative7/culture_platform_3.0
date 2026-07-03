@@ -7,6 +7,7 @@ import { renderSessionDrawerBody, canCreateDraftSession } from '../views/session
 import { bindSessions } from '../app.js';
 import { closeSessionDrawer } from './sessionActions.js';
 import { updateSessionType, updateSessionCohort, updateSessionYear, cancelEditSession, createOrUpdateSession } from './sessionDraftActions.js';
+import { ScheduleEditor } from './ScheduleEditor.jsx';
 
 export function SessionDrawer() {
   useVanillaStateTick();
@@ -16,10 +17,11 @@ export function SessionDrawer() {
   const editingSessionId = vanillaState.editingSessionId;
   const draftType = normalizeSessionType(vanillaState.draftType);
 
-  // The config panel / schedule editor inside bodyRef is still legacy-rendered
+  // The config panel inside bodyRef is still legacy-rendered
   // (dangerouslySetInnerHTML) and its internal buttons/selects/inputs are
   // bound by bindSessions() via document.querySelectorAll, so it needs to be
-  // re-invoked after every render this component produces.
+  // re-invoked after every render this component produces. The schedule
+  // editor is real React now (ScheduleEditor.jsx) and doesn't need this.
   useEffect(() => {
     bindSessions();
   });
@@ -63,6 +65,7 @@ export function SessionDrawer() {
             </label>
           </div>
           <div ref={bodyRef} dangerouslySetInnerHTML={{ __html: renderSessionDrawerBody(divisionList, hqList, teamList) }} />
+          <ScheduleEditor />
         </div>
         <div className="session-drawer-footer">
           {editingSessionId && (

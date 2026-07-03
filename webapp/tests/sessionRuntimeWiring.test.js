@@ -87,7 +87,6 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).not.toContain('document.querySelector("#cancel-edit-session")');
     expect(appSource).not.toContain('document.querySelector("#create-session")');
     expect(appSource).toContain('document.querySelector("#session-division")');
-    expect(appSource).toContain('document.querySelector("#add-round")');
     expect(appSource).toContain('document.querySelectorAll("[data-cross-team]")');
     expect(appSource).not.toContain("if (typeSelect)");
 
@@ -151,5 +150,43 @@ describe("Sessions runtime wiring", () => {
     expect(pageSource).toContain("DuplicateWarningModal");
     expect(pageSource).not.toContain("mountSessionsOverlays");
     expect(bridgeSource).not.toContain("mountSessionsOverlays");
+  });
+
+  it("converts the schedule/round editor to React while leaving the .schedule-row saveState()-free behavior unchanged", () => {
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
+    const drawerSource = readFileSync(new URL("../src/sessions/SessionDrawer.jsx", import.meta.url), "utf8");
+    const scheduleActionsSource = readFileSync(new URL("../src/sessions/scheduleActions.js", import.meta.url), "utf8");
+    const scheduleEditorSource = readFileSync(new URL("../src/sessions/ScheduleEditor.jsx", import.meta.url), "utf8");
+
+    expect(appSource).not.toContain('document.querySelectorAll(".schedule-row")');
+    expect(appSource).not.toContain('document.querySelectorAll("[data-delete-round]")');
+    expect(appSource).not.toContain('document.querySelector("#add-round")');
+    // The org-hierarchy/leader-group/cross-functional listeners bindSessions()
+    // still owns must be untouched by this removal.
+    expect(appSource).toContain('document.querySelector("#session-division")');
+    expect(appSource).toContain('document.querySelector("#add-team-leader")');
+
+    expect(sessionsSource).not.toContain("export function scheduleRow");
+    expect(sessionsSource).not.toContain("schedule-head");
+    expect(sessionsSource).not.toContain("schedule-table");
+
+    // The legacy .schedule-row field handler never called saveState() —
+    // per-field edits are only persisted as a batch when the session is
+    // actually created/updated. updateScheduleField must preserve that
+    // exactly, not add a saveState() call that wasn't there before.
+    expect(scheduleActionsSource).toContain("export function updateScheduleField");
+    expect(scheduleActionsSource).toContain("export function deleteRound");
+    expect(scheduleActionsSource).toContain("export function addRound");
+    const updateFieldFn = scheduleActionsSource.slice(
+      scheduleActionsSource.indexOf("export function updateScheduleField"),
+      scheduleActionsSource.indexOf("export function deleteRound")
+    );
+    expect(updateFieldFn).not.toContain("saveState()");
+
+    expect(scheduleEditorSource).toContain("useVanillaStateTick");
+    expect(scheduleEditorSource).toContain("defaultValue={item.date}");
+    expect(scheduleEditorSource).not.toContain("value={item.date}");
+    expect(drawerSource).toContain("ScheduleEditor");
   });
 });

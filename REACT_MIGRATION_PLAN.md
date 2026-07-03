@@ -511,3 +511,19 @@ With this, the entire Sessions screen — list, drawer, all 3 config panels (팀
 Next recommended commit:
 
 - Step 4 (Sessions) is functionally complete. The plan's Step 5 (Upload/Analytics/Report) is the next major screen per the original sequencing — see the "Convert Upload, Analytics, And Report" section above for its sub-items (move `parseCSV` out of `views/upload.js`; replace `renderQuantSection`/`renderQualSection` in Analytics; move report filter controls/export buttons to React). Alternatively, `renderSessionsShell()` itself (page-head + tab-header) could be converted first to fully close out Sessions before moving on.
+
+### 2026-07-04 - Step 5, Item 1 Complete (parseCSV relocated, dead legacy Upload view removed)
+
+`UploadPage.jsx` was already a real React page from an earlier pass, but it still imported `parseCSV` from `views/upload.js` — a file otherwise full of legacy HTML-string renderers. Investigated before moving anything: `views/upload.js` also exported `renderUpload()`/`renderUploadPreview()`/`uploadStateCard()`, reachable only through `app.js`'s `renderView()` "upload" branch and `bindCanvasEvents()`'s `bindUpload()` call — both dead, since `UploadPage.jsx` never sets `vanillaState.activeView = 'upload'` and already has its own independent save flow.
+
+Completed:
+
+- New `webapp/src/upload/csvParser.js`: `parseCSV`, moved verbatim. Updated its two real call sites (`UploadPage.jsx`, `survey/surveyResponseActions.js`).
+- Deleted `views/upload.js` entirely (all 4 exports: `parseCSV` relocated, the other 3 confirmed dead).
+- Deleted `bindUpload()` from `app.js` (the `#csv-file`/`#upload-session`/`#upload-phase`/`#save-upload` legacy handler, ~65 lines) along with both dead `state.activeView === "upload"` branches (`renderView()` and `bindCanvasEvents()`), and its stale entry in the trailing `export { ... }` statement.
+- Cleaned up imports left unused by this removal: `ensureXlsxLoaded` and `saveResponsesToFirestore` in `app.js` (both only used inside the now-deleted `bindUpload()`).
+- Verified: `npm run check`, full `vitest run` (55 tests, 1 new file `uploadRuntimeWiring.test.js`), `npm run build` all pass (one fix needed: `app.js`'s trailing `export { ..., bindUpload }` statement referenced the deleted function — only `npm run build` caught it, the same known gap as prior items). Browser-verified live: Upload page loads with no console errors; created a real 팀빌딩 session, uploaded a CSV missing required `q11`/`q12` columns and confirmed `parseCSV` (from its new location) still correctly reports the validation errors; uploaded a corrected CSV and confirmed the full success path (row count, PII-check badge, preview table, save button) renders identically to before the move.
+
+Next recommended commit:
+
+- Continue Step 5: Analytics ("replace `renderQuantSection`/`renderQualSection` HTML blocks with React components, remove inline section toggles") or Report ("move report filter controls and export buttons to React, keep PDF/XLSX export modules stable"). Should grill scope first — need to check whether AnalyticsPage.jsx/ReportPage.jsx are already React shells (like UploadPage.jsx turned out to be) or still full legacy bridges, before picking the next slice.

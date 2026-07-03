@@ -475,3 +475,22 @@ Completed:
 Next recommended Sessions commit:
 
 - The config-panel breakdown's last piece: 협업's cross-functional builder (mode switch between "리더십 세션 기반"/"전체 조직 무작위", parent-session select, team/member checkbox grids, random-count input + generate button, member removal chips). This is the largest and most complex remaining piece of `bindSessions()` — once it's done, `bindSessions()` should be down to just the calendar-nav/tab/DB-menu listeners, and the Sessions screen will be essentially all-React except for the calendar itself.
+
+### 2026-07-04 - Step 4, Item 4c Complete (협업 cross-functional builder) — config-panel breakdown finished
+
+Final slice of the config-panel breakdown.
+
+Completed:
+
+- New `webapp/src/sessions/sessionCrossActions.js`: `updateCrossMode`, `updateCrossParentSession`, `toggleCrossTeam`, `toggleCrossMember`, `updateCrossRandomCount`, `generateRandomCross`, `removeCrossMember` — moved verbatim from the legacy `input[name='cross-mode']`/`#cross-parent-session`/`[data-cross-team]`/`[data-cross-member]`/`#cross-random-count`/`#generate-random-cross`/`[data-remove-cross-member]` listeners in `bindSessions()`.
+- New `webapp/src/sessions/CrossFunctionalPanel.jsx`: real React for the 협업 config panel, with `CrossMemberSelector`/`SelectedCrossMembers` as local sub-components, replacing `renderCrossFunctionalPanel()`/`renderCrossMemberSelector()`/`renderSelectedCrossMembers()`. `#cross-random-count`'s legacy handler used `saveState()` per keystroke (no `render()`) exactly like cohort/year/schedule-content did, so it stays uncontrolled (`defaultValue`) rather than controlled, following the same pattern from earlier items.
+- Deleted `renderCrossFunctionalPanel()`/`renderCrossMemberSelector()`/`renderSelectedCrossMembers()` from `views/sessions.js` and removed the now-fully-dead cross-* listeners (~65 lines) from `bindSessions()` — the only listener left there for the config panels is the shared `#copy-session-survey-prompt` button, since all 3 panels still render the survey-prompt card via `dangerouslySetInnerHTML` (deferred, unchanged).
+- `SessionDrawer.jsx`: replaced the `dangerouslySetInnerHTML`-wrapped else-branch with `<CrossFunctionalPanel />`; removed the now-unused `bodyRef`/`useRef` (nothing dangerously-sets-innerHTML directly in the drawer anymore, only inside the 3 panel components for the shared survey-prompt card).
+- Cleaned up now-dead imports surfaced by this removal in `app.js` (`renderCrossFunctionalPanel`, `renderCrossMemberSelector`, `renderSelectedCrossMembers`, `leaderSessions`, `selectedLeaderSession`, `crossSourceTeams`, `crossMemberPool`, `allMemberCandidates`) — same known `npm run build`-only gap as prior items.
+- Verified: `npm run check`, full `vitest run` (53 tests, 1 new + 3 stale assertions fixed across 2 earlier items' tests that still referenced the now-removed cross-* bindings), `npm run build` all pass. Browser-verified live: 협업 panel renders pixel-identical to the original in both modes; switched to "전체 조직 무작위" mode, changed the random-count input to 3, clicked "무작위 구성" and confirmed exactly 3 member chips appeared; removed one chip and confirmed it dropped to 2; confirmed the shared `#copy-session-survey-prompt` button remains correctly bound; no console errors throughout (the known dashboard-redirect preview quirk fired twice mid-verification, unrelated, already tracked separately).
+
+With this, all 3 session-type config panels (팀빌딩/리더십/협업) are real React. `bindSessions()` is down to just calendar-nav/tab/DB-menu/survey-prompt-copy listeners — the Sessions screen is effectively all-React except the calendar view itself.
+
+Next recommended Sessions commit:
+
+- The calendar view (`#/sessions` "일정 캘린더" tab) is now the last significant legacy-rendered piece of the Sessions screen, still mounted via `SessionsBridge.js`'s `mountSessionsCalendar`. Converting it to React would be the natural next step to finish the Sessions screen's migration, or the plan could move on to Step 5 (Upload/Analytics/Report) instead and return to the calendar later.

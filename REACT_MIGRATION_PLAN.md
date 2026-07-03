@@ -279,3 +279,18 @@ Completed:
 Next recommended Survey commit:
 
 - Item 5 of the Step 3 sequence: build the closed Survey card React component.
+
+### 2026-07-03 - Step 3, Item 5 Complete
+
+Completed:
+
+- Extracted the closed-surveys ("배포 종료 · 응답 보관") block out of `renderSurveyRightColumnRest()` into `webapp/src/survey/ClosedSurveysSection.jsx` (section header, collapse-toggle chevron, card list) + `ClosedSurveyCard.jsx` (single closed-card row). Renamed the remaining legacy fragment function to `renderSurveyOrphanAndTemplates()` since it now covers only the orphan-scan and templates sections.
+- `SurveyPage.jsx` now mounts `<ActiveSurveysSection />` and `<ClosedSurveysSection />` in sequence before the one remaining legacy bridge div (orphan scan + templates).
+- `toggleClosedSurveysSection` (already in `surveyActions.js`) is reused directly; not-yet-extracted actions (`startEditSurvey`, `reopenSurveyDistribution`, `uploadSurveyResults`, `deleteRecoveredSurveyCard`) still go through `window.*`.
+- Removed the `surveyDistributionActive` import from `views/survey.js` — no longer used there now that both active- and closed-survey filtering live in the React sections.
+- Updated `tests/surveyRuntimeWiring.test.js` for the renamed function and added assertions that both card lists are real React.
+- Verified: `npm run check`, full `vitest run` (40 tests), `npm run build` all pass. Browser-verified with an injected closed survey (cleaned up after): section renders with correct title/session-label/phase text (confirmed via accessibility tree — a screenshot artifact made narrow-column text look character-wrapped, but that's an unchanged, pre-existing CSS behavior under narrow width, not a regression), collapse/expand toggle works, and all four card buttons (수정/배포 재개/CSV 업로드/카드 삭제) fire without console errors — CSV 업로드 correctly opens a native file picker (unchanged legacy behavior).
+
+Next recommended Survey commit:
+
+- Item 6 of the Step 3 sequence: build the creator step navigation and draft form components.

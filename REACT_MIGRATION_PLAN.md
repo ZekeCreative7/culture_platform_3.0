@@ -294,3 +294,18 @@ Completed:
 Next recommended Survey commit:
 
 - Item 6 of the Step 3 sequence: build the creator step navigation and draft form components.
+
+### 2026-07-03 - Step 3, Item 6 Complete
+
+Completed:
+
+- Replaced `renderSurveyWizardPanel()` with `webapp/src/survey/SurveyWizardPanel.jsx`, fully occupying the wizard's grid cell in `SurveyPage.jsx` (no bridge split needed here — unlike the card sections, the whole cell converts at once).
+- Critical constraint discovered mid-implementation: `updateSurveyDraftField`/`updateSurveyDraftQuestionText` already use `saveStateQuiet()` (no notify/re-render) specifically because `saveState()` previously caused a "one-character-typed" bug in this exact codebase (comment in `app.js` documents it), and `updateSurveyDraftQuestionType` manually patches radio `.checked` and label styles via `querySelectorAll`, bypassing `render()` entirely. So the free-text inputs (title, Google Form URL, per-question text) and the question-type radios are deliberately uncontrolled (`defaultValue`/`defaultChecked`, keyed on record identity) rather than fully controlled — letting the existing legacy functions keep patching the DOM directly, exactly as before. Selects and step navigation stay fully controlled since those handlers already call plain `saveState()+render()`.
+- Extracted the subscribe+debounce tick hook (now used 3 times) into `webapp/src/hooks/useVanillaStateTick.js`; refactored `ActiveSurveysSection`/`ClosedSurveysSection` to use it.
+- Exported `surveySessionTargetLabel` from `views/survey.js` for the new component to use.
+- Removed the now-fully-superseded `renderSurveyWizardPanel()` and its now-unused imports (`sameSessionType`, `sessionTypeLabel`, `SESSION_TYPES`); fixed `app.js`'s dead `renderView()` reference again.
+- Verified: `npm run check`, full `vitest run` (41 tests, including a new one asserting the uncontrolled-input strategy), `npm run build` all pass. Browser-verified the two highest-risk interactions directly: simulated real character-by-character typing into the title field (no dropped/reset characters, confirmed via both the DOM value and localStorage after the debounce window) and toggled the question-type radio (confirmed the legacy `querySelectorAll`-based DOM patch — header text, checked state, label colors — still updates correctly with zero console errors and no React/DOM fighting). Also verified step navigation, the step-3 checklist reflecting quietly-saved state, and add/delete-question buttons.
+
+Next recommended Survey commit:
+
+- Item 7 of the Step 3 sequence: move edit/cancel/save draft actions (`startEditSurvey`, `cancelSurveyEdit`, `submitSurveyDraft`, `updateSurveyDraftField`, `updateSurveyDraftSessionType`, `updateSurveyDraftCohort`, `updateSurveyDraftPhase`, `updateSurveyDraftQuestionText`, `updateSurveyDraftQuestionType`, `addSurveyDraftQuestion`, `deleteSurveyDraftQuestion`, `loadSurveyTemplate`) out of `app.js` into a Survey draft-actions module.

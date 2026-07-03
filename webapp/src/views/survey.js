@@ -23,8 +23,6 @@ import {
   lockSvg,
   SESSION_TYPES
 } from '../utils.js';
-import { getQrCodeFactory } from '../qrCode.js';
-
 // ── Calendar Views ────────────────────────────────────────────────
 export function renderCalendar() {
   const d = new Date(state.calendarDate);
@@ -370,11 +368,12 @@ function surveySessionTargetLabel(session) {
   return teams || sessionLabel(session);
 }
 
-// ── Main view: renderSurveyCreator() ─────────────────────────────
-export function renderSurveyCreator() {
+// ── Main view: renderSurveyWizardPanel() + renderSurveyRightColumnRest() ──
+// Split from a single renderSurveyCreator() so the active-survey-card list
+// can be owned by real React (ActiveSurveysSection.jsx / SurveyCard.jsx)
+// while the wizard and the not-yet-converted sections stay legacy-rendered.
+export function renderSurveyWizardPanel() {
   const activeSessions = state.sessions || [];
-  const activeSurveys = (state.surveys || []).filter(surveyDistributionActive);
-  const closedSurveys = (state.surveys || []).filter((survey) => !surveyDistributionActive(survey));
   const draftQuestions = state.draftSurveyQuestions || [];
   const currentStep = state.surveyCreatorStep || 1;
   const selectedDraftSession = activeSessions.find((session) => session.id === state.draftSurveySessionId);
@@ -574,111 +573,24 @@ export function renderSurveyCreator() {
   `;
 
   return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">설문지 제작</span>
-        <h1>동적 설문 설계 및 배포 QR 생성</h1>
-        <p>세션 및 회차별 모바일 설문을 설계하고, 자동 생성된 QR 코드로 구성원들의 응답을 실시간으로 적재합니다.</p>
-      </div>
-    </section>
-
-    <div class="workspace-grid">
-      <div class="panel">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-          <h3 style="margin:0;">${state.editingSurveyId ? '설문 수정' : '새 설문 조사 설계'}</h3>
-          ${state.editingSurveyId ? `
-            <span style="font-size:12px;color:#0ea5e9;font-weight:700;">설문 수정 중</span>
-          ` : ''}
-        </div>
-        
-        ${stepperHtml}
-        ${currentStep === 1 ? step1Html : currentStep === 2 ? step2Html : step3Html}
+    <div class="panel">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 style="margin:0;">${state.editingSurveyId ? '설문 수정' : '새 설문 조사 설계'}</h3>
+        ${state.editingSurveyId ? `
+          <span style="font-size:12px;color:#0ea5e9;font-weight:700;">설문 수정 중</span>
+        ` : ''}
       </div>
 
-      <div>
-        ${sectionTitle("배포 중인 설문지 및 QR", `${activeSurveys.length}건`)}
-        ${activeSurveys.length > 1 ? `
-        <div style="display:flex; gap:8px; margin-bottom:12px; justify-content:flex-end;">
-          <button class="ghost compact" style="font-size:11.5px;" onclick="collapseAllSurveys(true)">전체 접기</button>
-          <button class="ghost compact" style="font-size:11.5px;" onclick="collapseAllSurveys(false)">전체 펼치기</button>
-        </div>` : ''}
-        <div class="surveys-grid">
-          ${activeSurveys.length ? activeSurveys.map(s => {
-            const sess = state.sessions.find(session => session.id === s.sessionId);
-            const sessLabel = sess ? `${sess.type} · ${sessionLabel(sess)}` : "만료된 세션";
-            const isCollapsed = (state.collapsedSurveyIds || []).includes(s.id);
+      ${stepperHtml}
+      ${currentStep === 1 ? step1Html : currentStep === 2 ? step2Html : step3Html}
+    </div>
+  `;
+}
 
-            let surveyLink;
-            if (s.googleFormUrl) {
-              surveyLink = s.googleFormUrl;
-            } else {
-              const qrHost = (state.qrBaseUrl || new URL('.', window.location.href).href).replace(/\/$/, '');
-              surveyLink = `${qrHost}/survey.html?surveyId=${s.id}`;
-            }
+export function renderSurveyRightColumnRest() {
+  const closedSurveys = (state.surveys || []).filter((survey) => !surveyDistributionActive(survey));
 
-            let qrUrl = "";
-            try {
-              const qr = getQrCodeFactory()(0, 'L');
-              qr.addData(surveyLink);
-              qr.make();
-              qrUrl = qr.createDataURL(4);
-            } catch (err) {
-              qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(surveyLink)}`;
-            }
-
-            if (isCollapsed) {
-              const collapsedRows = surveyRows(s);
-              const collapsedTarget = targetCountForSession(sess);
-              return `
-                <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
-                  <div style="flex:1; min-width:0;">
-                    <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.title)}</strong>
-                    <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${escapeHtml(sessLabel)} · ${escapeHtml(s.phase)} · 대상 ${collapsedTarget || "-"}명 · 응답 ${collapsedRows.length}건${s.googleFormUrl ? ' · 구글 폼' : ''}</span>
-                  </div>
-                  <button onclick="startEditSurvey('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--blue-mid); cursor:pointer; white-space:nowrap; flex-shrink:0;">수정</button>
-                  <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; flex-shrink:0;">펼치기 ▾</button>
-                  <button class="ghost compact" onclick="deleteSurvey('${s.id}')" title="배포 종료" style="color:#b45309; border-color:#fcd34d; font-weight:800; padding:6px 10px;">✕</button>
-                </div>
-              `;
-            }
-
-            return `
-              <div class="survey-deploy-card">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                  <div class="survey-deploy-info" style="flex:1; min-width:0;">
-                    <strong>${escapeHtml(s.title)}</strong>
-                    <span>${escapeHtml(sessLabel)} [${escapeHtml(s.phase)}]${s.googleFormUrl ? ' · <span style="color:#0ea5e9;font-weight:800;">구글 폼</span>' : ''}</span>
-                  </div>
-                  <div style="display:flex; gap:6px; flex-shrink:0;">
-                    <button onclick="startEditSurvey('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--blue-mid); cursor:pointer;">수정</button>
-                    <button onclick="toggleSurveyCard('${s.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:var(--muted); cursor:pointer;">접기 ▴</button>
-                    <button class="ghost compact" onclick="deleteSurvey('${s.id}')" title="배포 종료" style="color:#b45309; border-color:#fcd34d; font-weight:800; padding:6px 10px;">✕</button>
-                  </div>
-                </div>
-                <input class="input-text compact-url" readonly value="${surveyLink}" onclick="this.select(); document.execCommand('copy'); alert('링크가 복사되었습니다!');" title="클릭 시 주소 복사" />
-                <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                  <a href="${surveyLink}" target="_blank" class="primary compact" style="text-decoration:none; display:inline-flex; align-items:center; font-size:11px;">설문지 열기</a>
-                  <button class="ghost compact" onclick="copySurveyLink('${surveyLink}')">링크 복사</button>
-                  ${!s.googleFormUrl ? `<button class="ghost compact" style="font-size:11px;" onclick="downloadSurveyTemplate('${s.id}')">CSV 템플릿 ↓</button>` : ''}
-                  ${!s.googleFormUrl && s.questions && s.questions.length ? `<button class="ghost compact" style="font-size:11px;" onclick="saveSurveyAsTemplate('${s.id}')">질문 템플릿으로 저장</button>` : ''}
-                </div>
-                <div style="display:flex; gap:14px; align-items:flex-start;">
-                  <div style="flex:1;">
-                    <button onclick="uploadSurveyResults('${s.id}')" style="width:100%; padding:9px; background:#eff6ff; border:1.5px dashed #93c5fd; border-radius:8px; color:#1d4ed8; font-size:12px; font-weight:700; cursor:pointer; text-align:center; transition:all 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
-                      ↑ 결과 CSV 업로드
-                    </button>
-                  </div>
-                  <div class="survey-deploy-qr" style="padding:10px;">
-                    <img src="${qrUrl}" alt="QR Code" style="width:100px; height:100px;" />
-                    <button onclick="downloadQrCode('${s.id}')" class="secondary compact" style="display:block; width:100%; text-align:center; margin-top:4px; font-size:10px;">QR 다운로드</button>
-                  </div>
-                </div>
-                ${renderSurveyResponsePanel(s, sess)}
-              </div>
-            `;
-          }).join("") : emptyCard("현재 배포 중인 설문지가 없습니다.")}
-        </div>
-
+  return `
         ${closedSurveys.length ? `
           <div style="margin-top:28px;">
             <button type="button" class="section-title section-title-toggle" style="width:100%; text-align:left;" onclick="toggleClosedSurveysSection()">
@@ -753,7 +665,5 @@ export function renderSurveyCreator() {
             `).join("") : emptyCard("저장된 템플릿이 없습니다.")}
           </div>
         </div>
-      </div>
-    </div>
   `;
 }

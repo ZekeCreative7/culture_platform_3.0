@@ -15,7 +15,6 @@ import {
   scoreOf,
   normalizeSessionType,
   targetCountForSession,
-  sectionTitle,
   sessionYear,
   lockSvg
 } from '../utils.js';
@@ -347,11 +346,6 @@ export function renderSurveyResponsePanel(survey, session, showReset = true) {
   `;
 }
 
-export function bindSurveyCreator() {
-  // Current Survey controls still use inline window.* handlers from app.js.
-  // Keep this bridge explicit so React pages do not import app.js directly.
-}
-
 export function surveySessionCohortKey(session) {
   return `${sessionYear(session) || session.year || ''}:${Number(session.cohort) || ''}`;
 }
@@ -362,54 +356,4 @@ export function surveySessionTargetLabel(session) {
   const teams = session.participatingTeams
     || [...new Set((session.members || []).map((member) => member.teamName).filter(Boolean))].join(', ');
   return teams || sessionLabel(session);
-}
-
-export function renderSurveyOrphanAndTemplates() {
-  return `
-        <div style="margin-top:28px;">
-          ${sectionTitle("지난 데이터 점검", "")}
-          <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">예전에 삭제된 설문에 연결돼 있던 응답이 DB에 남아있는지 확인합니다. 응답 자체는 보존돼 있을 가능성이 높고, 이 스캔은 그것을 다시 화면에 연결만 해 줍니다.</p>
-          <button class="ghost compact" style="font-size:11.5px;" onclick="scanForOrphanResponses()" ${state.orphanScanLoading ? "disabled" : ""}>
-            ${state.orphanScanLoading ? "스캔 중..." : "DB에서 연결 끊긴 응답 찾기"}
-          </button>
-          ${state.orphanScanResult && state.orphanScanResult.length ? `
-            <button class="primary compact" style="font-size:11.5px;" onclick="recoverAllOrphanSurveys()">전체 복구 (같은 세션·단계 중복은 최신 기준으로 합침)</button>
-          ` : ""}
-          ${state.orphanScanError ? `<p style="color:#dc2626; font-size:12px; margin-top:8px;">스캔 실패: ${escapeHtml(state.orphanScanError)}</p>` : ""}
-          ${state.orphanScanResult ? (
-            state.orphanScanResult.length ? `
-              <div class="surveys-grid" style="margin-top:12px;">
-                ${state.orphanScanResult.map((g) => `
-                  <div class="survey-deploy-card">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                      <div class="survey-deploy-info" style="flex:1; min-width:0;">
-                        <strong>연결 끊긴 응답 ${g.count}건</strong>
-                        <span>${escapeHtml(g.sessionLabel)} [${escapeHtml(g.phase || "단계 미상")}]${g.cohort ? ` · ${g.cohort}기` : ""}</span>
-                      </div>
-                      <button class="primary compact" onclick="recoverOrphanSurvey('${g.key}')">설문으로 복구</button>
-                    </div>
-                    <span style="font-size:11.5px; color:var(--muted);">링크/QR ${g.linkedCount}건 · 파일 업로드 ${g.uploadedCount}건${g.firstAt ? ` · ${g.firstAt.slice(0, 10)} ~ ${g.lastAt.slice(0, 10)}` : ""}</span>
-                  </div>
-                `).join("")}
-              </div>
-            ` : `<p style="font-size:12px; color:var(--muted); margin-top:8px;">연결 끊긴 응답을 찾지 못했습니다. 현재 보이는 설문 목록이 전부입니다.</p>`
-          ) : ""}
-        </div>
-
-        <div style="margin-top:28px;">
-          ${sectionTitle("템플릿", `${(state.surveyTemplates || []).length}건`)}
-          <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">설문을 삭제해도 남는 질문 보관함입니다. 위 설문 카드를 펼친 뒤 "질문 템플릿으로 저장"을 누르면 여기 추가됩니다.</p>
-          <div class="surveys-grid">
-            ${(state.surveyTemplates || []).length ? state.surveyTemplates.map(t => `
-              <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
-                <div style="flex:1; min-width:0;">
-                  <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(t.title)}</strong>
-                  <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${[t.sessionType, t.phase].filter(Boolean).map(escapeHtml).join(" · ")}${t.sessionType || t.phase ? " · " : ""}${(t.questions || []).length}문항</span>
-                </div>
-                <button class="delete-survey-btn" onclick="deleteSurveyTemplate('${t.id}')" style="position:static; margin-left:0;">&times;</button>
-              </div>
-            `).join("") : emptyCard("저장된 템플릿이 없습니다.")}
-          </div>
-        </div>
-  `;
 }

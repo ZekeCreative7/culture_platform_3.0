@@ -1,16 +1,14 @@
-import React, { useEffect, useRef, memo } from 'react';
+import React, { useEffect, memo } from 'react';
 import { state as vanillaState } from '../state.js';
-import { mountSurveyOrphanAndTemplates } from '../survey/SurveyCreatorBridge.js';
 import { PageHead } from '../components/layout/index.js';
 import { ActiveSurveysSection } from '../survey/ActiveSurveysSection.jsx';
 import { ClosedSurveysSection } from '../survey/ClosedSurveysSection.jsx';
 import { SurveyWizardPanel } from '../survey/SurveyWizardPanel.jsx';
+import { OrphanScanSection } from '../survey/OrphanScanSection.jsx';
+import { TemplatesSection } from '../survey/TemplatesSection.jsx';
 
 export const SurveyPage = memo(function SurveyPage() {
-  const restRef = useRef(null);
-
   useEffect(() => { vanillaState.activeView = 'survey'; }, []);
-  useEffect(() => mountSurveyOrphanAndTemplates(restRef.current), []);
 
   return (
     <>
@@ -24,7 +22,8 @@ export const SurveyPage = memo(function SurveyPage() {
         <div>
           <ActiveSurveysSection />
           <ClosedSurveysSection />
-          <div ref={restRef} />
+          <OrphanScanSection />
+          <TemplatesSection />
         </div>
       </div>
     </>

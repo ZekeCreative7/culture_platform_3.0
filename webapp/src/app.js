@@ -28,9 +28,7 @@ import {
   renderDayCalendar,
   renderAttendanceModal,
   renderDuplicateWarningModal,
-  renderSurveyResponsePanel,
-  renderSurveyOrphanAndTemplates,
-  bindSurveyCreator
+  renderSurveyResponsePanel
 } from './views/survey.js';
 import {
   renderAnalytics,
@@ -423,7 +421,7 @@ function render() {
 function renderView() {
   if (state.activeView === "sessions") return renderSessions();
   if (state.activeView === "org") return renderOrg();
-  if (state.activeView === "survey") return renderSurveyOrphanAndTemplates();
+  if (state.activeView === "survey") return "";
   if (state.activeView === "upload") return renderUpload();
   if (state.activeView === "analytics") return renderAnalytics();
   if (state.activeView === "report") return renderReport();
@@ -637,8 +635,6 @@ function bindLayout() {
 function bindCanvasEvents() {
   if (state.activeView === "sessions") {
     bindSessions();
-  } else if (state.activeView === "survey") {
-    bindSurveyCreator();
   } else if (state.activeView === "org") {
     bindOrg();
   } else if (state.activeView === "upload") {
@@ -2356,7 +2352,7 @@ window.__vanillaBindCanvas = () => {
 window.__vanillaFullRender = render;
 
 // React 앱이 import할 때 사용하는 bind 함수 exports
-export { bindSessions, bindOrg, bindSurveyCreator, bindUpload, bindSessionDrawerControls, bindReportQualSignals };
+export { bindSessions, bindOrg, bindUpload, bindSessionDrawerControls, bindReportQualSignals };
 
 if (!window.__reactMode) {
   if (LOCAL_PREVIEW) {

@@ -24,24 +24,26 @@ describe("Survey runtime wiring", () => {
     expect(viteConfigSource).toContain("survey.html");
   });
 
-  it("keeps the React Survey page behind the Survey bridge", () => {
+  it("keeps the React Survey page fully React-native, with no legacy bridge left", () => {
     const pageSource = readFileSync(new URL("../src/pages/SurveyPage.jsx", import.meta.url), "utf8");
-    const bridgeSource = readFileSync(new URL("../src/survey/SurveyCreatorBridge.js", import.meta.url), "utf8");
 
-    expect(pageSource).toContain("mountSurveyOrphanAndTemplates");
     expect(pageSource).toContain("SurveyWizardPanel");
     expect(pageSource).toContain("ActiveSurveysSection");
     expect(pageSource).toContain("ClosedSurveysSection");
+    expect(pageSource).toContain("OrphanScanSection");
+    expect(pageSource).toContain("TemplatesSection");
     expect(pageSource).not.toContain("../app.js");
-    expect(bridgeSource).toContain("renderSurveyOrphanAndTemplates");
-    expect(bridgeSource).toContain("subscribe");
+    expect(pageSource).not.toContain("SurveyCreatorBridge");
+    expect(existsSync(new URL("../src/survey/SurveyCreatorBridge.js", import.meta.url))).toBe(false);
   });
 
-  it("renders the active and closed survey card lists as real React, not a legacy HTML string", () => {
+  it("renders every survey-list section as real React, not a legacy HTML string", () => {
     const activeSurveysSectionSource = readFileSync(new URL("../src/survey/ActiveSurveysSection.jsx", import.meta.url), "utf8");
     const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
     const closedSurveysSectionSource = readFileSync(new URL("../src/survey/ClosedSurveysSection.jsx", import.meta.url), "utf8");
     const closedSurveyCardSource = readFileSync(new URL("../src/survey/ClosedSurveyCard.jsx", import.meta.url), "utf8");
+    const orphanScanSectionSource = readFileSync(new URL("../src/survey/OrphanScanSection.jsx", import.meta.url), "utf8");
+    const templatesSectionSource = readFileSync(new URL("../src/survey/TemplatesSection.jsx", import.meta.url), "utf8");
     const tickHookSource = readFileSync(new URL("../src/hooks/useVanillaStateTick.js", import.meta.url), "utf8");
     const surveySource = readFileSync(new URL("../src/views/survey.js", import.meta.url), "utf8");
 
@@ -51,11 +53,16 @@ describe("Survey runtime wiring", () => {
     expect(closedSurveysSectionSource).toContain("ClosedSurveyCard");
     expect(closedSurveysSectionSource).toContain("useVanillaStateTick");
     expect(closedSurveyCardSource).toContain("reopenSurveyDistribution");
+    expect(orphanScanSectionSource).toContain("useVanillaStateTick");
+    expect(orphanScanSectionSource).toContain("scanForOrphanResponses");
+    expect(templatesSectionSource).toContain("useVanillaStateTick");
+    expect(templatesSectionSource).toContain("deleteSurveyTemplate");
     expect(tickHookSource).toContain("subscribe");
-    expect(surveySource).toContain("export function renderSurveyOrphanAndTemplates");
     expect(surveySource).not.toContain("export function renderSurveyCreator");
     expect(surveySource).not.toContain("export function renderSurveyWizardPanel");
     expect(surveySource).not.toContain("export function renderSurveyRightColumnRest");
+    expect(surveySource).not.toContain("export function renderSurveyOrphanAndTemplates");
+    expect(surveySource).not.toContain("export function bindSurveyCreator");
     expect(surveySource).not.toContain("activeSurveys.map");
     expect(surveySource).not.toContain("closedSurveys.map");
   });

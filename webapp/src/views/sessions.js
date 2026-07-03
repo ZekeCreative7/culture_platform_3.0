@@ -9,7 +9,6 @@ import {
   sessionYear,
   sameSessionType,
   normalizeSessionType,
-  SESSION_TYPES,
   hasRoundPassed,
   ROUND_TYPES
 } from '../utils.js';
@@ -23,7 +22,6 @@ import {
   teamPath,
   teamMemberCandidates,
   allMemberCandidates,
-  ensureDraftOrgSelection,
   optionHtml,
   renderOrgPopup
 } from './org.js';
@@ -484,58 +482,36 @@ export function renderSessionsShell() {
 }
 
 // ── Drawer + org popup + attendance modal + duplicate-warning modal ──
+// ── Drawer body: config panel (org hierarchy / leader-group / cross-
+// functional builders) + schedule head/table ──────────────────────
+// Still legacy-rendered (dangerouslySetInnerHTML inside the real React
+// SessionDrawer.jsx) — the config panel's internal pieces and the
+// schedule editor are deferred to later Step 4 sub-items; only the
+// drawer's outer shell (header, type/cohort/year, footer) is React now.
+export function renderSessionDrawerBody(divisionList, hqList, teamList) {
+  return `
+    <div class="session-form">
+      ${renderSessionConfigPanel(divisionList, hqList, teamList)}
+    </div>
+    <div class="schedule-head">
+      <div>
+        <strong>${sessionTypeLabel(state.draftType)}</strong>
+        <span>${sessionTypeDef(state.draftType).desc}</span>
+      </div>
+      <button class="secondary small" id="add-round">회차 추가</button>
+    </div>
+    <div class="schedule-table">
+      ${state.draftSchedule.map(scheduleRow).join("")}
+    </div>
+  `;
+}
+
 export function renderSessionsOverlays() {
   const orgPopupHtml = state.showOrgPopup ? renderOrgPopup() : "";
   const attendanceModalHtml = state.showAttendanceModal ? renderAttendanceModal() : "";
   const duplicateWarningHtml = state.duplicateSessionWarning ? renderDuplicateWarningModal() : "";
-  const { divisionList, hqList, teamList } = ensureDraftOrgSelection();
-  const isDrawerOpen = state.sessionDrawerOpen || Boolean(state.editingSessionId);
-
-  const drawerHtml = `
-    <div class="session-drawer-overlay ${isDrawerOpen ? 'open' : ''}" id="session-drawer-overlay"></div>
-    <aside class="session-drawer ${isDrawerOpen ? 'open' : ''}" id="session-drawer" aria-label="세션 등록">
-      <div class="session-drawer-header">
-        <h2>${state.editingSessionId ? '세션 수정' : '새 세션 등록'}</h2>
-        <button class="ghost small" id="close-session-drawer" aria-label="닫기">✕</button>
-      </div>
-      <div class="session-drawer-body">
-        <div class="session-form">
-          <div class="session-meta-row">
-            <label>세션 유형
-              <select id="session-type">
-                ${Object.keys(SESSION_TYPES).map((type) => `<option value="${type}" ${normalizeSessionType(state.draftType) === type ? "selected" : ""}>${sessionTypeLabel(type)}</option>`).join("")}
-              </select>
-            </label>
-            <label>기수<input id="cohort" type="number" min="1" value="${state.draftCohort}" /></label>
-            <label>연도<input id="cohort-year" type="number" min="2000" value="${state.draftYear}" /></label>
-          </div>
-          ${renderSessionConfigPanel(divisionList, hqList, teamList)}
-        </div>
-        <div class="schedule-head">
-          <div>
-            <strong>${sessionTypeLabel(state.draftType)}</strong>
-            <span>${sessionTypeDef(state.draftType).desc}</span>
-          </div>
-          <button class="secondary small" id="add-round">회차 추가</button>
-        </div>
-        <div class="schedule-table">
-          ${state.draftSchedule.map(scheduleRow).join("")}
-        </div>
-      </div>
-      <div class="session-drawer-footer">
-        ${state.editingSessionId ? `
-          <span style="font-size:12px;color:#0ea5e9;font-weight:700;margin-right:8px;">세션 수정 중</span>
-          <button class="ghost" id="cancel-edit-session">취소</button>
-        ` : ''}
-        <button class="primary" id="create-session" ${canCreateDraftSession() ? "" : "disabled"}>
-          ${state.editingSessionId ? '수정 완료' : '세션 등록'}
-        </button>
-      </div>
-    </aside>
-  `;
 
   return `
-    ${drawerHtml}
     ${orgPopupHtml}
     ${attendanceModalHtml}
     ${duplicateWarningHtml}

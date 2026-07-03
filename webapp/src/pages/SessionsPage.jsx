@@ -3,6 +3,7 @@ import { state as vanillaState } from '../state.js';
 import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
 import { mountSessionsShell, mountSessionsCalendar, mountSessionsOverlays } from '../sessions/SessionsBridge.js';
 import { SessionsListSection } from '../sessions/SessionsListSection.jsx';
+import { SessionDrawer } from '../sessions/SessionDrawer.jsx';
 import '../sessions/sessionActions.js';
 
 export const SessionsPage = memo(function SessionsPage() {
@@ -27,6 +28,7 @@ export const SessionsPage = memo(function SessionsPage() {
       <div className="tab-container tab-content">
         {activeTab === 'list' ? <SessionsListSection /> : <div ref={calendarRef} />}
       </div>
+      <SessionDrawer />
       <div ref={overlaysRef} />
     </>
   );

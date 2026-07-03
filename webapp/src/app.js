@@ -37,14 +37,7 @@ import {
 } from './views/analytics.js';
 import {
   renderSessionsShell,
-  renderCrossFunctionalPanel,
-  renderCrossMemberSelector,
-  renderSelectedCrossMembers,
-  renderSessionOutcomeIntro,
-  leaderSessions,
-  selectedLeaderSession,
-  crossSourceTeams,
-  crossMemberPool
+  renderSessionOutcomeIntro
 } from './views/sessions.js';
 import {
   validateAndRepairSelectedOrg,
@@ -71,7 +64,6 @@ import {
   teamPath,
   orgMemberCandidate,
   teamMemberCandidates,
-  allMemberCandidates,
   positionRank,
   renderOrg,
   renderOrgActionMenu,
@@ -817,70 +809,6 @@ function bindSessions() {
       const original = event.currentTarget.textContent;
       event.currentTarget.textContent = "복사됨";
       setTimeout(() => { event.currentTarget.textContent = original; }, 1600);
-    });
-  });
-  document.querySelectorAll("input[name='cross-mode']").forEach((input) => {
-    input.addEventListener("change", () => {
-      state.draftCrossMode = input.value;
-      state.draftCrossTeamIds = [];
-      state.draftCrossMemberIds = [];
-      saveState();
-      render();
-    });
-  });
-  document.querySelector("#cross-parent-session")?.addEventListener("change", (event) => {
-    state.draftCrossParentSessionId = event.target.value;
-    state.draftCrossTeamIds = [];
-    state.draftCrossMemberIds = [];
-    saveState();
-    render();
-  });
-  document.querySelectorAll("[data-cross-team]").forEach((input) => {
-    input.addEventListener("change", () => {
-      const teamId = input.dataset.crossTeam;
-      if (input.checked && !state.draftCrossTeamIds.includes(teamId)) {
-        state.draftCrossTeamIds.push(teamId);
-      } else if (!input.checked) {
-        state.draftCrossTeamIds = state.draftCrossTeamIds.filter((id) => id !== teamId);
-        const validMemberIds = new Set(crossMemberPool().map((member) => member.id));
-        state.draftCrossMemberIds = state.draftCrossMemberIds.filter((id) => validMemberIds.has(id));
-      }
-      saveState();
-      render();
-    });
-  });
-  document.querySelectorAll("[data-cross-member]").forEach((input) => {
-    input.addEventListener("change", () => {
-      const memberId = input.dataset.crossMember;
-      if (input.checked && !state.draftCrossMemberIds.includes(memberId)) {
-        state.draftCrossMemberIds.push(memberId);
-      } else if (!input.checked) {
-        state.draftCrossMemberIds = state.draftCrossMemberIds.filter((id) => id !== memberId);
-      }
-      saveState();
-      render();
-    });
-  });
-  document.querySelector("#cross-random-count")?.addEventListener("input", (event) => {
-    state.draftCrossRandomCount = Math.max(1, Math.min(30, Number(event.target.value || 6)));
-    saveState();
-  });
-  document.querySelector("#generate-random-cross")?.addEventListener("click", () => {
-    const pool = allMemberCandidates(false);
-    const count = Math.max(1, Math.min(pool.length, Number(state.draftCrossRandomCount || 6)));
-    state.draftCrossMemberIds = pool
-      .map((member) => ({ member, sort: Math.random() }))
-      .sort((a, b) => a.sort - b.sort)
-      .slice(0, count)
-      .map((item) => item.member.id);
-    saveState();
-    render();
-  });
-  document.querySelectorAll("[data-remove-cross-member]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.draftCrossMemberIds = state.draftCrossMemberIds.filter((id) => id !== button.dataset.removeCrossMember);
-      saveState();
-      render();
     });
   });
   document.querySelector("#btn-db-upload")?.addEventListener("click", () => {

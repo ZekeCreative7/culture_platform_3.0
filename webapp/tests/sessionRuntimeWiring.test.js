@@ -78,23 +78,18 @@ describe("Sessions runtime wiring", () => {
     const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
 
     // The type/cohort/year/cancel/create-session bindings must be gone from
-    // bindSessions() (converted to React), but the cross-functional/
-    // schedule-row bindings it still owns must not have been caught in the
-    // same removal. (org-hierarchy/leader-group bindings were also legacy
-    // at the time this test was written, but items 4a/4b later converted
-    // those to React too — see the dedicated tests below.)
+    // bindSessions() (converted to React). (org-hierarchy/leader-group/
+    // cross-functional bindings were also legacy at the time this test was
+    // written, but items 4a/4b/4c later converted all 3 config panels to
+    // React too — see the dedicated tests below.)
     expect(appSource).not.toContain('document.querySelector("#session-type")');
     expect(appSource).not.toContain('document.querySelector("#cohort")');
     expect(appSource).not.toContain('document.querySelector("#cancel-edit-session")');
     expect(appSource).not.toContain('document.querySelector("#create-session")');
-    expect(appSource).toContain('document.querySelectorAll("[data-cross-team]")');
     expect(appSource).not.toContain("if (typeSelect)");
 
-    expect(sessionsSource).toContain("export function renderCrossFunctionalPanel");
     expect(sessionsSource).toContain("export function canCreateDraftSession");
 
-    expect(drawerSource).toContain("renderCrossFunctionalPanel");
-    expect(drawerSource).toContain("dangerouslySetInnerHTML");
     expect(drawerSource).toContain("bindSessions()");
     expect(drawerSource).toContain("defaultValue={vanillaState.draftCohort}");
     expect(drawerSource).not.toContain("value={vanillaState.draftCohort}");
@@ -162,9 +157,6 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).not.toContain('document.querySelectorAll(".schedule-row")');
     expect(appSource).not.toContain('document.querySelectorAll("[data-delete-round]")');
     expect(appSource).not.toContain('document.querySelector("#add-round")');
-    // The cross-functional listeners bindSessions() still owns must be
-    // untouched by this removal.
-    expect(appSource).toContain("input[name='cross-mode']");
 
     expect(sessionsSource).not.toContain("export function scheduleRow");
     expect(sessionsSource).not.toContain("schedule-head");
@@ -198,7 +190,6 @@ describe("Sessions runtime wiring", () => {
 
     expect(sessionsSource).not.toContain("export function renderTeamBuildingPanel");
     expect(sessionsSource).not.toContain("export function renderSessionDrawerBody");
-    expect(sessionsSource).toContain("export function renderCrossFunctionalPanel");
 
     expect(orgActionsSource).toContain("export function updateSessionDivision");
     expect(orgActionsSource).toContain("export function updateSessionHq");
@@ -234,9 +225,6 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).not.toContain("renderOrgSelectRow");
     expect(appSource).not.toContain("renderLeaderSessionPanel");
     expect(appSource).not.toContain("renderSessionConfigPanel");
-    // The 협업 mode-switch/cross-team/cross-member listeners bindSessions()
-    // still owns must be untouched by this removal.
-    expect(appSource).toContain("input[name='cross-mode']");
 
     expect(leaderActionsSource).toContain("export function addTeamLeader");
     expect(leaderActionsSource).toContain("export function removeTeamLeader");
@@ -248,6 +236,44 @@ describe("Sessions runtime wiring", () => {
 
     expect(drawerSource).toContain("LeaderGroupPanel");
     expect(drawerSource).toContain("draftType === '리더십'");
-    expect(drawerSource).toContain("renderCrossFunctionalPanel");
+  });
+
+  it("converts the 협업 cross-functional builder to React, finishing the config-panel breakdown", () => {
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
+    const drawerSource = readFileSync(new URL("../src/sessions/SessionDrawer.jsx", import.meta.url), "utf8");
+    const crossActionsSource = readFileSync(new URL("../src/sessions/sessionCrossActions.js", import.meta.url), "utf8");
+    const crossPanelSource = readFileSync(new URL("../src/sessions/CrossFunctionalPanel.jsx", import.meta.url), "utf8");
+
+    // renderCrossFunctionalPanel/renderCrossMemberSelector/renderSelectedCrossMembers
+    // and their bindSessions() listeners (mode-switch, parent-session,
+    // cross-team/cross-member checkboxes, random-count, generate, remove)
+    // are all gone now that 협업 is the last panel converted to React.
+    expect(sessionsSource).not.toContain("export function renderCrossFunctionalPanel");
+    expect(sessionsSource).not.toContain("export function renderCrossMemberSelector");
+    expect(sessionsSource).not.toContain("export function renderSelectedCrossMembers");
+    expect(appSource).not.toContain("input[name='cross-mode']");
+    expect(appSource).not.toContain('document.querySelector("#cross-parent-session")');
+    expect(appSource).not.toContain('document.querySelectorAll("[data-cross-team]")');
+    expect(appSource).not.toContain('document.querySelectorAll("[data-cross-member]")');
+    expect(appSource).not.toContain('document.querySelector("#cross-random-count")');
+    expect(appSource).not.toContain('document.querySelector("#generate-random-cross")');
+    expect(appSource).not.toContain('document.querySelectorAll("[data-remove-cross-member]")');
+    // #copy-session-survey-prompt is shared across all 3 panels (survey-prompt
+    // card stays dangerouslySetInnerHTML, deferred) and must still be bound.
+    expect(appSource).toContain('document.querySelector("#copy-session-survey-prompt")');
+
+    expect(crossActionsSource).toContain("export function updateCrossMode");
+    expect(crossActionsSource).toContain("export function toggleCrossTeam");
+    expect(crossActionsSource).toContain("export function toggleCrossMember");
+    expect(crossActionsSource).toContain("export function generateRandomCross");
+    expect(crossActionsSource).toContain("export function removeCrossMember");
+    // cross-random-count uses saveState() per keystroke like cohort/year did,
+    // so it must stay uncontrolled (defaultValue), not controlled (value).
+    expect(crossPanelSource).toContain("defaultValue={Number(state.draftCrossRandomCount");
+    expect(crossPanelSource).not.toContain("value={Number(state.draftCrossRandomCount");
+
+    expect(drawerSource).toContain("CrossFunctionalPanel");
+    expect(drawerSource).not.toContain("renderCrossFunctionalPanel");
   });
 });

@@ -1,30 +1,28 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { state as vanillaState } from '../state.js';
 import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
 import { SESSION_TYPES, sessionTypeLabel, normalizeSessionType } from '../utils.js';
 import { ensureDraftOrgSelection } from '../views/org.js';
-import { renderCrossFunctionalPanel, canCreateDraftSession } from '../views/sessions.js';
+import { canCreateDraftSession } from '../views/sessions.js';
 import { bindSessions } from '../app.js';
 import { closeSessionDrawer } from './sessionActions.js';
 import { updateSessionType, updateSessionCohort, updateSessionYear, cancelEditSession, createOrUpdateSession } from './sessionDraftActions.js';
 import { ScheduleEditor } from './ScheduleEditor.jsx';
 import { TeamBuildingPanel } from './TeamBuildingPanel.jsx';
 import { LeaderGroupPanel } from './LeaderGroupPanel.jsx';
+import { CrossFunctionalPanel } from './CrossFunctionalPanel.jsx';
 
 export function SessionDrawer() {
   useVanillaStateTick();
-  const bodyRef = useRef(null);
 
   const isDrawerOpen = vanillaState.sessionDrawerOpen || Boolean(vanillaState.editingSessionId);
   const editingSessionId = vanillaState.editingSessionId;
   const draftType = normalizeSessionType(vanillaState.draftType);
 
-  // The 협업 config panel inside bodyRef is still legacy-rendered
-  // (dangerouslySetInnerHTML) and its internal buttons/selects/inputs are
-  // bound by bindSessions() via document.querySelectorAll, so it needs to be
-  // re-invoked after every render this component produces. 팀빌딩/리더십's
-  // config panels and the schedule editor are real React now and don't need
-  // this, but bindSessions() is harmless to call regardless of type.
+  // All 3 config panels (팀빌딩/리더십/협업) and the schedule editor are real
+  // React now. bindSessions() still needs to run after every render for the
+  // survey-prompt card's #copy-session-survey-prompt button, which every
+  // panel renders via dangerouslySetInnerHTML (shared, deferred).
   useEffect(() => {
     bindSessions();
   });
@@ -70,9 +68,7 @@ export function SessionDrawer() {
           <div className="session-form">
             {draftType === '팀빌딩' && <TeamBuildingPanel divisionList={divisionList} hqList={hqList} teamList={teamList} />}
             {draftType === '리더십' && <LeaderGroupPanel divisionList={divisionList} hqList={hqList} teamList={teamList} />}
-            {draftType !== '팀빌딩' && draftType !== '리더십' && (
-              <div ref={bodyRef} dangerouslySetInnerHTML={{ __html: renderCrossFunctionalPanel() }} />
-            )}
+            {draftType !== '팀빌딩' && draftType !== '리더십' && <CrossFunctionalPanel />}
           </div>
           <ScheduleEditor />
         </div>

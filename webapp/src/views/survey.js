@@ -1,9 +1,8 @@
-import { 
-  state, 
-  surveyRows, 
-  surveyDistributionActive, 
-  surveyQuestionsForDistribution, 
-  rowMatchesSurvey 
+import {
+  state,
+  surveyRows,
+  surveyQuestionsForDistribution,
+  rowMatchesSurvey
 } from '../state.js';
 import { 
   PHASES, 
@@ -587,39 +586,8 @@ export function renderSurveyWizardPanel() {
   `;
 }
 
-export function renderSurveyRightColumnRest() {
-  const closedSurveys = (state.surveys || []).filter((survey) => !surveyDistributionActive(survey));
-
+export function renderSurveyOrphanAndTemplates() {
   return `
-        ${closedSurveys.length ? `
-          <div style="margin-top:28px;">
-            <button type="button" class="section-title section-title-toggle" style="width:100%; text-align:left;" onclick="toggleClosedSurveysSection()">
-              <h2><span class="section-title-chevron">${state.closedSurveysCollapsed ? "▸" : "▾"}</span>배포 종료 · 응답 보관</h2>
-              <span>${closedSurveys.length}건</span>
-            </button>
-            ${state.closedSurveysCollapsed ? "" : `
-            <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">링크와 QR만 비활성화된 상태입니다. 응답 결과는 Change(변화 분석) 화면에서 세션·단계로 그대로 조회됩니다.</p>
-            <div class="surveys-grid">
-              ${closedSurveys.map((survey) => {
-                const session = state.sessions.find((item) => item.id === survey.sessionId);
-                const sessionText = session ? `${session.type} · ${sessionLabel(session)}` : "만료된 세션";
-                return `
-                  <div class="survey-deploy-card" style="flex-direction:row; align-items:center; padding:14px 18px; gap:14px;">
-                    <div style="flex:1; min-width:0;">
-                      <strong style="font-size:14px; font-weight:800; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(survey.title)}</strong>
-                      <span style="font-size:11.5px; color:var(--muted); font-weight:600;">${escapeHtml(sessionText)} [${escapeHtml(survey.phase)}] · 배포 종료</span>
-                    </div>
-                    <button onclick="startEditSurvey('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--blue-mid); cursor:pointer; white-space:nowrap; flex-shrink:0;">정의 수정</button>
-                    <button onclick="reopenSurveyDistribution('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; flex-shrink:0;">배포 재개</button>
-                    <button onclick="uploadSurveyResults('${survey.id}')" style="background:none; border:1.5px solid var(--line-strong); border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:#1d4ed8; cursor:pointer; white-space:nowrap; flex-shrink:0;">CSV 업로드</button>
-                    <button onclick="deleteRecoveredSurveyCard('${survey.id}')" style="background:none; border:1.5px solid #fcd34d; border-radius:8px; padding:6px 12px; font-size:11.5px; font-weight:700; color:#b45309; cursor:pointer; white-space:nowrap; flex-shrink:0;">카드 삭제</button>
-                  </div>`;
-              }).join("")}
-            </div>
-            `}
-          </div>
-        ` : ""}
-
         <div style="margin-top:28px;">
           ${sectionTitle("지난 데이터 점검", "")}
           <p style="font-size:11.5px; color:var(--muted); margin:-6px 0 12px; line-height:1.6;">예전에 삭제된 설문에 연결돼 있던 응답이 DB에 남아있는지 확인합니다. 응답 자체는 보존돼 있을 가능성이 높고, 이 스캔은 그것을 다시 화면에 연결만 해 줍니다.</p>

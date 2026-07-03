@@ -30,7 +30,7 @@ import {
   renderDuplicateWarningModal,
   renderSurveyResponsePanel,
   renderSurveyWizardPanel,
-  renderSurveyRightColumnRest,
+  renderSurveyOrphanAndTemplates,
   bindSurveyCreator,
   surveySessionCohortKey
 } from './views/survey.js';
@@ -428,7 +428,7 @@ function render() {
 function renderView() {
   if (state.activeView === "sessions") return renderSessions();
   if (state.activeView === "org") return renderOrg();
-  if (state.activeView === "survey") return renderSurveyWizardPanel() + renderSurveyRightColumnRest();
+  if (state.activeView === "survey") return renderSurveyWizardPanel() + renderSurveyOrphanAndTemplates();
   if (state.activeView === "upload") return renderUpload();
   if (state.activeView === "analytics") return renderAnalytics();
   if (state.activeView === "report") return renderReport();

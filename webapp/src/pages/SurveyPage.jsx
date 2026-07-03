@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, memo } from 'react';
-import { mountSurveyWizard, mountSurveyRightColumnRest } from '../survey/SurveyCreatorBridge.js';
+import { mountSurveyWizard, mountSurveyOrphanAndTemplates } from '../survey/SurveyCreatorBridge.js';
 import { PageHead } from '../components/layout/index.js';
 import { ActiveSurveysSection } from '../survey/ActiveSurveysSection.jsx';
+import { ClosedSurveysSection } from '../survey/ClosedSurveysSection.jsx';
 
 export const SurveyPage = memo(function SurveyPage() {
   const wizardRef = useRef(null);
   const restRef = useRef(null);
 
   useEffect(() => mountSurveyWizard(wizardRef.current), []);
-  useEffect(() => mountSurveyRightColumnRest(restRef.current), []);
+  useEffect(() => mountSurveyOrphanAndTemplates(restRef.current), []);
 
   return (
     <>
@@ -21,6 +22,7 @@ export const SurveyPage = memo(function SurveyPage() {
         <div ref={wizardRef} />
         <div>
           <ActiveSurveysSection />
+          <ClosedSurveysSection />
           <div ref={restRef} />
         </div>
       </div>

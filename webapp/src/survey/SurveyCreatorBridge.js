@@ -1,6 +1,6 @@
 import './surveyActions.js';
 import { state as vanillaState, subscribe } from '../state.js';
-import { bindSurveyCreator, renderSurveyWizardPanel, renderSurveyRightColumnRest } from '../views/survey.js';
+import { bindSurveyCreator, renderSurveyWizardPanel, renderSurveyOrphanAndTemplates } from '../views/survey.js';
 
 function mountLegacyFragment(element, renderFragment, { debounceMs = 150, afterRefresh } = {}) {
   if (!element) return () => {};
@@ -33,6 +33,6 @@ export function mountSurveyWizard(element, options) {
   return mountLegacyFragment(element, renderSurveyWizardPanel, { ...options, afterRefresh: bindSurveyCreator });
 }
 
-export function mountSurveyRightColumnRest(element, options) {
-  return mountLegacyFragment(element, renderSurveyRightColumnRest, options);
+export function mountSurveyOrphanAndTemplates(element, options) {
+  return mountLegacyFragment(element, renderSurveyOrphanAndTemplates, options);
 }

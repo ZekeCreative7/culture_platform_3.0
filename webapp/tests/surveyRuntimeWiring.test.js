@@ -29,26 +29,34 @@ describe("Survey runtime wiring", () => {
     const bridgeSource = readFileSync(new URL("../src/survey/SurveyCreatorBridge.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("mountSurveyWizard");
-    expect(pageSource).toContain("mountSurveyRightColumnRest");
+    expect(pageSource).toContain("mountSurveyOrphanAndTemplates");
     expect(pageSource).toContain("ActiveSurveysSection");
+    expect(pageSource).toContain("ClosedSurveysSection");
     expect(pageSource).not.toContain("../app.js");
     expect(bridgeSource).toContain("renderSurveyWizardPanel");
-    expect(bridgeSource).toContain("renderSurveyRightColumnRest");
+    expect(bridgeSource).toContain("renderSurveyOrphanAndTemplates");
     expect(bridgeSource).toContain("bindSurveyCreator");
     expect(bridgeSource).toContain("subscribe");
   });
 
-  it("renders the active survey card list as real React, not a legacy HTML string", () => {
+  it("renders the active and closed survey card lists as real React, not a legacy HTML string", () => {
     const activeSurveysSectionSource = readFileSync(new URL("../src/survey/ActiveSurveysSection.jsx", import.meta.url), "utf8");
     const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
+    const closedSurveysSectionSource = readFileSync(new URL("../src/survey/ClosedSurveysSection.jsx", import.meta.url), "utf8");
+    const closedSurveyCardSource = readFileSync(new URL("../src/survey/ClosedSurveyCard.jsx", import.meta.url), "utf8");
     const surveySource = readFileSync(new URL("../src/views/survey.js", import.meta.url), "utf8");
 
     expect(activeSurveysSectionSource).toContain("SurveyCard");
     expect(activeSurveysSectionSource).toContain("subscribe");
     expect(surveyCardSource).toContain("renderSurveyResponsePanel");
+    expect(closedSurveysSectionSource).toContain("ClosedSurveyCard");
+    expect(closedSurveysSectionSource).toContain("subscribe");
+    expect(closedSurveyCardSource).toContain("reopenSurveyDistribution");
     expect(surveySource).toContain("export function renderSurveyWizardPanel");
-    expect(surveySource).toContain("export function renderSurveyRightColumnRest");
+    expect(surveySource).toContain("export function renderSurveyOrphanAndTemplates");
     expect(surveySource).not.toContain("export function renderSurveyCreator");
+    expect(surveySource).not.toContain("export function renderSurveyRightColumnRest");
     expect(surveySource).not.toContain("activeSurveys.map");
+    expect(surveySource).not.toContain("closedSurveys.map");
   });
 });

@@ -309,3 +309,18 @@ Completed:
 Next recommended Survey commit:
 
 - Item 7 of the Step 3 sequence: move edit/cancel/save draft actions (`startEditSurvey`, `cancelSurveyEdit`, `submitSurveyDraft`, `updateSurveyDraftField`, `updateSurveyDraftSessionType`, `updateSurveyDraftCohort`, `updateSurveyDraftPhase`, `updateSurveyDraftQuestionText`, `updateSurveyDraftQuestionType`, `addSurveyDraftQuestion`, `deleteSurveyDraftQuestion`, `loadSurveyTemplate`) out of `app.js` into a Survey draft-actions module.
+
+### 2026-07-03 - Step 3, Item 7 Complete
+
+Completed:
+
+- Moved all 12 listed functions plus `setSurveyCreatorStep` (grouped in since `SurveyWizardPanel.jsx` already called it via `window.*` and it fits the same "draft/creator state" theme) into `webapp/src/survey/surveyDraftActions.js`, unchanged — including `saveStateQuiet()`-based quiet-save behavior and the manual `querySelectorAll` DOM patching in `updateSurveyDraftQuestionType`.
+- `SurveyWizardPanel.jsx`, `SurveyCard.jsx`, and `ClosedSurveyCard.jsx` now call these as direct imports instead of `window.*`, per migration principle #3. Each function still self-attaches to `window` too (backward-compat, matching the pattern from items 1-3).
+- Left `loadDefaultQuestionsToDraft` and the small `draftSessionType()` helper in `app.js` untouched — `loadDefaultQuestionsToDraft` is pre-existing dead code (confirmed via grep: never called from anywhere), not something this item's live call graph needed to move.
+- Removed now-unused imports from `app.js` (`surveySessionCohortKey`, `saveStateQuiet`); updated the wiring test to track `surveyDraftActions.js` instead of `app.js` for the cohort-helper and quiet-save assertions, and added a test asserting all 13 functions are gone from `app.js` and present in the new module.
+- Verified: `npm run check`, full `vitest run` (42 tests), `npm run build` all pass. Browser-verified with an injected session (lost across reload by the pre-existing dashboard-redirect/Firestore-listener behavior tracked separately — see below), so testing was done via same-load DOM interaction instead: title typing, step navigation, add-question, and the question-type radio toggle all confirmed working through the new direct-import call path with zero console errors; `submitSurveyDraft()` and `cancelSurveyEdit()` called directly to confirm their guard-clause/reset logic still fires correctly (e.g. the exact "대상 세션을 선택해 주세요" alert).
+- Flagged separately (not fixed here, out of scope): a reproducible bug where the app auto-navigates to `#/dashboard` and drops `?preview=1` after some idle time — spun off as a background task (`task_c3da513a`) since it's unrelated to the Survey migration.
+
+Next recommended Survey commit:
+
+- Item 8 of the Step 3 sequence: move upload, reset, delete, recover orphan response actions (`deleteSurvey`, `uploadSurveyResults`, `resetSurveyResponses`, `deleteRecoveredSurveyCard`, `reopenSurveyDistribution`, `scanForOrphanResponses`, `recoverOrphanSurvey`, `recoverAllOrphanSurveys`, `downloadSurveyTemplate`, `saveSurveyAsTemplate`, `deleteSurveyTemplate`) out of `app.js`.

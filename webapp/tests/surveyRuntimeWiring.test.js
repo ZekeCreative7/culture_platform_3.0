@@ -2,13 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("Survey runtime wiring", () => {
-  it("wires the edit-flow cohort helper into app.js", () => {
-    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+  it("wires the edit-flow cohort helper into surveyDraftActions.js", () => {
+    const draftActionsSource = readFileSync(new URL("../src/survey/surveyDraftActions.js", import.meta.url), "utf8");
     const surveySource = readFileSync(new URL("../src/views/survey.js", import.meta.url), "utf8");
 
     expect(surveySource).toContain("export function surveySessionCohortKey");
-    expect(appSource).toContain("surveySessionCohortKey");
-    expect(appSource).toContain("} from './views/survey.js'");
+    expect(draftActionsSource).toContain("surveySessionCohortKey");
+    expect(draftActionsSource).toContain("} from '../views/survey.js'");
   });
 
   it("uses the QR factory from Survey render and QR download paths", () => {
@@ -62,15 +62,30 @@ describe("Survey runtime wiring", () => {
 
   it("keeps free-text draft inputs uncontrolled to avoid the one-character-typed regression", () => {
     const wizardSource = readFileSync(new URL("../src/survey/SurveyWizardPanel.jsx", import.meta.url), "utf8");
-    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const draftActionsSource = readFileSync(new URL("../src/survey/surveyDraftActions.js", import.meta.url), "utf8");
 
     // These must stay saveStateQuiet()-based (no re-render on every keystroke);
     // the wizard's text inputs and question-type radios must be uncontrolled
     // (defaultValue/defaultChecked) to match, not fully controlled.
-    expect(appSource).toContain("saveStateQuiet");
+    expect(draftActionsSource).toContain("saveStateQuiet");
     expect(wizardSource).toContain("defaultValue={vanillaState.draftSurveyTitle}");
     expect(wizardSource).toContain("defaultValue={vanillaState.draftGoogleFormUrl}");
     expect(wizardSource).toContain("defaultChecked={q.type === 'quant'}");
     expect(wizardSource).not.toContain("value={vanillaState.draftSurveyTitle}");
+  });
+
+  it("moves edit/cancel/save draft actions out of app.js into surveyDraftActions.js", () => {
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const draftActionsSource = readFileSync(new URL("../src/survey/surveyDraftActions.js", import.meta.url), "utf8");
+
+    for (const fn of [
+      "startEditSurvey", "cancelSurveyEdit", "submitSurveyDraft", "setSurveyCreatorStep",
+      "updateSurveyDraftField", "updateSurveyDraftSessionType", "updateSurveyDraftCohort",
+      "updateSurveyDraftPhase", "updateSurveyDraftQuestionText", "updateSurveyDraftQuestionType",
+      "addSurveyDraftQuestion", "deleteSurveyDraftQuestion", "loadSurveyTemplate",
+    ]) {
+      expect(appSource).not.toContain(`window.${fn} = function`);
+      expect(draftActionsSource).toContain(`export function ${fn}`);
+    }
   });
 });

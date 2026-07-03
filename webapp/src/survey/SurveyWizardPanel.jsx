@@ -9,6 +9,20 @@ import {
   sessionYear,
 } from '../utils.js';
 import { surveySessionCohortKey, surveySessionTargetLabel } from '../views/survey.js';
+import {
+  setSurveyCreatorStep,
+  updateSurveyDraftField,
+  updateSurveyDraftSessionType,
+  updateSurveyDraftCohort,
+  updateSurveyDraftPhase,
+  updateSurveyDraftQuestionText,
+  updateSurveyDraftQuestionType,
+  addSurveyDraftQuestion,
+  deleteSurveyDraftQuestion,
+  loadSurveyTemplate,
+  cancelSurveyEdit,
+  submitSurveyDraft,
+} from './surveyDraftActions.js';
 
 function CheckIcon({ valid }) {
   return valid ? (
@@ -37,17 +51,17 @@ function Stepper({ currentStep }) {
       <div style={{ position: 'absolute', top: '15px', left: '24px', right: '24px', height: '3px', background: '#e2e8f0', zIndex: 1, borderRadius: '2px' }} />
       <div style={{ position: 'absolute', top: '15px', left: '24px', width: `calc(${(currentStep - 1) * 50}% - ${(currentStep - 1) * 12}px)`, height: '3px', background: 'var(--neon-blue)', zIndex: 2, transition: 'width 0.3s ease', borderRadius: '2px' }} />
 
-      <div onClick={() => window.setSurveyCreatorStep(1)} style={{ zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+      <div onClick={() => setSurveyCreatorStep(1)} style={{ zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
         <div style={stepCircleStyle(1)}>1</div>
         <span style={stepLabelStyle(1)}>기본 정보</span>
       </div>
 
-      <div onClick={() => window.setSurveyCreatorStep(2)} style={{ zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+      <div onClick={() => setSurveyCreatorStep(2)} style={{ zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
         <div style={stepCircleStyle(2)}>2</div>
         <span style={stepLabelStyle(2)}>설문 설계</span>
       </div>
 
-      <div onClick={() => window.setSurveyCreatorStep(3)} style={{ zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+      <div onClick={() => setSurveyCreatorStep(3)} style={{ zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
         <div style={stepCircleStyle(3)}>3</div>
         <span style={stepLabelStyle(3)}>검증 및 배포</span>
       </div>
@@ -64,12 +78,12 @@ function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType,
           key={editingSurveyId || 'new'}
           defaultValue={vanillaState.draftSurveyTitle}
           placeholder="예: 리더십 세션 2026년 1기 사전 설문"
-          onChange={(e) => window.updateSurveyDraftField('draftSurveyTitle', e.target.value)}
+          onChange={(e) => updateSurveyDraftField('draftSurveyTitle', e.target.value)}
         />
       </label>
       <div className="survey-session-cascade">
         <label>세션 종류
-          <select id="survey-session-type-select" value={draftSessionType} onChange={(e) => window.updateSurveyDraftSessionType(e.target.value)}>
+          <select id="survey-session-type-select" value={draftSessionType} onChange={(e) => updateSurveyDraftSessionType(e.target.value)}>
             <option value="">-- 종류 선택 --</option>
             {availableSessionTypes.map((type) => (
               <option key={type} value={type}>{sessionTypeLabel(type)}</option>
@@ -77,7 +91,7 @@ function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType,
           </select>
         </label>
         <label>기수
-          <select id="survey-session-cohort-select" value={draftCohortKey} onChange={(e) => window.updateSurveyDraftCohort(e.target.value)} disabled={!draftSessionType}>
+          <select id="survey-session-cohort-select" value={draftCohortKey} onChange={(e) => updateSurveyDraftCohort(e.target.value)} disabled={!draftSessionType}>
             <option value="">-- 기수 선택 --</option>
             {cohortOptions.map((item) => (
               <option key={item.key} value={item.key}>{item.year ? `${item.year}년 ` : ''}{item.cohort}기</option>
@@ -85,7 +99,7 @@ function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType,
           </select>
         </label>
         <label>팀 / 대상 세션
-          <select id="survey-session-select" value={vanillaState.draftSurveySessionId} onChange={(e) => window.updateSurveyDraftField('draftSurveySessionId', e.target.value)} disabled={!draftCohortKey}>
+          <select id="survey-session-select" value={vanillaState.draftSurveySessionId} onChange={(e) => updateSurveyDraftField('draftSurveySessionId', e.target.value)} disabled={!draftCohortKey}>
             <option value="">-- 팀 선택 --</option>
             {sessionsForCohort.map((session) => (
               <option key={session.id} value={session.id}>{surveySessionTargetLabel(session)}</option>
@@ -94,7 +108,7 @@ function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType,
         </label>
       </div>
       <label>설문 시점
-        <select id="survey-phase-select" value={vanillaState.draftSurveyPhase} onChange={(e) => window.updateSurveyDraftPhase(e.target.value)}>
+        <select id="survey-phase-select" value={vanillaState.draftSurveyPhase} onChange={(e) => updateSurveyDraftPhase(e.target.value)}>
           <option value="사전">사전</option>
           <option value="사후">사후</option>
           <option value="팔로우업">팔로우업 (60일)</option>
@@ -102,7 +116,7 @@ function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType,
       </label>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-        <button className="primary" type="button" onClick={() => window.setSurveyCreatorStep(2)} style={{ width: '120px' }}>다음 단계 ➔</button>
+        <button className="primary" type="button" onClick={() => setSurveyCreatorStep(2)} style={{ width: '120px' }}>다음 단계 ➔</button>
       </div>
     </div>
   );
@@ -122,21 +136,21 @@ function DraftQuestionRow({ q }) {
         <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--cyan)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           {q.id.toUpperCase()} · {q.type === 'quant' ? '5점 척도' : '주관식 텍스트'}
         </span>
-        <button onClick={() => window.deleteSurveyDraftQuestion(q.id)} style={{ background: 'transparent', border: 'none', padding: '3px 8px', fontSize: '12px', color: 'var(--muted)', cursor: 'pointer', borderRadius: '4px', transition: 'all 0.15s', fontWeight: '700' }}>&times; 삭제</button>
+        <button onClick={() => deleteSurveyDraftQuestion(q.id)} style={{ background: 'transparent', border: 'none', padding: '3px 8px', fontSize: '12px', color: 'var(--muted)', cursor: 'pointer', borderRadius: '4px', transition: 'all 0.15s', fontWeight: '700' }}>&times; 삭제</button>
       </div>
       <input
         key={q.id}
         style={{ minHeight: '38px', fontSize: '13px', width: '100%', border: '1.5px solid #e5e7eb', borderRadius: 'var(--radius-sm)', background: '#ffffff', color: 'var(--ink)', padding: '8px 12px', outline: 'none', boxSizing: 'border-box' }}
         defaultValue={q.text}
         placeholder="질문 내용을 입력하세요."
-        onChange={(e) => window.updateSurveyDraftQuestionText(q.id, e.target.value)}
+        onChange={(e) => updateSurveyDraftQuestionText(q.id, e.target.value)}
       />
       <div style={{ display: 'inline-flex', gap: '4px', background: '#f3f4f6', padding: '3px', borderRadius: '8px', border: '1px solid #e5e7eb', marginTop: '2px' }}>
         <label style={labelStyle('quant')}>
-          <input type="radio" name={`qtype-${q.id}`} value="quant" defaultChecked={q.type === 'quant'} onChange={() => window.updateSurveyDraftQuestionType(q.id, 'quant')} style={{ display: 'none' }} /> 5점 척도
+          <input type="radio" name={`qtype-${q.id}`} value="quant" defaultChecked={q.type === 'quant'} onChange={() => updateSurveyDraftQuestionType(q.id, 'quant')} style={{ display: 'none' }} /> 5점 척도
         </label>
         <label style={labelStyle('qual')}>
-          <input type="radio" name={`qtype-${q.id}`} value="qual" defaultChecked={q.type === 'qual'} onChange={() => window.updateSurveyDraftQuestionType(q.id, 'qual')} style={{ display: 'none' }} /> 주관식
+          <input type="radio" name={`qtype-${q.id}`} value="qual" defaultChecked={q.type === 'qual'} onChange={() => updateSurveyDraftQuestionType(q.id, 'qual')} style={{ display: 'none' }} /> 주관식
         </label>
       </div>
     </div>
@@ -162,7 +176,7 @@ function Step2Fields({ editingSurveyId, draftQuestions }) {
             key={editingSurveyId || 'new'}
             defaultValue={vanillaState.draftGoogleFormUrl}
             placeholder="https://forms.gle/... 또는 https://docs.google.com/forms/..."
-            onChange={(e) => window.updateSurveyDraftField('draftGoogleFormUrl', e.target.value)}
+            onChange={(e) => updateSurveyDraftField('draftGoogleFormUrl', e.target.value)}
             style={{ marginTop: '6px' }}
           />
         </label>
@@ -195,14 +209,14 @@ function Step2Fields({ editingSurveyId, draftQuestions }) {
               )}
             </select>
           </label>
-          <button className="secondary compact" style={{ whiteSpace: 'nowrap', flexShrink: '0' }} onClick={() => window.loadSurveyTemplate()}>불러오기</button>
+          <button className="secondary compact" style={{ whiteSpace: 'nowrap', flexShrink: '0' }} onClick={() => loadSurveyTemplate()}>불러오기</button>
         </div>
       )}
 
       <div className="survey-questions-preview" style={{ background: 'var(--surface-soft)', borderRadius: '8px', padding: '16px', border: '1px solid var(--line)', opacity: questionsDisabled ? '0.45' : undefined, pointerEvents: questionsDisabled ? 'none' : undefined }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h4 style={{ margin: '0' }}>설문지 질문 구성 ({draftQuestions.length}문항)</h4>
-          <button className="secondary small compact" onClick={() => window.addSurveyDraftQuestion()}>+ 질문 추가</button>
+          <button className="secondary small compact" onClick={() => addSurveyDraftQuestion()}>+ 질문 추가</button>
         </div>
 
         <div className="draft-questions-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
@@ -213,8 +227,8 @@ function Step2Fields({ editingSurveyId, draftQuestions }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-        <button className="secondary" type="button" onClick={() => window.setSurveyCreatorStep(1)} style={{ width: '120px' }}>➔ 이전 단계</button>
-        <button className="primary" type="button" onClick={() => window.setSurveyCreatorStep(3)} style={{ width: '120px' }}>다음 단계 ➔</button>
+        <button className="secondary" type="button" onClick={() => setSurveyCreatorStep(1)} style={{ width: '120px' }}>➔ 이전 단계</button>
+        <button className="primary" type="button" onClick={() => setSurveyCreatorStep(3)} style={{ width: '120px' }}>다음 단계 ➔</button>
       </div>
     </div>
   );
@@ -259,9 +273,9 @@ function Step3Checklist({ hasTitle, hasSession, hasSource, isValid, activeSessio
       )}
 
       <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-        <button className="secondary" type="button" onClick={() => window.setSurveyCreatorStep(2)} style={{ width: '120px' }}>➔ 이전 단계</button>
-        {editingSurveyId && <button className="ghost" id="cancel-edit-survey" type="button" onClick={() => window.cancelSurveyEdit()}>취소</button>}
-        <button className="primary" id="btn-create-survey-submit" style={{ flex: '1' }} onClick={() => window.submitSurveyDraft()} disabled={!isValid}>
+        <button className="secondary" type="button" onClick={() => setSurveyCreatorStep(2)} style={{ width: '120px' }}>➔ 이전 단계</button>
+        {editingSurveyId && <button className="ghost" id="cancel-edit-survey" type="button" onClick={() => cancelSurveyEdit()}>취소</button>}
+        <button className="primary" id="btn-create-survey-submit" style={{ flex: '1' }} onClick={() => submitSurveyDraft()} disabled={!isValid}>
           {editingSurveyId ? '수정 완료' : '배포 및 QR 생성'}
         </button>
       </div>

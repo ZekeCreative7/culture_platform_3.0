@@ -4,6 +4,7 @@ import { sessionLabel, targetCountForSession } from '../utils.js';
 import { getQrCodeFactory } from '../qrCode.js';
 import { renderSurveyResponsePanel } from '../views/survey.js';
 import { copySurveyLink, toggleSurveyCard, downloadQrCode } from './surveyActions.js';
+import { startEditSurvey } from './surveyDraftActions.js';
 
 function buildSurveyLink(survey) {
   if (survey.googleFormUrl) return survey.googleFormUrl;
@@ -38,7 +39,7 @@ export function SurveyCard({ survey, session }) {
             {sessLabel} · {survey.phase} · 대상 {collapsedTarget || '-'}명 · 응답 {collapsedRows.length}건{survey.googleFormUrl ? ' · 구글 폼' : ''}
           </span>
         </div>
-        <button onClick={() => window.startEditSurvey(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '6px 12px', fontSize: '11.5px', fontWeight: '700', color: 'var(--blue-mid)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: '0' }}>수정</button>
+        <button onClick={() => startEditSurvey(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '6px 12px', fontSize: '11.5px', fontWeight: '700', color: 'var(--blue-mid)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: '0' }}>수정</button>
         <button onClick={() => toggleSurveyCard(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '6px 12px', fontSize: '11.5px', fontWeight: '700', color: 'var(--muted)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: '0' }}>펼치기 ▾</button>
         <button className="ghost compact" onClick={() => window.deleteSurvey(survey.id)} title="배포 종료" style={{ color: '#b45309', borderColor: '#fcd34d', fontWeight: '800', padding: '6px 10px' }}>✕</button>
       </div>
@@ -58,7 +59,7 @@ export function SurveyCard({ survey, session }) {
           </span>
         </div>
         <div style={{ display: 'flex', gap: '6px', flexShrink: '0' }}>
-          <button onClick={() => window.startEditSurvey(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--blue-mid)', cursor: 'pointer' }}>수정</button>
+          <button onClick={() => startEditSurvey(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--blue-mid)', cursor: 'pointer' }}>수정</button>
           <button onClick={() => toggleSurveyCard(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--muted)', cursor: 'pointer' }}>접기 ▴</button>
           <button className="ghost compact" onClick={() => window.deleteSurvey(survey.id)} title="배포 종료" style={{ color: '#b45309', borderColor: '#fcd34d', fontWeight: '800', padding: '6px 10px' }}>✕</button>
         </div>

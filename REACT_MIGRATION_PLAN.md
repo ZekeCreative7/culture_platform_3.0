@@ -324,3 +324,17 @@ Completed:
 Next recommended Survey commit:
 
 - Item 8 of the Step 3 sequence: move upload, reset, delete, recover orphan response actions (`deleteSurvey`, `uploadSurveyResults`, `resetSurveyResponses`, `deleteRecoveredSurveyCard`, `reopenSurveyDistribution`, `scanForOrphanResponses`, `recoverOrphanSurvey`, `recoverAllOrphanSurveys`, `downloadSurveyTemplate`, `saveSurveyAsTemplate`, `deleteSurveyTemplate`) out of `app.js`.
+
+### 2026-07-03 - Step 3, Item 8 Complete
+
+Completed:
+
+- Moved all 11 listed functions plus their private helpers (`orphanGroupKey`, `dedupeKeyForGroup`, `dedupeOrphanGroups`, `buildRecoveredSurveyFromGroup`) into `webapp/src/survey/surveyResponseActions.js`, unchanged.
+- `SurveyCard.jsx` and `ClosedSurveyCard.jsx` now call these as direct imports; each still self-attaches to `window` too since the still-legacy orphan-scan/templates section (`renderSurveyOrphanAndTemplates()`, Step 3 item 9's target) calls several of them via `onclick="..."` strings.
+- Removed now-unused Firestore/state imports from `app.js` (`setSurveyDistributionActiveInFirestore`, `updateSurveyInFirestore`, `deleteSurveyDocFromFirestore`, `normalizeSurveyRecord`, `saveSurveyTemplateToFirestore`, `deleteSurveyTemplateFromFirestore`, `deleteResponseFromFirestore`, `rowMatchesSurvey`, `surveyRows`) — kept `ensureXlsxLoaded`, `parseCSV`, `saveResponsesToFirestore`, `fetchAllResponsesFromFirestore`, `uid`, `sessionLabel`, `notify`, `defaultQuestions` since those are still used by other, unrelated app.js code.
+- This is the last of the 8 action-extraction items — every Survey action with a live React caller now lives in a dedicated `survey/*.js` module instead of `app.js`. What's left in `app.js`'s Survey-adjacent surface is `window.updateResponsesSubscription` (cross-cutting Firestore listener management, out of scope for the Survey action extraction) and the dead `loadDefaultQuestionsToDraft`/`draftSessionType()` pair.
+- Verified: `npm run check`, full `vitest run` (43 tests), `npm run build` all pass. Browser-verified: no console errors on page load; confirmed all 7 non-alert-guarded functions (`deleteSurvey`, `resetSurveyResponses`, `deleteRecoveredSurveyCard`, `reopenSurveyDistribution`, `recoverOrphanSurvey`, `recoverAllOrphanSurveys`, `deleteSurveyTemplate`) run their not-found guard clause without throwing; confirmed `scanForOrphanResponses()` completes its full async try/catch/finally cycle correctly (including its own `console.error` catching a real Firestore permission-denied response in this unauthenticated preview environment — expected, not a regression). Could not verify the full happy path (survey found → mutated → Firestore call) for the card actions live: data injected into localStorage for this got superseded by the live Firestore listener before the DOM re-rendered, a separate environment behavior that showed up today alongside the item-7 dashboard-redirect issue — worth investigating together if the user wants it (not yet spun off as a separate task; flagging here since it recurred).
+
+Next recommended Survey commit:
+
+- Item 9 of the Step 3 sequence: remove `SurveyCreatorBridge.js` and the last of `views/survey.js` from the live route by converting the orphan-scan and templates sections to React, then verify the full live QR, edit, create, delete, upload, and response page paths end-to-end.

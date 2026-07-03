@@ -7,9 +7,8 @@ import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
 import { renderComm, bindComm } from './views/comm.js';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js';
-import { downloadReportWorkbook, downloadReportPdf, ensureXlsxLoaded } from './report/reportExport.js';
+import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js';
 import { initializeAuthGate, syncAuthControls } from './authGate.js';
-import { parseCSV, renderUpload, renderUploadPreview } from './views/upload.js';
 import { exportBackupJson, importBackupJson } from './backup.js';
 import {
   renderReport,
@@ -85,7 +84,7 @@ import {
   subscribeSessionsFromFirestore, subscribeSurveysFromFirestore, subscribeSurveyTemplatesFromFirestore,
   subscribeOrganizationFromFirestore, subscribePulseYearsFromFirestore, subscribePulseCommitmentsFromFirestore,
   subscribeQualSignalsFromFirestore,
-  saveResponsesToFirestore, fetchAllResponsesFromFirestore, loadPulseYears,
+  fetchAllResponsesFromFirestore, loadPulseYears,
   savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore, fetchRecentAuditLogs,
   migrateOrganizationId,
@@ -394,7 +393,6 @@ function renderView() {
   if (state.activeView === "sessions") return renderSessionsShell();
   if (state.activeView === "org") return renderOrg();
   if (state.activeView === "survey") return "";
-  if (state.activeView === "upload") return renderUpload();
   if (state.activeView === "analytics") return renderAnalytics();
   if (state.activeView === "report") return renderReport();
   if (state.activeView === "pulse") return renderPulse({ state, pulseCache });
@@ -591,8 +589,6 @@ function bindCanvasEvents() {
     bindSessions();
   } else if (state.activeView === "org") {
     bindOrg();
-  } else if (state.activeView === "upload") {
-    bindUpload();
   } else if (state.activeView === "pulse") {
     bindPulse({
       state,
@@ -807,75 +803,6 @@ function bindSessions() {
     const dd = document.getElementById("session-more-dropdown");
     if (dd) dd.style.display = "none";
   }, { once: false });
-}
-
-function bindUpload() {
-  const file = document.querySelector("#csv-file");
-  if (!file) return;
-  file.addEventListener("change", async () => {
-    const selected = file.files[0];
-    if (!selected) return;
-    const sessionId = document.querySelector("#upload-session").value;
-    const phase = document.querySelector("#upload-phase").value;
-    const sessionType = (state.sessions || []).find(s => s.id === sessionId)?.type || null;
-    const text = await selected.text();
-    await ensureXlsxLoaded();
-    const { parsed, errors, droppedPii } = parseCSV(text, sessionId, phase, sessionType);
-    const linkedSurvey = (state.surveys || []).find((survey) => survey.sessionId === sessionId && survey.phase === phase);
-    const uploadedAt = new Date().toISOString();
-    state.uploadRows = parsed.map((row) => ({
-      ...row,
-      surveyId: linkedSurvey?.id || row.surveyId || "",
-      distributionId: linkedSurvey?.distribution?.id || null,
-      sourceType: "CSV 업로드",
-      uploadedAt,
-    }));
-    state.uploadErrors = errors;
-    state.uploadFileName = selected.name;
-    state.uploadPiiDropped = droppedPii || [];
-    render();
-  });
-  document.querySelector("#upload-session")?.addEventListener("change", () => {
-    const fileEl = document.querySelector("#csv-file");
-    if (fileEl && fileEl.files && fileEl.files[0]) {
-      fileEl.dispatchEvent(new Event("change"));
-    } else {
-      render();
-    }
-  });
-  document.querySelector("#upload-phase")?.addEventListener("change", () => {
-    const fileEl = document.querySelector("#csv-file");
-    if (fileEl && fileEl.files && fileEl.files[0]) {
-      fileEl.dispatchEvent(new Event("change"));
-    } else {
-      render();
-    }
-  });
-  document.querySelector("#save-upload")?.addEventListener("click", () => {
-    const rowsToSave = [...state.uploadRows];
-    state.responses.push(...rowsToSave);
-    state.uploadRows = [];
-    state.uploadErrors = [];
-    state.uploadPiiDropped = [];
-    state.uploadSuccessMsg = `${rowsToSave.length}행 저장 완료`;
-    // Land the 변화 분석 화면 exactly on the session + 시점 we just uploaded, so freshly added
-    // (e.g. 사전) data is visible immediately instead of defaulting to another phase tab.
-    const first = rowsToSave[0];
-    if (first) {
-      const sess = (state.sessions || []).find((s) => s.id === first.sessionId);
-      if (sess) {
-        state.selectedAnalyticsType = normalizeSessionType(sess.type);
-        state.selectedAnalyticsCohort = String(sess.cohort || "");
-        state.selectedAnalyticsSessionId = first.sessionId;
-      }
-      if (first.phase && PHASES.includes(first.phase)) state.selectedAnalyticsPhase = first.phase;
-    }
-    saveState();
-    state.activeView = "analytics";
-    render();
-    // Save to Firestore in background
-    saveResponsesToFirestore(rowsToSave).catch(e => console.error('Firestore 응답 저장 실패:', e));
-  });
 }
 
 function reportExportPayload() {
@@ -1849,7 +1776,7 @@ window.__vanillaBindCanvas = () => {
 window.__vanillaFullRender = render;
 
 // React 앱이 import할 때 사용하는 bind 함수 exports
-export { bindSessions, bindOrg, bindUpload, bindSessionDrawerControls, bindReportQualSignals };
+export { bindSessions, bindOrg, bindSessionDrawerControls, bindReportQualSignals };
 
 if (!window.__reactMode) {
   if (LOCAL_PREVIEW) {

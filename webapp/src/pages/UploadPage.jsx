@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore.js';
-import { parseCSV } from '../views/upload.js';
+import { parseCSV } from '../upload/csvParser.js';
 import { ensureXlsxLoaded } from '../report/reportExport.js';
 import { saveResponsesToFirestore } from '../state.js';
 import {

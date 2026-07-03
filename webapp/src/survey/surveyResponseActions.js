@@ -15,7 +15,7 @@ import {
   deleteSurveyDocFromFirestore,
 } from '../state.js';
 import { uid, sessionLabel, defaultQuestions } from '../utils.js';
-import { parseCSV } from '../views/upload.js';
+import { parseCSV } from '../upload/csvParser.js';
 import { ensureXlsxLoaded } from '../report/reportExport.js';
 
 export function uploadSurveyResults(surveyId) {

@@ -234,3 +234,17 @@ Completed:
 Next recommended Survey commit:
 
 - Start the Survey React-native slice by extracting legacy Survey actions into `webapp/src/survey/surveyActions.js`, beginning with read-only actions: copy link, card toggle, closed-section toggle, and collapse all.
+
+### 2026-07-03 - Step 3, Item 2 Complete
+
+Completed:
+
+- Created `webapp/src/survey/surveyActions.js` with `copySurveyLink`, `toggleClosedSurveysSection`, `toggleSurveyCard`, `collapseAllSurveys`.
+- Removed the equivalent `window.*` definitions from `app.js`.
+- `SurveyCreatorBridge.js` now imports `surveyActions.js` for its side effect so `views/survey.js`'s existing `onclick="..."` strings keep resolving.
+- `main.jsx`'s `import './app.js'` is untouched; no other screen was touched.
+- Verified: `npm run check`, `vitest run tests/surveyRuntimeWiring.test.js`, `npm run build` all pass. Browser-verified in `?preview=1` mode that all four functions resolve as `window.*` and run without console errors.
+
+Next recommended Survey commit:
+
+- Item 3 of the Step 3 sequence: move QR preview/download action while keeping `getQrCodeFactory()`.

@@ -45,12 +45,11 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).not.toContain("function closeSessionDrawer(");
   });
 
-  it("renders the session list/cards as real React, not a legacy HTML string, while calendar stays legacy", () => {
+  it("renders the session list/cards as real React, not a legacy HTML string (calendar was later converted too, see dedicated test below)", () => {
     const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
     const listSectionSource = readFileSync(new URL("../src/sessions/SessionsListSection.jsx", import.meta.url), "utf8");
     const cardSource = readFileSync(new URL("../src/sessions/SessionCard.jsx", import.meta.url), "utf8");
     const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
-    const bridgeSource = readFileSync(new URL("../src/sessions/SessionsBridge.js", import.meta.url), "utf8");
 
     expect(sessionsSource).not.toContain("export function renderSessions()");
     expect(sessionsSource).not.toContain("export function sessionsByTypeGrouped");
@@ -66,8 +65,6 @@ describe("Sessions runtime wiring", () => {
 
     expect(pageSource).toContain("SessionsListSection");
     expect(pageSource).toContain("mountSessionsShell");
-    expect(pageSource).toContain("mountSessionsCalendar");
-    expect(bridgeSource).toContain("renderCalendar");
   });
 
   it("converts the drawer's outer shell to React while the config panel/schedule editor stay legacy inside it", () => {
@@ -275,5 +272,47 @@ describe("Sessions runtime wiring", () => {
 
     expect(drawerSource).toContain("CrossFunctionalPanel");
     expect(drawerSource).not.toContain("renderCrossFunctionalPanel");
+  });
+
+  it("converts the Sessions calendar view to React, finishing the Sessions screen migration", () => {
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const surveySource = readFileSync(new URL("../src/views/survey.js", import.meta.url), "utf8");
+    const bridgeSource = readFileSync(new URL("../src/sessions/SessionsBridge.js", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
+    const calendarActionsSource = readFileSync(new URL("../src/sessions/sessionCalendarActions.js", import.meta.url), "utf8");
+    const calendarSource = readFileSync(new URL("../src/sessions/SessionsCalendar.jsx", import.meta.url), "utf8");
+
+    // renderCalendar/renderMonthCalendar/renderWeekCalendar/renderDayCalendar
+    // (originally in views/survey.js, a historical naming quirk) and their
+    // bindSessions() nav/view-toggle listeners are all gone now that the
+    // calendar is React.
+    expect(surveySource).not.toContain("export function renderCalendar()");
+    expect(surveySource).not.toContain("export function renderMonthCalendar");
+    expect(surveySource).not.toContain("export function renderWeekCalendar");
+    expect(surveySource).not.toContain("export function renderDayCalendar");
+    expect(appSource).not.toContain('document.querySelector("#cal-prev-btn")');
+    expect(appSource).not.toContain('document.querySelector("#cal-next-btn")');
+    expect(appSource).not.toContain('document.querySelector("#cal-view-month")');
+    expect(appSource).not.toContain('document.querySelector("#cal-view-week")');
+    expect(appSource).not.toContain('document.querySelector("#cal-view-day")');
+    expect(bridgeSource).not.toContain("mountSessionsCalendar");
+    expect(pageSource).not.toContain("mountSessionsCalendar");
+    expect(pageSource).toContain("SessionsCalendar");
+
+    expect(calendarActionsSource).toContain("export function goToPrevMonth");
+    expect(calendarActionsSource).toContain("export function goToNextMonth");
+    expect(calendarActionsSource).toContain("export function setCalendarView");
+
+    expect(calendarSource).toContain("useVanillaStateTick");
+    expect(calendarSource).toContain("openAttendance");
+    // Bug fix found during conversion: the legacy day view read item.time/
+    // item.topic, but the real schedule data model uses item.startTime/
+    // item.content (confirmed against scheduleActions.js/ScheduleEditor.jsx)
+    // — so the day view always showed placeholder text regardless of the
+    // actual schedule content. Fixed to read the real field names.
+    expect(calendarSource).toContain("item.startTime");
+    expect(calendarSource).toContain("item.content");
+    expect(calendarSource).not.toContain("item.time ");
+    expect(calendarSource).not.toContain("item.topic");
   });
 });

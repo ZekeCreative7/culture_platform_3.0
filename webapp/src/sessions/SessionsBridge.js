@@ -1,7 +1,6 @@
 import { subscribe } from '../state.js';
 import { bindSessions, bindSessionDrawerControls } from '../app.js';
 import { renderSessionsShell } from '../views/sessions.js';
-import { renderCalendar } from '../views/survey.js';
 
 function mountLegacyFragment(element, renderFragment, { debounceMs = 150 } = {}) {
   if (!element) return () => {};
@@ -35,8 +34,4 @@ function mountLegacyFragment(element, renderFragment, { debounceMs = 150 } = {})
 
 export function mountSessionsShell(element, options) {
   return mountLegacyFragment(element, renderSessionsShell, options);
-}
-
-export function mountSessionsCalendar(element, options) {
-  return mountLegacyFragment(element, renderCalendar, options);
 }

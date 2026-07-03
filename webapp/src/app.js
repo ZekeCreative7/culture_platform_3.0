@@ -23,10 +23,6 @@ import {
   scopedSessionOptions
 } from './views/report.js';
 import {
-  renderCalendar,
-  renderMonthCalendar,
-  renderWeekCalendar,
-  renderDayCalendar,
   renderSurveyResponsePanel
 } from './views/survey.js';
 import {
@@ -762,37 +758,6 @@ function bindSessions() {
   });
   document.querySelector("#btn-session-calendar")?.addEventListener("click", () => {
     state.activeSessionTab = "calendar";
-    saveState();
-    render();
-  });
-
-  document.querySelector("#cal-prev-btn")?.addEventListener("click", () => {
-    const d = new Date(state.calendarDate);
-    d.setMonth(d.getMonth() - 1);
-    state.calendarDate = d.toISOString().slice(0, 10);
-    saveState();
-    render();
-  });
-  document.querySelector("#cal-next-btn")?.addEventListener("click", () => {
-    const d = new Date(state.calendarDate);
-    d.setMonth(d.getMonth() + 1);
-    state.calendarDate = d.toISOString().slice(0, 10);
-    saveState();
-    render();
-  });
-
-  document.querySelector("#cal-view-month")?.addEventListener("click", () => {
-    state.calendarView = "month";
-    saveState();
-    render();
-  });
-  document.querySelector("#cal-view-week")?.addEventListener("click", () => {
-    state.calendarView = "week";
-    saveState();
-    render();
-  });
-  document.querySelector("#cal-view-day")?.addEventListener("click", () => {
-    state.calendarView = "day";
     saveState();
     render();
   });

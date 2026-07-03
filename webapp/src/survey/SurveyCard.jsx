@@ -5,6 +5,7 @@ import { getQrCodeFactory } from '../qrCode.js';
 import { renderSurveyResponsePanel } from '../views/survey.js';
 import { copySurveyLink, toggleSurveyCard, downloadQrCode } from './surveyActions.js';
 import { startEditSurvey } from './surveyDraftActions.js';
+import { deleteSurvey, downloadSurveyTemplate, saveSurveyAsTemplate, uploadSurveyResults } from './surveyResponseActions.js';
 
 function buildSurveyLink(survey) {
   if (survey.googleFormUrl) return survey.googleFormUrl;
@@ -41,7 +42,7 @@ export function SurveyCard({ survey, session }) {
         </div>
         <button onClick={() => startEditSurvey(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '6px 12px', fontSize: '11.5px', fontWeight: '700', color: 'var(--blue-mid)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: '0' }}>수정</button>
         <button onClick={() => toggleSurveyCard(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '6px 12px', fontSize: '11.5px', fontWeight: '700', color: 'var(--muted)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: '0' }}>펼치기 ▾</button>
-        <button className="ghost compact" onClick={() => window.deleteSurvey(survey.id)} title="배포 종료" style={{ color: '#b45309', borderColor: '#fcd34d', fontWeight: '800', padding: '6px 10px' }}>✕</button>
+        <button className="ghost compact" onClick={() => deleteSurvey(survey.id)} title="배포 종료" style={{ color: '#b45309', borderColor: '#fcd34d', fontWeight: '800', padding: '6px 10px' }}>✕</button>
       </div>
     );
   }
@@ -61,7 +62,7 @@ export function SurveyCard({ survey, session }) {
         <div style={{ display: 'flex', gap: '6px', flexShrink: '0' }}>
           <button onClick={() => startEditSurvey(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--blue-mid)', cursor: 'pointer' }}>수정</button>
           <button onClick={() => toggleSurveyCard(survey.id)} style={{ background: 'none', border: '1.5px solid var(--line-strong)', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', fontWeight: '700', color: 'var(--muted)', cursor: 'pointer' }}>접기 ▴</button>
-          <button className="ghost compact" onClick={() => window.deleteSurvey(survey.id)} title="배포 종료" style={{ color: '#b45309', borderColor: '#fcd34d', fontWeight: '800', padding: '6px 10px' }}>✕</button>
+          <button className="ghost compact" onClick={() => deleteSurvey(survey.id)} title="배포 종료" style={{ color: '#b45309', borderColor: '#fcd34d', fontWeight: '800', padding: '6px 10px' }}>✕</button>
         </div>
       </div>
       <input
@@ -79,16 +80,16 @@ export function SurveyCard({ survey, session }) {
         <a href={surveyLink} target="_blank" rel="noreferrer" className="primary compact" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', fontSize: '11px' }}>설문지 열기</a>
         <button className="ghost compact" onClick={() => copySurveyLink(surveyLink)}>링크 복사</button>
         {!survey.googleFormUrl && (
-          <button className="ghost compact" style={{ fontSize: '11px' }} onClick={() => window.downloadSurveyTemplate(survey.id)}>CSV 템플릿 ↓</button>
+          <button className="ghost compact" style={{ fontSize: '11px' }} onClick={() => downloadSurveyTemplate(survey.id)}>CSV 템플릿 ↓</button>
         )}
         {!survey.googleFormUrl && survey.questions && survey.questions.length > 0 && (
-          <button className="ghost compact" style={{ fontSize: '11px' }} onClick={() => window.saveSurveyAsTemplate(survey.id)}>질문 템플릿으로 저장</button>
+          <button className="ghost compact" style={{ fontSize: '11px' }} onClick={() => saveSurveyAsTemplate(survey.id)}>질문 템플릿으로 저장</button>
         )}
       </div>
       <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
         <div style={{ flex: '1' }}>
           <button
-            onClick={() => window.uploadSurveyResults(survey.id)}
+            onClick={() => uploadSurveyResults(survey.id)}
             style={{ width: '100%', padding: '9px', background: '#eff6ff', border: '1.5px dashed #93c5fd', borderRadius: '8px', color: '#1d4ed8', fontSize: '12px', fontWeight: '700', cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s' }}
             onMouseOver={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
             onMouseOut={(e) => { e.currentTarget.style.background = '#eff6ff'; }}

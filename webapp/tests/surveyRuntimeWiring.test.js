@@ -88,4 +88,29 @@ describe("Survey runtime wiring", () => {
       expect(draftActionsSource).toContain(`export function ${fn}`);
     }
   });
+
+  it("moves upload/reset/delete/recover orphan response actions out of app.js into surveyResponseActions.js", () => {
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const responseActionsSource = readFileSync(new URL("../src/survey/surveyResponseActions.js", import.meta.url), "utf8");
+    const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
+    const closedSurveyCardSource = readFileSync(new URL("../src/survey/ClosedSurveyCard.jsx", import.meta.url), "utf8");
+
+    for (const fn of [
+      "deleteSurvey", "uploadSurveyResults", "resetSurveyResponses", "deleteRecoveredSurveyCard",
+      "reopenSurveyDistribution", "scanForOrphanResponses", "recoverOrphanSurvey", "recoverAllOrphanSurveys",
+      "downloadSurveyTemplate", "saveSurveyAsTemplate", "deleteSurveyTemplate",
+    ]) {
+      expect(appSource).not.toContain(`window.${fn} = function`);
+      expect(
+        responseActionsSource.includes(`export function ${fn}`)
+        || responseActionsSource.includes(`export async function ${fn}`)
+      ).toBe(true);
+    }
+
+    // React cards call these as direct imports now, not window.*
+    expect(surveyCardSource).not.toContain("window.deleteSurvey");
+    expect(surveyCardSource).not.toContain("window.uploadSurveyResults");
+    expect(closedSurveyCardSource).not.toContain("window.reopenSurveyDistribution");
+    expect(closedSurveyCardSource).not.toContain("window.deleteRecoveredSurveyCard");
+  });
 });

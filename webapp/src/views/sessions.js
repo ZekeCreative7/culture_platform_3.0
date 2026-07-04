@@ -194,39 +194,7 @@ export function canCreateDraftSession() {
   return false;
 }
 
-// ── Sessions page shell (page-head + tab header) ──────────────────
-// The session-list card grid itself is now real React
-// (webapp/src/sessions/SessionsListSection.jsx) — this fragment stops
-// at the empty tab-content container so bindSessions() still finds the
-// tab buttons/DB-menu it binds regardless of which tab is active.
-export function renderSessionsShell() {
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">세션 운영</span>
-        <h1>조직문화 세션 스케줄 및 운영 관리</h1>
-      </div>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <div class="session-more-menu" style="position:relative;">
-          <button class="ghost compact" id="btn-session-more" aria-label="더보기" title="DB 관리">⋯</button>
-          <div class="session-more-dropdown" id="session-more-dropdown" style="display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.10); min-width:140px; z-index:200; overflow:hidden;">
-            <button class="session-more-item" id="btn-db-download">DB 다운로드</button>
-            <button class="session-more-item" id="btn-db-upload">DB 전송</button>
-            <div style="border-top:1px solid #e2e8f0; margin:4px 0;"></div>
-            <button class="session-more-item" id="btn-backup-export">JSON 백업 내보내기</button>
-            <button class="session-more-item" id="btn-backup-import">JSON 백업 복원...</button>
-            <input type="file" id="backup-import-file" accept=".json" style="display:none;"  />
-          </div>
-        </div>
-        <button type="button" class="primary" id="btn-open-session-drawer">+ 새 세션</button>
-      </div>
-    </section>
-    <div class="tab-header">
-      <button class="tab-btn ${state.activeSessionTab === 'list' ? 'active' : ''}" id="btn-session-list">목록</button>
-      <button class="tab-btn ${state.activeSessionTab === 'calendar' ? 'active' : ''}" id="btn-session-calendar">일정 캘린더</button>
-    </div>
-  `;
-}
+
 
 // ── Drawer body: config panel (org hierarchy / leader-group / cross-
 // functional builders) ────────────────────────────────────────────

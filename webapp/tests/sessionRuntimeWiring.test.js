@@ -5,6 +5,8 @@ describe("Sessions runtime wiring", () => {
   it("consolidates session list/drawer actions into sessionActions.js instead of app.js or a page-scoped duplicate", () => {
     const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
     const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
+    const cardSource = readFileSync(new URL("../src/sessions/SessionCard.jsx", import.meta.url), "utf8");
+    const drawerSource = readFileSync(new URL("../src/sessions/SessionDrawer.jsx", import.meta.url), "utf8");
     const actionsSource = readFileSync(new URL("../src/sessions/sessionActions.js", import.meta.url), "utf8");
 
     for (const fn of ["toggleSessionTypeGroup", "startEditSession", "deleteSession", "openSessionDrawer", "closeSessionDrawer"]) {
@@ -13,19 +15,17 @@ describe("Sessions runtime wiring", () => {
       expect(actionsSource).toContain(`export function ${fn}`);
     }
 
-    expect(pageSource).toContain("sessionActions.js");
+    // Sessions is fully React now: SessionCard owns startEditSession/deleteSession,
+    // SessionDrawer owns closeSessionDrawer, neither duplicates app.js.
+    expect(cardSource).toContain("sessionActions.js");
+    expect(drawerSource).toContain("sessionActions.js");
   });
 
   it("registers startEditSession/deleteSession/toggleSessionTypeGroup permanently at module load, not scoped to SessionsPage mount/unmount", () => {
-    // Dashboard calls window.startEditSession(sessionId) synchronously and
-    // expects it to already exist (dashboard/dashboardViews.js) — it must not
-    // depend on SessionsPage having (re-)mounted first, and must not be
-    // deleted when SessionsPage unmounts, or Dashboard's session quick-actions
-    // silently stop opening the intended session after the user has visited
-    // Sessions once and navigated away.
+    // Dashboard actions are fully migrated to React and no longer depend on window.* handlers,
+    // but we keep the window registrations in sessionActions.js for legacy/external compatibility.
     const actionsSource = readFileSync(new URL("../src/sessions/sessionActions.js", import.meta.url), "utf8");
     const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
-    const dashboardSource = readFileSync(new URL("../src/dashboard/dashboardViews.js", import.meta.url), "utf8");
 
     expect(actionsSource).toContain("window.startEditSession = startEditSession");
     expect(actionsSource).toContain("window.deleteSession = deleteSession");
@@ -33,16 +33,16 @@ describe("Sessions runtime wiring", () => {
     expect(pageSource).not.toContain("delete window.startEditSession");
     expect(pageSource).not.toContain("delete window.deleteSession");
     expect(pageSource).not.toContain("delete window.toggleSessionTypeGroup");
-    expect(dashboardSource).toContain("window.startEditSession");
   });
 
-  it("keeps bindSessionDrawerControls in app.js calling the consolidated open/close actions", () => {
+  it("retires bindSessionDrawerControls from app.js now that SessionDrawer opens/closes itself in React", () => {
     const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 
-    expect(appSource).toContain("import { openSessionDrawer, closeSessionDrawer, startEditSession } from './sessions/sessionActions.js'");
-    expect(appSource).toContain("function bindSessionDrawerControls");
+    expect(appSource).not.toContain("function bindSessionDrawerControls");
+    expect(appSource).not.toContain("bindSessionDrawerControls()");
     expect(appSource).not.toContain("function openSessionDrawer(");
     expect(appSource).not.toContain("function closeSessionDrawer(");
+    expect(appSource).not.toContain("sessions/sessionActions.js");
   });
 
   it("renders the session list/cards as real React, not a legacy HTML string (calendar was later converted too, see dedicated test below)", () => {
@@ -54,8 +54,8 @@ describe("Sessions runtime wiring", () => {
     expect(sessionsSource).not.toContain("export function renderSessions()");
     expect(sessionsSource).not.toContain("export function sessionsByTypeGrouped");
     expect(sessionsSource).not.toContain("export function sessionCard");
+    expect(sessionsSource).not.toContain("export function renderSessionsShell");
     expect(sessionsSource).toContain("export function getStatus");
-    expect(sessionsSource).toContain("export function renderSessionsShell");
 
     expect(listSectionSource).toContain("SessionCard");
     expect(listSectionSource).toContain("useVanillaStateTick");
@@ -63,8 +63,11 @@ describe("Sessions runtime wiring", () => {
     expect(cardSource).toContain("deleteSession");
     expect(cardSource).toContain("getStatus");
 
+    // The page-head + tab-header shell is now rendered natively by
+    // SessionsPage.jsx itself, not a legacy renderSessionsShell()/bridge mount.
     expect(pageSource).toContain("SessionsListSection");
-    expect(pageSource).toContain("mountSessionsShell");
+    expect(pageSource).toContain('className="page-head"');
+    expect(pageSource).toContain('className="tab-header"');
   });
 
   it("converts the drawer's outer shell to React while the config panel/schedule editor stay legacy inside it", () => {
@@ -87,7 +90,9 @@ describe("Sessions runtime wiring", () => {
 
     expect(sessionsSource).toContain("export function canCreateDraftSession");
 
-    expect(drawerSource).toContain("bindSessions()");
+    // bindSessions() itself is gone now that all 3 config panels and the
+    // survey-prompt card (its last caller) are real React.
+    expect(drawerSource).not.toContain("bindSessions()");
     expect(drawerSource).toContain("defaultValue={vanillaState.draftCohort}");
     expect(drawerSource).not.toContain("value={vanillaState.draftCohort}");
 
@@ -101,7 +106,6 @@ describe("Sessions runtime wiring", () => {
     const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
     const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
     const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
-    const bridgeSource = readFileSync(new URL("../src/sessions/SessionsBridge.js", import.meta.url), "utf8");
     const modalActionsSource = readFileSync(new URL("../src/sessions/sessionModalActions.js", import.meta.url), "utf8");
     const duplicateModalSource = readFileSync(new URL("../src/sessions/DuplicateWarningModal.jsx", import.meta.url), "utf8");
     const attendanceModalSource = readFileSync(new URL("../src/sessions/AttendanceModal.jsx", import.meta.url), "utf8");
@@ -141,7 +145,6 @@ describe("Sessions runtime wiring", () => {
     expect(pageSource).toContain("AttendanceModal");
     expect(pageSource).toContain("DuplicateWarningModal");
     expect(pageSource).not.toContain("mountSessionsOverlays");
-    expect(bridgeSource).not.toContain("mountSessionsOverlays");
   });
 
   it("converts the schedule/round editor to React while leaving the .schedule-row saveState()-free behavior unchanged", () => {
@@ -256,9 +259,11 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).not.toContain('document.querySelector("#cross-random-count")');
     expect(appSource).not.toContain('document.querySelector("#generate-random-cross")');
     expect(appSource).not.toContain('document.querySelectorAll("[data-remove-cross-member]")');
-    // #copy-session-survey-prompt is shared across all 3 panels (survey-prompt
-    // card stays dangerouslySetInnerHTML, deferred) and must still be bound.
-    expect(appSource).toContain('document.querySelector("#copy-session-survey-prompt")');
+    // The survey-prompt card (shared across all 3 panels) is now the real
+    // SessionSurveyPromptCard component, not a dangerouslySetInnerHTML
+    // fragment bound via #copy-session-survey-prompt.
+    expect(appSource).not.toContain('document.querySelector("#copy-session-survey-prompt")');
+    expect(crossPanelSource).toContain("SessionSurveyPromptCard");
 
     expect(crossActionsSource).toContain("export function updateCrossMode");
     expect(crossActionsSource).toContain("export function toggleCrossTeam");
@@ -277,7 +282,6 @@ describe("Sessions runtime wiring", () => {
   it("converts the Sessions calendar view to React, finishing the Sessions screen migration", () => {
     const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
     const surveySource = readFileSync(new URL("../src/views/survey.js", import.meta.url), "utf8");
-    const bridgeSource = readFileSync(new URL("../src/sessions/SessionsBridge.js", import.meta.url), "utf8");
     const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
     const calendarActionsSource = readFileSync(new URL("../src/sessions/sessionCalendarActions.js", import.meta.url), "utf8");
     const calendarSource = readFileSync(new URL("../src/sessions/SessionsCalendar.jsx", import.meta.url), "utf8");
@@ -295,7 +299,6 @@ describe("Sessions runtime wiring", () => {
     expect(appSource).not.toContain('document.querySelector("#cal-view-month")');
     expect(appSource).not.toContain('document.querySelector("#cal-view-week")');
     expect(appSource).not.toContain('document.querySelector("#cal-view-day")');
-    expect(bridgeSource).not.toContain("mountSessionsCalendar");
     expect(pageSource).not.toContain("mountSessionsCalendar");
     expect(pageSource).toContain("SessionsCalendar");
 

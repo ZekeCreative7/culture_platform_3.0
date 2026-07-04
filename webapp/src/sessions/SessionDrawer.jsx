@@ -1,10 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { state as vanillaState } from '../state.js';
 import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
 import { SESSION_TYPES, sessionTypeLabel, normalizeSessionType } from '../utils.js';
 import { ensureDraftOrgSelection } from '../views/org.js';
 import { canCreateDraftSession } from '../views/sessions.js';
-import { bindSessions } from '../app.js';
 import { closeSessionDrawer } from './sessionActions.js';
 import { updateSessionType, updateSessionCohort, updateSessionYear, cancelEditSession, createOrUpdateSession } from './sessionDraftActions.js';
 import { ScheduleEditor } from './ScheduleEditor.jsx';
@@ -18,14 +17,6 @@ export function SessionDrawer() {
   const isDrawerOpen = vanillaState.sessionDrawerOpen || Boolean(vanillaState.editingSessionId);
   const editingSessionId = vanillaState.editingSessionId;
   const draftType = normalizeSessionType(vanillaState.draftType);
-
-  // All 3 config panels (팀빌딩/리더십/협업) and the schedule editor are real
-  // React now. bindSessions() still needs to run after every render for the
-  // survey-prompt card's #copy-session-survey-prompt button, which every
-  // panel renders via dangerouslySetInnerHTML (shared, deferred).
-  useEffect(() => {
-    bindSessions();
-  });
 
   const { divisionList, hqList, teamList } = ensureDraftOrgSelection();
 

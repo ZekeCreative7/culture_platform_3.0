@@ -1,9 +1,5 @@
 import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where } from './firebase.js';
-import { openSessionDrawer, closeSessionDrawer, startEditSession } from './sessions/sessionActions.js';
-import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
-import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
-import { renderComm, bindComm } from './views/comm.js';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js';
 import { bindReportQualSignals } from './report/reportQualSignals.js';
 import { initializeAuthGate, syncAuthControls } from './authGate.js';
@@ -19,15 +15,6 @@ import {
 import {
   renderSurveyResponsePanel
 } from './views/survey.js';
-import {
-  renderAnalytics,
-  renderChart,
-  renderStatsTable
-} from './views/analytics.js';
-import {
-  renderSessionsShell,
-  renderSessionOutcomeIntro
-} from './views/sessions.js';
 import {
   validateAndRepairSelectedOrg,
   childUnits,
@@ -53,12 +40,6 @@ import {
   teamPath,
   orgMemberCandidate,
   teamMemberCandidates,
-  positionRank,
-  renderOrg,
-  renderOrgActionMenu,
-  renderOrgUnitCard,
-  renderMemberCard,
-  renderOrgEditorModal,
   persistOrganization
 } from './views/org.js';
 
@@ -378,37 +359,22 @@ function render() {
     bindLayout();
   }
   bindCanvasEvents();
-  bindSessionDrawerControls();
   syncAuthControls();
   restoreOrgScrollState(orgScrollState);
 }
 
 function renderView() {
-  if (state.activeView === "sessions") return renderSessionsShell();
-  if (state.activeView === "org") return renderOrg();
+  if (state.activeView === "sessions") return "";
+  if (state.activeView === "org") return "";
   if (state.activeView === "survey") return "";
-  if (state.activeView === "analytics") return renderAnalytics();
+  if (state.activeView === "analytics") return "";
   if (state.activeView === "report") return renderReport();
-  if (state.activeView === "pulse") return renderPulse({ state, pulseCache });
-  if (state.activeView === "comm") return renderComm({ state });
-  return renderHomeDashboard({ state, pulseCache, commitmentsCache });
+  if (state.activeView === "pulse") return "";
+  if (state.activeView === "comm") return "";
+  return "";
 }
 
-function bindSessionDrawerControls() {
-  document.querySelectorAll("#topbar-new-session, #btn-open-session-drawer").forEach((button) => {
-    button.onclick = (event) => {
-      event.preventDefault();
-      openSessionDrawer({ switchToSessions: button.id === "topbar-new-session" });
-    };
-  });
 
-  document.querySelectorAll("#close-session-drawer, #session-drawer-overlay").forEach((button) => {
-    button.onclick = (event) => {
-      event.preventDefault();
-      closeSessionDrawer();
-    };
-  });
-}
 
 function auditActionLabel(action) {
   return ({
@@ -579,225 +545,19 @@ function bindLayout() {
 }
 
 function bindCanvasEvents() {
-  if (state.activeView === "sessions") {
-    bindSessions();
-  } else if (state.activeView === "org") {
-    bindOrg();
-  } else if (state.activeView === "pulse") {
-    bindPulse({
-      state,
-      pulseCache,
-      saveState,
-      render,
-      loadPulseYears,
-      loadPulseCommitments,
-      savePulseCommitment: savePulseCommitmentToFirestore,
-      deletePulseCommitment: deletePulseCommitmentFromFirestore,
-      savePulseResult: savePulseResultToFirestore,
-      downloadPulseTemplate
-    });
-  } else if (state.activeView === "dashboard") {
-    bindHomeDashboard({
-      state,
-      saveState,
-      render,
-      pulseCache,
-      commitmentsCache
-    });
-  } else if (state.activeView === "comm") {
-    bindComm({ state, saveState, render });
-  } else if (["analytics", "report"].includes(state.activeView)) {
+  if (["analytics", "report"].includes(state.activeView)) {
     bindReportQualSignals();
   }
 }
 
-function bindOrg() {
-  document.querySelectorAll("[data-org-edit-unit]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      window.renameOrgNode(button.dataset.orgEditUnit);
-    });
-  });
-  document.querySelectorAll("[data-org-edit-member]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      window.renameMember(button.dataset.orgEditMember);
-    });
-  });
-  document.querySelectorAll("[data-org-direct-members]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      window.showDirectMembers(button.dataset.orgDirectMembers);
-    });
-  });
-  document.querySelector("#btn-org-search")?.addEventListener("click", () => {
-    const query = document.querySelector("#org-search-input").value.trim();
-    state.orgSearchQuery = query;
 
-    if (query) {
-      // Find matching member or unit and reveal parents
-      const matchMember = state.orgMembers.find(m => m.name.toLowerCase().includes(query.toLowerCase()));
-      if (matchMember) {
-        const parentUnit = state.orgUnits.find((unit) => unit.id === matchMember.parentId);
-        const path = parentUnit?.level === "team" ? teamPath(matchMember.parentId) : null;
-        if (path) {
-          state.selectedDivision = path.divisionId;
-          state.selectedHq = path.hqId;
-          state.selectedTeam = path.teamId;
-          state.orgDirectUnitId = "";
-        } else if (parentUnit?.level === "hq") {
-          state.selectedHq = parentUnit.id;
-          state.selectedTeam = "";
-          const division = state.orgUnits.find((unit) => unit.id === parentUnit.parentId && unit.level === "division");
-          if (division) state.selectedDivision = division.id;
-          state.orgDirectUnitId = parentUnit.id;
-        } else if (parentUnit?.level === "division") {
-          state.selectedDivision = parentUnit.id;
-          state.selectedHq = "";
-          state.selectedTeam = "";
-          state.orgDirectUnitId = parentUnit.id;
-        }
-      } else {
-        const matchUnit = state.orgUnits.find(u => u.name.toLowerCase().includes(query.toLowerCase()));
-        if (matchUnit) {
-          if (matchUnit.level === "team") {
-            const path = teamPath(matchUnit.id);
-            if (path) {
-              state.selectedDivision = path.divisionId;
-              state.selectedHq = path.hqId;
-              state.selectedTeam = path.teamId;
-            }
-          } else if (matchUnit.level === "hq") {
-            const parent = state.orgUnits.find(u => u.id === matchUnit.parentId);
-            if (parent?.level === "company") {
-              state.selectedDivision = matchUnit.id;
-              state.selectedHq = "";
-            } else {
-              state.selectedHq = matchUnit.id;
-              state.selectedDivision = matchUnit.parentId;
-            }
-          } else if (matchUnit.level === "division") {
-            state.selectedDivision = matchUnit.id;
-          }
-        }
-      }
-    }
-    
-    saveState();
-    render();
-  });
-
-  document.querySelector("#org-search-input")?.addEventListener("keyup", (e) => {
-    if (e.key === "Enter") {
-      document.querySelector("#btn-org-search")?.click();
-    }
-  });
-
-  document.querySelector("#btn-org-search-clear")?.addEventListener("click", () => {
-    state.orgSearchQuery = "";
-    saveState();
-    render();
-  });
-
-  window.onOrgSearchInput = (value) => {
-    state.orgSearchQuery = value.trim();
-    render();
-  };
-
-  window.clearOrgSearch = () => {
-    state.orgSearchQuery = "";
-    render();
-    setTimeout(() => document.querySelector("#org-search-input")?.focus(), 50);
-  };
-
-  window.handleTopbarSearch = (query) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return;
-    // Route to most relevant page based on keyword
-    const orgKeywords = ['팀', '부문', '본부', '구성원', '조직'];
-    const sessionKeywords = ['세션', '기수', '회차'];
-    const surveyKeywords = ['설문', '질문', '문항'];
-    if (orgKeywords.some(k => q.includes(k))) {
-      state.activeView = 'org';
-      state.orgSearchQuery = query.trim();
-    } else if (sessionKeywords.some(k => q.includes(k))) {
-      state.activeView = 'sessions';
-    } else if (surveyKeywords.some(k => q.includes(k))) {
-      state.activeView = 'survey';
-    } else {
-      // Default: search in org
-      state.activeView = 'org';
-      state.orgSearchQuery = query.trim();
-    }
-    render();
-    document.querySelector('#topbar-search')?.blur();
-  };
-
-}
 
 function draftSessionType() {
   const session = (state.sessions || []).find(s => s.id === state.draftSurveySessionId);
   return session?.type || null;
 }
 
-function bindSessions() {
-  document.querySelector("#btn-session-list")?.addEventListener("click", () => {
-    state.activeSessionTab = "list";
-    saveState();
-    render();
-  });
-  document.querySelector("#btn-session-calendar")?.addEventListener("click", () => {
-    state.activeSessionTab = "calendar";
-    saveState();
-    render();
-  });
 
-  // 팀빌딩/리더십's org-select-rows are both real React now (OrgSelectRow.jsx
-  // via sessionOrgActions.js), and 팀빌딩/리더십's own add/remove-leader
-  // actions are real React too (sessionLeaderGroupActions.js). Only 협업
-  // remains legacy-rendered here, and it has no #session-division/#add-team-leader
-  // elements of its own, so none of those listeners are needed anymore.
-  document.querySelector("#copy-session-survey-prompt")?.addEventListener("click", (event) => {
-    const text = document.querySelector("#session-survey-prompt-text")?.value || "";
-    if (!text.trim()) return;
-    navigator.clipboard.writeText(text).then(() => {
-      const original = event.currentTarget.textContent;
-      event.currentTarget.textContent = "복사됨";
-      setTimeout(() => { event.currentTarget.textContent = original; }, 1600);
-    });
-  });
-  document.querySelector("#btn-db-upload")?.addEventListener("click", () => {
-    document.getElementById("session-more-dropdown").style.display = "none";
-    uploadStateToDb();
-  });
-  document.querySelector("#btn-db-download")?.addEventListener("click", () => {
-    document.getElementById("session-more-dropdown").style.display = "none";
-    downloadStateFromDb();
-  });
-  document.querySelector("#btn-backup-export")?.addEventListener("click", () => {
-    document.getElementById("session-more-dropdown").style.display = "none";
-    exportBackupJson().catch(e => alert('내보내기 실패: ' + e.message));
-  });
-  document.querySelector("#btn-backup-import")?.addEventListener("click", () => {
-    document.getElementById("session-more-dropdown").style.display = "none";
-    document.getElementById("backup-import-file")?.click();
-  });
-  document.querySelector("#backup-import-file")?.addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await importBackupJson(file).catch(err => alert('복원 실패: ' + err.message));
-    e.target.value = "";
-  });
-  document.getElementById("btn-session-more")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const dd = document.getElementById("session-more-dropdown");
-    dd.style.display = dd.style.display === "none" ? "block" : "none";
-  });
-  document.addEventListener("click", () => {
-    const dd = document.getElementById("session-more-dropdown");
-    if (dd) dd.style.display = "none";
-  }, { once: false });
-}
 
 window.loadDefaultQuestionsToDraft = function(phase) {
   state.draftSurveyQuestions = defaultQuestions(phase || state.draftSurveyPhase, draftSessionType());
@@ -1543,8 +1303,7 @@ window.__vanillaBindCanvas = () => {
 // Full render — React pages intercept this to trigger syncFromVanilla instead
 window.__vanillaFullRender = render;
 
-// React 앱이 import할 때 사용하는 bind 함수 exports
-export { bindSessions, bindOrg, bindSessionDrawerControls };
+
 
 if (!window.__reactMode) {
   if (LOCAL_PREVIEW) {

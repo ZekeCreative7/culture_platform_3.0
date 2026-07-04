@@ -8,7 +8,6 @@ import {
   crossSourceTeams,
   crossMemberPool,
   selectedCrossMembers,
-  renderSessionSurveyPromptCard,
 } from '../views/sessions.js';
 import {
   updateCrossMode,
@@ -19,6 +18,7 @@ import {
   generateRandomCross,
   removeCrossMember,
 } from './sessionCrossActions.js';
+import { SessionSurveyPromptCard } from './SessionSurveyPromptCard.jsx';
 
 function CrossMemberSelector({ memberPool, selectedMembers }) {
   return (
@@ -160,7 +160,7 @@ export function CrossFunctionalPanel() {
           <SelectedCrossMembers selectedMembers={selectedMembers} />
         </>
       )}
-      <div dangerouslySetInnerHTML={{ __html: renderSessionSurveyPromptCard() }} />
+      <SessionSurveyPromptCard />
     </div>
   );
 }

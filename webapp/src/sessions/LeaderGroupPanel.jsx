@@ -2,7 +2,7 @@ import React from 'react';
 import { state } from '../state.js';
 import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
 import { leaderCandidateForTeam } from '../views/org.js';
-import { renderSessionSurveyPromptCard } from '../views/sessions.js';
+import { SessionSurveyPromptCard } from './SessionSurveyPromptCard.jsx';
 import { OrgSelectRow } from './OrgSelectRow.jsx';
 import { addTeamLeader, removeTeamLeader } from './sessionLeaderGroupActions.js';
 
@@ -46,7 +46,7 @@ export function LeaderGroupPanel({ divisionList, hqList, teamList }) {
       ) : (
         <div className="empty compact">아직 추가된 리더가 없습니다.</div>
       )}
-      <div dangerouslySetInnerHTML={{ __html: renderSessionSurveyPromptCard() }} />
+      <SessionSurveyPromptCard />
     </div>
   );
 }

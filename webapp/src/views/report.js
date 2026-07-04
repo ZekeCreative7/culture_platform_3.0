@@ -538,7 +538,7 @@ export function renderRadarChart(dimScores) {
 }
 
 // ── Slope Chart 렌더러 (사전 vs 사후 대각 변화 분석용) ──────
-function renderSlopeChart(dim, preScore, postScore, preN, postN, deltaColor, deltaText) {
+export function renderSlopeChart(dim, preScore, postScore, preN, postN, deltaColor, deltaText) {
   const mapY = (val) => {
     if (val === null || val === undefined) return 50;
     return 100 - ((val - 1) / 4) * 80 - 10; // 1.0 ~ 5.0을 SVG 세로 높이 % 비율로 변환
@@ -690,6 +690,8 @@ export function renderCompareReport(type, cohort, options = {}) {
   const includeControls = options.includeControls !== false;
   const includeShell = options.includeShell !== false;
   const includeOutcomeIntro = options.includeOutcomeIntro !== false;
+  const includeCompareSummary = options.includeCompareSummary !== false;
+  const includeCompareRanking = options.includeCompareRanking !== false;
   const sessions = sessionsForTypeCohort(type, cohort);
   const types = availableSessionTypes();
   const isAllCohorts = cohort === "all";
@@ -801,7 +803,7 @@ export function renderCompareReport(type, cohort, options = {}) {
 
     ${includeOutcomeIntro ? renderSessionOutcomeIntro(type) : ""}
 
-    <div class="report-summary" style="margin-bottom:28px;">
+    ${includeCompareSummary ? `<div class="report-summary" style="margin-bottom:28px;">
       <div>
         <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">총 세션(팀) 수</span>
         <strong style="font-size:28px; font-weight:800; color:var(--cb-ink);">${sessions.length}개</strong>
@@ -814,8 +816,9 @@ export function renderCompareReport(type, cohort, options = {}) {
         <span style="font-size:12px; color:var(--cb-muted); font-weight:600; display:block; margin-bottom:6px;">${isAllCohorts ? "전체 평균 종합점수" : "기수 평균 종합점수"}</span>
         <strong style="font-size:28px; font-weight:800; color:var(--cb-blue);">${avgOverall}<span style="font-size:14px; color:var(--cb-muted); font-weight:500;"> / 5</span></strong>
       </div>
-    </div>
+    </div>` : ""}
 
+    ${includeCompareRanking ? `
     <section class="report-export-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:12px;">
         <h2>① 종합 점수 및 순위</h2>
@@ -881,6 +884,7 @@ export function renderCompareReport(type, cohort, options = {}) {
         </div>
       `}
     </section>
+    ` : `<div id="react-compare-ranking-placeholder"></div>`}
     ${includeShell ? "</div>" : ""}
   `;
 }
@@ -896,11 +900,134 @@ function getStatusLabel(session) {
   return "진행중";
 }
 
+export function getReportMetadata() {
+  const scope = ensureScopedSelection("report");
+  const type = scope.type;
+  const cohort = scope.cohort;
+  const cohorts = scope.cohorts;
+  const session = scope.session;
+
+  const sessionId = session?.id || "";
+  const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
+  const pre      = stats.find(s => s.phase === '사전')    || null;
+  const mid      = stats.find(s => s.phase === '중간')    || null;
+  const post     = stats.find(s => s.phase === '사후')    || null;
+  const followup = stats.find(s => s.phase === '팔로우업') || null;
+
+  const hasPreData      = pre      && pre.n      >= 1;
+  const hasPostData     = post     && post.n     >= 1;
+  const hasFollowupData = followup && followup.n >= 1;
+  
+  const diagnosis = hasPostData ? post : (mid?.n >= 1 ? mid : (hasPreData ? pre : null));
+  const pulseSessionInsight = session
+    ? buildPulseSessionInsight({
+        session,
+        stats,
+        pulseYears: pulseCache.years,
+        selectedYear: state.pulseYear,
+      })
+    : null;
+  
+  const diagnosisTarget = session ? targetCountForSession(session) : 0;
+  const outcomeStory = session ? buildSessionOutcomeStory({ stats, targetCount: diagnosisTarget }) : null;
+
+  // Comparison report data
+  const sessions = sessionsForTypeCohort(type, cohort);
+  const isAllCohorts = cohort === "all";
+  
+  const sessionScores = sessions.map(s => {
+    const sStats = statsForSession(s.cohort, s.id);
+    const sPre = sStats.find(x => x.phase === '사전') || null;
+    const sMid = sStats.find(x => x.phase === '중간') || null;
+    const sPost = sStats.find(x => x.phase === '사후') || null;
+    const sDiagnosis = (sPost && sPost.n >= 1) ? sPost : ((sMid && sMid.n >= 1) ? sMid : ((sPre && sPre.n >= 1) ? sPre : null));
+    
+    if (!sDiagnosis) {
+      return { session: s, hasData: false, overall: null };
+    }
+    
+    const psych = dimAvg(sDiagnosis, ['q1', 'q2', 'q3']);
+    const silo = dimAvg(sDiagnosis, ['q4', 'q5', 'q6']);
+    const resilience = dimAvg(sDiagnosis, ['q7']);
+    const mood = dimAvg(sDiagnosis, ['q8']);
+
+    const weighted = REPORT_DIMS
+      .map(dim => ({ score: dimAvg(sDiagnosis, dim.qs), weight: dim.qs.length }))
+      .filter(d => d.score !== null);
+    const overall = weighted.length
+      ? weighted.reduce((sum, d) => sum + d.score * d.weight, 0) / weighted.reduce((sum, d) => sum + d.weight, 0)
+      : null;
+
+    const target = targetCountForSession(s);
+    const responseRate = target ? Math.round((sDiagnosis.n / target) * 100) : null;
+
+    return {
+      session: s,
+      hasData: true,
+      phase: sDiagnosis.phase,
+      n: sDiagnosis.n,
+      responseRate,
+      scores: { psych, silo, resilience, mood },
+      overall
+    };
+  });
+  
+  const rankedSessions = sessionScores
+    .filter(s => s.hasData && s.overall !== null)
+    .sort((a, b) => b.overall - a.overall);
+    
+  let currentRank = 1;
+  let prevScore = null;
+  rankedSessions.forEach((s, idx) => {
+    if (prevScore !== null && s.overall < prevScore) {
+      currentRank = idx + 1;
+    }
+    s.rank = currentRank;
+    prevScore = s.overall;
+  });
+  
+  const validOverallScores = rankedSessions.map(s => s.overall).filter(v => v !== null);
+  const avgOverall = validOverallScores.length 
+    ? (validOverallScores.reduce((a, b) => a + b, 0) / validOverallScores.length).toFixed(2) 
+    : '—';
+
+  return {
+    scope,
+    type,
+    cohort,
+    cohorts,
+    session,
+    sessionId,
+    stats,
+    pre,
+    mid,
+    post,
+    followup,
+    hasPreData,
+    hasPostData,
+    hasFollowupData,
+    diagnosis,
+    pulseSessionInsight,
+    outcomeStory,
+    sessions,
+    rankedSessions,
+    avgOverall,
+    isAllCohorts
+  };
+}
+
 // ── Main view: renderReport() with slope chart and overlays ──────
 export function renderReport(options = {}) {
   const includeControls = options.includeControls !== false;
   const includeShell = options.includeShell !== false;
   const includeOutcomeIntro = options.includeOutcomeIntro !== false;
+  const includeExecSummary = options.includeExecSummary !== false;
+  const includeOutcomeStory = options.includeOutcomeStory !== false;
+  const includePulseInsight = options.includePulseInsight !== false;
+  const includeDimensionCards = options.includeDimensionCards !== false;
+  const includeRecommendations = options.includeRecommendations !== false;
+  const includeChangeAnalysis = options.includeChangeAnalysis !== false;
+  const includeQualSignals = options.includeQualSignals !== false;
   const scope = ensureScopedSelection("report");
   const type = scope.type;
   const cohort = scope.cohort;
@@ -908,7 +1035,7 @@ export function renderReport(options = {}) {
   const session = scope.session;
 
   if (state.selectedReportSessionId === "all" && cohort) {
-    return renderCompareReport(type, cohort, { includeControls, includeShell, includeOutcomeIntro });
+    return renderCompareReport(type, cohort, options);
   }
 
   const sessionId = session?.id || "";
@@ -1034,9 +1161,9 @@ export function renderReport(options = {}) {
     ${includeOutcomeIntro ? renderSessionOutcomeIntro(type) : ""}
     
     <!-- 경영진 요약 카드 (Executive Summary Board) -->
-    ${execSummaryHtml}
-    ${session ? renderOutcomeStoryPanel(outcomeStory) : ''}
-    ${pulseSessionInsight ? renderPulseSessionInsightPanel({ session, insight: pulseSessionInsight }) : ''}
+    ${includeExecSummary ? execSummaryHtml : ""}
+    ${includeOutcomeStory && session ? renderOutcomeStoryPanel(outcomeStory) : ''}
+    ${includePulseInsight && pulseSessionInsight ? renderPulseSessionInsightPanel({ session, insight: pulseSessionInsight }) : ''}
 
     ${!cohort ? emptyCard("기수와 세션 유형을 선택하면 분석이 시작됩니다.") : `
 
@@ -1063,7 +1190,7 @@ export function renderReport(options = {}) {
           </div>
         </div>
         <!-- Dimension Score Cards -->
-        <div class="report-dimension-grid">
+        ${includeDimensionCards ? `<div class="report-dimension-grid">
           ${REPORT_DIMS.map(dim => {
             const score = dimAvg(diagnosis, dim.qs);
             const rag = ragInfo(score);
@@ -1106,7 +1233,7 @@ export function renderReport(options = {}) {
               })()}
             </p>
           </div>
-        </div>
+        </div>` : `<div id="react-dimension-cards-placeholder" style="display:contents;"></div>`}
         ${(() => {
           const diagnosisResponses = (state.responses || []).filter(row => row.sessionId === sessionId && row.phase === diagnosisPhase);
           const questions = questionSetForSession(sessionId);
@@ -1118,6 +1245,7 @@ export function renderReport(options = {}) {
     </section>
 
     <!-- ② 세션 운영 제안 -->
+    ${includeRecommendations ? `
     <section class="report-export-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>② 세션 운영 제안</h2>
@@ -1147,8 +1275,10 @@ export function renderReport(options = {}) {
       </div>
       `}
     </section>
+    ` : `<div id="react-recommendations-placeholder"></div>`}
 
     <!-- ③ 변화 분석 (고도화된 Slope Chart 적용 및 N<3 마스킹 CSS 강화) -->
+    ${includeChangeAnalysis ? `
     <section class="report-export-section" style="margin-bottom:28px;">
       <div class="section-title" style="margin-bottom:16px;">
         <h2>③ 변화 분석</h2>
@@ -1218,9 +1348,10 @@ export function renderReport(options = {}) {
       <p style="font-size:11.5px; color:#94a3b8; margin:14px 0 0; line-height:1.6;">N이 3 미만인 데이터는 익명 보장을 위해 마스킹 처리됩니다. 응답은 개인 추적 없이 익명으로 수집되어 사전·사후가 동일인 비교가 아니며, 수치는 통계적 유의성이 아닌 운영 방향 참고 지표입니다.</p>
       `}
     </section>
+    ` : `<div id="react-change-analysis-placeholder"></div>`}
 
     <!-- ④ 현장의 목소리 (정성 신호) -->
-    ${(() => {
+    ${includeQualSignals ? (() => {
       if (!session) return '';
 
       const preSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
@@ -1285,7 +1416,7 @@ export function renderReport(options = {}) {
           </div>
         </section>
       `;
-    })()}
+    })() : `<div id="react-qual-signals-placeholder"></div>`}
     
     `}
     ${includeShell ? "</div>" : ""}

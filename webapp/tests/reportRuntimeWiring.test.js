@@ -29,7 +29,7 @@ describe("Report runtime wiring", () => {
     const reportSource = readFileSync(new URL("../src/views/report.js", import.meta.url), "utf8");
 
     expect(reportSource).toContain("includeControls = options.includeControls !== false");
-    expect(reportSource).toContain("renderCompareReport(type, cohort, { includeControls, includeShell, includeOutcomeIntro })");
+    expect(reportSource).toContain("renderCompareReport(type, cohort, options)");
     expect(reportSource).toContain("${includeControls ? `<section class=\"panel filters-panel\"");
     expect(reportSource).toContain("${includeControls && cohort && session ? `");
   });
@@ -72,6 +72,33 @@ describe("Report runtime wiring", () => {
     expect(appSource).not.toContain("renderQualAnalysisModal");
     expect(appSource).not.toContain("renderQualSignalPanel");
     expect(appSource).not.toContain("qualResponseRows");
-    expect(appSource).toContain("export { bindSessions, bindOrg, bindSessionDrawerControls };");
+  });
+
+  it("wires new native React components for Executive Summary, Outcome Story, Pulse Insight, Compare Summary Cards, Dimension Cards, Recommendations, Change Analysis, Qualitative Signals, and Compare Ranking Table", () => {
+    const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
+    const reportSource = readFileSync(new URL("../src/views/report.js", import.meta.url), "utf8");
+
+    expect(pageSource).toContain("ExecSummaryPanel");
+    expect(pageSource).toContain("OutcomeStoryPanel");
+    expect(pageSource).toContain("PulseSessionInsightPanel");
+    expect(pageSource).toContain("CompareSummaryCards");
+    expect(pageSource).toContain("DimensionScoreCards");
+    expect(pageSource).toContain("ReportRecommendations");
+    expect(pageSource).toContain("ReportChangeAnalysis");
+    expect(pageSource).toContain("ReportQualSignals");
+    expect(pageSource).toContain("CompareRankingTable");
+    expect(pageSource).toContain("getReportMetadata");
+
+    expect(reportSource).toContain("export function getReportMetadata");
+    expect(reportSource).toContain("export function renderSlopeChart");
+    expect(reportSource).toContain("includeExecSummary = options.includeExecSummary !== false");
+    expect(reportSource).toContain("includeOutcomeStory = options.includeOutcomeStory !== false");
+    expect(reportSource).toContain("includePulseInsight = options.includePulseInsight !== false");
+    expect(reportSource).toContain("includeCompareSummary = options.includeCompareSummary !== false");
+    expect(reportSource).toContain("includeDimensionCards = options.includeDimensionCards !== false");
+    expect(reportSource).toContain("includeRecommendations = options.includeRecommendations !== false");
+    expect(reportSource).toContain("includeChangeAnalysis = options.includeChangeAnalysis !== false");
+    expect(reportSource).toContain("includeQualSignals = options.includeQualSignals !== false");
+    expect(reportSource).toContain("includeCompareRanking = options.includeCompareRanking !== false");
   });
 });

@@ -1,0 +1,86 @@
+import React, { useState } from 'react';
+import { useAppStore } from '../store/useAppStore.js';
+import { state as vanillaState } from '../state.js';
+import { buildSessionSurveyQuestionPrompt, pulseContextForSurveyPrompt } from '../survey/surveyPrompt.js';
+import { normalizeSessionType } from '../utils.js';
+import { selectedCrossMembers } from '../views/sessions.js';
+
+export function SessionSurveyPromptCard() {
+  const store = useAppStore();
+  const [copied, setCopied] = useState(false);
+
+  const type = normalizeSessionType(vanillaState.draftType);
+  const base = {
+    type,
+    cohort: vanillaState.draftCohort,
+    year: vanillaState.draftYear,
+    divisionId: vanillaState.draftDivisionId,
+    hqId: vanillaState.draftHqId,
+    teamId: vanillaState.draftTeamId,
+    division: vanillaState.draftDivision,
+    hq: vanillaState.draftHq,
+    team: vanillaState.draftTeam,
+  };
+
+  const getDraftSession = () => {
+    if (type === '팀빌딩') {
+      return { ...base, members: vanillaState.draftMembers || [] };
+    }
+    if (type === '리더십') {
+      return {
+        ...base,
+        participatingTeams: (vanillaState.draftLeaderGroup || []).map((leader) => leader.teamName).join(', '),
+        members: (vanillaState.draftLeaderGroup || []).map((leader) => ({ id: leader.id, name: leader.name })),
+      };
+    }
+    if (type === '협업') {
+      const members = selectedCrossMembers();
+      return {
+        ...base,
+        participatingTeams: [...new Set(members.map((member) => member.teamName))].join(', '),
+        members,
+      };
+    }
+    return base;
+  };
+
+  const draftSession = getDraftSession();
+  const prompt = buildSessionSurveyQuestionPrompt({
+    session: draftSession,
+    pulseYears: store.pulseYears || {},
+    selectedYear: store.pulseYear,
+  });
+  const pulse = pulseContextForSurveyPrompt({
+    session: draftSession,
+    pulseYears: store.pulseYears || {},
+    selectedYear: store.pulseYear,
+  });
+  const pulseText = pulse.status === 'ready'
+    ? `${pulse.year}년 ${pulse.divisionId} 본부 기준 · ${pulse.focusDomain}`
+    : 'Pulse 매핑 없음 · 기본 세션 목적 기준';
+
+  const handleCopy = () => {
+    if (!prompt.trim()) return;
+    navigator.clipboard.writeText(prompt).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    });
+  };
+
+  return (
+    <div className="session-survey-prompt-card">
+      <div className="session-survey-prompt-head">
+        <div>
+          <strong>설문 질문 생성 프롬프트</strong>
+          <span>{pulseText} · 사전/사후/팔로우업 질문을 한 번에 설계합니다.</span>
+        </div>
+        <div className="session-survey-prompt-actions">
+          <button type="button" className="secondary compact" onClick={handleCopy}>
+            {copied ? '복사됨' : '프롬프트 복사'}
+          </button>
+        </div>
+      </div>
+      <textarea className="session-survey-prompt-text" readOnly value={prompt} />
+    </div>
+  );
+}

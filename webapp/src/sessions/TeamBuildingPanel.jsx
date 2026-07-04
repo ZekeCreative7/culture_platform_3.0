@@ -2,7 +2,7 @@ import React from 'react';
 import { state } from '../state.js';
 import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
 import { unitLeaderDetails } from '../views/org.js';
-import { renderSessionSurveyPromptCard } from '../views/sessions.js';
+import { SessionSurveyPromptCard } from './SessionSurveyPromptCard.jsx';
 import { OrgSelectRow } from './OrgSelectRow.jsx';
 
 export function TeamBuildingPanel({ divisionList, hqList, teamList }) {
@@ -20,7 +20,7 @@ export function TeamBuildingPanel({ divisionList, hqList, teamList }) {
         <span>한 팀을 선택하면 팀장과 팀원 데이터를 불러옵니다.</span>
       </div>
       <OrgSelectRow divisionList={divisionList} hqList={hqList} teamList={teamList} />
-      <div dangerouslySetInnerHTML={{ __html: renderSessionSurveyPromptCard() }} />
+      <SessionSurveyPromptCard />
       {state.draftTeamId ? (
         <div className="selected-team-wrap">
           <div className="selected-team-badge" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>

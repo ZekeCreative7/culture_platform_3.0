@@ -13,6 +13,7 @@ import { CommPage } from './pages/CommPage.jsx';
 import { ReportPage } from './pages/ReportPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { PulsePage } from './pages/PulsePage.jsx';
+import { PulseReportPage } from './pages/PulseReportPage.jsx';
 
 const BASE = '/culture_platform_3.0';
 
@@ -62,6 +63,7 @@ function App() {
               <Route path="/survey" element={<SurveyPage />} />
               <Route path="/comm" element={<CommPage />} />
               <Route path="/pulse" element={<PulsePage />} />
+              <Route path="/pulse-report" element={<PulseReportPage />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </AppLayout>

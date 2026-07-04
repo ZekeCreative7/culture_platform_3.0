@@ -1,0 +1,1407 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pulse Survey Page Improvement Plan Visual</title>
+  <style>
+    :root {
+      --ink: #202329;
+      --muted: #667085;
+      --line: #d9dee7;
+      --paper: #ffffff;
+      --soft: #f6f7f9;
+      --mist: #edf4f2;
+      --teal: #0f766e;
+      --green: #2f8f5b;
+      --amber: #b7791f;
+      --coral: #c6533f;
+      --red: #b42318;
+      --violet: #6f5aa7;
+      --charcoal: #30343b;
+      --shadow: 0 18px 46px rgba(32, 35, 41, 0.12);
+      --radius: 8px;
+      --max: 1180px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f2f3f5;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      line-height: 1.5;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255, 255, 255, 0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar-inner {
+      width: min(var(--max), calc(100% - 32px));
+      margin: 0 auto;
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, #0f766e 0%, #2f8f5b 48%, #e0a33a 100%);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+      flex: 0 0 auto;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    .brand span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .nav {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav a {
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 800;
+      color: #3f4652;
+      border: 1px solid transparent;
+      padding: 7px 10px;
+      border-radius: 7px;
+    }
+
+    .nav a:hover {
+      border-color: var(--line);
+      background: var(--soft);
+    }
+
+    .hero {
+      background:
+        linear-gradient(90deg, rgba(15, 118, 110, 0.92), rgba(48, 52, 59, 0.88)),
+        radial-gradient(circle at 80% 20%, rgba(224, 163, 58, 0.42), transparent 32%),
+        #30343b;
+      color: #fff;
+    }
+
+    .hero-inner {
+      width: min(var(--max), calc(100% - 32px));
+      margin: 0 auto;
+      min-height: 520px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.88fr);
+      gap: 38px;
+      align-items: center;
+      padding: 58px 0 44px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #d9f4ec;
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 20px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 99px;
+    }
+
+    h1, h2, h3, p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin: 18px 0 18px;
+      max-width: 880px;
+      font-size: clamp(42px, 6vw, 76px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 710px;
+      color: rgba(255, 255, 255, 0.84);
+      font-size: 18px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 30px;
+    }
+
+    .button {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.36);
+      text-decoration: none;
+      font-weight: 900;
+      font-size: 13px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .button.primary {
+      background: #fff;
+      color: #24312f;
+      border-color: #fff;
+    }
+
+    .hero-panel {
+      background: rgba(255, 255, 255, 0.11);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .signal-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .signal {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    .signal b {
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+      font-size: 20px;
+    }
+
+    .signal strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .signal span {
+      color: rgba(255, 255, 255, 0.76);
+      font-size: 12px;
+    }
+
+    .band {
+      padding: 56px 0;
+    }
+
+    .band.paper {
+      background: var(--paper);
+    }
+
+    .band.soft {
+      background: var(--soft);
+    }
+
+    .wrap {
+      width: min(var(--max), calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: flex-end;
+      margin-bottom: 24px;
+    }
+
+    .section-head h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1.08;
+      letter-spacing: 0;
+      margin-bottom: 8px;
+    }
+
+    .section-head p {
+      color: var(--muted);
+      max-width: 640px;
+      margin-bottom: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 900;
+      background: var(--mist);
+      color: var(--teal);
+      border: 1px solid #cce3dd;
+      white-space: nowrap;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .metric-card {
+      min-height: 160px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: 0 8px 22px rgba(32, 35, 41, 0.06);
+    }
+
+    .metric-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .metric-card strong {
+      display: block;
+      font-size: 36px;
+      line-height: 1;
+      margin-bottom: 12px;
+      color: var(--charcoal);
+    }
+
+    .metric-card p {
+      margin: 0;
+      color: #555d69;
+      font-size: 13px;
+    }
+
+    .big-principle {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .principle-title {
+      min-height: 300px;
+      padding: 28px;
+      border-radius: var(--radius);
+      background: #29312f;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+    }
+
+    .principle-title h2 {
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.02;
+      margin-bottom: 18px;
+      letter-spacing: 0;
+    }
+
+    .principle-title p {
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 17px;
+      margin-bottom: 0;
+    }
+
+    .principle-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .principle-item {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      min-height: 144px;
+    }
+
+    .principle-item b {
+      display: inline-grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: #edf4f2;
+      color: var(--teal);
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .principle-item strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .principle-item p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 0;
+    }
+
+    .review-matrix {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .review-cell {
+      min-height: 138px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--paper);
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .review-cell::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 4px;
+      background: var(--accent, var(--teal));
+    }
+
+    .review-cell span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .review-cell strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .review-cell p {
+      margin: 0;
+      color: #5d6672;
+      font-size: 12px;
+    }
+
+    .objection-board {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    .objection {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      min-height: 142px;
+    }
+
+    .objection b {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: #fff4ed;
+      color: var(--coral);
+      font-size: 18px;
+    }
+
+    .objection strong {
+      display: block;
+      margin-bottom: 7px;
+    }
+
+    .objection p {
+      color: var(--muted);
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .roadmap {
+      display: grid;
+      gap: 14px;
+    }
+
+    .roadmap-step {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr) 210px;
+      gap: 16px;
+      align-items: stretch;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .step-index {
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--step-color, var(--teal));
+      font-weight: 950;
+      text-align: center;
+      min-height: 92px;
+    }
+
+    .step-index span {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .step-index strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1;
+    }
+
+    .step-main {
+      padding: 6px 0;
+    }
+
+    .step-main h3 {
+      margin-bottom: 6px;
+      font-size: 19px;
+    }
+
+    .step-main p {
+      color: var(--muted);
+      margin-bottom: 0;
+      font-size: 14px;
+    }
+
+    .step-output {
+      background: var(--soft);
+      border: 1px dashed #c8ced7;
+      border-radius: 8px;
+      padding: 13px;
+      font-size: 13px;
+      color: #4d5663;
+      display: flex;
+      align-items: center;
+    }
+
+    .flow-wrap {
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .flow {
+      min-width: 920px;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .flow-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      min-height: 168px;
+      position: relative;
+    }
+
+    .flow-card:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      right: -13px;
+      top: 50%;
+      width: 13px;
+      height: 2px;
+      background: #aeb6c2;
+    }
+
+    .flow-card span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: #edf4f2;
+      color: var(--teal);
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .flow-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .flow-card p {
+      color: var(--muted);
+      margin: 0;
+      font-size: 12px;
+    }
+
+    .slice {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .slice-hero {
+      background: #fbfbfc;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      position: sticky;
+      top: 88px;
+    }
+
+    .slice-hero h2 {
+      font-size: 38px;
+      line-height: 1.05;
+      margin-bottom: 14px;
+    }
+
+    .slice-hero p {
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    .slice-status {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .slice-status div {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 92px;
+    }
+
+    .slice-status span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .slice-status strong {
+      display: block;
+      font-size: 15px;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 10px;
+    }
+
+    .check {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .check b {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      background: var(--mist);
+      color: var(--teal);
+      font-size: 13px;
+    }
+
+    .check strong {
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .check p {
+      color: var(--muted);
+      margin-bottom: 0;
+      font-size: 13px;
+    }
+
+    .scope-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    .scope-panel {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--paper);
+      padding: 20px;
+    }
+
+    .scope-panel h3 {
+      font-size: 19px;
+      margin-bottom: 14px;
+    }
+
+    .scope-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .scope-list li {
+      padding: 10px 11px;
+      border-radius: 7px;
+      background: var(--soft);
+      color: #505966;
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .scope-panel.out li {
+      background: #fff4ed;
+      color: #8a3a2c;
+    }
+
+    .footer {
+      padding: 34px 0 44px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .footer .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .file-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 9px 11px;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 850;
+      background: var(--soft);
+    }
+
+    @media (max-width: 980px) {
+      .hero-inner,
+      .big-principle,
+      .slice,
+      .scope-grid,
+      .objection-board {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-inner {
+        min-height: auto;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .review-matrix {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .roadmap-step {
+        grid-template-columns: 82px minmax(0, 1fr);
+      }
+
+      .step-output {
+        grid-column: 1 / -1;
+      }
+
+      .slice-hero {
+        position: static;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .topbar-inner {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 12px 0;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+
+      .summary-grid,
+      .review-matrix,
+      .principle-list,
+      .slice-status {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .roadmap-step {
+        grid-template-columns: 1fr;
+      }
+
+      .step-index {
+        min-height: 74px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .footer .wrap {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <strong>Pulse Survey 개선계획 시각화</strong>
+          <span>10회 독립 검토 반영본 · 2026-07-04</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="페이지 이동">
+        <a href="#summary">핵심</a>
+        <a href="#reviews">10회 검토</a>
+        <a href="#roadmap">우선순위</a>
+        <a href="#slice">첫 개발</a>
+        <a href="#scope">범위</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-inner">
+        <div>
+          <span class="eyebrow">Final Planning View</span>
+          <h1>Pulse는 판정표가 아니라 신뢰 회복 운영도구다</h1>
+          <p>
+            10개 독립 검토의 결론은 하나로 모였습니다. 다음 작업은 거대한 리디자인이 아니라
+            해석 안전장치, 데이터 계약, 권한과 감사, 운영 큐를 먼저 고정하는 Pulse Trust Patch입니다.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#slice">첫 구현 슬라이스 보기</a>
+            <a class="button" href="#roadmap">최종 우선순위 보기</a>
+          </div>
+        </div>
+
+        <aside class="hero-panel" aria-label="핵심 신호">
+          <div class="signal-stack">
+            <div class="signal">
+              <b>1</b>
+              <div>
+                <strong>해석을 더하기 전에 경계를 세운다</strong>
+                <span>점수는 심리 진단이 아니라 경청을 시작할 신호입니다.</span>
+              </div>
+            </div>
+            <div class="signal">
+              <b>2</b>
+              <div>
+                <strong>랭킹보다 지원 우선순위</strong>
+                <span>숫자 순위는 쉽게 평가표처럼 읽히므로 밴드화가 필요합니다.</span>
+              </div>
+            </div>
+            <div class="signal">
+              <b>3</b>
+              <div>
+                <strong>운영자가 10초 안에 다음 행동을 알아야 한다</strong>
+                <span>데이터 상태, 경청 대상, 안전한 질문, 열린 약속을 먼저 보여줍니다.</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="band paper" id="summary">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="badge">한눈에 보는 결론</span>
+            <h2>최종 계획의 방향</h2>
+          </div>
+          <p>
+            기존 계획은 분석 화면을 개선하려 했지만, 10회 검토 뒤에는 더 작은 첫 조각으로 좁혔습니다.
+            핵심은 기능 추가가 아니라 신뢰 가능한 사용 조건을 먼저 만드는 것입니다.
+          </p>
+        </div>
+
+        <div class="summary-grid">
+          <article class="metric-card">
+            <span>Review Rounds</span>
+            <strong>10</strong>
+            <p>조직진단, 문화, 운영, 심리, 방법론, 거버넌스, UX, 레드팀 관점으로 검토했습니다.</p>
+          </article>
+          <article class="metric-card">
+            <span>Final Slice</span>
+            <strong>1</strong>
+            <p>첫 구현은 Pulse Trust Patch 하나로 제한합니다.</p>
+          </article>
+          <article class="metric-card">
+            <span>Priority</span>
+            <strong>0</strong>
+            <p>해석 안전장치와 데이터 사용 제한을 가장 먼저 둡니다.</p>
+          </article>
+          <article class="metric-card">
+            <span>Evidence Cards</span>
+            <strong>2</strong>
+            <p>전사 1개, 조직 1개만 먼저 바꿔 패턴을 검증합니다.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band soft">
+      <div class="wrap">
+        <div class="big-principle">
+          <div class="principle-title">
+            <div>
+              <span class="eyebrow">Product Principle</span>
+              <h2>Pulse is not a verdict engine</h2>
+            </div>
+            <p>
+              Pulse는 조직을 판정하는 엔진이 아니라, 어디서 조심스럽게 듣고 어떤 약속을 닫아야 하는지
+              알려주는 운영 장치입니다.
+            </p>
+          </div>
+
+          <div class="principle-list">
+            <article class="principle-item">
+              <b>01</b>
+              <strong>데이터가 쓸 만한지 확인</strong>
+              <p>N, 응답률, 매핑 신뢰도, 조직개편, 벤치마크 가능 여부를 먼저 봅니다.</p>
+            </article>
+            <article class="principle-item">
+              <b>02</b>
+              <strong>먼저 들을 곳을 정함</strong>
+              <p>낮은 점수 조직을 줄 세우는 대신 지원 필요 구간으로 묶습니다.</p>
+            </article>
+            <article class="principle-item">
+              <b>03</b>
+              <strong>해석을 안전하게 낮춤</strong>
+              <p>심리 상태를 단정하지 않고 관찰 신호, 대안 설명, 확인 질문으로 말합니다.</p>
+            </article>
+            <article class="principle-item">
+              <b>04</b>
+              <strong>경청 대화를 준비</strong>
+              <p>질문, 금지 발언, 민감 주제 전환, 안전한 첫 약속을 준비합니다.</p>
+            </article>
+            <article class="principle-item">
+              <b>05</b>
+              <strong>작은 약속을 기록</strong>
+              <p>누가, 언제, 무엇을, 어떤 증거로 확인할지 약속 원장에 남깁니다.</p>
+            </article>
+            <article class="principle-item">
+              <b>06</b>
+              <strong>다시 확인</strong>
+              <p>세션, 후속 설문, 완료 증거를 연결해 실제 변화 여부를 확인합니다.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band paper" id="reviews">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="badge">10회 독립 검토</span>
+            <h2>관점별로 나온 가장 강한 경고</h2>
+          </div>
+          <p>
+            모든 검토가 같은 말을 하지는 않았지만, 방향은 같았습니다. 더 많은 분석보다 먼저
+            안전한 해석, 권한, 데이터 계약, 운영 리듬을 고정해야 합니다.
+          </p>
+        </div>
+
+        <div class="review-matrix">
+          <article class="review-cell" style="--accent:#0f766e">
+            <span>조직진단</span>
+            <strong>전사 진단과 조직 진단이 섞일 수 있음</strong>
+            <p>선택 조직 화면에서 전사 인사이트가 조직 상태처럼 보이면 잘못된 개입으로 이어집니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#2f8f5b">
+            <span>조직문화</span>
+            <strong>분석 정확도보다 신뢰 경험이 먼저</strong>
+            <p>구성원이 보기에 또 다른 평가 도구처럼 보이면 Pulse의 목적이 깨집니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#b7791f">
+            <span>조직운영</span>
+            <strong>점수가 아니라 약속 부채를 봐야 함</strong>
+            <p>미해결 약속, 담당자, 기한, 막힘, 임원 지원 필요 여부가 운영의 중심입니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#c6533f">
+            <span>조직심리</span>
+            <strong>심리 라벨은 과잉해석</strong>
+            <p>조용한 퇴사, 학습된 무력감, 냉소 같은 표현은 설문 점수만으로 말하기 어렵습니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#6f5aa7">
+            <span>설문방법론</span>
+            <strong>문항 사전과 벤치마크부터 정비</strong>
+            <p>Q 의미, semantic key, 도메인, 벤치마크 결측이 섞이면 정교한 오진이 됩니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#406079">
+            <span>임원보고</span>
+            <strong>요약이 아니라 결정 카드가 필요</strong>
+            <p>임원은 좋은 서사가 아니라 지금 승인하거나 지원해야 할 결정을 봐야 합니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#8a5a2f">
+            <span>HRBP</span>
+            <strong>현장에서 망치지 않는 도구가 먼저</strong>
+            <p>질문, 금지 발언, 민감 주제 전환, 안전한 첫 약속이 실제 경청을 지킵니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#0e7490">
+            <span>제품 UX</span>
+            <strong>사용자 모드가 분리되어야 함</strong>
+            <p>경영진, 운영자, 퍼실리테이터, 데이터 관리자가 한 화면에서 섞이면 길을 잃습니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#b42318">
+            <span>거버넌스</span>
+            <strong>권한과 감사로그가 늦으면 위험</strong>
+            <p>업로드, 매핑, 이상치, 약속, GPT 복사는 누가 무엇을 했는지 기록되어야 합니다.</p>
+          </article>
+          <article class="review-cell" style="--accent:#30343b">
+            <span>레드팀</span>
+            <strong>큰 리디자인은 false precision을 키움</strong>
+            <p>문항 사전과 해석 경계가 불안정한 상태에서 카드와 브리프를 늘리면 더 위험합니다.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band soft">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="badge">초기 계획에 대한 반론</span>
+            <h2>계획을 바꾼 7가지 쟁점</h2>
+          </div>
+          <p>이 쟁점들 때문에 첫 구현 범위를 큰 화면 재구성이 아니라 Pulse Trust Patch로 줄였습니다.</p>
+        </div>
+
+        <div class="objection-board">
+          <article class="objection">
+            <b>1</b>
+            <div>
+              <strong>해석 안전장치가 먼저</strong>
+              <p>진단 문장을 더 잘 쓰기 전에 어떤 표현은 쓰면 안 되는지 정해야 합니다.</p>
+            </div>
+          </article>
+          <article class="objection">
+            <b>2</b>
+            <div>
+              <strong>문항 사전이 선행 조건</strong>
+              <p>Q 번호, 라벨, 의미키, 도메인, 허용 해석이 한 원천으로 묶여야 합니다.</p>
+            </div>
+          </article>
+          <article class="objection">
+            <b>3</b>
+            <div>
+              <strong>거버넌스는 후순위가 아님</strong>
+              <p>집계 데이터라도 조직 낙인과 모자이크 식별 위험이 있습니다.</p>
+            </div>
+          </article>
+          <article class="objection">
+            <b>4</b>
+            <div>
+              <strong>랭킹 명칭만 바꿔도 부족</strong>
+              <p>숫자 순위는 지원 우선순위라고 써도 평가표처럼 소비될 수 있습니다.</p>
+            </div>
+          </article>
+          <article class="objection">
+            <b>5</b>
+            <div>
+              <strong>퍼실리테이션이 더 긴급</strong>
+              <p>가장 위험한 순간은 차트가 아니라 실제 경청 대화입니다.</p>
+            </div>
+          </article>
+          <article class="objection">
+            <b>6</b>
+            <div>
+              <strong>임원 요약은 결정 중심</strong>
+              <p>멋진 스토리보다 어떤 지원과 승인이 필요한지 보여줘야 합니다.</p>
+            </div>
+          </article>
+          <article class="objection">
+            <b>7</b>
+            <div>
+              <strong>미리보기 오류는 제품 신뢰를 깎음</strong>
+              <p>권한 오류가 보이는 상태에서는 계획 검토와 데모 모두 흔들립니다.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band paper" id="roadmap">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="badge">최종 우선순위</span>
+            <h2>큰 리디자인 전에 고정할 순서</h2>
+          </div>
+          <p>각 단계는 다음 단계를 안전하게 만들기 위한 선행 조건입니다. 순서를 바꾸면 분석이 더 그럴듯해질수록 위험도 같이 커집니다.</p>
+        </div>
+
+        <div class="roadmap">
+          <article class="roadmap-step" style="--step-color:#0f766e">
+            <div class="step-index"><div><span>Priority</span><strong>0</strong></div></div>
+            <div class="step-main">
+              <h3>Pulse Safety Rails</h3>
+              <p>심리 라벨 제거, 사용 제한 문구, 관찰 신호와 가능한 해석 분리, 우선순위 밴드화.</p>
+            </div>
+            <div class="step-output">산출물: 안전한 표현 규칙과 지원 우선순위 언어</div>
+          </article>
+
+          <article class="roadmap-step" style="--step-color:#2f8f5b">
+            <div class="step-index"><div><span>Priority</span><strong>1</strong></div></div>
+            <div class="step-main">
+              <h3>Preview And Empty-State Trust</h3>
+              <p>로컬 미리보기 권한 오류 제거, 데이터 출처 표시, 다음 행동 안내.</p>
+            </div>
+            <div class="step-output">산출물: 오류 없는 검토 및 데모 경로</div>
+          </article>
+
+          <article class="roadmap-step" style="--step-color:#b7791f">
+            <div class="step-index"><div><span>Priority</span><strong>2</strong></div></div>
+            <div class="step-main">
+              <h3>Data Contract And Question Dictionary</h3>
+              <p>Q 번호, 라벨, 의미키, 허용 해석, 금지 해석, 도메인 렌즈, 비교 가능성 정리.</p>
+            </div>
+            <div class="step-output">산출물: Pulse 문항 사전과 데이터 계약</div>
+          </article>
+
+          <article class="roadmap-step" style="--step-color:#c6533f">
+            <div class="step-index"><div><span>Priority</span><strong>3</strong></div></div>
+            <div class="step-main">
+              <h3>Governance And Auditability</h3>
+              <p>업로드, 매핑, 이상치, 약속 변경, GPT 복사에 권한과 감사 기록 추가.</p>
+            </div>
+            <div class="step-output">산출물: 누가 무엇을 바꿨는지 남는 운영 레일</div>
+          </article>
+
+          <article class="roadmap-step" style="--step-color:#0e7490">
+            <div class="step-index"><div><span>Priority</span><strong>4</strong></div></div>
+            <div class="step-main">
+              <h3>Operator First Screen</h3>
+              <p>데이터 상태, 이번 주 경청 큐, 안전한 질문, 열린 약속을 10초 안에 보이게 구성.</p>
+            </div>
+            <div class="step-output">산출물: HR 운영자의 첫 화면 작업 큐</div>
+          </article>
+
+          <article class="roadmap-step" style="--step-color:#6f5aa7">
+            <div class="step-index"><div><span>Priority</span><strong>5</strong></div></div>
+            <div class="step-main">
+              <h3>Two Evidence Cards</h3>
+              <p>전사 신호 1개와 조직 신호 1개만 먼저 카드화해 패턴 검증.</p>
+            </div>
+            <div class="step-output">산출물: 관찰, 한계, 대안 설명, 다음 질문이 있는 카드</div>
+          </article>
+
+          <article class="roadmap-step" style="--step-color:#8a5a2f">
+            <div class="step-index"><div><span>Priority</span><strong>6</strong></div></div>
+            <div class="step-main">
+              <h3>Facilitator Brief</h3>
+              <p>질문, 금지 발언, 민감 주제 전환 기준, 안전한 첫 약속 예시 제공.</p>
+            </div>
+            <div class="step-output">산출물: 현장에서 대화를 망치지 않게 하는 브리프</div>
+          </article>
+
+          <article class="roadmap-step" style="--step-color:#30343b">
+            <div class="step-index"><div><span>Priority</span><strong>7</strong></div></div>
+            <div class="step-main">
+              <h3>Commitment Board As Trust Ledger</h3>
+              <p>들은 것, 이해한 것, 약속한 것, 진행, 완료, 재확인을 하나의 원장으로 연결.</p>
+            </div>
+            <div class="step-output">산출물: 약속 부채와 완료 증거가 보이는 보드</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band soft">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="badge">운영 루프</span>
+            <h2>Pulse가 닫아야 할 변화 흐름</h2>
+          </div>
+          <p>화면이 결국 도와야 하는 건 분석 자체가 아니라 경청과 약속이 실제로 닫히는 흐름입니다.</p>
+        </div>
+
+        <div class="flow-wrap">
+          <div class="flow" aria-label="Pulse 운영 흐름">
+            <article class="flow-card">
+              <span>1</span>
+              <strong>데이터 확인</strong>
+              <p>출처, N, 응답률, 매핑, 비교 가능성을 먼저 확인합니다.</p>
+            </article>
+            <article class="flow-card">
+              <span>2</span>
+              <strong>안전한 해석</strong>
+              <p>관찰 신호와 가능한 해석을 분리하고, 결론낼 수 없는 것을 표시합니다.</p>
+            </article>
+            <article class="flow-card">
+              <span>3</span>
+              <strong>경청 우선순위</strong>
+              <p>조직을 줄 세우지 않고 먼저 들을 구간을 정합니다.</p>
+            </article>
+            <article class="flow-card">
+              <span>4</span>
+              <strong>대화 준비</strong>
+              <p>질문, 금지 발언, 민감 주제 전환 기준을 준비합니다.</p>
+            </article>
+            <article class="flow-card">
+              <span>5</span>
+              <strong>작은 약속</strong>
+              <p>지킬 수 있는 약속만 담당, 기한, 증거와 함께 남깁니다.</p>
+            </article>
+            <article class="flow-card">
+              <span>6</span>
+              <strong>재확인</strong>
+              <p>세션, 후속 설문, 완료 증거로 변화 여부를 확인합니다.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band paper" id="slice">
+      <div class="wrap">
+        <div class="slice">
+          <aside class="slice-hero">
+            <span class="badge">첫 구현 슬라이스</span>
+            <h2>Pulse Trust Patch</h2>
+            <p>
+              첫 개발은 작아야 합니다. 이 패치는 Pulse 페이지가 더 화려해지기 전에,
+              신뢰 가능한 데이터와 안전한 해석 위에서 움직이도록 만드는 최소 단위입니다.
+            </p>
+            <div class="slice-status">
+              <div>
+                <span>Build Style</span>
+                <strong>작은 신뢰성 패치</strong>
+              </div>
+              <div>
+                <span>First Screen Goal</span>
+                <strong>10초 안에 다음 행동 파악</strong>
+              </div>
+              <div>
+                <span>Evidence Cards</span>
+                <strong>전사 1개, 조직 1개</strong>
+              </div>
+              <div>
+                <span>Verification</span>
+                <strong>브라우저와 콘솔 확인</strong>
+              </div>
+            </div>
+          </aside>
+
+          <div class="checklist">
+            <article class="check">
+              <b>01</b>
+              <div>
+                <strong>preview와 empty state 오류 제거</strong>
+                <p>`?preview=1#/pulse`에서 Firestore permission 오류가 보이지 않아야 합니다.</p>
+              </div>
+            </article>
+            <article class="check">
+              <b>02</b>
+              <div>
+                <strong>데이터 출처와 사용 제한 배지 추가</strong>
+                <p>live, upload, local preview, no data 상태와 사용 금지 원칙을 명확히 표시합니다.</p>
+              </div>
+            </article>
+            <article class="check">
+              <b>03</b>
+              <div>
+                <strong>랭킹 언어를 지원 우선순위로 교체</strong>
+                <p>리스크 점수 중심의 줄 세우기 대신 경청/확인/모니터링/데이터 재검토 구간으로 묶습니다.</p>
+              </div>
+            </article>
+            <article class="check">
+              <b>04</b>
+              <div>
+                <strong>Pulse 문항 사전 중앙화</strong>
+                <p>Q 라벨, 의미키, 도메인 렌즈, 허용 해석, 금지 해석을 하나의 원천으로 관리합니다.</p>
+              </div>
+            </article>
+            <article class="check">
+              <b>05</b>
+              <div>
+                <strong>전사 인사이트와 조직 인사이트 혼선 차단</strong>
+                <p>조직 상세에서 전사 문구가 선택 조직의 결론처럼 보이지 않게 분리합니다.</p>
+              </div>
+            </article>
+            <article class="check">
+              <b>06</b>
+              <div>
+                <strong>안전한 evidence card 2개 도입</strong>
+                <p>관찰, 가능한 해석, 대안 설명, 알 수 없는 것, 다음 질문을 반드시 포함합니다.</p>
+              </div>
+            </article>
+            <article class="check">
+              <b>07</b>
+              <div>
+                <strong>감사로그 훅 계획 또는 최소 구현</strong>
+                <p>Pulse 업로드와 약속 생성/수정/삭제가 추적될 수 있도록 길을 열어둡니다.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band soft" id="scope">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="badge">범위 결정</span>
+            <h2>이번에 할 것과 미룰 것</h2>
+          </div>
+          <p>범위를 줄이는 이유는 속도가 아니라 신뢰입니다. 기초가 불안정한 상태에서 자동 요약과 새 분석을 늘리면 더 빨리 오해할 수 있습니다.</p>
+        </div>
+
+        <div class="scope-grid">
+          <section class="scope-panel">
+            <h3>이번 개발에 포함</h3>
+            <ul class="scope-list">
+              <li>preview와 no-data 상태 안정화</li>
+              <li>데이터 출처와 사용 제한 표시</li>
+              <li>지원 우선순위 언어와 밴드</li>
+              <li>Pulse 문항 사전 정비</li>
+              <li>전사/조직 인사이트 분리</li>
+              <li>안전한 evidence card 2개</li>
+              <li>Pulse 감사로그 훅 계획</li>
+            </ul>
+          </section>
+
+          <section class="scope-panel out">
+            <h3>이번에는 제외</h3>
+            <ul class="scope-list">
+              <li>전체 5탭 IA 재설계</li>
+              <li>전체 임원 브리프</li>
+              <li>전체 퍼실리테이터 툴킷</li>
+              <li>GPT 프롬프트 기능 확대</li>
+              <li>신뢰구간 시각화</li>
+              <li>모든 문항 evidence card화</li>
+              <li>자동 심리 진단 문장</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <span>Source: PULSE_SURVEY_PAGE_IMPROVEMENT_PLAN.md · Visualized as a planning artifact.</span>
+      <a class="file-link" href="PULSE_SURVEY_PAGE_IMPROVEMENT_PLAN.md">원문 계획 보기</a>
+    </div>
+  </footer>
+</body>
+</html>

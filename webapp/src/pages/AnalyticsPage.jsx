@@ -72,16 +72,11 @@ export function AnalyticsPage() {
   const applyFilter = useCallback(() => {
     if (draftSessionId !== selectedAnalyticsSessionId) {
       setSelectedAnalyticsPhase('');
-      vanillaState.selectedAnalyticsPhase = '';
     }
     const norm = normalizeSessionType(draftType);
     setSelectedAnalyticsType(norm);
     setSelectedAnalyticsCohort(draftCohort);
     setSelectedAnalyticsSessionId(draftSessionId);
-    vanillaState.selectedAnalyticsType = norm;
-    vanillaState.selectedAnalyticsCohort = draftCohort;
-    vanillaState.selectedAnalyticsSessionId = draftSessionId;
-    saveState();
   }, [draftType, draftCohort, draftSessionId, selectedAnalyticsSessionId,
       setSelectedAnalyticsType, setSelectedAnalyticsCohort, setSelectedAnalyticsSessionId, setSelectedAnalyticsPhase]);
 
@@ -116,8 +111,6 @@ export function AnalyticsPage() {
 
   const setPhase = useCallback((phase) => {
     setSelectedAnalyticsPhase(phase);
-    vanillaState.selectedAnalyticsPhase = phase;
-    saveState();
   }, [setSelectedAnalyticsPhase]);
 
   const toggleAnalyticsSection = useCallback((key) => {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, memo } from 'react';
 import { createPortal } from 'react-dom';
+import { useAppStore } from '../store/useAppStore.js';
 import { state as vanillaState, subscribe } from '../state.js';
 import { renderReport, getReportMetadata } from '../views/report.js';
 import { ReportControls } from '../report/ReportControls.jsx';
@@ -16,6 +17,7 @@ import { ReportQualSignals } from '../report/ReportQualSignals.jsx';
 import { CompareRankingTable } from '../report/CompareRankingTable.jsx';
 
 export const ReportPage = memo(function ReportPage() {
+  const store = useAppStore();
   const [reportBodyHtml, setReportBodyHtml] = useState('');
   const [metadata, setMetadata] = useState(null);
   const [dimPlaceholderEl, setDimPlaceholderEl] = useState(null);
@@ -25,7 +27,7 @@ export const ReportPage = memo(function ReportPage() {
   const [compareRankingPlaceholderEl, setCompareRankingPlaceholderEl] = useState(null);
 
   useEffect(() => {
-    vanillaState.activeView = 'report';
+    store.setActiveView('report');
     function refresh() {
       const meta = getReportMetadata();
       setMetadata(meta);

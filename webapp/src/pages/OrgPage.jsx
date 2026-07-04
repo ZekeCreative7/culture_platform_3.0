@@ -22,8 +22,7 @@ export const OrgPage = memo(function OrgPage() {
   const store = useAppStore();
 
   useEffect(() => {
-    vanillaState.activeView = 'org';
-    saveState();
+    store.setActiveView('org');
   }, []);
 
   const [searchQuery, setSearchQuery] = useState(store.orgSearchQuery || '');

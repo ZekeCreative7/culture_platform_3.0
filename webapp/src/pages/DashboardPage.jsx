@@ -36,8 +36,7 @@ export const DashboardPage = memo(function DashboardPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    vanillaState.activeView = 'dashboard';
-    saveState();
+    store.setActiveView('dashboard');
     // Load pulse cache if needed
     if (!pulseCache.loaded || !commitmentsCache.loaded) {
       Promise.all([loadPulseYears(), loadPulseCommitments()]);

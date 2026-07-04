@@ -2,8 +2,8 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore.js';
 import { parseCSV } from '../upload/csvParser.js';
+import { setUploadPiiDropped, saveUploadedResponses } from '../upload/uploadActions.js';
 import { ensureXlsxLoaded } from '../report/reportExport.js';
-import { saveResponsesToFirestore } from '../state.js';
 import {
   PHASES,
   sessionTypeLabel,
@@ -116,8 +116,7 @@ export function UploadPage() {
     setUploadRows(parsed);
     setUploadErrors(errors);
     setUploadFileName(file.name);
-    // store piiDropped in vanilla state directly (no dedicated setter needed for display)
-    import('../state.js').then(m => { m.state.uploadPiiDropped = droppedPii || []; });
+    setUploadPiiDropped(droppedPii);
   }, [selectedSessionId, selectedPhase, sessions, setUploadRows, setUploadErrors, setUploadFileName]);
 
   const handleSessionChange = useCallback((e) => {
@@ -134,39 +133,30 @@ export function UploadPage() {
     }
   }, []);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(() => {
     if (!uploadRows.length || saving) return;
     setSaving(true);
-    try {
-      const { state } = await import('../state.js');
-      const { saveState } = await import('../state.js');
-      const { normalizeSessionType: norm } = await import('../utils.js');
 
-      const rowsToSave = [...uploadRows];
-      state.responses.push(...rowsToSave);
-      setUploadRows([]);
-      setUploadErrors([]);
-      state.uploadPiiDropped = [];
+    const rowsToSave = [...uploadRows];
+    setUploadRows([]);
+    setUploadErrors([]);
 
-      const first = rowsToSave[0];
-      if (first) {
-        const sess = sessions.find(s => s.id === first.sessionId);
-        if (sess) {
-          setSelectedAnalyticsType(norm(sess.type));
-          setSelectedAnalyticsCohort(String(sess.cohort || ''));
-          setSelectedAnalyticsSessionId(first.sessionId);
-        }
-        if (first.phase && PHASES.includes(first.phase)) {
-          setSelectedAnalyticsPhase(first.phase);
-        }
+    const first = rowsToSave[0];
+    if (first) {
+      const sess = sessions.find(s => s.id === first.sessionId);
+      if (sess) {
+        setSelectedAnalyticsType(normalizeSessionType(sess.type));
+        setSelectedAnalyticsCohort(String(sess.cohort || ''));
+        setSelectedAnalyticsSessionId(first.sessionId);
       }
-
-      saveState();
-      saveResponsesToFirestore(rowsToSave).catch(e => console.error('Firestore 응답 저장 실패:', e));
-      navigate('/analytics');
-    } finally {
-      setSaving(false);
+      if (first.phase && PHASES.includes(first.phase)) {
+        setSelectedAnalyticsPhase(first.phase);
+      }
     }
+
+    saveUploadedResponses(rowsToSave);
+    navigate('/analytics');
+    setSaving(false);
   }, [uploadRows, saving, sessions, setUploadRows, setUploadErrors, navigate,
       setSelectedAnalyticsType, setSelectedAnalyticsCohort, setSelectedAnalyticsSessionId, setSelectedAnalyticsPhase]);
 

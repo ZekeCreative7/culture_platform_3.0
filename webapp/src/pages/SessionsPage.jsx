@@ -19,7 +19,7 @@ export const SessionsPage = memo(function SessionsPage() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    vanillaState.activeView = 'sessions';
+    store.setActiveView('sessions');
   }, []);
 
   // Close dropdown on outside click

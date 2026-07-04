@@ -39,8 +39,7 @@ export const PulsePage = memo(function PulsePage() {
   const [isUploadExpanded, setIsUploadExpanded] = useState(store.pulseUploadExpanded || false);
 
   useEffect(() => {
-    vanillaState.activeView = 'pulse';
-    saveState();
+    store.setActiveView('pulse');
     if (!pulseCache.loaded || !commitmentsCache.loaded) {
       Promise.all([loadPulseYears(), loadPulseCommitments()]);
     }

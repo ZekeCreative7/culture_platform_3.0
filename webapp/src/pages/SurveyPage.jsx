@@ -1,5 +1,5 @@
 import React, { useEffect, memo } from 'react';
-import { state as vanillaState } from '../state.js';
+import { useAppStore } from '../store/useAppStore.js';
 import { PageHead } from '../components/layout/index.js';
 import { ActiveSurveysSection } from '../survey/ActiveSurveysSection.jsx';
 import { ClosedSurveysSection } from '../survey/ClosedSurveysSection.jsx';
@@ -8,7 +8,8 @@ import { OrphanScanSection } from '../survey/OrphanScanSection.jsx';
 import { TemplatesSection } from '../survey/TemplatesSection.jsx';
 
 export const SurveyPage = memo(function SurveyPage() {
-  useEffect(() => { vanillaState.activeView = 'survey'; }, []);
+  const store = useAppStore();
+  useEffect(() => { store.setActiveView('survey'); }, []);
 
   return (
     <>

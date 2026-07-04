@@ -22,8 +22,7 @@ export const CommPage = memo(function CommPage() {
   const store = useAppStore();
 
   useEffect(() => {
-    vanillaState.activeView = 'comm';
-    saveState();
+    store.setActiveView('comm');
   }, []);
 
   const drafts = store.commDrafts || [];

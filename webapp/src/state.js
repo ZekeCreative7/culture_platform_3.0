@@ -103,6 +103,7 @@ export const blankState = () => ({
   uploadFileName: "",
   uploadPiiDropped: [],
   uploadSuccessMsg: "",
+  uploadSyncWarning: "",
   orgUnits: [],
   orgMembers: [],
   orgDataVersion: 0,
@@ -261,7 +262,7 @@ function persistState() {
     sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups,
-    commDrafts, commActiveDraftId
+    commDrafts, commActiveDraftId, uploadSyncWarning
   } = state;
   localStorage.setItem(STORE_KEY, JSON.stringify({
     activeView, sessions, draftType, draftSchedule, draftCohort, draftYear,
@@ -275,7 +276,7 @@ function persistState() {
     sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups,
-    commDrafts, commActiveDraftId
+    commDrafts, commActiveDraftId, uploadSyncWarning
   }));
 }
 

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useInitApp } from '../../hooks/useInitApp.js';
+import { clearUploadSyncWarning } from '../../upload/uploadActions.js';
 import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { VanillaCanvas, isVanillaView } from './VanillaCanvas.jsx';
@@ -16,7 +17,7 @@ export function AppLayout({ children }) {
 
   useInitApp(isAuthenticated, orgId);
 
-  const { dbStatus, setOrgSearchQuery, mobileNavOpen, setMobileNavOpen, sidebarCollapsed, setSidebarCollapsed } = useAppStore();
+  const { dbStatus, setOrgSearchQuery, mobileNavOpen, setMobileNavOpen, sidebarCollapsed, setSidebarCollapsed, uploadSyncWarning } = useAppStore();
 
   // 앱 진입 시 mobileNavOpen을 항상 false로 초기화.
   // localStorage에 true가 저장돼 있으면 syncFromVanilla가 backdrop을 활성화해 콘텐츠 클릭을 막음.
@@ -70,6 +71,12 @@ export function AppLayout({ children }) {
           userEmail={user?.email || ''}
           onLogout={logout}
         />
+        {uploadSyncWarning && (
+          <div className="global-sync-warning">
+            <span>{uploadSyncWarning}</span>
+            <button type="button" onClick={clearUploadSyncWarning}>닫기</button>
+          </div>
+        )}
         <div className="canvas">
           {isVanillaView(activeView)
             ? <VanillaCanvas view={activeView} />

@@ -2,11 +2,10 @@ import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnap
 import { openSessionDrawer, closeSessionDrawer, startEditSession } from './sessions/sessionActions.js';
 import { bindPulse, renderPulse } from './pulse/pulseViews.js';
 import { downloadPulseTemplate } from './pulse/pulseTemplate.js';
-import { renderQualAnalysisModal } from './qual/qual-analysis-modal.js';
-import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
 import { renderComm, bindComm } from './views/comm.js';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js';
+import { bindReportQualSignals } from './report/reportQualSignals.js';
 import { initializeAuthGate, syncAuthControls } from './authGate.js';
 import { exportBackupJson, importBackupJson } from './backup.js';
 import {
@@ -23,8 +22,7 @@ import {
 import {
   renderAnalytics,
   renderChart,
-  renderStatsTable,
-  qualResponseRows
+  renderStatsTable
 } from './views/analytics.js';
 import {
   renderSessionsShell,
@@ -66,8 +64,8 @@ import {
 
 import {
   PHASES, QUANT_LABELS, SESSION_TYPES, ROUND_TYPES, SESSION_TYPE_ALIASES, POSITION_OPTIONS, POSITION_ALIASES,
-  UNIT_LABELS, UNIT_LEADER_LABELS, isQualText, todayISO,
-  escapeHtml, normalizeSessionType, sessionTypeLabel, sameSessionType,
+  UNIT_LABELS, UNIT_LEADER_LABELS, todayISO,
+  escapeHtml, normalizeSessionType, sessionTypeLabel,
   normalizePosition, rankOptions, defaultQuestions, sessionStartDate, sessionYear,
   sessionLabel,
   emptyCard
@@ -81,13 +79,13 @@ import {
   subscribeOrganizationFromFirestore, subscribePulseYearsFromFirestore, subscribePulseCommitmentsFromFirestore,
   subscribeQualSignalsFromFirestore,
   fetchAllResponsesFromFirestore, loadPulseYears,
-  savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore, saveQualSignalToFirestore,
+  savePulseResultToFirestore, uploadStateToDb, downloadStateFromDb, saveOrganizationToFirestore,
   loadPulseCommitments, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore, fetchRecentAuditLogs,
   migrateOrganizationId,
   sessionsSortedByStart, phasesForSession, getQuestionsForCohort, sessionsForCohort,
   availableSessionTypes,
   cohortsForType, sessionsForTypeCohort, yearForCohortType,
-  questionSetForSession, phaseHasQuantQuestions, statsForSession, ensureScopedSelection,
+  questionSetForSession, phaseHasQuantQuestions, statsForSession,
   surveyDistributionActive, surveyQuestionsForDistribution
 } from './state.js';
 
@@ -801,29 +799,6 @@ function bindSessions() {
   }, { once: false });
 }
 
-function bindReportQualSignals() {
-  const preContainer = document.getElementById("qual-signal-pre-container");
-  const postContainer = document.getElementById("qual-signal-post-container");
-  if (preContainer || postContainer) {
-    const scope = ensureScopedSelection("report");
-    const session = scope.session;
-    if (session) {
-      if (preContainer) {
-        const preSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
-        if (preSig) {
-          renderQualSignalPanel(preContainer, { qualSignal: preSig });
-        }
-      }
-      if (postContainer) {
-        const postSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
-        if (postSig) {
-          renderQualSignalPanel(postContainer, { qualSignal: postSig });
-        }
-      }
-    }
-  }
-}
-
 window.loadDefaultQuestionsToDraft = function(phase) {
   state.draftSurveyQuestions = defaultQuestions(phase || state.draftSurveyPhase, draftSessionType());
   saveState();
@@ -1414,81 +1389,6 @@ async function initApp({ localPreview = false } = {}) {
   window.updateResponsesSubscription();
 }
 
-function qualQuestionLabel(qid, type, sessionId = "", phase = "") {
-  let survey = sessionId
-    ? (state.surveys || []).find(s => s.sessionId === sessionId && (!phase || s.phase === phase) && (s.questions || []).some(q => q.id === qid))
-    : null;
-  if (!survey) survey = (state.surveys || []).find(s => sameSessionType(s.sessionType, type) && (s.questions || []).some(q => q.id === qid));
-  const text = survey?.questions?.find(q => q.id === qid)?.text;
-  if (text) return text;
-  if (qid === 'q9')  return '세션 참여 전 기대하는 점';
-  if (qid === 'q10') return '세션 중 도움이 된 점';
-  if (qid === 'q11') return '운영진에게 전달하고 싶은 메시지';
-  return qid;
-}
-
-window.openQualAnalysisModal = function(sessionId, phase) {
-  const session = state.sessions.find(s => s.id === sessionId);
-  if (!session) return;
-  const koreanPhase = phase === 'pre' ? '사전' : '사후';
-  const { qualIds, rows } = qualResponseRows(session.cohort, session.type, session.id, koreanPhase);
-  const formattedResponses = [];
-  rows.forEach(row => {
-    // tone_distribution은 답변 문장 수가 아니라 응답자 수 기준이다. 한 사람이 여러 주관식
-    // 문항에 답해도 GPT에는 한 묶음으로 전달해야 analyzed_n과 감성 분포 합계가 일치한다.
-    const answers = qualIds.map(qid => {
-      const ans = row[qid];
-      if (!isQualText(ans)) return '';
-      return `[${qualQuestionLabel(qid, session.type, session.id, koreanPhase)}] ${ans}`;
-    }).filter(Boolean);
-    if (answers.length) {
-      formattedResponses.push({
-        question: `응답자 ${formattedResponses.length + 1}`,
-        answer: answers.join('\n')
-      });
-    }
-  });
-
-  let modalMount = document.getElementById('qual-analysis-modal-container');
-  if (!modalMount) {
-    modalMount = document.createElement('div');
-    modalMount.id = 'qual-analysis-modal-container';
-    document.body.appendChild(modalMount);
-  }
-
-  modalMount.style.position = 'fixed';
-  modalMount.style.top = '0';
-  modalMount.style.left = '0';
-  modalMount.style.right = '0';
-  modalMount.style.bottom = '0';
-  modalMount.style.zIndex = '2000';
-  modalMount.style.display = 'flex';
-  modalMount.style.alignItems = 'center';
-  modalMount.style.justifyContent = 'center';
-  modalMount.style.background = 'rgba(6,15,38,0.45)';
-  modalMount.style.backdropFilter = 'blur(8px)';
-
-  const hasConfig = (state.surveys || []).some(s => s.sessionId === session.id && s.phase === koreanPhase && (s.questions || []).length > 0);
-  const sessionClone = {
-    ...session,
-    analyzed_n: rows.length,
-    team_id: session.type === '팀빌딩' ? (session.team || session.teamId) : (session.team || `${session.cohort}기 ${session.type}`),
-    session_type: session.type === '팀빌딩' ? 'teambuilding' : session.type === '리더십' ? 'leadership' : 'collaboration',
-    phase: phase,
-    instrument_version: hasConfig ? 'current' : 'legacy'
-  };
-
-  renderQualAnalysisModal(modalMount, {
-    session: sessionClone,
-    responses: formattedResponses,
-    onConfirm: async (qualSignal) => {
-      await saveQualSignalToFirestore(qualSignal);
-      render();
-    }
-  });
-};
-
-
 window.applyAnalyticsFilter = function() {
   const typeVal = document.querySelector("#analytics-type-select")?.value || "";
   const cohort = document.querySelector("#analytics-cohort-select")?.value || "";
@@ -1644,7 +1544,7 @@ window.__vanillaBindCanvas = () => {
 window.__vanillaFullRender = render;
 
 // React 앱이 import할 때 사용하는 bind 함수 exports
-export { bindSessions, bindOrg, bindSessionDrawerControls, bindReportQualSignals };
+export { bindSessions, bindOrg, bindSessionDrawerControls };
 
 if (!window.__reactMode) {
   if (LOCAL_PREVIEW) {

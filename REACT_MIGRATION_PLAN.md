@@ -571,3 +571,26 @@ Verified:
 Next recommended commit:
 
 - Continue Report by converting the remaining report body/header sections incrementally, or split `bindReportQualSignals` out of `app.js` so Report no longer imports any binder from the full legacy app.
+
+### 2026-07-04 - Step 5, Item 4 Complete (Report qualitative signal wiring extracted)
+
+Completed:
+
+- Added `webapp/src/report/reportQualSignals.js` for Report-owned qualitative signal binding and `openQualAnalysisModal()`.
+- `ReportPage.jsx` now imports `bindReportQualSignals()` from the Report module instead of `app.js`.
+- `app.js` still imports `bindReportQualSignals()` for the remaining legacy-safe render path, but no longer owns the qualitative signal binder, modal opener, or local `qualQuestionLabel()` copy.
+- Removed the old `renderQualAnalysisModal`/`renderQualSignalPanel`/`qualResponseRows` qualitative-analysis block from `app.js`, plus the now-dead imports (`isQualText`, `sameSessionType`, `saveQualSignalToFirestore`, `ensureScopedSelection`) that only supported that block.
+- Extended `webapp/tests/reportRuntimeWiring.test.js` to lock the ownership boundary: Report imports the new module, `app.js` no longer exports or defines the old qualitative signal functions.
+- Added `webapp/tests/reportQualSignals.test.js` to verify the extracted behavior directly: confirmed signal panels bind into Report containers, `openQualAnalysisModal()` groups answers per respondent, mounts the modal, passes the correct session metadata, and wires `saveQualSignalToFirestore` as the confirm callback.
+
+Verified:
+
+- Focused Report tests pass: `reportRuntimeWiring.test.js` + `reportQualSignals.test.js` (5 tests).
+- `npm run check` passes.
+- Full `vitest run` passes: 62 tests.
+- `npm run build` passes. Existing Vite dynamic/static import chunk warnings remain.
+- Browser-verified live at `?preview=1#/report`: Report page loads, filters apply across all available team/leadership sessions, no error overlay appears, and console has no errors. The current preview data has no qualitative response rows for the available Report sessions, so the live AI-analysis button does not naturally render in this dataset; the new module test covers that modal-opening behavior with seeded qualitative responses.
+
+Next recommended commit:
+
+- Continue Report by converting the rendered Report body/header sections incrementally, starting with a low-risk static shell section (`report-hero`/outcome intro) before touching the data-heavy chart and PDF/export-sensitive content.

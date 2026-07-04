@@ -33,4 +33,27 @@ describe("Report runtime wiring", () => {
     expect(reportSource).toContain("${includeControls ? `<section class=\"panel filters-panel\"");
     expect(reportSource).toContain("${includeControls && cohort && session ? `");
   });
+
+  it("moves Report qualitative signal wiring to a Report-owned module", () => {
+    const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
+    const qualSignalsSource = readFileSync(new URL("../src/report/reportQualSignals.js", import.meta.url), "utf8");
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+
+    expect(pageSource).toContain("from '../report/reportQualSignals.js'");
+    expect(pageSource).not.toContain("from '../app.js'");
+    expect(qualSignalsSource).toContain("export function bindReportQualSignals");
+    expect(qualSignalsSource).toContain("export function openQualAnalysisModal");
+    expect(qualSignalsSource).toContain("renderQualSignalPanel");
+    expect(qualSignalsSource).toContain("renderQualAnalysisModal");
+    expect(qualSignalsSource).toContain("qualResponseRows");
+    expect(qualSignalsSource).toContain("window.openQualAnalysisModal = openQualAnalysisModal");
+
+    expect(appSource).not.toContain("function bindReportQualSignals()");
+    expect(appSource).not.toContain("window.openQualAnalysisModal = function");
+    expect(appSource).not.toContain("function qualQuestionLabel");
+    expect(appSource).not.toContain("renderQualAnalysisModal");
+    expect(appSource).not.toContain("renderQualSignalPanel");
+    expect(appSource).not.toContain("qualResponseRows");
+    expect(appSource).toContain("export { bindSessions, bindOrg, bindSessionDrawerControls };");
+  });
 });

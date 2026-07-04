@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { state as vanillaState, subscribe } from '../state.js';
 import { renderReport } from '../views/report.js';
-import { bindReportQualSignals } from '../app.js';
 import { ReportControls } from '../report/ReportControls.jsx';
+import { bindReportQualSignals } from '../report/reportQualSignals.js';
 
 export const ReportPage = memo(function ReportPage() {
   const divRef = useRef(null);

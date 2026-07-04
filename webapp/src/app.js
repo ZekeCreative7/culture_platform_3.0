@@ -7,17 +7,13 @@ import { renderQualSignalPanel } from './qual/qual-signal-panel.js';
 import { renderHomeDashboard, bindHomeDashboard } from './dashboard/dashboardViews.js';
 import { renderComm, bindComm } from './views/comm.js';
 import { dashboardActionQueue } from './dashboard/dashboardEngine.js';
-import { downloadReportWorkbook, downloadReportPdf } from './report/reportExport.js';
 import { initializeAuthGate, syncAuthControls } from './authGate.js';
 import { exportBackupJson, importBackupJson } from './backup.js';
 import {
   renderReport,
   renderCompareReport,
-  REPORT_DIMS,
-  dimAvg,
   dimSpread,
   ragInfo,
-  dimRecommendation,
   cohortOptionsHtml,
   scopedSessionOptions
 } from './views/report.js';
@@ -805,65 +801,6 @@ function bindSessions() {
   }, { once: false });
 }
 
-function reportExportPayload() {
-  const scope = ensureScopedSelection("report");
-  const session = scope.session;
-  if (!session) throw new Error("내보낼 세션을 선택해 주세요.");
-
-  const sessionResponses = (state.responses || []).filter((row) => row.sessionId === session.id);
-  const sessionSurveys = (state.surveys || []).filter((survey) => survey.sessionId === session.id);
-  const phases = [...new Set([
-    ...PHASES,
-    ...sessionSurveys.map((survey) => survey.phase),
-    ...sessionResponses.map((response) => response.phase),
-  ].filter(Boolean))];
-  const questions = phases.flatMap((phase) => {
-    const survey = sessionSurveys.find((item) => item.phase === phase);
-    const phaseQuestions = survey?.questions?.length ? survey.questions : defaultQuestions(phase);
-    return phaseQuestions.map((question) => ({
-      phase,
-      id: question.id,
-      type: question.type || (isQualText(question.text) ? "qual" : "quant"),
-      text: question.text || question.label || question.id,
-    }));
-  }).filter((question, index, list) => list.findIndex((item) => item.phase === question.phase && item.id === question.id) === index);
-
-  const stats = statsForSession(scope.cohort, session.id);
-  const pre      = stats.find((item) => item.phase === "사전")    || null;
-  const mid      = stats.find((item) => item.phase === "중간")    || null;
-  const post     = stats.find((item) => item.phase === "사후")    || null;
-  const followup = stats.find((item) => item.phase === "팔로우업") || null;
-  const current  = post?.n ? post : (mid?.n ? mid : pre);
-  const analysis = REPORT_DIMS.map((dimension) => {
-    const currentScore  = current  ? dimAvg(current,  dimension.qs) : null;
-    const preScore      = pre?.n      >= 3 ? dimAvg(pre,      dimension.qs) : null;
-    const postScore     = post?.n     >= 3 ? dimAvg(post,     dimension.qs) : null;
-    const followupScore = followup?.n >= 3 ? dimAvg(followup, dimension.qs) : null;
-    return {
-      label: dimension.label,
-      current:  currentScore  === null ? "-"    : Number(currentScore.toFixed(2)),
-      pre:      preScore      === null ? "N<3"  : Number(preScore.toFixed(2)),
-      post:     postScore     === null ? "N<3"  : Number(postScore.toFixed(2)),
-      delta:    preScore      === null || postScore     === null ? "-" : Number((postScore     - preScore).toFixed(2)),
-      followup: followupScore === null ? (followup ? "N<3" : "-") : Number(followupScore.toFixed(2)),
-      fuDelta:  postScore     === null || followupScore === null ? "-" : Number((followupScore - postScore).toFixed(2)),
-      recommendation: dimRecommendation(dimension.key, currentScore),
-    };
-  });
-
-  return {
-    meta: {
-      typeLabel: sessionTypeLabel(session.type),
-      sessionLabel: sessionLabel(session),
-      cohort: session.cohort || scope.cohort,
-      year: sessionYear(session),
-    },
-    questions,
-    responses: sessionResponses,
-    analysis,
-  };
-}
-
 function bindReportQualSignals() {
   const preContainer = document.getElementById("qual-signal-pre-container");
   const postContainer = document.getElementById("qual-signal-post-container");
@@ -1552,64 +1489,6 @@ window.openQualAnalysisModal = function(sessionId, phase) {
 };
 
 
-window.downloadReportXlsx = async function(event) {
-  const button = event.currentTarget || document.querySelector("#download-report-xlsx");
-  if (!button) return;
-  if (state.selectedReportSessionId === "all") {
-    window.alert("전체 비교 분석의 엑셀 다운로드는 지원하지 않습니다. 개별 팀 결과를 선택해 주세요.");
-    return;
-  }
-  const original = button.innerHTML;
-  button.disabled = true;
-  button.classList.add("is-loading");
-  button.innerHTML = '<span><b>엑셀 생성 중</b><small>잠시만 기다려 주세요</small></span>';
-  try {
-    await downloadReportWorkbook(reportExportPayload());
-  } catch (error) {
-    console.error("엑셀 리포트 생성 실패:", error);
-    window.alert(error.message || "엑셀 파일을 만들지 못했습니다.");
-  } finally {
-    button.disabled = false;
-    button.classList.remove("is-loading");
-    button.innerHTML = original;
-  }
-};
-
-window.downloadReportPdf = async function(event) {
-  const button = event.currentTarget || document.querySelector("#download-report-pdf");
-  if (!button) return;
-  const original = button.innerHTML;
-  button.disabled = true;
-  button.classList.add("is-loading");
-  button.innerHTML = '<span><b>PDF 생성 중</b><small>분석 화면을 정리하고 있어요</small></span>';
-  try {
-    const scope = ensureScopedSelection("report");
-    let meta;
-    if (state.selectedReportSessionId === "all") {
-      meta = {
-        typeLabel: sessionTypeLabel(scope.type),
-        sessionLabel: "전체 비교 분석",
-        cohort: scope.cohort === "all" ? "전체 기수" : `${scope.cohort}기`,
-        year: scope.cohort === "all" ? "전체" : (yearForCohortType(scope.cohort, scope.type) || new Date().getFullYear()),
-      };
-    } else {
-      const payload = reportExportPayload();
-      meta = payload.meta;
-    }
-    await downloadReportPdf({
-      element: document.querySelector("#report-export-content"),
-      meta: meta,
-    });
-  } catch (error) {
-    console.error("PDF 리포트 생성 실패:", error);
-    window.alert(error.message || "PDF 파일을 만들지 못했습니다.");
-  } finally {
-    button.disabled = false;
-    button.classList.remove("is-loading");
-    button.innerHTML = original;
-  }
-};
-
 window.applyAnalyticsFilter = function() {
   const typeVal = document.querySelector("#analytics-type-select")?.value || "";
   const cohort = document.querySelector("#analytics-cohort-select")?.value || "";
@@ -1618,17 +1497,6 @@ window.applyAnalyticsFilter = function() {
   if (typeVal) state.selectedAnalyticsType = normalizeSessionType(typeVal);
   state.selectedAnalyticsCohort = cohort;
   state.selectedAnalyticsSessionId = sessionId;
-  saveState();
-  render();
-};
-
-window.applyReportFilter = function() {
-  const typeVal = document.querySelector("#report-type-select")?.value || "";
-  const cohort = document.querySelector("#report-cohort-select")?.value || "";
-  const sessionId = document.querySelector("#report-session-select")?.value || "";
-  if (typeVal) state.selectedReportType = normalizeSessionType(typeVal);
-  state.selectedReportCohort = cohort;
-  state.selectedReportSessionId = sessionId;
   saveState();
   render();
 };

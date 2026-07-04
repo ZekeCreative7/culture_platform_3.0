@@ -548,3 +548,26 @@ Verified:
 Next recommended commit:
 
 - Continue Step 5 with Report. Start small by moving report filter/apply state and export button actions out of `app.js`/`renderReport()` into explicit React-owned modules while keeping `reportExport.js` unchanged until the rendered report output is verified.
+
+### 2026-07-04 - Step 5, Item 3 Complete (Report controls/actions moved to React)
+
+Completed:
+
+- Added `webapp/src/report/ReportControls.jsx` for Report's staged filter controls and export buttons.
+- Added `webapp/src/report/reportActions.js` for `applyReportFilter`, `downloadReportXlsx`, `downloadReportPdf`, and the report export payload builder. `reportExport.js` itself is unchanged.
+- `ReportPage.jsx` now renders `<ReportControls />` and calls `renderReport({ includeControls: false })`, so the live React route no longer uses the legacy Report filter/export HTML controls.
+- `views/report.js` now accepts `includeControls: false` for both single-session and compare-report rendering, while preserving the old default for any still-legacy caller.
+- Removed the old Report export/apply implementations from `app.js`; the compatibility `window.downloadReportXlsx`, `window.downloadReportPdf`, and `window.applyReportFilter` names are attached from `reportActions.js` instead.
+- Added `webapp/tests/reportRuntimeWiring.test.js` to lock the Report ownership boundary.
+
+Verified:
+
+- `npm run check` passes.
+- Full `vitest run` passes: 59 tests.
+- `npm run build` passes. Existing Vite dynamic/static import chunk warnings remain.
+- Browser-verified live at `?preview=1#/report`: the page loads with one React filter set and one React export button set; no legacy inline Report handlers remain in the DOM; single-session Report shows Excel + PDF; all-team compare Report shows PDF only; applying filters rerenders the correct report body; no console errors or error overlay.
+- Smoke-clicked the Excel export button: the button entered and exited its loading path with no console errors or alert. The in-app browser did not expose a download event for this run, so the next deeper export verification should use the actual downloaded file or a lower-level export test.
+
+Next recommended commit:
+
+- Continue Report by converting the remaining report body/header sections incrementally, or split `bindReportQualSignals` out of `app.js` so Report no longer imports any binder from the full legacy app.

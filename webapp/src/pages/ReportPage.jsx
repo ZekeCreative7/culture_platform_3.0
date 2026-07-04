@@ -2,6 +2,7 @@ import React, { useEffect, useRef, memo } from 'react';
 import { state as vanillaState, subscribe } from '../state.js';
 import { renderReport } from '../views/report.js';
 import { bindReportQualSignals } from '../app.js';
+import { ReportControls } from '../report/ReportControls.jsx';
 
 export const ReportPage = memo(function ReportPage() {
   const divRef = useRef(null);
@@ -9,7 +10,7 @@ export const ReportPage = memo(function ReportPage() {
     vanillaState.activeView = 'report';
     function refresh() {
       if (divRef.current) {
-        divRef.current.innerHTML = renderReport();
+        divRef.current.innerHTML = renderReport({ includeControls: false });
         bindReportQualSignals();
       }
     }
@@ -21,5 +22,10 @@ export const ReportPage = memo(function ReportPage() {
     });
     return () => { clearTimeout(timer); unsub(); };
   }, []);
-  return <div ref={divRef} />;
+  return (
+    <>
+      <ReportControls />
+      <div ref={divRef} />
+    </>
+  );
 }, () => true);

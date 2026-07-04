@@ -686,7 +686,8 @@ function qualResponseRows(cohort, type, sessionId, phase) {
 }
 
 // ── Compare & Details views definitions ───────────────────────────
-export function renderCompareReport(type, cohort) {
+export function renderCompareReport(type, cohort, options = {}) {
+  const includeControls = options.includeControls !== false;
   const sessions = sessionsForTypeCohort(type, cohort);
   const types = availableSessionTypes();
   const isAllCohorts = cohort === "all";
@@ -765,15 +766,15 @@ export function renderCompareReport(type, cohort) {
         <h1>전체 팀별 결과 비교 분석</h1>
         <p>${subtitle}</p>
       </div>
-      <div class="report-export-actions" data-html2canvas-ignore="true">
+      ${includeControls ? `<div class="report-export-actions" data-html2canvas-ignore="true">
         <button class="report-export-button pdf" id="download-report-pdf" type="button" onclick="window.downloadReportPdf(event)">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 11h6M7 14h4"/></svg>
           <span><b>PDF 리포트</b><small>전체 비교 화면 디자인</small></span>
         </button>
-      </div>
+      </div>` : ""}
     </section>
 
-    <section class="panel filters-panel" data-html2canvas-ignore="true">
+    ${includeControls ? `<section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
         <label>세션 유형
           <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
@@ -793,7 +794,7 @@ export function renderCompareReport(type, cohort) {
         <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
       </div>
       <div class="filter-current">${currentFilterLabel}</div>
-    </section>
+    </section>` : ""}
 
     ${renderSessionOutcomeIntro(type)}
 
@@ -893,7 +894,8 @@ function getStatusLabel(session) {
 }
 
 // ── Main view: renderReport() with slope chart and overlays ──────
-export function renderReport() {
+export function renderReport(options = {}) {
+  const includeControls = options.includeControls !== false;
   const scope = ensureScopedSelection("report");
   const type = scope.type;
   const cohort = scope.cohort;
@@ -901,7 +903,7 @@ export function renderReport() {
   const session = scope.session;
 
   if (state.selectedReportSessionId === "all" && cohort) {
-    return renderCompareReport(type, cohort);
+    return renderCompareReport(type, cohort, { includeControls });
   }
 
   const sessionId = session?.id || "";
@@ -988,7 +990,7 @@ export function renderReport() {
         <h1>변화 분석 리포트</h1>
         <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
       </div>
-      ${cohort && session ? `
+      ${includeControls && cohort && session ? `
         <div class="report-export-actions" data-html2canvas-ignore="true">
           <button class="report-export-button excel" id="download-report-xlsx" type="button" onclick="window.downloadReportXlsx(event)">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 10l2 3m0-3-2 3m4-3h2v3h-2"/></svg>
@@ -1001,7 +1003,7 @@ export function renderReport() {
         </div>` : ""}
     </section>
 
-    <section class="panel filters-panel" data-html2canvas-ignore="true">
+    ${includeControls ? `<section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
         <label>세션 유형
           <select id="report-type-select" onchange="refreshScopedTypeSelect('report')">
@@ -1021,7 +1023,7 @@ export function renderReport() {
         <button class="primary" id="apply-report-filter" type="button" onclick="window.applyReportFilter()">적용</button>
       </div>
       <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
-    </section>
+    </section>` : ""}
 
     ${renderSessionOutcomeIntro(type)}
     

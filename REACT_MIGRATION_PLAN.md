@@ -877,3 +877,22 @@ Verified: `npm run check`, full `vitest run` (64 tests), `npm run build` all pas
 Next recommended commit:
 
 - Continue Step 7 with Pulse (~9-12 sites, needs a new `pulse/pulseActions.js` from scratch — no existing precedent file in that domain, unlike Dashboard) before Comm or Organization.
+
+### 2026-07-04 - Step 7, Slice 3 Complete (Pulse) — found and fixed 2 live crash bugs along the way
+
+Completed:
+
+- New `webapp/src/pulse/pulseActions.js`: `setPulseLayer`, `setPulseView`, `setPulseYear`, `selectPulseDivision`, `setPulseUploadExpanded`, `clearPulseAutoOpenCommitmentForm`, `savePulseUpload`, `reloadPulseData` — the first action module for this domain. `savePulseUpload`/`reloadPulseData` also wrap their Firestore/cache-invalidation calls (matching the established precedent of async action functions elsewhere, e.g. `surveyResponseActions.js`).
+- `PulsePage.jsx`'s handlers are now thin wrappers; DOM-scroll side effects (`document.querySelector('main')?.scrollTo(...)`) stayed in the component, matching the UI-layer-effects-stay-local convention used elsewhere.
+- `pulse/PulseCommitmentsBoard.jsx`'s one mutation (`pulseAutoOpenCommitmentForm` one-shot-flag reset) now calls `clearPulseAutoOpenCommitmentForm()`.
+
+Found two live, pre-existing crash bugs while extracting (both unrelated to state-ownership, discovered because reaching the affected code paths required actually exercising them in the browser rather than just reading source):
+
+- **`handleToggleUploadExpand` referenced an undefined `isExpanded`** instead of the actual state variable `isUploadExpanded` — this was a guaranteed `ReferenceError` crash the instant a user clicked the Pulse Overview tab's "데이터 업로드 및 템플릿 관리" toggle. Fixed by using the correct variable (`const next = !isUploadExpanded`); the extraction naturally absorbed this since the new `setPulseUploadExpanded(next)` call needed the right value anyway.
+- **`QUESTIONS` and `companyFav` were used but never imported** in `PulsePage.jsx` (`QUESTIONS` from `config/questions.js`, `companyFav` from `pulse/pulseEngine.js`) — both are real, existing exports. `QUESTIONS[qNo]` is referenced unconditionally inside the `questionTrends`/`divisionTrends` `useMemo`s that compute the moment any real Pulse data exists, meaning **the entire Overview and Expert tabs were crashing for any org with real Pulse data loaded** — this was a serious, currently-live production bug, not a hypothetical. `companyFav` is used in `listeningDiffs`, crashing the Listening tab once a division is selected. Same bug class as the earlier `TrustFunnelSection`/`WeeklyCalendarSection` missing-import crash in Dashboard — Rollup's import-resolution check doesn't catch a bare undefined identifier the way it catches a missing named import, so `npm run build` was silent about both. Added both imports.
+
+Verified: `npm run check`, full `vitest run` (64 tests), `npm run build` all pass. Browser-verified live: seeded fake `pulseCache` data (this unauthenticated preview environment has no real Pulse data) to reach all 3 tabs — Overview no longer crashes and the upload-panel toggle now correctly expands/collapses (confirmed the `isExpanded` fix directly, previously an instant crash); Listening tab renders and division selection triggers `listeningDiffs` with no error (confirmed the `companyFav` fix); Expert tab renders with no error (confirmed the `QUESTIONS` fix in `divisionTrends`). No console errors beyond expected unauthenticated-preview Firestore permission messages.
+
+Next recommended commit:
+
+- Continue Step 7 with Comm (~10-17 sites, deepest nesting — `target.rounds[i].feedback[key] = val`, no existing action file) before attempting Organization (~52-62 sites, largest and riskiest — grill scope separately given its size, per the original audit's own recommendation).

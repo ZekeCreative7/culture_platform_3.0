@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore.js';
 import { uid } from '../utils.js';
-import { savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore, state as vanillaState, saveState } from '../state.js';
+import { savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore } from '../state.js';
+import { clearPulseAutoOpenCommitmentForm } from './pulseActions.js';
 
 const PII_PATTERN = /(이름|성명|사번|이메일|email|전화|phone|휴대폰|주민|주소)/i;
 
@@ -48,8 +49,7 @@ export function PulseCommitmentsBoard({ year, scopeId }) {
   useEffect(() => {
     if (store.pulseAutoOpenCommitmentForm) {
       setDraft(createPulseCommitmentDraft(year, scopeId));
-      vanillaState.pulseAutoOpenCommitmentForm = false;
-      saveState();
+      clearPulseAutoOpenCommitmentForm();
       setTimeout(() => {
         document.getElementById("pulse-commitment-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);

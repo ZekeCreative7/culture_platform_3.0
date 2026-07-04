@@ -1,16 +1,23 @@
 import React, { useEffect, useMemo, useState, memo } from 'react';
 import { useAppStore } from '../store/useAppStore.js';
 import {
-  state as vanillaState,
   pulseCache,
   commitmentsCache,
-  saveState,
   loadPulseYears,
-  loadPulseCommitments,
-  savePulseResultToFirestore
+  loadPulseCommitments
 } from '../state.js';
 import { todayISO } from '../utils.js';
+import { QUESTIONS } from '../config/questions.js';
 import { downloadPulseTemplate } from '../pulse/pulseTemplate.js';
+import {
+  setPulseLayer,
+  setPulseView,
+  setPulseYear,
+  selectPulseDivision,
+  setPulseUploadExpanded,
+  savePulseUpload,
+  reloadPulseData
+} from '../pulse/pulseActions.js';
 import {
   comparisonPair,
   pulseDiagnostics,
@@ -23,7 +30,8 @@ import {
   favFromItem,
   unfavFromItem,
   careBelongingProfile,
-  supportSummary
+  supportSummary,
+  companyFav
 } from '../pulse/pulseEngine.js';
 import {
   PulseNoData,
@@ -220,51 +228,36 @@ export const PulsePage = memo(function PulsePage() {
 
   // ── Callbacks ─────────────────────────────────────────────────────
   const handleToggleLayer = (l) => {
-    vanillaState.pulseLayer = l;
-    saveState();
+    setPulseLayer(l);
   };
 
   const handleToggleView = (v) => {
-    vanillaState.pulseView = v;
-    saveState();
+    setPulseView(v);
     document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSelectYear = (e) => {
-    const val = Number(e.target.value);
-    vanillaState.pulseYear = val;
-    saveState();
+    setPulseYear(Number(e.target.value));
   };
 
   const handleSelectDivision = (divId) => {
-    vanillaState.pulseScopeId = divId || 'company';
-    vanillaState.pulseView = 'listening';
-    saveState();
+    selectPulseDivision(divId);
     document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleToggleUploadExpand = () => {
-    setIsUploadExpanded(!isExpanded);
-    vanillaState.pulseUploadExpanded = !isExpanded;
-    saveState();
+    const next = !isUploadExpanded;
+    setIsUploadExpanded(next);
+    setPulseUploadExpanded(next);
   };
 
   const handleSaveUpload = async (payload) => {
-    await savePulseResultToFirestore(payload);
-    vanillaState.pulseYear = payload.year;
-    vanillaState.pulseView = 'overview';
-    vanillaState.pulseUploadExpanded = false;
+    await savePulseUpload(payload);
     setIsUploadExpanded(false);
-    pulseCache.loaded = false;
-    saveState();
-    await loadPulseYears();
   };
 
   const handleReload = async () => {
-    pulseCache.loaded = false;
-    commitmentsCache.loaded = false;
-    saveState();
-    await Promise.all([loadPulseYears(), loadPulseCommitments()]);
+    await reloadPulseData();
   };
 
   return (

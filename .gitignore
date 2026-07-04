@@ -5,6 +5,8 @@ __pycache__/
 .claude/
 .gemini/
 browser-data-backup-*.json
+culture-platform-org-backup-*.json
+backups/
 node_portable/
 webapp/node_modules/
 webapp/dist/

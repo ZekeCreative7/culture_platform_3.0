@@ -527,3 +527,24 @@ Completed:
 Next recommended commit:
 
 - Continue Step 5: Analytics ("replace `renderQuantSection`/`renderQualSection` HTML blocks with React components, remove inline section toggles") or Report ("move report filter controls and export buttons to React, keep PDF/XLSX export modules stable"). Should grill scope first — need to check whether AnalyticsPage.jsx/ReportPage.jsx are already React shells (like UploadPage.jsx turned out to be) or still full legacy bridges, before picking the next slice.
+
+### 2026-07-04 - Step 5, Item 2 Complete (Analytics response sections converted)
+
+Completed:
+
+- Added `webapp/src/analytics/AnalyticsSections.jsx` with React-owned `AnalyticsSectionShell`, `QuantSection`, and `QualSection`.
+- `AnalyticsPage.jsx` no longer imports `renderQuantSection()`/`renderQualSection()` from `views/analytics.js`, no longer injects those sections with `dangerouslySetInnerHTML`, and no longer temporarily overrides `window.setQualAnswersGroupBy`/`window.toggleAnalyticsSection`.
+- Preserved the existing `.analytics-split`, `.quant-*`, `.qual-*`, `.section-title-toggle`, and `.pulse-segmented` class names so the visual layout and responsive two-column behavior stay aligned with the previous UI.
+- `QualSection` still reuses the existing `qualResponseRows()` and `qualQuestionLabel()` helpers, keeping the response scoping and custom survey-question lookup stable while moving the rendered controls to React.
+- Added `webapp/tests/analyticsRuntimeWiring.test.js` to lock the ownership change and render a seeded non-empty quant/qual data scenario (`4.50` average, total qualitative answer count, and answer text).
+
+Verified:
+
+- `npm run check` passes.
+- Full `vitest run` passes: 57 tests.
+- `npm run build` passes. Vite still prints the pre-existing dynamic/static import chunk warnings for `utils.js` and `state.js`; no new build failure.
+- Browser-verified live at `?preview=1#/analytics`: page loads with no console errors; quant collapse hides the quant body and expands it again; qualitative "사람으로 보기" and "질문으로 보기" segmented controls switch active state both ways with no error overlay.
+
+Next recommended commit:
+
+- Continue Step 5 with Report. Start small by moving report filter/apply state and export button actions out of `app.js`/`renderReport()` into explicit React-owned modules while keeping `reportExport.js` unchanged until the rendered report output is verified.

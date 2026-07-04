@@ -4,26 +4,19 @@ import {
   state as vanillaState,
   saveState,
   availableSessionTypes,
-  cohortsForType,
   sessionsForTypeCohort,
-  yearForCohortType,
   ensureScopedSelection,
   isAnalyticsSectionCollapsed,
-  collapsibleSectionHeader,
 } from '../state.js';
 import {
   PHASES,
   sessionTypeLabel,
   sessionLabel,
-  emptyCard,
   sameSessionType,
   normalizeSessionType,
 } from '../utils.js';
-import {
-  renderQuantSection,
-  renderQualSection,
-} from '../views/analytics.js';
 import { PageHead } from '../components/layout/index.js';
+import { AnalyticsSectionShell, QuantSection, QualSection } from '../analytics/AnalyticsSections.jsx';
 
 // ── Helpers ──────────────────────────────────────────────────────
 function cohortOptions(type, selectedCohort) {
@@ -40,9 +33,8 @@ function sessionOptions(type, cohort, selectedId) {
   return sessions.map(s => ({ value: s.id, label: sessionLabel(s), selected: s.id === selectedId }));
 }
 
-// ── Content rendered from vanilla functions ───────────────────────
-function HtmlBlock({ html }) {
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+function EmptyCard({ children }) {
+  return <div className="empty">{children}</div>;
 }
 
 export function AnalyticsPage() {
@@ -104,30 +96,6 @@ export function AnalyticsPage() {
     setDraftSessionId(selectedAnalyticsSessionId || '');
   }, [selectedAnalyticsType, selectedAnalyticsCohort, selectedAnalyticsSessionId]);
 
-  // Override vanilla globals so inline onclick handlers trigger React re-render
-  useEffect(() => {
-    const prev = {
-      setQualAnswersGroupBy: window.setQualAnswersGroupBy,
-      toggleAnalyticsSection: window.toggleAnalyticsSection,
-    };
-    window.setQualAnswersGroupBy = (groupBy) => {
-      vanillaState.qualAnswersGroupBy = groupBy;
-      store.syncFromVanilla();
-    };
-    window.toggleAnalyticsSection = (key) => {
-      vanillaState.collapsedAnalyticsSections = vanillaState.collapsedAnalyticsSections || [];
-      const idx = vanillaState.collapsedAnalyticsSections.indexOf(key);
-      if (idx >= 0) vanillaState.collapsedAnalyticsSections.splice(idx, 1);
-      else vanillaState.collapsedAnalyticsSections.push(key);
-      saveState();
-      store.syncFromVanilla();
-    };
-    return () => {
-      window.setQualAnswersGroupBy = prev.setQualAnswersGroupBy;
-      window.toggleAnalyticsSection = prev.toggleAnalyticsSection;
-    };
-  }, [store]);
-
   // Computed content
   const scope = useMemo(() => ensureScopedSelection('analytics'), [
     selectedAnalyticsType, selectedAnalyticsCohort, selectedAnalyticsSessionId, store.sessions, store.responses
@@ -146,21 +114,24 @@ export function AnalyticsPage() {
     return phasesWithData[0] || PHASES[0];
   }, [selectedAnalyticsPhase, phasesWithData]);
 
-  const quantHtml = useMemo(() => {
-    if (!cohort) return '';
-    return renderQuantSection(sessionId, session, activePhase);
-  }, [sessionId, session, activePhase, store.responses, store.surveys]);
-
-  const qualHtml = useMemo(() => {
-    if (!cohort) return '';
-    return renderQualSection(cohort, type, sessionId, activePhase);
-  }, [cohort, type, sessionId, activePhase, store.responses, store.surveys, store.qualAnswersGroupBy]);
-
   const setPhase = useCallback((phase) => {
     setSelectedAnalyticsPhase(phase);
     vanillaState.selectedAnalyticsPhase = phase;
     saveState();
   }, [setSelectedAnalyticsPhase]);
+
+  const toggleAnalyticsSection = useCallback((key) => {
+    vanillaState.collapsedAnalyticsSections = vanillaState.collapsedAnalyticsSections || [];
+    const idx = vanillaState.collapsedAnalyticsSections.indexOf(key);
+    if (idx >= 0) vanillaState.collapsedAnalyticsSections.splice(idx, 1);
+    else vanillaState.collapsedAnalyticsSections.push(key);
+    saveState();
+  }, []);
+
+  const setQualAnswersGroupBy = useCallback((groupBy) => {
+    vanillaState.qualAnswersGroupBy = groupBy;
+    saveState();
+  }, []);
 
   const successMsg = vanillaState.uploadSuccessMsg || '';
   if (successMsg) vanillaState.uploadSuccessMsg = '';
@@ -221,18 +192,33 @@ export function AnalyticsPage() {
           </div>
 
           <section className="analytics-split">
-            <div>
-              <HtmlBlock html={collapsibleSectionHeader('정량 응답', `${sessionTypeLabel(type)} · ${activePhase}`, 'quant')} />
-              {!isAnalyticsSectionCollapsed('quant') && <HtmlBlock html={quantHtml} />}
-            </div>
-            <div>
-              <HtmlBlock html={collapsibleSectionHeader('정성 응답', `${sessionTypeLabel(type)} · ${activePhase}`, 'qual')} />
-              {!isAnalyticsSectionCollapsed('qual') && <HtmlBlock html={qualHtml} />}
-            </div>
+            <AnalyticsSectionShell
+              title="정량 응답"
+              meta={`${sessionTypeLabel(type)} · ${activePhase}`}
+              collapsed={isAnalyticsSectionCollapsed('quant')}
+              onToggle={() => toggleAnalyticsSection('quant')}
+            >
+              <QuantSection sessionId={sessionId} session={session} activePhase={activePhase} />
+            </AnalyticsSectionShell>
+            <AnalyticsSectionShell
+              title="정성 응답"
+              meta={`${sessionTypeLabel(type)} · ${activePhase}`}
+              collapsed={isAnalyticsSectionCollapsed('qual')}
+              onToggle={() => toggleAnalyticsSection('qual')}
+            >
+              <QualSection
+                cohort={cohort}
+                type={type}
+                sessionId={sessionId}
+                activePhase={activePhase}
+                groupBy={store.qualAnswersGroupBy}
+                onGroupByChange={setQualAnswersGroupBy}
+              />
+            </AnalyticsSectionShell>
           </section>
         </>
       ) : (
-        <HtmlBlock html={emptyCard('선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.')} />
+        <EmptyCard>선택한 기수 및 세션 유형에 해당하는 응답 데이터가 없습니다.</EmptyCard>
       )}
     </>
   );

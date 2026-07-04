@@ -6,7 +6,6 @@ describe("Report runtime wiring", () => {
     const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
     const controlsSource = readFileSync(new URL("../src/report/ReportControls.jsx", import.meta.url), "utf8");
     const actionsSource = readFileSync(new URL("../src/report/reportActions.js", import.meta.url), "utf8");
-    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("ReportControls");
     expect(pageSource).toContain("includeControls: false");
@@ -18,11 +17,6 @@ describe("Report runtime wiring", () => {
     expect(actionsSource).toContain("export async function downloadReportXlsx");
     expect(actionsSource).toContain("downloadReportWorkbook");
     expect(actionsSource).toContain("exportReportPdf");
-
-    expect(appSource).not.toContain("window.downloadReportXlsx = async function");
-    expect(appSource).not.toContain("window.downloadReportPdf = async function");
-    expect(appSource).not.toContain("window.applyReportFilter = function");
-    expect(appSource).not.toContain("function reportExportPayload");
   });
 
   it("lets the legacy report renderer omit inline controls for the React route", () => {
@@ -55,7 +49,6 @@ describe("Report runtime wiring", () => {
   it("moves Report qualitative signal wiring to a Report-owned module", () => {
     const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
     const qualSignalsSource = readFileSync(new URL("../src/report/reportQualSignals.js", import.meta.url), "utf8");
-    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("from '../report/reportQualSignals.js'");
     expect(pageSource).not.toContain("from '../app.js'");
@@ -65,13 +58,6 @@ describe("Report runtime wiring", () => {
     expect(qualSignalsSource).toContain("renderQualAnalysisModal");
     expect(qualSignalsSource).toContain("qualResponseRows");
     expect(qualSignalsSource).toContain("window.openQualAnalysisModal = openQualAnalysisModal");
-
-    expect(appSource).not.toContain("function bindReportQualSignals()");
-    expect(appSource).not.toContain("window.openQualAnalysisModal = function");
-    expect(appSource).not.toContain("function qualQuestionLabel");
-    expect(appSource).not.toContain("renderQualAnalysisModal");
-    expect(appSource).not.toContain("renderQualSignalPanel");
-    expect(appSource).not.toContain("qualResponseRows");
   });
 
   it("wires new native React components for Executive Summary, Outcome Story, Pulse Insight, Compare Summary Cards, Dimension Cards, Recommendations, Change Analysis, Qualitative Signals, and Compare Ranking Table", () => {

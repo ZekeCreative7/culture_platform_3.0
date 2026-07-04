@@ -1,4 +1,4 @@
-import { state, saveState, saveSessionToFirestore } from '../state.js';
+import { state, saveState, saveSessionToFirestore, subscribeResponsesFromFirestore } from '../state.js';
 import { normalizeSessionType, sameSessionType, makeSchedule, sessionTypeDef, uid } from '../utils.js';
 import { syncDraftOrgFromTeam } from '../views/org.js';
 import { selectedCrossMembers, resetCrossDraft, canCreateDraftSession } from '../views/sessions.js';
@@ -173,5 +173,5 @@ export function createOrUpdateSession() {
   state.draftSchedule = makeSchedule(type);
   saveState();
   saveSessionToFirestore(session);
-  window.updateResponsesSubscription?.();
+  subscribeResponsesFromFirestore();
 }

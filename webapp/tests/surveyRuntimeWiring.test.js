@@ -81,8 +81,7 @@ describe("Survey runtime wiring", () => {
     expect(wizardSource).not.toContain("value={vanillaState.draftSurveyTitle}");
   });
 
-  it("moves edit/cancel/save draft actions out of app.js into surveyDraftActions.js", () => {
-    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+  it("keeps edit/cancel/save draft actions in surveyDraftActions.js, not app.js or a component", () => {
     const draftActionsSource = readFileSync(new URL("../src/survey/surveyDraftActions.js", import.meta.url), "utf8");
 
     for (const fn of [
@@ -91,13 +90,11 @@ describe("Survey runtime wiring", () => {
       "updateSurveyDraftPhase", "updateSurveyDraftQuestionText", "updateSurveyDraftQuestionType",
       "addSurveyDraftQuestion", "deleteSurveyDraftQuestion", "loadSurveyTemplate",
     ]) {
-      expect(appSource).not.toContain(`window.${fn} = function`);
       expect(draftActionsSource).toContain(`export function ${fn}`);
     }
   });
 
-  it("moves upload/reset/delete/recover orphan response actions out of app.js into surveyResponseActions.js", () => {
-    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+  it("keeps upload/reset/delete/recover orphan response actions in surveyResponseActions.js, not app.js or a component", () => {
     const responseActionsSource = readFileSync(new URL("../src/survey/surveyResponseActions.js", import.meta.url), "utf8");
     const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
     const closedSurveyCardSource = readFileSync(new URL("../src/survey/ClosedSurveyCard.jsx", import.meta.url), "utf8");
@@ -107,7 +104,6 @@ describe("Survey runtime wiring", () => {
       "reopenSurveyDistribution", "scanForOrphanResponses", "recoverOrphanSurvey", "recoverAllOrphanSurveys",
       "downloadSurveyTemplate", "saveSurveyAsTemplate", "deleteSurveyTemplate",
     ]) {
-      expect(appSource).not.toContain(`window.${fn} = function`);
       expect(
         responseActionsSource.includes(`export function ${fn}`)
         || responseActionsSource.includes(`export async function ${fn}`)

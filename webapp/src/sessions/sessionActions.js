@@ -1,4 +1,4 @@
-import { state, saveState, deleteSessionFromFirestore } from '../state.js';
+import { state, saveState, deleteSessionFromFirestore, subscribeResponsesFromFirestore } from '../state.js';
 import { normalizeSessionType } from '../utils.js';
 
 export function toggleSessionTypeGroup(type) {
@@ -43,7 +43,7 @@ export function deleteSession(id) {
   }
   saveState();
   deleteSessionFromFirestore(id);
-  window.updateResponsesSubscription?.();
+  subscribeResponsesFromFirestore();
 }
 
 export function openSessionDrawer({ switchToSessions = false } = {}) {

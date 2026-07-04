@@ -507,6 +507,101 @@ export async function saveResponsesToFirestore(rows) {
     await batch.commit();
   }
 }
+
+// A survey's responses must stay reachable even if the session it was created
+// under was later deleted (e.g. a recovered orphan survey) — union both id sets
+// instead of trusting only currently-existing sessions.
+let responseUnsubscribes = [];
+
+export function subscribeResponsesFromFirestore() {
+  responseUnsubscribes.forEach(unsub => unsub());
+  responseUnsubscribes = [];
+  state.responsesLoaded = false;
+  saveState();
+
+  const sessionIds = Array.from(new Set([
+    ...(state.sessions || []).map(s => s.id),
+    ...(state.surveys || []).map(s => s.sessionId),
+  ].filter(Boolean)));
+  if (sessionIds.length === 0) {
+    state.responses = [];
+    state.responsesLoaded = true;
+    saveState();
+    return;
+  }
+
+  // Chunk session IDs into arrays of max 30 items (Firestore 'in' query limit)
+  const chunks = [];
+  for (let i = 0; i < sessionIds.length; i += 30) {
+    chunks.push(sessionIds.slice(i, i + 30));
+  }
+
+  const chunkResponses = {};
+  const chunkReady = {};
+
+  chunks.forEach((chunk, chunkIdx) => {
+    const q = query(collection(db, 'responses'), where('sessionId', 'in', chunk));
+    const unsub = onSnapshot(q, async (snap) => {
+      const surveyMap = Object.fromEntries((state.surveys || []).map(s => [s.id, s]));
+      const sessionMap = Object.fromEntries((state.sessions || []).map(s => [s.id, s]));
+
+      chunkResponses[chunkIdx] = snap.docs.map(d => {
+        const data = d.data();
+        let cohort = Number(data.cohort) || 0;
+        const sess = data.sessionId ? sessionMap[data.sessionId] : null;
+        if (sess && Number(sess.cohort)) {
+          cohort = Number(sess.cohort);
+        } else if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
+          cohort = Number(surveyMap[data.surveyId].sessionCohort) || 0;
+        }
+        return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || "" };
+      });
+      chunkReady[chunkIdx] = true;
+
+      // Merge all chunks
+      let allResponses = [];
+      Object.keys(chunkResponses).forEach(idx => {
+        allResponses.push(...chunkResponses[idx]);
+      });
+
+      // Recovered surveys can point at responses whose sessionId/cohort no longer
+      // lines up cleanly with the chunk query above (e.g. malformed or missing
+      // sessionId on very old rows) — backstop with a direct fetch+match so a
+      // recovered survey's results don't silently stay empty.
+      const recoveredSurveys = (state.surveys || []).filter((s) => s.recoveredAt);
+      if (recoveredSurveys.length) {
+        try {
+          const everything = await fetchAllResponsesFromFirestore();
+          const seen = new Set(allResponses.map((r) => r.id));
+          everything.forEach((row) => {
+            if (seen.has(row.id)) return;
+            const matches = recoveredSurveys.some((survey) =>
+              row.surveyId === survey.id
+              || (row.sessionId === survey.sessionId && row.phase === survey.phase
+                && (Number(row.cohort) || 0) === (Number(survey.sessionCohort) || 0))
+            );
+            if (matches) { allResponses.push(row); seen.add(row.id); }
+          });
+        } catch (e) {
+          console.error('복구된 설문 응답 보강 조회 실패:', e);
+        }
+      }
+
+      allResponses.sort((a, b) => {
+        const aTime = Date.parse(a.createdAt) || 0;
+        const bTime = Date.parse(b.createdAt) || 0;
+        return bTime - aTime;
+      });
+
+      state.responses = allResponses;
+      state.responsesLoaded = Object.keys(chunkReady).length === chunks.length;
+      saveState();
+    }, (err) => {
+      console.error(`Firestore responses chunk ${chunkIdx} 실시간 리스너 오류:`, err);
+    });
+    responseUnsubscribes.push(unsub);
+  });
+}
 export async function setSurveyDistributionActiveInFirestore(id, active) {
   const now = new Date().toISOString();
   await setDoc(doc(db, 'surveys', id), {
@@ -789,7 +884,7 @@ export async function downloadStateFromDb() {
     normalizeAppState(state);
     saveOrgData();
     saveState();
-    window.updateResponsesSubscription?.();
+    subscribeResponsesFromFirestore();
     notify();
   } catch (e) {
     alert('DB 다운로드 실패: ' + e.message);

@@ -1,11 +1,6 @@
-import './reactMode.js';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-// app.js import: window.__reactMode=true (index.html에서 설정)가 먼저 실행된 후
-// 이 import가 평가되면 render()는 saveState() 샤임으로 동작하고
-// initializeAuthGate/initApp은 호출되지 않는다.
-import './app.js';
 import { AuthProvider, useAuth } from './hooks/useAuth.js';
 import { AppLayout } from './components/layout/index.js';
 import { LoginPage } from './pages/LoginPage.jsx';

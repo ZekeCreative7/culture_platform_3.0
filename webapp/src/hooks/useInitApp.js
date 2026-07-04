@@ -18,6 +18,7 @@ import {
   subscribePulseYearsFromFirestore,
   subscribePulseCommitmentsFromFirestore,
   subscribeQualSignalsFromFirestore,
+  subscribeResponsesFromFirestore,
   syncSurveysToSessions,
   setDbStatus,
 } from '../state.js';
@@ -77,11 +78,11 @@ export function useInitApp(isAuthenticated, orgId) {
         subscribeSessionsFromFirestore(() => {
           syncSurveysToSessions();
           // 세션 목록 변경 시 responses 구독도 재설정 (세션 추가/삭제 반영)
-          window.updateResponsesSubscription?.();
+          subscribeResponsesFromFirestore();
         }),
         subscribeSurveysFromFirestore(() => {
           syncSurveysToSessions();
-          window.updateResponsesSubscription?.();
+          subscribeResponsesFromFirestore();
         }),
         subscribeSurveyTemplatesFromFirestore(),
         subscribeOrganizationFromFirestore(),
@@ -92,7 +93,7 @@ export function useInitApp(isAuthenticated, orgId) {
 
       // 각 subscribe 함수의 첫 스냅샷이 초기 로드 역할을 겸한다.
       // 세션/설문 스냅샷이 도착하면 콜백에서 responses 구독도 재설정된다.
-      window.updateResponsesSubscription?.();
+      subscribeResponsesFromFirestore();
     })();
 
     return () => {

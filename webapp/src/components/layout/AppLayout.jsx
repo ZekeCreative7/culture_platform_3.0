@@ -6,7 +6,6 @@ import { useInitApp } from '../../hooks/useInitApp.js';
 import { clearUploadSyncWarning } from '../../upload/uploadActions.js';
 import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
-import { VanillaCanvas, isVanillaView } from './VanillaCanvas.jsx';
 
 const VALID_VIEWS = ['dashboard', 'sessions', 'org', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse'];
 
@@ -78,10 +77,7 @@ export function AppLayout({ children }) {
           </div>
         )}
         <div className="canvas">
-          {isVanillaView(activeView)
-            ? <VanillaCanvas view={activeView} />
-            : children
-          }
+          {children}
         </div>
       </main>
     </div>

@@ -688,6 +688,8 @@ function qualResponseRows(cohort, type, sessionId, phase) {
 // ── Compare & Details views definitions ───────────────────────────
 export function renderCompareReport(type, cohort, options = {}) {
   const includeControls = options.includeControls !== false;
+  const includeShell = options.includeShell !== false;
+  const includeOutcomeIntro = options.includeOutcomeIntro !== false;
   const sessions = sessionsForTypeCohort(type, cohort);
   const types = availableSessionTypes();
   const isAllCohorts = cohort === "all";
@@ -759,7 +761,7 @@ export function renderCompareReport(type, cohort, options = {}) {
     : '—';
   
   return `
-    <div id="report-export-content" class="report-export-content">
+    ${includeShell ? `<div id="report-export-content" class="report-export-content">
     <section class="page-head report-export-header">
       <div>
         <span class="eyebrow">기수 비교 분석</span>
@@ -773,6 +775,7 @@ export function renderCompareReport(type, cohort, options = {}) {
         </button>
       </div>` : ""}
     </section>
+    ` : ""}
 
     ${includeControls ? `<section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
@@ -796,7 +799,7 @@ export function renderCompareReport(type, cohort, options = {}) {
       <div class="filter-current">${currentFilterLabel}</div>
     </section>` : ""}
 
-    ${renderSessionOutcomeIntro(type)}
+    ${includeOutcomeIntro ? renderSessionOutcomeIntro(type) : ""}
 
     <div class="report-summary" style="margin-bottom:28px;">
       <div>
@@ -878,7 +881,7 @@ export function renderCompareReport(type, cohort, options = {}) {
         </div>
       `}
     </section>
-    </div>
+    ${includeShell ? "</div>" : ""}
   `;
 }
 
@@ -896,6 +899,8 @@ function getStatusLabel(session) {
 // ── Main view: renderReport() with slope chart and overlays ──────
 export function renderReport(options = {}) {
   const includeControls = options.includeControls !== false;
+  const includeShell = options.includeShell !== false;
+  const includeOutcomeIntro = options.includeOutcomeIntro !== false;
   const scope = ensureScopedSelection("report");
   const type = scope.type;
   const cohort = scope.cohort;
@@ -903,7 +908,7 @@ export function renderReport(options = {}) {
   const session = scope.session;
 
   if (state.selectedReportSessionId === "all" && cohort) {
-    return renderCompareReport(type, cohort, { includeControls });
+    return renderCompareReport(type, cohort, { includeControls, includeShell, includeOutcomeIntro });
   }
 
   const sessionId = session?.id || "";
@@ -983,7 +988,7 @@ export function renderReport(options = {}) {
   }
 
   return `
-    <div id="report-export-content" class="report-export-content">
+    ${includeShell ? `<div id="report-export-content" class="report-export-content">
     <section class="page-head report-export-header">
       <div>
         <span class="eyebrow">변화 분석 리포트</span>
@@ -1002,6 +1007,7 @@ export function renderReport(options = {}) {
           </button>
         </div>` : ""}
     </section>
+    ` : ""}
 
     ${includeControls ? `<section class="panel filters-panel" data-html2canvas-ignore="true">
       <div class="form-grid compact scoped-filter-grid">
@@ -1025,7 +1031,7 @@ export function renderReport(options = {}) {
       <div class="filter-current">현재 적용: ${session ? `${escapeHtml(sessionTypeLabel(session.type))} · ${escapeHtml(sessionLabel(session))}` : `${escapeHtml(sessionTypeLabel(type))} · 선택된 세션 없음`}</div>
     </section>` : ""}
 
-    ${renderSessionOutcomeIntro(type)}
+    ${includeOutcomeIntro ? renderSessionOutcomeIntro(type) : ""}
     
     <!-- 경영진 요약 카드 (Executive Summary Board) -->
     ${execSummaryHtml}
@@ -1282,7 +1288,7 @@ export function renderReport(options = {}) {
     })()}
     
     `}
-    </div>
+    ${includeShell ? "</div>" : ""}
   `;
 }
 

@@ -9,7 +9,7 @@ describe("Report runtime wiring", () => {
     const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("ReportControls");
-    expect(pageSource).toContain("renderReport({ includeControls: false })");
+    expect(pageSource).toContain("includeControls: false");
     expect(controlsSource).toContain("applyReportFilter");
     expect(controlsSource).toContain("downloadReportPdf");
     expect(controlsSource).toContain("downloadReportXlsx");
@@ -29,9 +29,27 @@ describe("Report runtime wiring", () => {
     const reportSource = readFileSync(new URL("../src/views/report.js", import.meta.url), "utf8");
 
     expect(reportSource).toContain("includeControls = options.includeControls !== false");
-    expect(reportSource).toContain("renderCompareReport(type, cohort, { includeControls })");
+    expect(reportSource).toContain("renderCompareReport(type, cohort, { includeControls, includeShell, includeOutcomeIntro })");
     expect(reportSource).toContain("${includeControls ? `<section class=\"panel filters-panel\"");
     expect(reportSource).toContain("${includeControls && cohort && session ? `");
+  });
+
+  it("moves the Report export shell and outcome intro to React", () => {
+    const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
+    const shellSource = readFileSync(new URL("../src/report/ReportExportShell.jsx", import.meta.url), "utf8");
+    const reportSource = readFileSync(new URL("../src/views/report.js", import.meta.url), "utf8");
+
+    expect(pageSource).toContain("ReportExportShell");
+    expect(pageSource).toContain("includeShell: false");
+    expect(pageSource).toContain("includeOutcomeIntro: false");
+    expect(pageSource).not.toContain("divRef.current.innerHTML");
+    expect(shellSource).toContain('id="report-export-content"');
+    expect(shellSource).toContain("session-outcome-intro");
+    expect(shellSource).toContain("getSessionOutcomeCopy");
+    expect(reportSource).toContain("includeShell = options.includeShell !== false");
+    expect(reportSource).toContain("includeOutcomeIntro = options.includeOutcomeIntro !== false");
+    expect(reportSource).toContain("${includeShell ? `<div id=\"report-export-content\"");
+    expect(reportSource).toContain("${includeOutcomeIntro ? renderSessionOutcomeIntro(type) : \"\"}");
   });
 
   it("moves Report qualitative signal wiring to a Report-owned module", () => {

@@ -594,3 +594,25 @@ Verified:
 Next recommended commit:
 
 - Continue Report by converting the rendered Report body/header sections incrementally, starting with a low-risk static shell section (`report-hero`/outcome intro) before touching the data-heavy chart and PDF/export-sensitive content.
+
+### 2026-07-04 - Step 5, Item 5 Complete (Report export shell/header moved to React)
+
+Completed:
+
+- Added `webapp/src/report/ReportExportShell.jsx` so the React Report route now owns `#report-export-content`, `.report-export-header`, and the session outcome intro.
+- `ReportPage.jsx` now renders `<ReportExportShell />` and asks `renderReport()` for body-only HTML with `includeShell: false` and `includeOutcomeIntro: false`.
+- `views/report.js` keeps the legacy default behavior, but now supports body-only rendering for both single-session reports and all-team compare reports via `includeShell` / `includeOutcomeIntro` options.
+- Added `webapp/src/sessions/sessionOutcomeCopy.js` so the React shell and legacy `renderSessionOutcomeIntro()` share the same outcome copy instead of duplicating text.
+- Extended `webapp/tests/reportRuntimeWiring.test.js` to lock this ownership boundary.
+
+Verified:
+
+- Focused Report tests pass: `reportRuntimeWiring.test.js` + `reportQualSignals.test.js` (6 tests).
+- `npm run check` passes.
+- Full `vitest run` passes: 63 tests.
+- `npm run build` passes. Existing Vite dynamic/static import chunk warnings remain.
+- Browser-verified live at `?preview=1#/report`: single-session report has exactly one `#report-export-content`, one `.report-export-header`, one `.session-outcome-intro`, no nested export wrapper, and no export/filter controls inside the PDF export content. Switching to `[전체 비교 분석]` updates the React header to "기수 비교 분석 / 전체 팀별 결과 비교 분석", keeps exactly one export wrapper, renders the comparison summary/ranking body, and shows no console errors or error overlay.
+
+Next recommended commit:
+
+- Continue Report body migration by extracting the next low-risk static/data-light section from `views/report.js`, such as the compare summary cards or the single-report `report-outcome-story` panel. Leave radar charts, slope charts, and PDF/XLSX export internals untouched until each surrounding section has its own React boundary.

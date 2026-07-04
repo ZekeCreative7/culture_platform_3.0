@@ -1,18 +1,21 @@
-import React, { useEffect, useRef, memo } from 'react';
+import React, { useEffect, useState, memo } from 'react';
 import { state as vanillaState, subscribe } from '../state.js';
 import { renderReport } from '../views/report.js';
 import { ReportControls } from '../report/ReportControls.jsx';
+import { ReportExportShell } from '../report/ReportExportShell.jsx';
 import { bindReportQualSignals } from '../report/reportQualSignals.js';
 
 export const ReportPage = memo(function ReportPage() {
-  const divRef = useRef(null);
+  const [reportBodyHtml, setReportBodyHtml] = useState('');
+
   useEffect(() => {
     vanillaState.activeView = 'report';
     function refresh() {
-      if (divRef.current) {
-        divRef.current.innerHTML = renderReport({ includeControls: false });
-        bindReportQualSignals();
-      }
+      setReportBodyHtml(renderReport({
+        includeControls: false,
+        includeShell: false,
+        includeOutcomeIntro: false,
+      }));
     }
     refresh();
     let timer = null;
@@ -22,10 +25,17 @@ export const ReportPage = memo(function ReportPage() {
     });
     return () => { clearTimeout(timer); unsub(); };
   }, []);
+
+  useEffect(() => {
+    bindReportQualSignals();
+  }, [reportBodyHtml]);
+
   return (
     <>
       <ReportControls />
-      <div ref={divRef} />
+      <ReportExportShell>
+        <div dangerouslySetInnerHTML={{ __html: reportBodyHtml }} />
+      </ReportExportShell>
     </>
   );
 }, () => true);

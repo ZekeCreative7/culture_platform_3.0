@@ -896,3 +896,20 @@ Verified: `npm run check`, full `vitest run` (64 tests), `npm run build` all pas
 Next recommended commit:
 
 - Continue Step 7 with Comm (~10-17 sites, deepest nesting — `target.rounds[i].feedback[key] = val`, no existing action file) before attempting Organization (~52-62 sites, largest and riskiest — grill scope separately given its size, per the original audit's own recommendation).
+
+### 2026-07-04 - Step 7, Slice 4 Complete (Comm) — Step 7's small/medium domains all done
+
+Completed:
+
+- New `webapp/src/comm/commActions.js` (first directory + action module for this domain): `createNewCommDraft`, `selectCommDraft`, `deleteCommDraft`, `updateCommDraftField`, `generateCommPrompt`, `saveCommAiDraft`, `toggleCommFeedback`, `generateCommRefinedPrompt`, `applyCommRefinedPrompt`, `saveCommFinalMessage`. All 10 mutation sites in `CommPage.jsx` moved verbatim, including the deepest nesting in the codebase (`round.feedback[key] = val`, `target.rounds[i]`) — preserved the original's in-place-mutation semantics exactly rather than "improving" it to an immutable update, matching migration principle #6.
+- `views/comm.js` is now purely helpers/constants (`createCommDraft`, `buildInitialPrompt`, `buildRefinedPrompt`, `planningProgress`, `commPulseInsightForSession`, the `COMM_*`/`FB_*` constant arrays) — no state-mutating logic left there, matching the `views/sessions.js`/`views/report.js` end-state.
+- `CommPage.jsx`'s `vanillaState`/`saveState` imports are now fully removed — the first Step-7 domain slice where the component ends up not importing `state.js` directly at all.
+- **Found and fixed in passing**: `<span class="step-badge">` (line ~426) used the raw DOM `class` attribute instead of React's `className` — a real, live bug (React silently drops unrecognized DOM attributes like bare `class`, so the STEP 2 badge was never getting its styling). One-line fix, same file already being edited.
+
+Verified: `npm run check`, full `vitest run` (64 tests), `npm run build` all pass. Browser-verified live at `?preview=1#/comm`: filled all 4 planning fields to reach 100% progress, generated the initial prompt, then verified the full remaining chain (save AI draft → toggle feedback → generate refined prompt → apply refined prompt → save final message → delete draft) via direct calls into `commActions.js` after the idle-navigation pre-existing bug (already tracked, unrelated) interrupted UI click-through — confirmed `toggleCommFeedback`'s in-place mutation and `generateCommRefinedPrompt`'s feedback-merge both preserve prior feedback keys correctly (`{ tone: 'warm', extra: '...' }` after both ran), and the full create→edit→delete lifecycle round-trips cleanly. No console errors beyond expected unauthenticated-preview Firestore permission messages.
+
+With this, Step 7's smaller/medium domains (`activeView`, Upload, Analytics, Dashboard, Pulse, Comm) are all done. Organization is the only domain left — deliberately deferred given its size (~52-62 sites) and risk (in-place mutation of array elements found via `.find()`, delete-cascade logic duplicated 3x, zero existing action layer).
+
+Next recommended commit:
+
+- Grill Organization's scope specifically before starting (per the original audit's own recommendation) — it's large enough and different enough in shape (data-model cascade logic, not just simple field toggles) to warrant its own planning pass rather than folding into the established "smallest first" rhythm.

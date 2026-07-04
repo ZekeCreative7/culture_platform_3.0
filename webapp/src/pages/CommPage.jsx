@@ -1,22 +1,27 @@
 import React, { useEffect, useMemo, useState, memo } from 'react';
 import { useAppStore } from '../store/useAppStore.js';
 import {
-  state as vanillaState,
-  saveState
-} from '../state.js';
-import {
   COMM_TYPES,
   COMM_LENGTHS,
   FB_TONE,
   FB_LENGTH,
   FB_STRATEGY,
   FB_EMPATHY,
-  createCommDraft,
-  buildInitialPrompt,
-  buildRefinedPrompt,
   planningProgress,
   commPulseInsightForSession
 } from '../views/comm.js';
+import {
+  createNewCommDraft,
+  selectCommDraft,
+  deleteCommDraft,
+  updateCommDraftField,
+  generateCommPrompt,
+  saveCommAiDraft,
+  toggleCommFeedback,
+  generateCommRefinedPrompt,
+  applyCommRefinedPrompt,
+  saveCommFinalMessage
+} from '../comm/commActions.js';
 
 export const CommPage = memo(function CommPage() {
   const store = useAppStore();
@@ -64,32 +69,22 @@ export const CommPage = memo(function CommPage() {
   };
 
   const handleNewComm = () => {
-    const d = createCommDraft();
-    vanillaState.commDrafts = [...(store.commDrafts || []), d];
-    vanillaState.commActiveDraftId = d.id;
-    saveState();
+    createNewCommDraft();
   };
 
   const handleSelectItem = (id) => {
-    vanillaState.commActiveDraftId = id;
-    saveState();
+    selectCommDraft(id);
   };
 
   const handleDeleteComm = (id, e) => {
     e.stopPropagation();
     if (!confirm("이 기획을 삭제할까요?")) return;
-    vanillaState.commDrafts = (store.commDrafts || []).filter((d) => d.id !== id);
-    if (activeId === id) vanillaState.commActiveDraftId = null;
-    saveState();
+    deleteCommDraft(id);
   };
 
   const handleFieldChange = (field, val) => {
     if (!current) return;
-    const target = vanillaState.commDrafts.find((d) => d.id === current.id);
-    if (target) {
-      target[field] = val;
-      saveState();
-    }
+    updateCommDraftField(current.id, field, val);
   };
 
   const handleTypeSelect = (typeKey) => {
@@ -102,13 +97,7 @@ export const CommPage = memo(function CommPage() {
 
   const handleGeneratePrompt = () => {
     if (!current) return;
-    const target = vanillaState.commDrafts.find((d) => d.id === current.id);
-    if (target) {
-      target.generatedPrompt = buildInitialPrompt(target, vanillaState);
-      target.rounds = [];
-      target.activeRound = -1;
-      saveState();
-    }
+    generateCommPrompt(current.id);
   };
 
   const handleRegeneratePrompt = () => {
@@ -131,40 +120,17 @@ export const CommPage = memo(function CommPage() {
       alert("AI 초안을 붙여넣어 주세요.");
       return;
     }
-    const target = vanillaState.commDrafts.find((d) => d.id === current.id);
-    if (target) {
-      const newRound = {
-        aiDraft: trimmedDraft,
-        feedback: {},
-        refinedPrompt: '',
-        promptUsed: target.generatedPrompt
-      };
-      target.rounds = [...(target.rounds || []), newRound];
-      target.activeRound = target.rounds.length - 1;
-      saveState();
-    }
+    saveCommAiDraft(current.id, trimmedDraft);
   };
 
   const handleToggleFeedback = (key, val) => {
     if (!current || activeRound < 0) return;
-    const target = vanillaState.commDrafts.find((d) => d.id === current.id);
-    if (target && target.rounds?.[activeRound]) {
-      const round = target.rounds[activeRound];
-      if (!round.feedback) round.feedback = {};
-      round.feedback[key] = val;
-      saveState();
-    }
+    toggleCommFeedback(current.id, activeRound, key, val);
   };
 
   const handleGenerateRefinedPrompt = () => {
     if (!current || activeRound < 0) return;
-    const target = vanillaState.commDrafts.find((d) => d.id === current.id);
-    if (target && target.rounds?.[activeRound]) {
-      const round = target.rounds[activeRound];
-      round.feedback = { ...(round.feedback || {}), extra: extraFeedback };
-      round.refinedPrompt = buildRefinedPrompt(round);
-      saveState();
-    }
+    generateCommRefinedPrompt(current.id, activeRound, extraFeedback);
   };
 
   const handleCopyRefinedPrompt = () => {
@@ -181,21 +147,13 @@ export const CommPage = memo(function CommPage() {
     if (!current || activeRound < 0) return;
     const refinedText = current.rounds?.[activeRound]?.refinedPrompt;
     if (!refinedText) return;
-    const target = vanillaState.commDrafts.find((d) => d.id === current.id);
-    if (target) {
-      target.generatedPrompt = refinedText;
-      saveState();
-    }
+    applyCommRefinedPrompt(current.id, refinedText);
   };
 
   const handleSaveFinalMessage = () => {
     if (!current || !current.finalMessage?.trim()) return;
-    const target = vanillaState.commDrafts.find((d) => d.id === current.id);
-    if (target) {
-      target.savedAt = new Date().toLocaleDateString("ko-KR");
-      saveState();
-      alert("최종 메시지가 저장되었습니다.");
-    }
+    saveCommFinalMessage(current.id);
+    alert("최종 메시지가 저장되었습니다.");
   };
 
   // ── Selected Data Summarizer ──────────────────────────────────────
@@ -461,7 +419,7 @@ export const CommPage = memo(function CommPage() {
 
                     {/* STEP 2: AI 초안 붙여넣기 */}
                     <div className="comm-loop-step">
-                      <div className="loop-step-label"><span class="step-badge">STEP 2</span> AI 초안 붙여넣기</div>
+                      <div className="loop-step-label"><span className="step-badge">STEP 2</span> AI 초안 붙여넣기</div>
                       <textarea
                         className="comm-step-input"
                         rows="8"

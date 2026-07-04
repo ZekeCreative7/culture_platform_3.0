@@ -913,3 +913,16 @@ With this, Step 7's smaller/medium domains (`activeView`, Upload, Analytics, Das
 Next recommended commit:
 
 - Grill Organization's scope specifically before starting (per the original audit's own recommendation) — it's large enough and different enough in shape (data-model cascade logic, not just simple field toggles) to warrant its own planning pass rather than folding into the established "smallest first" rhythm.
+
+### 2026-07-04 - Investigated and closed: "?preview=1 drops after idle" (task_c3da513a)
+
+This was flagged during Step 3, item 7 as a reproducible bug ("the app auto-navigates to `#/dashboard` and drops `?preview=1` after some idle time") and left open since then. Investigated properly this session rather than continuing to carry it as an open item.
+
+Findings:
+
+- Grepped the entire app source (`src/**/*.{js,jsx}`, `index.html`, `vite.config.js`) for anything that could cause this: `setInterval`, `history.replaceState`/`pushState`, `location.replace`/`assign`, service worker registration, `visibilitychange`/`blur`/`focus` listeners, Firebase App Check auto-refresh config. Found nothing — there is no code anywhere in this app that manipulates the URL on a timer or on idle.
+- Reproduced it directly: a single navigation and 8 rapid navigations in a row never drop `?preview=1`. Only genuine elapsed idle time (~3 minutes, zero interaction) reproduces it, and when it does, the console shows a fresh `[vite] connecting... / connected.` sequence — the signature of an actual full page reload/re-navigation, not anything that happens during normal single-page-app operation.
+- Conclusion: since nothing in the app's own code causes a reload like this, the most likely explanation is the testing/preview tooling itself reconnecting to the tab's original URL after the session sits idle — an artifact of how this app has been tested in this environment, not a defect a real visitor's browser would ever trigger.
+- Critically, **it doesn't matter functionally either way**: `useAuth.js`/`useInitApp.js` already persist local-preview mode to `sessionStorage.previewMode` the moment `?preview=1` is seen, and read from *either* the URL or that storage. Confirmed live that `sessionStorage.previewMode` survives the reload untouched — so even when the address bar's `?preview=1` disappears, the app never actually drops out of preview/local-auth mode. The only thing that resets is the URL bar's visible text, which is cosmetic. Real production visitors never set `?preview=1` at all, so this has zero production impact regardless of root cause.
+
+Closing this out as "investigated, not a real product bug, no fix needed" rather than a fix — manufacturing code to prevent a cosmetic URL-text reset with no functional consequence would be adding a defense for a scenario that doesn't actually cause harm.

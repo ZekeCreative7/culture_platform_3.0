@@ -861,3 +861,19 @@ Verified: `npm run check`, full `vitest run` (64 tests), `npm run build` all pas
 Next recommended commit:
 
 - Continue Step 7 with the next-smallest remaining domain (Pulse or Dashboard — both need a new `*Actions.js` file built from scratch but are small, ~6-12 sites each) before attempting Comm (~10-17 sites, deepest nesting) or Organization (~52-62 sites, largest and riskiest — grill scope separately given its size, per the audit's own recommendation).
+
+### 2026-07-04 - Step 7, Slice 2 Complete (Dashboard field toggles)
+
+Picked Dashboard over Pulse for this slice since it already had `dashboard/dashboardNavigation.js` as an existing precedent in the same domain, even though that file's own convention (pure functions taking `state` as a parameter, caller calls `saveState()`) differs from the self-contained convention used everywhere else (Sessions/Survey/Report/Upload: action file imports `state`/`saveState` directly, calls `saveState()` internally). Rather than extend `dashboardNavigation.js` with a second convention, created a new sibling file matching the majority convention.
+
+Completed:
+
+- New `webapp/src/dashboard/dashboardStateActions.js`: `selectDashboardDate`, `setDashboardWeekOffset`, `toggleDashboardActionGroup`, `setTeamPipelineView` — moved verbatim from `DashboardPage.jsx`'s `handleSelectDate`/`handleToggleWeekOffset`/`handleToggleGroup`/`handleToggleViewMode`. `setDashboardWeekOffset` previously took `today` implicitly from the component's render-scoped `todayISO()` call; the extracted version calls `todayISO()` itself instead of threading it through, since it's a pure zero-arg function.
+- `DashboardPage.jsx`'s 4 handlers are now one-line delegations to the new module.
+- Left `handleNavigate`/`handleActionClick` (which call `applyDashboardNavigationState`/`applyDashboardActionState` from `dashboardNavigation.js`) untouched — out of scope for this slice, a separate larger piece mixing cross-domain navigation state.
+
+Verified: `npm run check`, full `vitest run` (64 tests), `npm run build` all pass. Browser-verified live at `?preview=1#/dashboard`: clicked "본부별" and confirmed `teamPipelineView` updated to `"division"` with the button showing active state; clicked "다음 주" and confirmed both `dashboardWeekOffset` (→ 1) and `dashboardSelectedDate` (→ next week's date) updated together correctly; no console errors beyond expected unauthenticated-preview Firestore permission messages.
+
+Next recommended commit:
+
+- Continue Step 7 with Pulse (~9-12 sites, needs a new `pulse/pulseActions.js` from scratch — no existing precedent file in that domain, unlike Dashboard) before Comm or Organization.

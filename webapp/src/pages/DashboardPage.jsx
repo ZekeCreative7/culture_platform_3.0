@@ -18,6 +18,12 @@ import {
 } from '../dashboard/dashboardEngine.js';
 import { applyDashboardActionState, applyDashboardNavigationState } from '../dashboard/dashboardNavigation.js';
 import {
+  selectDashboardDate,
+  setDashboardWeekOffset,
+  toggleDashboardActionGroup,
+  setTeamPipelineView
+} from '../dashboard/dashboardStateActions.js';
+import {
   DashboardStatusStrip,
   DashboardKPIGrid,
   TeamPipelineSection,
@@ -125,30 +131,19 @@ export const DashboardPage = memo(function DashboardPage() {
   };
 
   const handleSelectDate = (dateStr) => {
-    vanillaState.dashboardSelectedDate = dateStr;
-    saveState();
+    selectDashboardDate(dateStr);
   };
 
   const handleToggleWeekOffset = (offset) => {
-    vanillaState.dashboardWeekOffset = offset;
-    const start = new Date(today);
-    start.setDate(start.getDate() + offset * 7);
-    vanillaState.dashboardSelectedDate = start.toISOString().slice(0, 10);
-    saveState();
+    setDashboardWeekOffset(offset);
   };
 
   const handleToggleGroup = (key) => {
-    const current = store.dashboardExpandedActionGroups || {};
-    vanillaState.dashboardExpandedActionGroups = {
-      ...current,
-      [key]: !current[key]
-    };
-    saveState();
+    toggleDashboardActionGroup(key);
   };
 
   const handleToggleViewMode = (mode) => {
-    vanillaState.teamPipelineView = mode;
-    saveState();
+    setTeamPipelineView(mode);
   };
 
   const handleScrollTo = (id) => {

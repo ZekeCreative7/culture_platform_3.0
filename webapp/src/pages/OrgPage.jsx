@@ -1,15 +1,19 @@
 import React, { useEffect, useMemo, useState, memo } from 'react';
 import { useAppStore } from '../store/useAppStore.js';
 import {
-  state as vanillaState,
-  saveState
-} from '../state.js';
-import {
   childUnits,
-  topLevelOrgUnits,
-  teamPath,
-  persistOrganization
+  topLevelOrgUnits
 } from '../views/org.js';
+import {
+  setOrgSearchQuery,
+  searchOrgAndNavigate,
+  clearOrgSearch,
+  toggleOrgUnitExpanded,
+  selectOrgTeam,
+  closeOrgTeamPanel,
+  reparentOrgUnit,
+  reparentOrgMember
+} from '../org/orgActions.js';
 import {
   OrgActionMenu,
   OrgSearchResults,
@@ -69,86 +73,24 @@ export const OrgPage = memo(function OrgPage() {
   };
 
   const handleSearch = () => {
-    const q = searchQuery.trim();
-    vanillaState.orgSearchQuery = q;
-
-    if (q) {
-      const matchMember = (store.orgMembers || []).find((m) => m.name.toLowerCase().includes(q.toLowerCase()));
-      if (matchMember) {
-        const parentUnit = (store.orgUnits || []).find((unit) => unit.id === matchMember.parentId);
-        const path = parentUnit?.level === 'team' ? teamPath(matchMember.parentId) : null;
-        if (path) {
-          vanillaState.selectedDivision = path.divisionId;
-          vanillaState.selectedHq = path.hqId;
-          vanillaState.selectedTeam = path.teamId;
-          vanillaState.orgDirectUnitId = '';
-        } else if (parentUnit?.level === 'hq') {
-          vanillaState.selectedHq = parentUnit.id;
-          vanillaState.selectedTeam = '';
-          const division = (store.orgUnits || []).find((unit) => unit.id === parentUnit.parentId && unit.level === 'division');
-          if (division) vanillaState.selectedDivision = division.id;
-          vanillaState.orgDirectUnitId = parentUnit.id;
-        } else if (parentUnit?.level === 'division') {
-          vanillaState.selectedDivision = parentUnit.id;
-          vanillaState.selectedHq = '';
-          vanillaState.selectedTeam = '';
-          vanillaState.orgDirectUnitId = parentUnit.id;
-        }
-      } else {
-        const matchUnit = (store.orgUnits || []).find((u) => u.name.toLowerCase().includes(q.toLowerCase()));
-        if (matchUnit) {
-          if (matchUnit.level === 'team') {
-            const path = teamPath(matchUnit.id);
-            if (path) {
-              vanillaState.selectedDivision = path.divisionId;
-              vanillaState.selectedHq = path.hqId;
-              vanillaState.selectedTeam = path.teamId;
-            }
-          } else if (matchUnit.level === 'hq') {
-            const parent = (store.orgUnits || []).find((u) => u.id === matchUnit.parentId);
-            if (parent?.level === 'company') {
-              vanillaState.selectedDivision = matchUnit.id;
-              vanillaState.selectedHq = '';
-            } else {
-              vanillaState.selectedHq = matchUnit.id;
-              vanillaState.selectedDivision = matchUnit.parentId;
-            }
-          } else if (matchUnit.level === 'division') {
-            vanillaState.selectedDivision = matchUnit.id;
-          }
-        }
-      }
-    }
-    saveState();
+    searchOrgAndNavigate(searchQuery);
   };
 
   const handleClearSearch = () => {
     setSearchQuery('');
-    vanillaState.orgSearchQuery = '';
-    saveState();
+    clearOrgSearch();
   };
 
   const handleToggleUnit = (id) => {
-    const ids = store.orgExpandedUnitIds || [];
-    const idx = ids.indexOf(id);
-    let next;
-    if (idx >= 0) {
-      next = ids.filter((x) => x !== id);
-    } else {
-      next = [...ids, id];
-    }
-    vanillaState.orgExpandedUnitIds = next;
-    saveState();
+    toggleOrgUnitExpanded(id);
   };
 
   const handleSelectTeam = (id) => {
-    vanillaState.orgSelectedTeamId = store.orgSelectedTeamId === id ? '' : id;
-    saveState();
+    selectOrgTeam(id);
   };
 
   const handleClosePanel = () => {
-    vanillaState.orgSelectedTeamId = '';
-    saveState();
+    closeOrgTeamPanel();
   };
 
   // ── Drag & Drop Handlers ─────────────────────────────────────────
@@ -179,43 +121,9 @@ export const OrgPage = memo(function OrgPage() {
     if (!id || !type) return;
 
     if (type === 'hq' && targetLevel === 'division') {
-      const unit = (vanillaState.orgUnits || []).find((u) => u.id === id);
-      if (unit) {
-        unit.parentId = targetId;
-        vanillaState.selectedDivision = targetId;
-        vanillaState.selectedHq = id;
-        persistOrganization();
-      }
-    } else if (type === 'team' && targetLevel === 'hq') {
-      const unit = (vanillaState.orgUnits || []).find((u) => u.id === id);
-      if (unit) {
-        unit.parentId = targetId;
-        const parentHq = (vanillaState.orgUnits || []).find((u) => u.id === targetId);
-        if (parentHq) {
-          vanillaState.selectedDivision = parentHq.parentId;
-        }
-        vanillaState.selectedHq = targetId;
-        vanillaState.selectedTeam = id;
-        persistOrganization();
-      }
-    } else if (type === 'team' && targetLevel === 'division') {
-      const unit = (vanillaState.orgUnits || []).find((u) => u.id === id);
-      if (unit) {
-        unit.parentId = targetId;
-        vanillaState.selectedDivision = targetId;
-        vanillaState.selectedHq = "";
-        vanillaState.selectedTeam = id;
-        persistOrganization();
-      }
+      reparentOrgUnit(id, targetId);
     } else if (type === 'member' && ['division', 'hq', 'team'].includes(targetLevel)) {
-      const member = (vanillaState.orgMembers || []).find((m) => m.id === id);
-      if (member) {
-        member.parentId = targetId;
-        if (targetLevel === 'team') vanillaState.selectedTeam = targetId;
-        if (targetLevel === 'hq') { vanillaState.selectedHq = targetId; vanillaState.selectedTeam = ""; }
-        if (targetLevel === 'division') { vanillaState.selectedDivision = targetId; vanillaState.selectedHq = ""; vanillaState.selectedTeam = ""; }
-        persistOrganization();
-      }
+      reparentOrgMember(id, targetId, targetLevel);
     }
   };
 
@@ -241,8 +149,7 @@ export const OrgPage = memo(function OrgPage() {
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);
-            vanillaState.orgSearchQuery = e.target.value.trim();
-            saveState();
+            setOrgSearchQuery(e.target.value);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleSearch();

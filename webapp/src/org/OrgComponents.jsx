@@ -1,24 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore.js';
 import {
-  state as vanillaState,
-  saveState,
-  saveOrgData,
-  saveOrganizationToFirestore,
-  setDbStatus
+  state as vanillaState
 } from '../state.js';
 import {
-  escapeHtml,
   POSITION_OPTIONS,
   UNIT_LABELS,
   UNIT_LEADER_LABELS
 } from '../utils.js';
 import {
   childUnits,
-  hqUnitsForDivision,
-  teamUnitsForSelection,
   descendantTeamIds,
-  descendantUnitIds,
   memberGrade,
   memberJobTitle,
   orgPathLabel,
@@ -27,12 +19,10 @@ import {
   distinctPeopleCount,
   distinctDirectPeopleCount,
   orgMemberOptionsForUnit,
-  syncDraftOrgFromTeam,
-  syncPersonSnapshotsEverywhere,
-  teamPath,
-  persistOrganization
+  teamPath
 } from '../views/org.js';
 import { exportBackupJson, importBackupJson } from '../backup.js';
+import { resetOrganizationData, saveOrgUnit, saveOrgMember, deleteOrgMember, deleteOrgUnitCascade } from './orgActions.js';
 
 // ── Dropdown Action Menu ───────────────────────────────────────────
 export function OrgActionMenu({ companyId }) {
@@ -83,13 +73,7 @@ export function OrgActionMenu({ companyId }) {
   const handleReset = async () => {
     setOpen(false);
     if (!confirm("정말 모든 조직 데이터(부서 및 구성원)를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")) return;
-    vanillaState.orgUnits = [];
-    vanillaState.orgMembers = [];
-    vanillaState.selectedCompany = "";
-    vanillaState.selectedDivision = "";
-    vanillaState.selectedHq = "";
-    vanillaState.selectedTeam = "";
-    persistOrganization();
+    resetOrganizationData();
     alert("조직 데이터가 초기화되었습니다.");
   };
 
@@ -187,24 +171,7 @@ export function OrgTeamPanel({ teamId, onOpenEditor, onClosePanel, isMobile = fa
 
   const handleDeleteNode = () => {
     if (!confirm("정말 이 조직과 하위 조직들을 모두 삭제하시겠습니까?")) return;
-    function getChildIds(parentId) {
-      let ids = [parentId];
-      const children = (vanillaState.orgUnits || []).filter((u) => u.parentId === parentId);
-      children.forEach((c) => {
-        ids = ids.concat(getChildIds(c.id));
-      });
-      return ids;
-    }
-    const toDelete = getChildIds(teamId);
-    vanillaState.orgUnits = (vanillaState.orgUnits || []).filter((u) => !toDelete.includes(u.id));
-    vanillaState.orgMembers = (vanillaState.orgMembers || []).filter((m) => !toDelete.includes(m.parentId));
-
-    if (toDelete.includes(vanillaState.selectedTeam)) vanillaState.selectedTeam = "";
-    if (toDelete.includes(vanillaState.selectedHq)) vanillaState.selectedHq = "";
-    if (toDelete.includes(vanillaState.selectedDivision)) vanillaState.selectedDivision = "";
-
-    persistOrganization();
-    onClosePanel();
+    deleteOrgUnitCascade(teamId);
   };
 
   const handleDeleteMember = (memberId) => {
@@ -213,14 +180,7 @@ export function OrgTeamPanel({ teamId, onOpenEditor, onClosePanel, isMobile = fa
       ? `\n\n이 구성원은 ${linkedUnits.map((unit) => `${unit.name} ${UNIT_LEADER_LABELS[unit.level] || '리더'}`).join(', ')}로 지정되어 있습니다. 삭제하면 해당 리더 지정도 해제됩니다.`
       : '';
     if (!confirm(`정말 이 구성원을 삭제하시겠습니까?${warning}`)) return;
-
-    vanillaState.orgMembers = (vanillaState.orgMembers || []).filter((m) => m.id !== memberId);
-    linkedUnits.forEach((unit) => {
-      unit.leader = '';
-      unit.leaderTitle = '';
-      unit.leaderMemberId = '';
-    });
-    persistOrganization();
+    deleteOrgMember(memberId);
   };
 
   const dragStartHandler = (e, memberId) => {
@@ -371,18 +331,7 @@ export function AccordionHq({ hq, expandedIds, selectedTeamId, onToggle, onSelec
   const handleDeleteNode = (e) => {
     e.stopPropagation();
     if (!confirm("정말 이 조직과 하위 조직들을 모두 삭제하시겠습니까?")) return;
-    function getChildIds(parentId) {
-      let ids = [parentId];
-      const children = (vanillaState.orgUnits || []).filter((u) => u.parentId === parentId);
-      children.forEach((c) => {
-        ids = ids.concat(getChildIds(c.id));
-      });
-      return ids;
-    }
-    const toDelete = getChildIds(hq.id);
-    vanillaState.orgUnits = (vanillaState.orgUnits || []).filter((u) => !toDelete.includes(u.id));
-    vanillaState.orgMembers = (vanillaState.orgMembers || []).filter((m) => !toDelete.includes(m.parentId));
-    persistOrganization();
+    deleteOrgUnitCascade(hq.id);
   };
 
   const dragStartHandler = (e) => {
@@ -456,18 +405,7 @@ export function AccordionDivision({ div, expandedIds, selectedTeamId, onToggle, 
   const handleDeleteNode = (e) => {
     e.stopPropagation();
     if (!confirm("정말 이 조직과 하위 조직들을 모두 삭제하시겠습니까?")) return;
-    function getChildIds(parentId) {
-      let ids = [parentId];
-      const children = (vanillaState.orgUnits || []).filter((u) => u.parentId === parentId);
-      children.forEach((c) => {
-        ids = ids.concat(getChildIds(c.id));
-      });
-      return ids;
-    }
-    const toDelete = getChildIds(div.id);
-    vanillaState.orgUnits = (vanillaState.orgUnits || []).filter((u) => !toDelete.includes(u.id));
-    vanillaState.orgMembers = (vanillaState.orgMembers || []).filter((m) => !toDelete.includes(m.parentId));
-    persistOrganization();
+    deleteOrgUnitCascade(div.id);
   };
 
   const dragStartHandler = (e) => {
@@ -601,53 +539,7 @@ function UnitEditor({ editor, units, onClose }) {
       return;
     }
 
-    let targetUnit = isEdit ? vanillaState.orgUnits.find((item) => item.id === editor.id) : null;
-    if (!targetUnit) {
-      const generatedId = `${level.toUpperCase()}_${Math.floor(Math.random() * 100000)}`;
-      targetUnit = {
-        recordType: 'unit',
-        id: generatedId,
-        level: level,
-        parentId: parentId,
-        name: name.trim(),
-        leader: '',
-        leaderTitle: '',
-        leaderRole: '',
-        leaderMemberId: ''
-      };
-      vanillaState.orgUnits.push(targetUnit);
-      if (level === 'company') vanillaState.selectedCompany = generatedId;
-      if (level === 'division') vanillaState.selectedDivision = generatedId;
-      if (level === 'hq') vanillaState.selectedHq = generatedId;
-      if (level === 'team') vanillaState.selectedTeam = generatedId;
-    }
-
-    targetUnit.name = name.trim();
-    if (level !== 'company') {
-      // Apply leader role/memberId
-      targetUnit.leaderRole = UNIT_LEADER_LABELS[level] || '리더';
-      if (!leaderVal) {
-        targetUnit.leader = manualName.trim();
-        targetUnit.leaderTitle = manualTitle;
-        targetUnit.leaderMemberId = '';
-      } else if (leaderVal.startsWith('member:')) {
-        const memberId = leaderVal.slice('member:'.length);
-        const matchMem = vanillaState.orgMembers.find((m) => m.id === memberId);
-        if (matchMem) {
-          targetUnit.leader = matchMem.name;
-          targetUnit.leaderTitle = memberGrade(matchMem);
-          targetUnit.leaderMemberId = matchMem.id;
-        }
-      } else {
-        targetUnit.leaderMemberId = '';
-      }
-    } else {
-      targetUnit.leaderTitle = manualTitle || targetUnit.leaderTitle;
-      targetUnit.leaderRole = UNIT_LEADER_LABELS[level] || targetUnit.leaderRole;
-    }
-
-    syncDraftOrgFromTeam(vanillaState.draftTeamId);
-    persistOrganization();
+    saveOrgUnit({ isEdit, editorId: editor.id, level, parentId, name, leaderVal, manualName, manualTitle });
     onClose();
   };
 
@@ -764,48 +656,15 @@ function MemberEditor({ editor, units, members, onClose }) {
       return;
     }
 
-    if (editor.mode === 'add') {
-      vanillaState.orgMembers.push({
-        recordType: 'person',
-        id: `person-${selectedParentId}-${Math.floor(Math.random() * 100000)}`,
-        name: name.trim(),
-        parentId: selectedParentId,
-        level: 'member',
-        jobGrade: position,
-        position,
-        jobTitle: jobTitle.trim(),
-        employmentStatus,
-        role: jobTitle.trim() || '팀원',
-        tags: '팀원',
-        generation: '30대'
-      });
-    } else {
-      const targetMem = vanillaState.orgMembers.find((item) => item.id === editor.id);
-      if (targetMem) {
-        targetMem.name = name.trim();
-        targetMem.parentId = selectedParentId;
-        targetMem.jobGrade = position;
-        targetMem.position = position;
-        targetMem.jobTitle = jobTitle.trim();
-        targetMem.employmentStatus = employmentStatus;
-        targetMem.role = jobTitle.trim() || targetMem.role || '팀원';
-        
-        syncPersonSnapshotsEverywhere(targetMem);
-        // Sync any sessions linked to this person
-        (vanillaState.sessions || [])
-          .filter((session) =>
-            session.leaderPersonId === targetMem.id ||
-            (session.members || []).some((m) => (m.memberId || m.id) === targetMem.id) ||
-            (session.leaderGroup || []).some((m) => (m.memberId || m.id) === targetMem.id)
-          )
-          .forEach((session) => {
-            // update in place or save
-          });
-      }
-    }
-
-    syncDraftOrgFromTeam(vanillaState.draftTeamId);
-    persistOrganization();
+    saveOrgMember({
+      isEdit: editor.mode === 'edit',
+      editorId: editor.id,
+      name,
+      parentId: selectedParentId,
+      position,
+      jobTitle,
+      employmentStatus
+    });
     onClose();
   };
 

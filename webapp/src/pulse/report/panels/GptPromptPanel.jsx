@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 
 const STORAGE_KEY_PREFIX = 'pulse_report_gpt_';
 
-function buildPrompt({ year, headline, insights, topWeakened, ranked, companyN }) {
+function buildPrompt({ year, headline, insights, topWeakened, ranked, companyN, scopeLabel = '전사' }) {
   const weakItems = topWeakened
     .slice(0, 3)
     .map((t) => `- Q${t.qNo} ${t.label}: ${t.totalDelta !== null ? `${Math.round(t.totalDelta * 100) > 0 ? '+' : ''}${Math.round(t.totalDelta * 100)}pp 변화` : ''}`)
@@ -18,7 +18,7 @@ function buildPrompt({ year, headline, insights, topWeakened, ranked, companyN }
     .map((ins) => `- 관찰: ${ins.title} / 가설: ${ins.hypothesis}`)
     .join('\n');
 
-  return `# ${year}년 Pulse Survey 원인 가설 검토 요청
+  return `# ${year}년 Pulse Survey 원인 가설 검토 요청 (범위: ${scopeLabel})
 
 ## 역할
 당신은 조직개발 전문가입니다. 아래 Pulse Survey 데이터를 바탕으로 원인 가설을 정리하고, FGD/IDI 설계에 도움이 되는 분석을 제공합니다.
@@ -30,9 +30,9 @@ function buildPrompt({ year, headline, insights, topWeakened, ranked, companyN }
 - 리더십·평가 관련 민감 주제는 IDI 분리를 제안하세요.
 - 프로그램은 원인 확인 후 연결하고, 이 단계에서는 개입 후보만 제안하세요.
 
-## ${year}년 데이터 요약
+## ${year}년 데이터 요약 (범위: ${scopeLabel})
 
-**전사 N**: ${companyN !== null ? companyN : '확인 필요'}명
+**${scopeLabel} N**: ${companyN !== null && companyN !== undefined ? companyN : '확인 필요'}명
 
 **핵심 판단**:
 ${headline?.title ?? '데이터 없음'}
@@ -66,8 +66,10 @@ export function GptPromptPanel({
   topWeakened = [],
   ranked = [],
   companyN = null,
+  scope = 'company',
+  scopeLabel = '전사',
 }) {
-  const storageKey = `${STORAGE_KEY_PREFIX}${year}`;
+  const storageKey = `${STORAGE_KEY_PREFIX}${year}_${scope}`;
 
   const [savedText, setSavedText] = useState(() => {
     try {
@@ -81,7 +83,7 @@ export function GptPromptPanel({
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const prompt = buildPrompt({ year, headline, insights, topWeakened, ranked, companyN });
+  const prompt = buildPrompt({ year, headline, insights, topWeakened, ranked, companyN, scopeLabel });
 
   const handleCopy = useCallback(async () => {
     try {

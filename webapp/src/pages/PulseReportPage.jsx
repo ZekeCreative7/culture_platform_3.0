@@ -17,6 +17,8 @@ import {
   getCompanyN,
 } from '../pulse/pulseEngine.js';
 import { setPulseYear, selectPulseDivision } from '../pulse/pulseActions.js';
+import { inferDivisionNs } from '../pulse/inferN.js';
+import { cleanFavSeries, engagementSeries, cleanCompanyFav } from '../pulse/report/reportContent.js';
 import { PulseReportLayout } from '../pulse/report/PulseReportLayout.jsx';
 
 const DEFAULT_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
@@ -58,17 +60,45 @@ export const PulseReportPage = memo(function PulseReportPage() {
   const commonQuestionCount = pair?.commonQuestionIds?.length ?? 0;
   const prevDoc = previousYear ? pulseCache.years?.[previousYear] : null;
 
-  // ── Core diagnostics ───────────────────────────────────────────
-  const diagnostics = useMemo(
-    () => (currentDoc ? pulseDiagnostics(currentDoc, prevDoc) : null),
-    [currentDoc, prevDoc]
-  );
-
   // ── Company N ─────────────────────────────────────────────────
   const companyN = useMemo(
     () => (currentDoc ? getCompanyN(currentDoc) : null),
     [currentDoc]
   );
+
+  // ── Core diagnostics (+ 본부별 N 역산 추정 부착) ────────────────
+  const diagnostics = useMemo(() => {
+    if (!currentDoc) return null;
+    const d = pulseDiagnostics(currentDoc, prevDoc);
+    // 실측 N이 없는 본부는 전사 642 기준 가중평균으로 N을 역산(추정)한다.
+    const missingN = d.rows.some((r) => r.status !== 'masked' && (r.n === null || r.n === undefined));
+    const inferred = missingN ? inferDivisionNs(currentDoc, companyN) : { estimates: {}, confidence: 'none', relResidual: 1 };
+    d.inferredConfidence = inferred.confidence;
+    d.inferredResidual = inferred.relResidual;
+    d.rows.forEach((r) => {
+      if (r.n !== null && r.n !== undefined) {
+        r.nSource = 'reported';
+        r.nEff = r.n;
+      } else {
+        const est = inferred.estimates[r.id];
+        if (est && est.reliable) {
+          r.nSource = 'inferred';
+          r.nEst = est.n;
+          r.nEff = est.n;
+        } else if (est) {
+          // 역산했지만 유사 프로필로 불안정 → 숫자를 숨긴다
+          r.nSource = 'inferred_unreliable';
+          r.nEst = null;
+          r.nEff = null;
+        } else {
+          r.nSource = 'none';
+          r.nEst = null;
+          r.nEff = null;
+        }
+      }
+    });
+    return d;
+  }, [currentDoc, prevDoc, companyN]);
 
   // ── Headline ───────────────────────────────────────────────────
   const headline = useMemo(
@@ -84,6 +114,20 @@ export const PulseReportPage = memo(function PulseReportPage() {
   const themeTrendData = useMemo(
     () => themeTrend(pulseCache.years || {}),
     [pulseCache.years]
+  );
+
+  // ── 오염 2본부 제외 계열 (전사 긍정률 / Engagement Score) ────────
+  const favSeries = useMemo(
+    () => cleanFavSeries(pulseCache.years || {}),
+    [pulseCache.years]
+  );
+  const engagementSeriesData = useMemo(
+    () => engagementSeries(pulseCache.years || {}),
+    [pulseCache.years]
+  );
+  const cleanFav = useMemo(
+    () => cleanCompanyFav(pulseCache.years || {}, year),
+    [pulseCache.years, year]
   );
 
   // ── Voice & care profiles ─────────────────────────────────────
@@ -193,6 +237,9 @@ export const PulseReportPage = memo(function PulseReportPage() {
       diagnostics={diagnostics}
       trendMatchedData={trendMatchedData}
       themeTrendData={themeTrendData}
+      favSeries={favSeries}
+      engagementSeries={engagementSeriesData}
+      cleanFav={cleanFav}
       voiceImpact={voiceImpact}
       prevVoiceImpact={prevVoiceImpact}
       careBelonging={careBelonging}

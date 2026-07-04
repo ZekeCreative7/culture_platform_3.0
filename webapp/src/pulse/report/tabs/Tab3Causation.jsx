@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SignalFlowDiagram } from '../charts/SignalFlowDiagram.jsx';
 import { GptPromptPanel } from '../panels/GptPromptPanel.jsx';
-import { fallbackInsights } from '../reportContent.js';
+import { fallbackInsights, divisionInsights, questionExtremes } from '../reportContent.js';
 
 const pctLabel = (v) => (v === null || v === undefined ? '-' : `${Math.round(v * 100)}%`);
 
@@ -14,7 +14,7 @@ const INTERVENTION_TYPES = [
 ];
 
 /**
- * Tab3Causation — 원인과 실행 연결 탭
+ * Tab3Causation — 원인과 실행 연결 탭 (전사 / 본부별 스코프 지원)
  */
 export function Tab3Causation({
   year,
@@ -24,17 +24,44 @@ export function Tab3Causation({
   ranked,
   companyN,
   mismatchInsights,
+  currentDoc,
+  rows = [],
 }) {
-  // 사용자 확인된 원인 입력
-  const storageKey = `pulse_report_cause_${year}`;
-  const [causeText, setCauseText] = useState(() => {
-    try { return localStorage.getItem(storageKey) || ''; } catch { return ''; }
-  });
+  // ── 스코프: 'company' | 본부 id ─────────────────────────────────
+  const [scope, setScope] = useState('company');
+  const selectableRows = rows.filter((r) => r.status !== 'masked');
+  const scopeRow = scope === 'company' ? null : rows.find((r) => r.id === scope);
+  const scopeLabel = scope === 'company' ? '전사' : scope;
+  const scopeDoc = scope === 'company' ? currentDoc : currentDoc?.divisions?.[scope];
+
+  // 스코프별 검증 흐름 insight
+  const flowInsights = useMemo(() => {
+    if (scope === 'company') {
+      const base = mismatchInsights ?? insights ?? [];
+      return base.length > 0 ? base : fallbackInsights(topWeakened, ranked);
+    }
+    return divisionInsights(scopeDoc, scopeRow);
+  }, [scope, mismatchInsights, insights, topWeakened, ranked, scopeDoc, scopeRow]);
+
+  // GPT 프롬프트에 넘길 스코프별 데이터
+  const scopeWeakened = useMemo(() => {
+    if (scope === 'company') return topWeakened;
+    const { weaknesses } = questionExtremes(scopeRow, 3);
+    return weaknesses.map((w) => ({ qNo: w.qNo, label: w.label, totalDelta: null }));
+  }, [scope, topWeakened, scopeRow]);
+  const scopeRanked = scope === 'company' ? ranked : (scopeRow ? [scopeRow] : []);
+  const scopeN = scope === 'company' ? companyN : (scopeRow?.nEff ?? scopeRow?.n ?? null);
+
+  // ── 확인된 원인 기록 (스코프 + 연도별) ─────────────────────────
+  const storageKey = `pulse_report_cause_${year}_${scope}`;
+  const [causeText, setCauseText] = useState('');
   const [causeInput, setCauseInput] = useState('');
   const [causeSaved, setCauseSaved] = useState(false);
 
-  const baseInsights = mismatchInsights ?? insights ?? [];
-  const flowInsights = baseInsights.length > 0 ? baseInsights : fallbackInsights(topWeakened, ranked);
+  useEffect(() => {
+    try { setCauseText(localStorage.getItem(storageKey) || ''); } catch { setCauseText(''); }
+    setCauseInput('');
+  }, [storageKey]);
 
   function handleSaveCause() {
     if (!causeInput.trim()) return;
@@ -50,9 +77,53 @@ export function Tab3Causation({
   return (
     <div className="pr-tab-content pr-tab3">
 
+      {/* ── 스코프 선택 ───────────────────────────────────────────── */}
+      <div className="pr2-scope">
+        <div className="pr2-scope-seg">
+          <button
+            type="button"
+            className={`pr2-scope-btn ${scope === 'company' ? 'is-active' : ''}`}
+            onClick={() => setScope('company')}
+          >전사 전체</button>
+          <button
+            type="button"
+            className={`pr2-scope-btn ${scope !== 'company' ? 'is-active' : ''}`}
+            onClick={() => setScope(selectableRows[0]?.id ?? 'company')}
+          >본부별</button>
+        </div>
+        {scope !== 'company' && (
+          <select
+            className="pr-div-select pr2-scope-select"
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+          >
+            {selectableRows.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.id}{r.flags?.outlier ? ' (이상치)' : ''}
+              </option>
+            ))}
+          </select>
+        )}
+        <span className="pr2-scope-now">
+          지금 보는 범위: <strong>{scopeLabel}</strong>
+          {scopeRow && <> · 전체 긍정률 {pctLabel(scopeRow.overall)} · {scopeRow.nSource === 'inferred' ? `~N ${scopeRow.nEst} (추정)` : scopeRow.nSource === 'inferred_unreliable' ? 'N 추정 불가' : `N ${scopeRow.n ?? '미제공'}`}</>}
+        </span>
+      </div>
+
+      {/* ── 사용 안내 ─────────────────────────────────────────────── */}
+      <div className="pr2-howto">
+        <span className="pri-chip pri-chip--blue">사용 순서</span>
+        <ol className="pr2-howto-steps">
+          <li><strong>관찰 신호 → 가설</strong>을 확인합니다. (아래 흐름도)</li>
+          <li>GPT 프롬프트를 복사해 ChatGPT/Claude에 붙여넣어 <strong>가설·FGD 질문 초안</strong>을 받습니다.</li>
+          <li>실제 <strong>FGD/IDI를 진행</strong>해 가설을 검증합니다.</li>
+          <li>확인된 원인을 <strong>기록</strong>하고, 원인 위치에 맞는 <strong>개입 유형</strong>에 연결합니다.</li>
+        </ol>
+      </div>
+
       {/* ── 섹션 1: 원인 확인 흐름 ───────────────────────────────── */}
       <section className="pr-section">
-        <div className="pr-section-eyebrow">원인 확인 흐름</div>
+        <div className="pr-section-eyebrow">원인 확인 흐름 · {scopeLabel}</div>
         <h3 className="pr-section-title">관찰 신호 → 검증 가설 → FGD/IDI → 개입 후보</h3>
         <p className="pr-section-desc">
           이 흐름은 원인을 확정하는 것이 아니라 <strong>검증 절차를 설계하는 과정</strong>입니다.
@@ -64,7 +135,7 @@ export function Tab3Causation({
       {/* ── 섹션 2: 가설별 상세 ─────────────────────────────────── */}
       {flowInsights.length > 0 && (
         <section className="pr-section">
-          <div className="pr-section-eyebrow">검증 가설 상세</div>
+          <div className="pr-section-eyebrow">검증 가설 상세 · {scopeLabel}</div>
           <h3 className="pr-section-title">가설별 검증 기준</h3>
           <div className="pr-hypothesis-list">
             {flowInsights.map((ins, i) => (
@@ -126,17 +197,18 @@ export function Tab3Causation({
       {/* ── 섹션 4+5: 원인 기록 저장 + GPT 프롬프트 (2컬럼) ────────── */}
       <div className="pr-workspace-grid">
         <section className="pr-section">
-          <div className="pr-section-eyebrow">확인된 원인 기록</div>
+          <div className="pr-section-eyebrow">확인된 원인 기록 · {scopeLabel}</div>
           <h3 className="pr-section-title">FGD/IDI 후 확인된 원인 후보</h3>
           <p className="pr-section-desc">
             FGD/IDI 결과를 바탕으로 확인된 원인을 아래에 기록하세요. 자동 분석 결과가 아닙니다.
+            기록은 <strong>{scopeLabel}</strong> 범위로 저장됩니다.
           </p>
 
           <textarea
             className="pr-cause-textarea"
             value={causeInput}
             onChange={(e) => setCauseInput(e.target.value)}
-            placeholder="예) FGD 결과, 영업본부에서는 고객 압박 중 제안 처리 결과가 공유되지 않는 패턴이 반복 확인됨..."
+            placeholder={`예) FGD 결과, ${scope === 'company' ? '영업본부' : scope}에서는 고객 압박 중 제안 처리 결과가 공유되지 않는 패턴이 반복 확인됨...`}
             rows={5}
           />
           <div className="pr-cause-actions">
@@ -152,7 +224,7 @@ export function Tab3Causation({
 
           {causeText && (
             <div className="pr-cause-saved-block">
-              <div className="pr-cause-saved-label">저장된 원인 기록</div>
+              <div className="pr-cause-saved-label">저장된 원인 기록 · {scopeLabel}</div>
               <pre className="pr-cause-saved-text">{causeText}</pre>
             </div>
           )}
@@ -160,12 +232,15 @@ export function Tab3Causation({
 
         <section className="pr-section">
           <GptPromptPanel
+            key={`${year}-${scope}`}
             year={year}
+            scope={scope}
+            scopeLabel={scopeLabel}
             headline={headline}
-            insights={mismatchInsights ?? insights ?? []}
-            topWeakened={topWeakened}
-            ranked={ranked}
-            companyN={companyN}
+            insights={flowInsights}
+            topWeakened={scopeWeakened}
+            ranked={scopeRanked}
+            companyN={scopeN}
           />
         </section>
       </div>

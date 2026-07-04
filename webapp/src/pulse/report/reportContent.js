@@ -10,7 +10,18 @@
 
 import { DOMAINS, MANAGER_CLUSTER, CORE } from '../../config/domains.js';
 import { QUESTIONS } from '../../config/questions.js';
-import { favFromItem, unfavFromItem } from '../pulseEngine.js';
+import { ENGAGEMENT_SCORE_HISTORY } from '../../config/pulseDivisions.js';
+import { favFromItem, unfavFromItem, relationshipInsights, percentValue } from '../pulseEngine.js';
+
+/**
+ * 데이터 오염으로 판단돼 전사 긍정률·Engagement Score 집계에서 제외하는 본부.
+ * (고객혁신본부CE, Data Control) — id 표기 변형까지 함께 매칭한다.
+ */
+export const CONTAMINATED_IDS = ['Data_Control', 'DataControl', 'Data Control', '고객혁신본부CE', '고객경험혁신본부CE'];
+export const CONTAMINATED_LABEL = '고객혁신본부CE · Data Control';
+export function isContaminated(id) {
+  return CONTAMINATED_IDS.includes(id);
+}
 
 export const DOMAIN_META = {
   심리적안전감: {
@@ -198,6 +209,105 @@ export function fallbackInsights(topWeakened = [], ranked = []) {
     });
   }
   return out;
+}
+
+/**
+ * 한 본부의 검증 흐름 insight. 먼저 관계 규칙(relationshipInsights)을 돌리고,
+ * 규칙이 안 걸리면 그 본부의 약점 문항·집중 도메인으로 흐름을 합성한다.
+ */
+export function divisionInsights(divisionDoc, row) {
+  const ruleBased = divisionDoc ? relationshipInsights(divisionDoc) : [];
+  if (ruleBased.length > 0) return ruleBased;
+  if (!row) return [];
+
+  const out = [];
+  const dm = DOMAIN_META[row.focusDomain];
+  if (dm) {
+    out.push({
+      title: `${dm.short} 집중 신호`,
+      evidence: `이 본부는 '${row.focusDomain}' 영역이 전사 평균 대비 가장 크게 벌어져 있습니다.`,
+      hypothesis: `${dm.blurb}이 이 본부에서 특히 약하게 경험되고 있을 가능성이 있습니다.`,
+      checkQuestion: dm.fgd,
+      responseGuidance: '본부 고유 패턴이면 본부별 워크숍, 전사 공통이면 전사 세션으로 연결합니다.',
+      tone: 'warn',
+    });
+  }
+  const { weaknesses } = questionExtremes(row, 2);
+  weaknesses.forEach((w) => {
+    out.push({
+      title: `약점 문항: ${w.label}`,
+      evidence: `${w.label}(Q${w.qNo}) 긍정률이 ${pct(w.fav)}%로 이 본부에서 낮은 편입니다.`,
+      hypothesis: `${w.label} 관련해 반복적으로 겪는 장벽이 있을 가능성이 있습니다.`,
+      checkQuestion: `'${w.label}'이 실제로 어렵게 느껴진 최근 상황을 구체적 사례로 들려주세요.`,
+      responseGuidance: '확인된 기제가 리더 행동이면 팀장 코칭, 구조 문제면 운영개선 과제로 연결합니다.',
+      tone: 'warn',
+    });
+  });
+  return out.slice(0, 3);
+}
+
+/** 한 본부(division doc)의 전체 긍정률 = 22문항 favorability 평균. */
+export function divisionOverall(division) {
+  if (!division?.items) return null;
+  const vals = [];
+  for (let q = 1; q <= 22; q++) {
+    const f = favFromItem(division.items[`Q${q}`]);
+    if (f !== null) vals.push(f);
+  }
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+/**
+ * 전사 긍정률 추이 — 연도별로 (전체 포함) vs (오염 2본부 제외) 두 값을 계산.
+ * 두 값 모두 "본부 긍정률의 단순 평균"으로 동일하게 계산해 비교 가능하게 한다.
+ * @returns [{ year, all, clean }]  값은 0~1
+ */
+export function cleanFavSeries(yearDocs) {
+  const years = Object.keys(yearDocs || {}).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  return years.map((year) => {
+    const doc = yearDocs[year];
+    const entries = Object.entries(doc?.divisions || {})
+      .map(([id, div]) => ({ id, overall: divisionOverall(div) }))
+      .filter((e) => e.overall !== null);
+    const allVals = entries.map((e) => e.overall);
+    const cleanVals = entries.filter((e) => !isContaminated(e.id)).map((e) => e.overall);
+    const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    return { year, all: mean(allVals), clean: mean(cleanVals) };
+  }).filter((d) => d.all !== null || d.clean !== null);
+}
+
+/** 현재 연도 전사 긍정률(오염 2본부 제외). cleanFavSeries의 해당 연도 clean 값. */
+export function cleanCompanyFav(yearDocs, year) {
+  const s = cleanFavSeries(yearDocs).find((d) => d.year === Number(year));
+  return s ? s.clean : null;
+}
+
+/**
+ * Engagement Score 추이 — 본사 제공 공식값. 연도별 (전체) vs (오염 2본부 제외).
+ * doc.engagementScore가 있으면 우선, 없으면 ENGAGEMENT_SCORE_HISTORY(config) 사용.
+ * 제외값은 exOutlier{year}가 제공되면 그 값을, 없으면 본부 값들의 단순 평균(제외)으로 계산.
+ * @returns [{ year, full, clean, cleanProvided }]  값은 0~1
+ */
+export function engagementSeries(yearDocs) {
+  const years = Object.keys(yearDocs || {}).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  const hist = ENGAGEMENT_SCORE_HISTORY || {};
+  return years.map((year) => {
+    const doc = yearDocs[year];
+    const company = doc?.engagementScore?.company || null;
+    const full = percentValue(company?.[`y${year}`] ?? hist['전사']?.[`y${year}`]);
+    const provided = percentValue(company?.[`exOutlier${year}`] ?? hist['전사']?.[`exOutlier${year}`]);
+    let clean = provided;
+    let cleanProvided = provided !== null;
+    if (clean === null) {
+      // 본부별 engagement에서 오염 2본부를 뺀 단순 평균으로 근사
+      const vals = Object.entries(hist)
+        .filter(([label]) => label !== '전사' && !isContaminated(label))
+        .map(([, v]) => percentValue(v[`y${year}`]))
+        .filter((v) => v !== null);
+      clean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    }
+    return { year, full, clean, cleanProvided };
+  }).filter((d) => d.full !== null || d.clean !== null);
 }
 
 /** RAG 색상 토큰 */

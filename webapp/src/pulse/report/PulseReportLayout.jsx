@@ -23,6 +23,9 @@ export function PulseReportLayout({
   diagnostics,
   trendMatchedData,
   themeTrendData,
+  favSeries,
+  engagementSeries,
+  cleanFav,
   voiceImpact,
   prevVoiceImpact,
   careBelonging,
@@ -101,6 +104,9 @@ export function PulseReportLayout({
             diagnostics={diagnostics}
             trendMatchedData={trendMatchedData}
             themeTrendData={themeTrendData}
+            favSeries={favSeries}
+            engagementSeries={engagementSeries}
+            cleanFav={cleanFav}
             voiceImpact={voiceImpact}
             prevVoiceImpact={prevVoiceImpact}
             careBelonging={careBelonging}
@@ -136,6 +142,8 @@ export function PulseReportLayout({
             topWeakened={topWeakened}
             ranked={ranked}
             companyN={companyN}
+            currentDoc={currentDoc}
+            rows={diagnostics?.rows ?? []}
           />
         )}
       </div>

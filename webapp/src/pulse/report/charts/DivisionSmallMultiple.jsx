@@ -80,7 +80,11 @@ function SmallMultipleCard({ row, companyOverall, onSelect }) {
 
           {/* N */}
           <div className="pr-small-card-n">
-            {row.n !== null ? `N = ${row.n}` : 'N = ?'}
+            {row.nSource === 'inferred'
+              ? `N ≈ ${row.nEst} (추정)`
+              : row.nSource === 'inferred_unreliable'
+                ? 'N 추정 불가'
+                : row.n !== null ? `N = ${row.n}` : 'N = ?'}
             {row.flags?.reorg && <span className="pr-small-reorg-badge"> 조직개편</span>}
           </div>
         </>

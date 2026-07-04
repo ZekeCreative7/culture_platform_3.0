@@ -120,6 +120,80 @@ export function Sparkline({ points = [], width = 200, height = 56, color = 'var(
 }
 
 /**
+ * DualTrendChart — 두 계열(예: 전체 포함 vs 오염 2본부 제외)을 한 차트에.
+ * @param series [{ key, label, color, dashed?, points:[{year,value}] }]  value 0~1
+ */
+export function DualTrendChart({ series = [], height = 260, note }) {
+  const W = 640, H = height;
+  const padL = 46, padR = 24, padT = 42, padB = 42;
+  const all = series.flatMap((s) => s.points.map((p) => p.value)).filter((v) => v !== null && v !== undefined);
+  if (all.length === 0) return <div className="pr-chart-empty">데이터 없음</div>;
+  const years = [...new Set(series.flatMap((s) => s.points.map((p) => p.year)))].sort((a, b) => a - b);
+  if (years.length < 1) return <div className="pr-chart-empty">데이터 없음</div>;
+
+  const rawMin = Math.min(...all), rawMax = Math.max(...all);
+  const yMin = Math.max(0, rawMin - 0.08), yMax = Math.min(1, rawMax + 0.08);
+  const xOf = (year) => years.length === 1 ? (padL + (W - padL - padR) / 2)
+    : padL + ((year - years[0]) / (years[years.length - 1] - years[0])) * (W - padL - padR);
+  const yOf = (v) => padT + (1 - (v - yMin) / (yMax - yMin || 1)) * (H - padT - padB);
+  const pathOf = (pts) => {
+    const valid = pts.filter((p) => p.value !== null && p.value !== undefined);
+    if (valid.length < 2) return null;
+    return valid.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.year).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(' ');
+  };
+
+  // 마지막 연도의 두 계열 간 격차
+  const lastYear = years[years.length - 1];
+  const lastVals = series.map((s) => ({ ...s, v: s.points.find((p) => p.year === lastYear)?.value }));
+
+  return (
+    <div className="pr2-dual">
+      <div className="pr2-dual-legend">
+        {series.map((s) => (
+          <span key={s.key} className="pr2-dual-key">
+            <span className="pr2-dual-swatch" style={{ background: s.color, opacity: s.dashed ? 0.6 : 1, borderStyle: s.dashed ? 'dashed' : 'solid' }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="pr2-dual-svg" role="img" aria-label="추이 비교">
+        {[0.3, 0.5, 0.7].map((g) => {
+          const y = yOf(g);
+          if (y < padT || y > H - padB) return null;
+          return (
+            <g key={g}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="rgba(14,120,220,0.09)" strokeWidth="1" strokeDasharray="4 4" />
+              <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="var(--faint)">{pct(g)}%</text>
+            </g>
+          );
+        })}
+        <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="rgba(14,120,220,0.15)" strokeWidth="1" />
+        {years.map((y) => (
+          <text key={y} x={xOf(y)} y={H - padB + 18} textAnchor="middle" fontSize="11" fill="var(--muted)">{y}</text>
+        ))}
+
+        {series.map((s) => {
+          const d = pathOf(s.points);
+          return (
+            <g key={s.key}>
+              {d && <path d={d} fill="none" stroke={s.color} strokeWidth={s.dashed ? 2 : 2.6}
+                strokeDasharray={s.dashed ? '5 4' : undefined} strokeLinecap="round" strokeLinejoin="round" opacity={s.dashed ? 0.7 : 1} />}
+              {s.points.filter((p) => p.value !== null && p.value !== undefined).map((p) => (
+                <g key={p.year}>
+                  <circle cx={xOf(p.year)} cy={yOf(p.value)} r={s.dashed ? 3.5 : 4.5} fill={s.dashed ? 'var(--surface)' : s.color} stroke={s.color} strokeWidth="2" />
+                  <text x={xOf(p.year)} y={yOf(p.value) - 11} textAnchor="middle" fontSize="11.5" fontWeight="800" fill={s.color}>{pct(p.value)}%</text>
+                </g>
+              ))}
+            </g>
+          );
+        })}
+      </svg>
+      {note && <p className="pr2-dual-note">{note}</p>}
+    </div>
+  );
+}
+
+/**
  * DomainBars — 도메인 4종 가로 게이지 + 회사 평균 마커
  * @param domains  domainBreakdown() 결과 배열
  */

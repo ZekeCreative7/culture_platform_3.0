@@ -82,7 +82,7 @@ export function HorizBarDelta({ rows = [], companyOverall = null }) {
                 {gapFromCompany !== null && (
                   <span className="pr2-hbar-gap">전사 {pct(gapFromCompany) > 0 ? '+' : ''}{pct(gapFromCompany)}pp</span>
                 )}
-                <span className="pr2-hbar-n">N {row.n ?? '?'}</span>
+                <span className="pr2-hbar-n">{row.nSource === 'inferred' ? `~N ${row.nEst}` : row.nSource === 'inferred_unreliable' ? 'N 추정불가' : `N ${row.n ?? '?'}`}</span>
               </div>
             </div>
           );

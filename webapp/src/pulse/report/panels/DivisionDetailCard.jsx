@@ -79,8 +79,20 @@ export function DivisionDetailCard({ row, companyOverall, companyDomainMeans = {
           </div>
           <div className="pri-stat">
             <span className="pri-stat-label">응답 규모</span>
-            <span className="pri-stat-value">N {row.n ?? '?'}</span>
-            <span className="pri-stat-sub">{row.n !== null && row.n < 15 ? '소규모 — 변동 큼' : '해석 가능 규모'}</span>
+            <span className="pri-stat-value">
+              {row.nSource === 'inferred' ? `~N ${row.nEst}`
+                : row.nSource === 'inferred_unreliable' ? 'N 추정 불가'
+                : (row.n !== null && row.n !== undefined ? `N ${row.n}` : 'N 미제공')}
+            </span>
+            <span className="pri-stat-sub">
+              {row.nSource === 'inferred'
+                ? '전사 642 기준 역산 추정치'
+                : row.nSource === 'inferred_unreliable'
+                  ? '유사 프로필 본부라 역산 오차 큼'
+                  : (row.n === null || row.n === undefined)
+                    ? '“응답자수(N)” 시트 미업로드'
+                    : row.n < 15 ? '소규모 — 변동 큼' : '해석 가능 규모'}
+            </span>
           </div>
         </div>
       </div>

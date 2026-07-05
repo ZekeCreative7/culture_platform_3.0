@@ -66,10 +66,16 @@ describe("Report runtime wiring", () => {
 
   it("moves Report qualitative signal wiring to a Report-owned module", () => {
     const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
+    const reportQualSignalsComponentSource = readFileSync(new URL("../src/report/ReportQualSignals.jsx", import.meta.url), "utf8");
+    const sessionCardSource = readFileSync(new URL("../src/sessions/SessionCard.jsx", import.meta.url), "utf8");
     const qualSignalsSource = readFileSync(new URL("../src/report/reportQualSignals.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("from '../report/reportQualSignals.js'");
     expect(pageSource).not.toContain("from '../app.js'");
+    expect(reportQualSignalsComponentSource).toContain("from './reportQualSignals.js'");
+    expect(sessionCardSource).toContain("from '../report/reportQualSignals.js'");
+    expect(reportQualSignalsComponentSource).not.toContain("window.openQualAnalysisModal");
+    expect(sessionCardSource).not.toContain("window.openQualAnalysisModal");
     expect(qualSignalsSource).toContain("export function bindReportQualSignals");
     expect(qualSignalsSource).toContain("export function openQualAnalysisModal");
     expect(qualSignalsSource).toContain("renderQualSignalPanel");

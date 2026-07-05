@@ -4,6 +4,7 @@ import { sessionTypeLabel, sessionLabel } from '../utils.js';
 import { qualResponseRows } from '../views/analytics.js';
 import { getStatus } from '../views/sessions.js';
 import { startEditSession, deleteSession } from './sessionActions.js';
+import { openQualAnalysisModal } from '../report/reportQualSignals.js';
 
 export function SessionCard({ session }) {
   const [status, tone] = getStatus(session);
@@ -53,12 +54,12 @@ export function SessionCard({ session }) {
       {(hasPreQual || hasPostQual) && (
         <div className="session-qual-actions" style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap', borderTop: '0.5px solid var(--color-border-tertiary,#eee)', paddingTop: '10px' }}>
           {hasPreQual && (
-            <button className="secondary compact" onClick={() => window.openQualAnalysisModal(session.id, 'pre')} style={{ fontSize: '11px', padding: '4px 8px' }}>
+            <button className="secondary compact" onClick={() => openQualAnalysisModal(session.id, 'pre')} style={{ fontSize: '11px', padding: '4px 8px' }}>
               {hasPreSig ? '정성 분석 수정 (사전) ✓' : '정성 분석 (사전)'}
             </button>
           )}
           {hasPostQual && (
-            <button className="secondary compact" onClick={() => window.openQualAnalysisModal(session.id, 'post')} style={{ fontSize: '11px', padding: '4px 8px' }}>
+            <button className="secondary compact" onClick={() => openQualAnalysisModal(session.id, 'post')} style={{ fontSize: '11px', padding: '4px 8px' }}>
               {hasPostSig ? '정성 분석 수정 (사후) ✓' : '정성 분석 (사후)'}
             </button>
           )}

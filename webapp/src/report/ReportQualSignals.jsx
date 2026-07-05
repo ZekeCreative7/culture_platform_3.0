@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { state } from '../state.js';
 import { qualResponseRows } from '../views/analytics.js';
 import { renderQualSignalPanel } from '../qual/qual-signal-panel.js';
+import { openQualAnalysisModal } from './reportQualSignals.js';
 
 function QualSignalPanelWrapper({ qualSignal }) {
   const mountRef = useRef(null);
@@ -39,9 +40,7 @@ export function ReportQualSignals({ session }) {
   }
 
   const handleOpenModal = (phase) => {
-    if (window.openQualAnalysisModal) {
-      window.openQualAnalysisModal(session.id, phase);
-    }
+    openQualAnalysisModal(session.id, phase);
   };
 
   return (

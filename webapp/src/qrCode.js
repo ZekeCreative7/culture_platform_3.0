@@ -4,10 +4,6 @@ let cachedFactory = null;
 
 export function getQrCodeFactory() {
   if (cachedFactory) return cachedFactory;
-  if (typeof globalThis.qrcode === 'function') {
-    cachedFactory = globalThis.qrcode;
-    return cachedFactory;
-  }
 
   const module = { exports: {} };
   const exports = module.exports;
@@ -18,6 +14,5 @@ export function getQrCodeFactory() {
     `${qrCodeSource}; return typeof qrcode === "function" ? qrcode : module.exports;`
   );
   cachedFactory = loadFactory(module, exports, undefined);
-  globalThis.qrcode = cachedFactory;
   return cachedFactory;
 }

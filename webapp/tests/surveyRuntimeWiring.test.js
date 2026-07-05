@@ -11,15 +11,29 @@ describe("Survey runtime wiring", () => {
     expect(draftActionsSource).toContain("} from '../views/survey.js'");
   });
 
-  it("uses the QR factory from Survey render and QR download paths", () => {
+  it("uses a module-cached QR factory from Survey render and QR download paths", async () => {
     const surveyActionsSource = readFileSync(new URL("../src/survey/surveyActions.js", import.meta.url), "utf8");
     const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
     const activeSurveysSectionSource = readFileSync(new URL("../src/survey/ActiveSurveysSection.jsx", import.meta.url), "utf8");
     const closedSurveysSectionSource = readFileSync(new URL("../src/survey/ClosedSurveysSection.jsx", import.meta.url), "utf8");
+    const qrCodeSource = readFileSync(new URL("../src/qrCode.js", import.meta.url), "utf8");
     const viteConfigSource = readFileSync(new URL("../vite.config.js", import.meta.url), "utf8");
+    const previousQrCode = globalThis.qrcode;
+    delete globalThis.qrcode;
+
+    try {
+      const { getQrCodeFactory } = await import("../src/qrCode.js");
+      expect(typeof getQrCodeFactory()).toBe("function");
+      expect(globalThis.qrcode).toBeUndefined();
+    } finally {
+      if (previousQrCode === undefined) delete globalThis.qrcode;
+      else globalThis.qrcode = previousQrCode;
+    }
 
     expect(surveyActionsSource).toContain("getQrCodeFactory()(0, 'M')");
     expect(surveyCardSource).toContain("getQrCodeFactory()(0, 'L')");
+    expect(qrCodeSource).toContain("let cachedFactory = null");
+    expect(qrCodeSource).not.toContain("globalThis.qrcode");
     expect(surveyCardSource).toContain("from './surveyActions.js'");
     expect(activeSurveysSectionSource).toContain("from './surveyActions.js'");
     expect(closedSurveysSectionSource).toContain("from './surveyActions.js'");

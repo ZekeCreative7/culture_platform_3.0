@@ -136,6 +136,7 @@ Known remaining compatibility surfaces:
 - Report filter/export actions are React-owned direct imports and should not attach `window.*` handlers again.
 - Report qualitative-analysis actions are React-owned direct imports and should not attach `window.openQualAnalysisModal` again.
 - Current organization/user identity is owned by `auth/currentAuthContext.js` and should not use `window.__current*` globals again.
+- QR generation is module-cached in `qrCode.js` and should not attach `globalThis.qrcode` again.
 - `state.js` still exposes `collapsibleSectionHeader()` as an HTML string helper.
 
 Treat these as cleanup targets, not as permission to add new string-rendered UI. New UI should be React components with explicit action imports.

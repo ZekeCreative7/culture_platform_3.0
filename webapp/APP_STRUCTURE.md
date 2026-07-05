@@ -129,12 +129,12 @@ Known remaining compatibility surfaces:
 - `views/*.js` files still exist as helper modules and partial HTML renderers.
 - `ReportPage.jsx` still injects HTML from `views/report.js` for the report body while React components fill key sections with portals.
 - `report/reportHtmlBridge.js` is the only allowed bridge from React Report to `views/report.js`. It forces all React-route omit flags and rejects inline handlers/export controls before the HTML reaches `dangerouslySetInnerHTML`.
-- React Report and Session components call qualitative-analysis actions by direct import; `window.openQualAnalysisModal` remains only for legacy `views/report.js` HTML until that section is retired.
 - Some action modules still attach functions to `window.*` for cross-screen compatibility or leftover inline HTML handlers.
 - Survey list, draft, and response/recovery actions are React-owned direct imports and should not attach `window.*` handlers again.
 - Session list/drawer actions are React-owned direct imports and should not attach `window.*` handlers again.
 - Session attendance actions are React-owned direct imports and should not attach `window.openAttendance` again.
 - Report filter/export actions are React-owned direct imports and should not attach `window.*` handlers again.
+- Report qualitative-analysis actions are React-owned direct imports and should not attach `window.openQualAnalysisModal` again.
 - `state.js` still exposes `collapsibleSectionHeader()` as an HTML string helper.
 
 Treat these as cleanup targets, not as permission to add new string-rendered UI. New UI should be React components with explicit action imports.

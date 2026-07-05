@@ -130,7 +130,7 @@ describe("reportQualSignals", () => {
       ],
     });
 
-    expect(window.openQualAnalysisModal).toBe(openQualAnalysisModal);
+    expect(window.openQualAnalysisModal).toBeUndefined();
     openQualAnalysisModal("session-1", "pre");
 
     expect(qualResponseRows).toHaveBeenCalledWith("1", "팀빌딩", "session-1", "사전");

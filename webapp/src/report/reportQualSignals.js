@@ -101,5 +101,3 @@ export function openQualAnalysisModal(sessionId, phase) {
     onConfirm: saveQualSignalToFirestore,
   });
 }
-
-window.openQualAnalysisModal = openQualAnalysisModal;

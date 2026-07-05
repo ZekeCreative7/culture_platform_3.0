@@ -85,7 +85,7 @@ describe("Report runtime wiring", () => {
     expect(qualSignalsSource).toContain("renderQualSignalPanel");
     expect(qualSignalsSource).toContain("renderQualAnalysisModal");
     expect(qualSignalsSource).toContain("qualResponseRows");
-    expect(qualSignalsSource).toContain("window.openQualAnalysisModal = openQualAnalysisModal");
+    expect(qualSignalsSource).not.toContain("window.openQualAnalysisModal");
   });
 
   it("wires new native React components for Executive Summary, Outcome Story, Pulse Insight, Compare Summary Cards, Dimension Cards, Recommendations, Change Analysis, Qualitative Signals, and Compare Ranking Table", () => {

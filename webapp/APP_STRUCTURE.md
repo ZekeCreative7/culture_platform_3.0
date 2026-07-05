@@ -39,6 +39,8 @@ Current top-level routes:
 
 `operational/smokePlan.js` defines the current post-migration smoke flow: Dashboard -> Sessions -> Survey -> public `survey.html` -> Analytics -> Report/PDF -> Pulse Report.
 
+`report/pdfExportReadiness.js` checks the PDF export document before html2pdf runs. It blocks empty/stale export markup, duplicate critical export IDs, and legacy inline `window.*` handlers from entering the generated report.
+
 `scripts/smoke-preview.mjs` checks a running preview server for built operator and public-survey entries, including the legacy `/webapp/survey.html` QR path. Run it after starting Vite preview:
 
 ```bash

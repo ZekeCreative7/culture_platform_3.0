@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "node scripts/check-imports.js",
-    "smoke": "vitest run tests/operationalQuality.test.js",
+    "smoke": "vitest run tests/operationalQuality.test.js tests/reportPdfReadiness.test.js",
     "smoke:preview": "node scripts/smoke-preview.mjs"
   },
   "dependencies": {

@@ -1,4 +1,5 @@
 import { scoreOf } from "../utils.js";
+import { assertPdfExportReady } from "./pdfExportReadiness.js";
 
 function loadScriptOnce(src) {
   return new Promise((resolve, reject) => {
@@ -248,7 +249,6 @@ export async function downloadReportPdf({ element, meta }) {
   const stage = document.createElement("div");
   stage.className = "report-export-stage";
   const clone = element.cloneNode(true);
-  clone.removeAttribute("id");
   clone.classList.add("report-pdf-document");
   clone.style.width = `${PDF_EXPORT_WIDTH_PX}px`;
   clone.style.maxWidth = "none";
@@ -257,6 +257,7 @@ export async function downloadReportPdf({ element, meta }) {
   clone.style.top = "0";
   clone.style.transform = "none";
   clone.querySelectorAll("[data-html2canvas-ignore]").forEach((node) => node.remove());
+  clone.removeAttribute("id");
   stage.appendChild(clone);
   document.body.appendChild(stage);
 
@@ -264,6 +265,7 @@ export async function downloadReportPdf({ element, meta }) {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
   try {
+    assertPdfExportReady(clone);
     const blocks = buildPdfBlocks(clone);
     if (!blocks.length) throw new Error("PDF로 변환할 리포트 내용이 없습니다.");
 

@@ -146,4 +146,39 @@ describe("Survey runtime wiring", () => {
     expect(templateFirestoreSource).toContain("collection(db, 'surveyTemplates')");
     expect(templateFirestoreSource).toContain("doc(db, 'surveyTemplates'");
   });
+
+  it("keeps survey Firestore mechanics in the survey module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const surveyFirestoreSource = readFileSync(new URL("../src/survey/surveyFirestore.js", import.meta.url), "utf8");
+
+    const surveyFacades = stateSource.slice(
+      stateSource.indexOf("export async function loadSurveysFromFirestore"),
+      stateSource.indexOf("export async function loadSessionsFromFirestore")
+    ) + stateSource.slice(
+      stateSource.indexOf("export async function deleteSurveyDocFromFirestore"),
+      stateSource.indexOf("export async function fetchAllResponsesFromFirestore")
+    ) + stateSource.slice(
+      stateSource.indexOf("export async function setSurveyDistributionActiveInFirestore"),
+      stateSource.indexOf("export async function fetchRecentAuditLogs")
+    ) + stateSource.slice(
+      stateSource.indexOf("export async function updateSurveyInFirestore"),
+      stateSource.indexOf("export async function loadPulseYears")
+    );
+
+    expect(stateSource).toContain("loadSurveysFromFirestoreAdapter");
+    expect(stateSource).toContain("subscribeSurveysFromFirestoreAdapter");
+    expect(stateSource).toContain("deleteSurveyDocFromFirestoreAdapter");
+    expect(stateSource).toContain("setSurveyDistributionActiveInFirestoreAdapter");
+    expect(stateSource).toContain("updateSurveyInFirestoreAdapter");
+    expect(surveyFacades).not.toContain("collection(db, 'surveys')");
+    expect(surveyFacades).not.toContain("doc(db, 'surveys'");
+
+    expect(surveyFirestoreSource).toContain("export async function loadSurveysFromFirestoreAdapter");
+    expect(surveyFirestoreSource).toContain("export function subscribeSurveysFromFirestoreAdapter");
+    expect(surveyFirestoreSource).toContain("export async function deleteSurveyDocFromFirestoreAdapter");
+    expect(surveyFirestoreSource).toContain("export async function setSurveyDistributionActiveInFirestoreAdapter");
+    expect(surveyFirestoreSource).toContain("export async function updateSurveyInFirestoreAdapter");
+    expect(surveyFirestoreSource).toContain("collection(db, 'surveys')");
+    expect(surveyFirestoreSource).toContain("doc(db, 'surveys'");
+  });
 });

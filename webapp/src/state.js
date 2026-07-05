@@ -42,6 +42,13 @@ import {
   saveResponsesToFirestoreAdapter
 } from './responses/responseFirestore.js';
 import {
+  deleteSurveyDocFromFirestoreAdapter,
+  loadSurveysFromFirestoreAdapter,
+  setSurveyDistributionActiveInFirestoreAdapter,
+  subscribeSurveysFromFirestoreAdapter,
+  updateSurveyInFirestoreAdapter
+} from './survey/surveyFirestore.js';
+import {
   deleteSurveyTemplateFromFirestoreAdapter,
   loadSurveyTemplatesFromFirestoreAdapter,
   saveSurveyTemplateToFirestoreAdapter,
@@ -394,28 +401,24 @@ export function syncSurveysToSessions() {
 }
 
 export async function loadSurveysFromFirestore() {
-  try {
-    const snap = await getDocs(query(collection(db, 'surveys'), where('organizationId', '==', getCurrentOrgId())));
-    state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
-    state.surveysLoaded = true;
-    syncSurveysToSessions();
-    saveState();
-  } catch (e) {
-    console.error('Firestore 설문 로드 실패:', e);
-  }
+  return loadSurveysFromFirestoreAdapter({
+    state,
+    saveState,
+    getCurrentOrgId,
+    normalizeSurveyRecord,
+    syncSurveysToSessions
+  });
 }
 
 export function subscribeSurveysFromFirestore(onChange = () => {}) {
-  return onSnapshot(query(collection(db, 'surveys'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
-    state.surveys = snap.docs.map(d => normalizeSurveyRecord({ ...d.data(), id: d.id }));
-    state.surveysLoaded = true;
-    syncSurveysToSessions();
-    saveState();
-    setDbStatus('connected');
-    onChange();
-  }, (e) => {
-    console.error('Firestore 설문 실시간 갱신 오류:', e);
-    setDbStatus('error');
+  return subscribeSurveysFromFirestoreAdapter({
+    state,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    normalizeSurveyRecord,
+    syncSurveysToSessions,
+    onChange
   });
 }
 
@@ -502,7 +505,7 @@ export async function fetchResponsesBySurveyId(surveyId) {
 }
 
 export async function deleteSurveyDocFromFirestore(id) {
-  await deleteDoc(doc(db, 'surveys', id));
+  return deleteSurveyDocFromFirestoreAdapter({ id });
 }
 
 export async function fetchAllResponsesFromFirestore() {
@@ -532,24 +535,11 @@ export function subscribeResponsesFromFirestore() {
   });
 }
 export async function setSurveyDistributionActiveInFirestore(id, active) {
-  const now = new Date().toISOString();
-  await setDoc(doc(db, 'surveys', id), {
-    status: active ? 'active' : 'closed',
-    distributionActive: active,
-    distribution: {
-      id: `distribution-${id}`,
-      active,
-      status: active ? 'active' : 'closed',
-      ...(active ? { publishedAt: now, closedAt: '', deletedAt: '' } : { closedAt: now, deletedAt: now })
-    },
-    organizationId: getCurrentOrgId(),
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-  await writeAuditLog({
-    action: 'survey_distribution_toggled',
-    targetId: id,
-    targetType: 'survey',
-    detail: active ? '배포 활성화' : '배포 비활성화'
+  return setSurveyDistributionActiveInFirestoreAdapter({
+    id,
+    active,
+    getCurrentOrgId,
+    writeAuditLog
   });
 }
 
@@ -595,7 +585,11 @@ export async function deleteSurveyTemplateFromFirestore(id) {
 }
 
 export async function updateSurveyInFirestore(id, data) {
-  await setDoc(doc(db, 'surveys', id), { ...data, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() }, { merge: true });
+  return updateSurveyInFirestoreAdapter({
+    id,
+    data,
+    getCurrentOrgId
+  });
 }
 
 export async function loadPulseYears() {

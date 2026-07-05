@@ -73,11 +73,3 @@ export function downloadQrCode(surveyId) {
     alert('QR 다운로드 실패: ' + (err?.message || err));
   }
 }
-
-// views/survey.js still renders onclick="..." string attributes, which only
-// resolve against window.*, so keep these attached the same way app.js did.
-window.copySurveyLink = copySurveyLink;
-window.toggleClosedSurveysSection = toggleClosedSurveysSection;
-window.toggleSurveyCard = toggleSurveyCard;
-window.collapseAllSurveys = collapseAllSurveys;
-window.downloadQrCode = downloadQrCode;

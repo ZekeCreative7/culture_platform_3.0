@@ -14,10 +14,21 @@ describe("Survey runtime wiring", () => {
   it("uses the QR factory from Survey render and QR download paths", () => {
     const surveyActionsSource = readFileSync(new URL("../src/survey/surveyActions.js", import.meta.url), "utf8");
     const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
+    const activeSurveysSectionSource = readFileSync(new URL("../src/survey/ActiveSurveysSection.jsx", import.meta.url), "utf8");
+    const closedSurveysSectionSource = readFileSync(new URL("../src/survey/ClosedSurveysSection.jsx", import.meta.url), "utf8");
     const viteConfigSource = readFileSync(new URL("../vite.config.js", import.meta.url), "utf8");
 
     expect(surveyActionsSource).toContain("getQrCodeFactory()(0, 'M')");
     expect(surveyCardSource).toContain("getQrCodeFactory()(0, 'L')");
+    expect(surveyCardSource).toContain("from './surveyActions.js'");
+    expect(activeSurveysSectionSource).toContain("from './surveyActions.js'");
+    expect(closedSurveysSectionSource).toContain("from './surveyActions.js'");
+    for (const fn of [
+      "copySurveyLink", "toggleClosedSurveysSection", "toggleSurveyCard", "collapseAllSurveys", "downloadQrCode",
+    ]) {
+      expect(surveyActionsSource).toContain(`export function ${fn}`);
+      expect(surveyActionsSource).not.toContain(`window.${fn}`);
+    }
     expect(existsSync(new URL("../public/qrcode.min.js", import.meta.url))).toBe(true);
     expect(existsSync(new URL("../survey.html", import.meta.url))).toBe(true);
     expect(existsSync(new URL("../public/webapp/survey.html", import.meta.url))).toBe(true);
@@ -67,6 +78,9 @@ describe("Survey runtime wiring", () => {
     expect(surveySource).not.toContain("export function renderSurveyOrphanAndTemplates");
     expect(surveySource).not.toContain("export function renderSurveyResponsePanel");
     expect(surveySource).not.toContain("onclick=\"resetSurveyResponses");
+    expect(surveySource).not.toContain("copySurveyLink");
+    expect(surveySource).not.toContain("toggleSurveyCard");
+    expect(surveySource).not.toContain("downloadQrCode");
     expect(surveySource).not.toContain("export function bindSurveyCreator");
     expect(surveySource).not.toContain("activeSurveys.map");
     expect(surveySource).not.toContain("closedSurveys.map");

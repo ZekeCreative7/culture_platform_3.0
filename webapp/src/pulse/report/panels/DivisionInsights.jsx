@@ -75,7 +75,7 @@ export function DivisionInsights({ row, divisionDoc, currentDoc }) {
               </div>
               <div className="pr2-di-trend-viz">
                 {t.history.length >= 2
-                  ? <Sparkline points={t.history.map((h) => ({ year: h.year, value: h.fav }))} width={110} height={34} />
+                  ? <Sparkline points={t.history.map((h) => ({ year: h.year, value: h.fav }))} width={140} height={40} />
                   : <span className="pr2-di-trend-single">{pctLabel(t.latest)}</span>}
                 {t.totalDelta !== null && t.history.length >= 2 && <DeltaPill value={t.totalDelta} />}
               </div>

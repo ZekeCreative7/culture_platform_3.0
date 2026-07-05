@@ -17,6 +17,10 @@ import {
 } from './utils.js';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 import {
+  saveOrganizationToFirestoreAdapter,
+  subscribeOrganizationFromFirestoreAdapter
+} from './org/organizationFirestore.js';
+import {
   deletePulseCommitmentFromFirestoreAdapter,
   loadPulseCommitmentsAdapter,
   savePulseCommitmentToFirestoreAdapter,
@@ -673,35 +677,17 @@ export async function uploadStateToDb() {
 }
 
 export async function saveOrganizationToFirestore() {
-  await setDoc(doc(db, 'appState', 'main'), {
-    orgUnits: state.orgUnits || [],
-    orgMembers: state.orgMembers || [],
-    savedAt: serverTimestamp(),
-  }, { merge: true });
+  return saveOrganizationToFirestoreAdapter({ state });
 }
 
 export function subscribeOrganizationFromFirestore(onChange = () => {}) {
-  return onSnapshot(doc(db, 'appState', 'main'), (snap) => {
-    if (!snap.exists()) return;
-    const data = snap.data();
-    let changed = false;
-    if (Array.isArray(data.orgUnits)) {
-      state.orgUnits = data.orgUnits;
-      changed = true;
-    }
-    if (Array.isArray(data.orgMembers)) {
-      state.orgMembers = data.orgMembers;
-      changed = true;
-    }
-    if (!changed) return;
-    normalizeAppState(state);
-    saveOrgData();
-    saveState();
-    setDbStatus('connected');
-    onChange();
-  }, (e) => {
-    console.error('Firestore 조직도 실시간 갱신 오류:', e);
-    setDbStatus('error');
+  return subscribeOrganizationFromFirestoreAdapter({
+    state,
+    normalizeAppState,
+    saveOrgData,
+    saveState,
+    setDbStatus,
+    onChange
   });
 }
 

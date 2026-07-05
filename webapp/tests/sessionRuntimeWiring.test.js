@@ -101,6 +101,26 @@ describe("Sessions runtime wiring", () => {
     expect(sessionFirestoreSource).toContain("doc(db, 'sessions'");
   });
 
+  it("keeps organization Firestore mechanics in the org module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const organizationFirestoreSource = readFileSync(new URL("../src/org/organizationFirestore.js", import.meta.url), "utf8");
+
+    const organizationFacades = stateSource.slice(
+      stateSource.indexOf("export async function saveOrganizationToFirestore"),
+      stateSource.indexOf("export async function downloadStateFromDb")
+    );
+
+    expect(stateSource).toContain("saveOrganizationToFirestoreAdapter");
+    expect(stateSource).toContain("subscribeOrganizationFromFirestoreAdapter");
+    expect(organizationFacades).not.toContain("doc(db, 'appState'");
+    expect(organizationFacades).not.toContain("onSnapshot(doc");
+
+    expect(organizationFirestoreSource).toContain("export async function saveOrganizationToFirestoreAdapter");
+    expect(organizationFirestoreSource).toContain("export function subscribeOrganizationFromFirestoreAdapter");
+    expect(organizationFirestoreSource).toContain("doc(db, 'appState'");
+    expect(organizationFirestoreSource).toContain("onSnapshot(doc");
+  });
+
   it("keeps Pulse commitment Firestore mechanics in the pulse module while state.js exposes only facades", () => {
     const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
     const pulseCommitmentFirestoreSource = readFileSync(new URL("../src/pulse/pulseCommitmentFirestore.js", import.meta.url), "utf8");

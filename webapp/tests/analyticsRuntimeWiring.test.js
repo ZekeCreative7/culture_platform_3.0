@@ -5,6 +5,7 @@ describe("Analytics runtime wiring", () => {
   it("renders Analytics response sections through React components instead of legacy HTML strings", () => {
     const pageSource = readFileSync(new URL("../src/pages/AnalyticsPage.jsx", import.meta.url), "utf8");
     const sectionsSource = readFileSync(new URL("../src/analytics/AnalyticsSections.jsx", import.meta.url), "utf8");
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("AnalyticsSectionShell");
     expect(pageSource).toContain("QuantSection");
@@ -21,6 +22,8 @@ describe("Analytics runtime wiring", () => {
     expect(sectionsSource).toContain("scoreOf");
     expect(sectionsSource).not.toContain("onclick=");
     expect(sectionsSource).not.toContain("dangerouslySetInnerHTML");
+    expect(stateSource).not.toContain("collapsibleSectionHeader");
+    expect(stateSource).not.toContain("toggleAnalyticsSection('");
   });
 
   it("renders non-empty quantitative and qualitative response data", async () => {

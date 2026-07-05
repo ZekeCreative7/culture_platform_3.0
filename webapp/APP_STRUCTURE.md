@@ -140,7 +140,6 @@ Known remaining compatibility surfaces:
 - Current organization/user identity is owned by `auth/currentAuthContext.js` and should not use `window.__current*` globals again.
 - QR generation is module-cached in `qrCode.js` and should not attach `globalThis.qrcode` again.
 - Survey helper modules should not reintroduce retired modal HTML or inline handlers.
-- `state.js` still exposes `collapsibleSectionHeader()` as an HTML string helper.
 
 Treat these as cleanup targets, not as permission to add new string-rendered UI. New UI should be React components with explicit action imports.
 

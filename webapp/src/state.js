@@ -849,16 +849,6 @@ export function isAnalyticsSectionCollapsed(key) {
   return (state.collapsedAnalyticsSections || []).includes(key);
 }
 
-export function collapsibleSectionHeader(title, meta, key) {
-  const collapsed = isAnalyticsSectionCollapsed(key);
-  return `
-    <button type="button" class="section-title section-title-toggle" onclick="toggleAnalyticsSection('${key}')">
-      <h2><span class="section-title-chevron">${collapsed ? "▸" : "▾"}</span>${title}</h2>
-      <span>${meta}</span>
-    </button>
-  `;
-}
-
 export function rowMatchesSurvey(row, survey) {
   if (row.surveyId === survey.id) return true;
   const cohort = Number(survey.sessionCohort) || 0;

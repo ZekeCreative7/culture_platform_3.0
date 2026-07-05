@@ -122,4 +122,28 @@ describe("Survey runtime wiring", () => {
     expect(closedSurveyCardSource).not.toContain("window.deleteRecoveredSurveyCard");
     expect(responseActionsSource).not.toContain("window.resetSurveyResponses");
   });
+
+  it("keeps survey template Firestore mechanics in the survey module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const templateFirestoreSource = readFileSync(new URL("../src/survey/surveyTemplateFirestore.js", import.meta.url), "utf8");
+
+    const templateFacades = stateSource.slice(
+      stateSource.indexOf("export async function loadSurveyTemplatesFromFirestore"),
+      stateSource.indexOf("export async function updateSurveyInFirestore")
+    );
+
+    expect(stateSource).toContain("loadSurveyTemplatesFromFirestoreAdapter");
+    expect(stateSource).toContain("subscribeSurveyTemplatesFromFirestoreAdapter");
+    expect(stateSource).toContain("saveSurveyTemplateToFirestoreAdapter");
+    expect(stateSource).toContain("deleteSurveyTemplateFromFirestoreAdapter");
+    expect(templateFacades).not.toContain("collection(db, 'surveyTemplates')");
+    expect(templateFacades).not.toContain("doc(db, 'surveyTemplates'");
+
+    expect(templateFirestoreSource).toContain("export async function loadSurveyTemplatesFromFirestoreAdapter");
+    expect(templateFirestoreSource).toContain("export function subscribeSurveyTemplatesFromFirestoreAdapter");
+    expect(templateFirestoreSource).toContain("export async function saveSurveyTemplateToFirestoreAdapter");
+    expect(templateFirestoreSource).toContain("export async function deleteSurveyTemplateFromFirestoreAdapter");
+    expect(templateFirestoreSource).toContain("collection(db, 'surveyTemplates')");
+    expect(templateFirestoreSource).toContain("doc(db, 'surveyTemplates'");
+  });
 });

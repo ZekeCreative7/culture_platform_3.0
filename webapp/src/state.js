@@ -33,6 +33,12 @@ import {
   subscribeQualSignalsFromFirestoreAdapter
 } from './qual/qualSignalFirestore.js';
 import { subscribeResponsesFromFirestoreAdapter } from './responses/responseFirestoreSubscription.js';
+import {
+  deleteSurveyTemplateFromFirestoreAdapter,
+  loadSurveyTemplatesFromFirestoreAdapter,
+  saveSurveyTemplateToFirestoreAdapter,
+  subscribeSurveyTemplatesFromFirestoreAdapter
+} from './survey/surveyTemplateFirestore.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
 export const ORG_STORE_KEY = "culture-platform-org-v1";
@@ -577,33 +583,33 @@ export async function fetchRecentAuditLogs(count = 20) {
 
 // 설문을 지워도 다음 세션 만들 때 불러올 예시 질문이 남도록, 배포 설문과는 별도 컬렉션에 저장한다.
 export async function loadSurveyTemplatesFromFirestore() {
-  try {
-    const snap = await getDocs(query(collection(db, 'surveyTemplates'), where('organizationId', '==', getCurrentOrgId())));
-    state.surveyTemplates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    saveState();
-  } catch (e) {
-    console.error('Firestore 설문 템플릿 로드 실패:', e);
-  }
+  return loadSurveyTemplatesFromFirestoreAdapter({
+    state,
+    saveState,
+    getCurrentOrgId
+  });
 }
 
 export function subscribeSurveyTemplatesFromFirestore(onChange = () => {}) {
-  return onSnapshot(query(collection(db, 'surveyTemplates'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
-    state.surveyTemplates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    saveState();
-    setDbStatus('connected');
-    onChange();
-  }, (e) => {
-    console.error('Firestore 설문 템플릿 실시간 갱신 오류:', e);
-    setDbStatus('error');
+  return subscribeSurveyTemplatesFromFirestoreAdapter({
+    state,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    onChange
   });
 }
 
 export async function saveSurveyTemplateToFirestore(id, data) {
-  await setDoc(doc(db, 'surveyTemplates', id), { ...data, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() });
+  return saveSurveyTemplateToFirestoreAdapter({
+    id,
+    data,
+    getCurrentOrgId
+  });
 }
 
 export async function deleteSurveyTemplateFromFirestore(id) {
-  await deleteDoc(doc(db, 'surveyTemplates', id));
+  return deleteSurveyTemplateFromFirestoreAdapter({ id });
 }
 
 export async function updateSurveyInFirestore(id, data) {

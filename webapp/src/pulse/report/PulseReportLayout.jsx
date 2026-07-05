@@ -117,7 +117,6 @@ export function PulseReportLayout({
             outliers={outliers}
             masked={masked}
             currentDoc={currentDoc}
-            companyN={companyN}
           />
         )}
 

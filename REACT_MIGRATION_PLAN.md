@@ -941,7 +941,7 @@ Completed:
 
 Verified: `npm run check`, full `vitest run` (64 tests), `npm run build` all pass (bundle shrank ~39KB, 1,168KB → 1,129KB, consistent with the deletion). Browser-verified live — this was the highest-blast-radius change of the whole migration since every page depended on `app.js` loading as a side effect: cycled through all 9 pages with no crashes; created a real session end-to-end and confirmed `subscribeResponsesFromFirestore()` fires correctly from the `sessionDraftActions.js` call site (console showed the real chunked-query attempt and its expected permission-denied error in this unauthenticated preview, exactly matching pre-extraction behavior); confirmed Analytics and Report both render correctly against that real session with no errors.
 
-Remaining Step 8 items (all confirmed non-blocking, no further app.js-shaped debris left): `views/*.js` files still exist but now contain only pure helper functions (already the end-state per earlier Sessions/Survey/Report/Comm work); no `window.*` action-handler duplication remains anywhere.
+Remaining Step 8 items (all confirmed non-blocking, no further app.js-shaped debris left): `views/*.js` files still exist as helper modules and a few partial HTML renderers. The old `app.js` duplication is gone, but some compatibility globals remain in feature action modules for cross-screen and leftover inline-handler compatibility.
 
 Next recommended commit:
 
@@ -964,4 +964,17 @@ Completed, as 6 slices (new `webapp/src/org/orgActions.js`, the first action mod
 
 Verified: `npm run check`, full `vitest run` (64 tests), `npm run build` all pass. Browser-verified live against the real 12-division/74-team/829-member org dataset — this was the most thorough verification pass of the whole migration given the data-integrity risk: confirmed search-and-navigate (member match → correct division/hq/team path), toggle-expand, and select-team all work; **directly verified the bug fix** by deleting an Hq containing the currently-open team's panel and confirming `orgSelectedTeamId`/`selectedTeam`/`selectedHq` all correctly cleared (previously this path left them stale); created a real Hq unit end-to-end (auto-generated id, correct `parentId`/`leaderRole`), edited it to assign a manual leader, then deleted it to confirm cleanup; created a real member on a real team, confirmed the count updated correctly in the UI, then deleted the member; verified `reparentOrgUnit`/`reparentOrgMember` by moving a real Hq and a real member to different parents and back, confirming `parentId` and the cascaded selection fields updated correctly both ways. Every mutation's Firestore call fired as expected (confirmed via the `Firestore 조직도 저장 실패` permission-denied message appearing after each real edit, proving `persistOrganization()` — not just `saveState()` — is running on every code path, the single highest-risk regression class identified in the audit).
 
-**This completes every step of REACT_MIGRATION_PLAN.md.** Steps 1-6 (screen-by-screen React conversion), Step 7 (state ownership normalization across all domains), and Step 2 + Step 8 (retiring `app.js`, `views/*.js` reduced to pure helpers, no `window.*` action duplication) are all done. The app is fully React-native end to end, with no remaining legacy Vanilla rendering, binding, or state-mutation surface.
+**This completes the planned React route/shell migration.** Steps 1-6 (screen-by-screen React conversion), Step 7 (state ownership normalization across all domains), and Step 2 + the major Step 8 goal (retiring `app.js`) are done. The app now runs through React Router with no legacy `app.js` shell, but a small post-migration cleanup surface remains: partial HTML helpers in Survey/Report, `dangerouslySetInnerHTML` call sites that consume those helpers, and compatibility `window.*` exports kept for known callers.
+
+### 2026-07-05 - Post-Migration Cleanup Pass 1
+
+Completed:
+
+- Removed the duplicate `companyN` prop passed to `Tab1Executive` from `PulseReportLayout.jsx`, clearing the Vite/esbuild duplicate-attribute warning.
+- Removed the noisy `saveState called!` debug log from the hot `saveState()` path in `state.js`.
+- Rewrote `webapp/APP_STRUCTURE.md` from the obsolete `app.js`/query-string architecture to the current React Router structure.
+- Corrected this plan's completion wording so it distinguishes the completed React route/shell migration from the remaining Survey/Report compatibility cleanup.
+
+Next recommended cleanup:
+
+- Convert `renderSurveyResponsePanel()` into a React component first. It is a small, operationally important leftover because it still injects HTML into `SurveyCard.jsx` and contains the reset-response inline handler.

@@ -1,9 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect, vi } from 'vitest';
 import { getSessionStatus, dashboardSnapshot, dashboardActionQueue, followupSurveyState, dashboardPulseTeamSupport, dashboardOutcomeSnapshot, dashboardActionDataReady } from '../src/dashboard/dashboardEngine.js';
 import { applyDashboardActionState, applyDashboardNavigationState } from '../src/dashboard/dashboardNavigation.js';
 import { sampleState } from './fixtures/sampleState.js';
 
 describe('getSessionStatus', () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-27T09:00:00+09:00'));
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it('확정된 일정이 전혀 없으면 "시작전"이어야 한다', () => {
     const session = {
       schedule: [

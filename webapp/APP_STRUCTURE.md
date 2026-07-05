@@ -1,198 +1,156 @@
 # Culture Platform Web App Structure
 
-Last updated: 2026-06-27
+Last updated: 2026-07-05
 
-This document describes the current vanilla JavaScript SPA structure after the session drawer and organization screen fixes. Keep it current when changing `app.js`, shared state, module import cache keys, or page-level render/bind flow.
+This document describes the current React-era web app structure after the React migration retired the old `app.js` shell. Keep it current when changing routing, shared state, Firestore listener startup, compatibility globals, or legacy helper modules.
 
 ## Runtime Shape
 
-The app is a static browser SPA served from `webapp/index.html`.
+The app is a static React SPA served from `webapp/index.html`.
 
 `index.html` loads one module entry point:
 
 ```html
-<script type="module" src="./src/app.js?v=20260627-session-drawer-fix-v6"></script>
+<script type="module" src="./src/main.jsx"></script>
 ```
 
-`app.js` is the shell controller. It imports:
+`src/main.jsx` mounts React into `#react-root`, wraps the app in `HashRouter`, and routes authenticated users through `AppLayout`.
 
-- shared data/state from `src/state.js`
-- shared labels/helpers from `src/utils.js`
-- page renderers from `src/views/*`
-- page binders from modules that have active controls, such as `dashboard/dashboardViews.js`, `pulse/pulseViews.js`, and `views/comm.js`
-- Firebase/Auth helpers through `firebase.js`, `authGate.js`, and state persistence functions
+Current top-level routes:
 
-There is no framework router. Navigation is driven by `state.activeView`.
-
-## Core Flow
-
-1. `initApp()` loads persisted state, seeds org data if needed, normalizes organization references, and calls `render()`.
-2. `render()` draws the persistent shell once, then usually replaces only `.canvas` with `renderView()`.
-3. `renderView()` chooses the page renderer from `state.activeView`.
-4. `bindCanvasEvents()` attaches handlers for the active page after every render.
-5. `bindSessionDrawerControls()` attaches shell-level session drawer controls after every render because the topbar button lives outside the canvas.
-6. Firestore listeners update shared `state`, then call `render()` for affected surfaces.
-
-Current top-level views:
-
-| `state.activeView` | Renderer |
+| Route | Page component |
 | --- | --- |
-| `dashboard` | `renderHomeDashboard()` |
-| `sessions` | `renderSessions()` |
-| `org` | `renderOrg()` |
-| `survey` | `renderSurveyCreator()` |
-| `upload` | `renderUpload()` |
-| `analytics` | `renderAnalytics()` |
-| `report` | `renderReport()` |
-| `pulse` | `renderPulse()` |
-| `comm` | `renderComm()` |
+| `#/dashboard` | `pages/DashboardPage.jsx` |
+| `#/sessions` | `pages/SessionsPage.jsx` |
+| `#/org` | `pages/OrgPage.jsx` |
+| `#/upload` | `pages/UploadPage.jsx` |
+| `#/analytics` | `pages/AnalyticsPage.jsx` |
+| `#/report` | `pages/ReportPage.jsx` |
+| `#/survey` | `pages/SurveyPage.jsx` |
+| `#/comm` | `pages/CommPage.jsx` |
+| `#/pulse` | `pages/PulsePage.jsx` |
+| `#/pulse-report` | `pages/PulseReportPage.jsx` |
 
-## Shared State Contract
+`src/app.js`, `src/reactMode.js`, and `components/layout/VanillaCanvas.jsx` have been deleted. Do not reintroduce a full-page legacy shell to add new behavior.
 
-`src/state.js` owns the mutable singleton objects:
+## Public Survey Entry
 
-- `state`
-- `pulseCache`
-- `commitmentsCache`
-- `dbStatus`
+The public mobile survey remains a separate Vite entry:
 
-All modules that import `state.js` must use the exact same module URL:
+- Source: `webapp/survey.html`
+- Built output: `dist/survey.html`
+- Legacy redirect: `public/webapp/survey.html`
+
+Old QR codes may still open `/culture_platform_3.0/webapp/survey.html?surveyId=...`. That redirect must continue forwarding query string and hash to `/culture_platform_3.0/survey.html?surveyId=...`.
+
+## App Initialization
+
+`hooks/useAuth.js` owns auth/preview-mode user state.
+
+`hooks/useInitApp.js` starts the app data listeners and seeds local preview data when needed. It replaces the old `app.js` `initApp()` responsibility without doing full DOM rendering.
+
+Core listener and persistence responsibilities live in `src/state.js`:
+
+- normalized mutable `state`
+- `pulseCache`, `commitmentsCache`, and `dbStatus`
+- local persistence helpers
+- Firestore subscribe/save/delete helpers
+- `subscribeResponsesFromFirestore()`, extracted from the old app-level global
+
+React components still use the shared mutable `state` as the compatibility source of truth, usually through `useVanillaStateTick()` or `useAppStore()`.
+
+## State Contract
+
+`src/state.js` is a singleton module. Import it by the plain path used across the current codebase, for example:
 
 ```js
-../state.js?v=20260627-state-singleton-v1
+import { state, saveState } from '../state.js';
 ```
 
-or, from `app.js`:
+Do not add query-string cache keys to source imports. Browser ESM treats different URLs as different module instances, and this app previously hit real bugs from split singleton state.
 
-```js
-./state.js?v=20260627-state-singleton-v1
-```
-
-Do not bump this query string in only one importing file. Browser ESM treats different query strings as different modules. If `state.js` is imported as two URLs, the app gets two separate `state` objects. That was the cause of the session drawer bug: `app.js` set `sessionDrawerOpen = true`, while `renderSessions()` read a different `state` object where it was still false.
-
-If the `state.js` cache key must change, update every `state.js` import in the same commit and verify with:
+When changing shared state behavior, verify import identity with:
 
 ```bash
-rg -n "state\.js\?v=" webapp/src
+rg -n "state\.js\?" webapp/src
 ```
 
-The result should show one version string only.
+The command should return no source imports with query strings.
 
-## Render And Bind Rules
+## React Ownership
 
-Render functions should return HTML strings and avoid attaching listeners directly. Bind functions attach behavior after render.
+The app is React-routed end to end and the old `app.js` controller is gone. Most operational UI now lives in feature components and action modules:
 
-Current page binding pattern:
+- `dashboard/*`
+- `sessions/*`
+- `survey/*`
+- `upload/*`
+- `analytics/*`
+- `report/*`
+- `org/*`
+- `pulse/*`
+- `comm/*`
 
-- Shell-level controls: `bindLayout()`
-- Per-view controls: `bindCanvasEvents()`
-- Session drawer controls that cross shell/canvas: `bindSessionDrawerControls()`
+Action modules own data mutations and compatibility functions where a workflow still needs a stable callable from another screen. Prefer direct imports for new React call sites.
 
-Because `render()` replaces `.canvas.innerHTML`, any button inside a page renderer loses listeners on every render. Page-level binders must be re-run after each render.
+## Remaining Compatibility Surface
 
-Controls in the persistent shell are different. The sidebar/topbar shell is created once and then patched. If a new topbar control affects page state or a drawer, bind it from a shell-safe binder such as `bindSessionDrawerControls()`.
+The migration is functionally complete at the route/shell level, but not every helper is pure React yet.
 
-## View Module Contract
+Known remaining compatibility surfaces:
 
-View modules currently fall into two types.
+- `views/*.js` files still exist as helper modules and partial HTML renderers.
+- `ReportPage.jsx` still injects HTML from `views/report.js` for the report body while React components fill key sections with portals.
+- `SurveyCard.jsx` still injects `renderSurveyResponsePanel()` from `views/survey.js`; that HTML includes the reset-response button.
+- Some action modules still attach functions to `window.*` for cross-screen compatibility or leftover inline HTML handlers.
+- `state.js` still exposes `collapsibleSectionHeader()` as an HTML string helper.
 
-Render-only or mostly render modules:
+Treat these as cleanup targets, not as permission to add new string-rendered UI. New UI should be React components with explicit action imports.
 
-- `views/sessions.js`
-- `views/org.js`
-- `views/survey.js`
-- `views/upload.js`
-- `views/analytics.js`
-- `views/report.js`
+## Module Guidelines
 
-Render plus bind modules:
-
-- `dashboard/dashboardViews.js`
-- `pulse/pulseViews.js`
-- `views/comm.js`
-
-Several older controls still call `window.*` functions from inline HTML. Those functions are currently registered in `app.js`. This works, but it keeps `app.js` broad. New behavior should prefer a local `bind...()` function in the owning view module when practical.
-
-## Cache-Bust Rules
-
-This app uses query strings for static GitHub Pages cache busting.
-
-Safe rule:
-
-- Bump `index.html`'s `app.js` query string for deployed entry-point changes.
-- For ordinary render modules, bump the import query in `app.js` when needed.
-- For singleton or initialization modules, use one canonical query string across all importers.
-
-Singleton or initialization modules include:
-
-- `state.js`
-- `firebase.js`
-- modules that initialize SDKs, listeners, shared caches, or process-wide browser state
-
-Avoid having these modules imported with multiple query strings. Multiple URLs mean multiple module instances.
-
-Current known follow-up: `firebase.js` is still imported with more than one query string through different modules. It is not the current user-visible failure, but it is structurally risky because `firebase.js` initializes Firebase and App Check at module load time. A cleanup pass should give it one canonical URL, the same way `state.js` was unified.
-
-## Current App.js Responsibilities
-
-`app.js` currently owns too much:
-
-- imports all major renderers
-- owns the shell HTML
-- owns route/view selection
-- owns shell and page binding orchestration
-- owns many `window.*` handlers for sessions, surveys, org editing, reports, uploads, and recovery actions
-- owns Firestore listener startup for surveys, templates, responses, and QualSignal
-
-This is workable for quick iteration, but it is no longer a deep module. The next structure improvement should reduce `app.js` by moving action handlers into feature modules behind small bind interfaces.
-
-Recommended seam direction:
-
-- `app.js`: shell, routing, startup, listener orchestration
-- `state.js`: state shape, persistence, Firestore adapters
-- `views/<feature>.js`: render plus local bind for that feature
-- `features/<feature>Actions.js` or similar, only if a feature's action logic becomes too large for its view module
-
-Do not do a broad rewrite in one pass. Move one feature at a time and keep browser validation around the exact user flow being touched.
+- Page components set the active view through `useAppStore().setActiveView(...)`.
+- Feature components should call action modules directly instead of mutating `state` inline.
+- Keep Firestore write paths in state/action modules, not in presentational components.
+- If a `window.*` export is still needed, document the caller and avoid deleting it casually.
+- Avoid adding new `dangerouslySetInnerHTML`; if one remains, keep its input constrained to local, deterministic helper output.
 
 ## Regression Checklist
 
-After changing `app.js`, `state.js`, import query strings, or a view module:
+After changing routing, `state.js`, listener startup, a public Survey path, or a remaining legacy helper:
 
-1. Run syntax checks:
+1. Run static checks:
 
    ```bash
-   /Users/zekedongwookrho/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --check webapp/src/app.js
-   /Users/zekedongwookrho/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --check webapp/src/views/sessions.js
-   /Users/zekedongwookrho/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --check webapp/src/views/org.js
+   PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run check
+   PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ./node_modules/vitest/vitest.mjs run
+   PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run build
    git diff --check
    ```
 
-2. Verify singleton imports:
+2. Browser-check at least these flows:
+
+   - Dashboard loads without a JS error overlay.
+   - Sessions opens and the edit drawer can be opened from a session card.
+   - Survey opens, QR/link actions still work, and public `survey.html` loads.
+   - Upload parses a CSV and shows validation/preview.
+   - Analytics and Report render against an existing session.
+   - Pulse and Pulse Report load without console errors.
+   - `/webapp/survey.html?surveyId=...` redirects to `/survey.html?surveyId=...`.
+
+3. For GitHub Pages deploy checks, confirm the built entries:
 
    ```bash
-   rg -n "state\.js\?v=" webapp/src
+   PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run build
    ```
 
-3. Browser-check at least these flows:
+   Expected outputs include `dist/index.html` and `dist/survey.html`.
 
-   - Home loads without a JS error overlay.
-   - Topbar `+ 새 세션` opens `새 세션 등록`.
-   - Session-page `+ 새 세션` opens `새 세션 등록`.
-   - Organization nav opens `조직 구조 및 인원 관리`.
-   - Survey page opens without losing text input focus on typing.
+## Current Cleanup Direction
 
-4. For live GitHub Pages issues, verify the loaded entry script:
+The next cleanup passes should remove the remaining compatibility surface in small, browser-verified slices:
 
-   ```js
-   Array.from(document.scripts).map(s => s.src).filter(src => src.includes('/src/app.js'))
-   ```
-
-## Recent Fix Context
-
-The 2026-06-27 session drawer and org screen fixes addressed two related problems:
-
-- `state.js` was loaded under multiple query strings, splitting the shared state singleton.
-- `views/org.js` called `sectionTitle()` without importing it from `utils.js`.
-
-The durable lesson is that import identity is part of the architecture in browser ESM. Query strings are not only cache-bust metadata; they change the module instance.
+1. Convert `renderSurveyResponsePanel()` into a React component and remove its inline reset handler.
+2. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
+3. Remove `window.*` attachments only after every real caller has a direct import or React handler.
+4. Reduce `views/*.js` to true pure helpers, then delete any helper file that no longer has live imports.

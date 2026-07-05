@@ -237,7 +237,6 @@ export function loadState() {
 }
 
 export function saveState() {
-  console.log('saveState called!');
   persistState();
   notify();
 }

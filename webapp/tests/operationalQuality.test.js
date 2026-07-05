@@ -7,7 +7,6 @@ describe("Operational quality guardrails", () => {
 
     expect(source).toContain("React, { Suspense, lazy }");
     expect(source).toContain("lazyNamed(() => import('./pages/ReportPage.jsx')");
-    expect(source).toContain("lazyNamed(() => import('./pages/PulsePage.jsx')");
     expect(source).toContain("lazyNamed(() => import('./pages/PulseReportPage.jsx')");
     expect(source).not.toContain("import { ReportPage } from './pages/ReportPage.jsx'");
     expect(source).not.toContain("import { PulsePage } from './pages/PulsePage.jsx'");
@@ -93,16 +92,16 @@ describe("Operational quality guardrails", () => {
     expect(calls).toEqual(["local", "rollback", "error"]);
   });
 
-  it("routes session and Pulse commitment deletes through the destructive-action guard", () => {
+  it("routes session and survey deletes through the destructive-action guard", () => {
     const sessionActions = readFileSync(new URL("../src/sessions/sessionActions.js", import.meta.url), "utf8");
-    const commitmentsBoard = readFileSync(new URL("../src/pulse/PulseCommitmentsBoard.jsx", import.meta.url), "utf8");
+    const surveyActions = readFileSync(new URL("../src/survey/surveyResponseActions.js", import.meta.url), "utf8");
 
     expect(sessionActions).toContain("runDestructiveAction");
     expect(sessionActions).toContain("rollbackLocal");
     expect(sessionActions).toContain("deleteSessionFromFirestore");
-    expect(commitmentsBoard).toContain("runDestructiveAction");
-    expect(commitmentsBoard).toContain("deletePulseCommitmentFromFirestore");
-    expect(commitmentsBoard).toContain("rollbackLocal");
+    expect(surveyActions).toContain("runDestructiveAction");
+    expect(surveyActions).toContain("deleteSurveyDocFromFirestore");
+    expect(surveyActions).toContain("rollbackLocal");
   });
 
   it("keeps the PDF exporter on the block-sliced reliability profile", async () => {

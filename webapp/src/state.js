@@ -17,6 +17,10 @@ import {
 } from './utils.js';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 import { assertNotQuantInput } from './qual/qual-signal.js';
+import {
+  saveQualSignalToFirestoreAdapter,
+  subscribeQualSignalsFromFirestoreAdapter
+} from './qual/qualSignalFirestore.js';
 import { subscribeResponsesFromFirestoreAdapter } from './responses/responseFirestoreSubscription.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
@@ -423,16 +427,12 @@ export function subscribeSessionsFromFirestore(onChange = () => {}) {
 }
 
 export function subscribeQualSignalsFromFirestore(onChange = () => {}) {
-  return onSnapshot(collection(db, 'QualSignal'), (snap) => {
-    state.qualSignals = snap.docs
-      .map(d => ({ ...d.data(), id: d.id }))
-      .filter(q => !q.organizationId || q.organizationId === getCurrentOrgId());
-    saveState();
-    setDbStatus('connected');
-    onChange();
-  }, (e) => {
-    console.error('Firestore QualSignal 실시간 갱신 오류:', e);
-    setDbStatus('error');
+  return subscribeQualSignalsFromFirestoreAdapter({
+    state,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    onChange
   });
 }
 
@@ -843,23 +843,13 @@ export async function downloadStateFromDb() {
 }
 
 export async function saveQualSignalToFirestore(qualSignal) {
-  try {
-    const docId = `${qualSignal.session_id}__${qualSignal.phase}`;
-    await setDoc(doc(db, 'QualSignal', docId), { ...qualSignal, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() });
-    setDbStatus('connected');
-
-    const idx = state.qualSignals.findIndex(q => q.id === docId);
-    if (idx >= 0) {
-      state.qualSignals[idx] = { ...qualSignal, id: docId };
-    } else {
-      state.qualSignals.push({ ...qualSignal, id: docId });
-    }
-    saveState();
-  } catch (e) {
-    console.error('Firestore QualSignal 저장 실패:', e);
-    setDbStatus('error');
-    throw e;
-  }
+  return saveQualSignalToFirestoreAdapter({
+    qualSignal,
+    state,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId
+  });
 }
 
 /**

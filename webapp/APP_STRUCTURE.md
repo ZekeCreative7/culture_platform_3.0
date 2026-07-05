@@ -72,6 +72,7 @@ Core listener and persistence responsibilities live in `src/state.js`:
 - local persistence helpers
 - Firestore subscribe/save/delete helpers
 - `subscribeResponsesFromFirestore()`, a thin state facade over `responses/responseFirestoreSubscription.js`
+- `subscribeQualSignalsFromFirestore()` and `saveQualSignalToFirestore()`, thin state facades over `qual/qualSignalFirestore.js`
 
 React components still use the shared mutable `state` as the compatibility source of truth, usually through `useVanillaStateTick()` or `useAppStore()`.
 
@@ -169,7 +170,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
 
 The next cleanup passes should remove the remaining compatibility surface in small, browser-verified slices:
 
-1. Keep shrinking `state.js` by moving remaining Firestore adapters into domain modules; response rules and the response listener adapter now live under `responses/`.
+1. Keep shrinking `state.js` by moving remaining Firestore adapters into domain modules; response rules/listeners now live under `responses/`, and QualSignal listener/save mechanics now live under `qual/`.
 2. Grow the smoke flow from structural guardrails into browser E2E once a stable local auth/preview fixture exists.
 3. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
 4. Remove `window.*` attachments only after every real caller has a direct import or React handler.

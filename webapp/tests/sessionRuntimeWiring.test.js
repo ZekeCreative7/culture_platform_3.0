@@ -50,6 +50,30 @@ describe("Sessions runtime wiring", () => {
     expect(responseFirestoreSource).toContain("onSnapshot(q");
   });
 
+  it("keeps QualSignal Firestore mechanics in the qual module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const qualFirestoreSource = readFileSync(new URL("../src/qual/qualSignalFirestore.js", import.meta.url), "utf8");
+
+    const subscribeFacade = stateSource.slice(
+      stateSource.indexOf("export function subscribeQualSignalsFromFirestore"),
+      stateSource.indexOf("export async function saveSessionToFirestore")
+    );
+    const saveFacade = stateSource.slice(
+      stateSource.indexOf("export async function saveQualSignalToFirestore"),
+      stateSource.indexOf("/**\n * 기존 Firestore 데이터")
+    );
+
+    expect(stateSource).toContain("subscribeQualSignalsFromFirestoreAdapter");
+    expect(stateSource).toContain("saveQualSignalToFirestoreAdapter");
+    expect(subscribeFacade).not.toContain("onSnapshot(collection(db, 'QualSignal')");
+    expect(saveFacade).not.toContain("setDoc(doc(db, 'QualSignal'");
+
+    expect(qualFirestoreSource).toContain("export function subscribeQualSignalsFromFirestoreAdapter");
+    expect(qualFirestoreSource).toContain("export async function saveQualSignalToFirestoreAdapter");
+    expect(qualFirestoreSource).toContain("collection(db, 'QualSignal')");
+    expect(qualFirestoreSource).toContain("setDoc(doc(db, 'QualSignal'");
+  });
+
   it("renders the session list/cards as real React, not a legacy HTML string (calendar was later converted too, see dedicated test below)", () => {
     const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
     const listSectionSource = readFileSync(new URL("../src/sessions/SessionsListSection.jsx", import.meta.url), "utf8");

@@ -23,6 +23,10 @@ export const ORG_STORE_KEY = "culture-platform-org-v1";
 export const PULSE_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 
 function getCurrentOrgId() { return window.__currentOrgId || 'lina'; }
+export function isLocalPreviewMode() {
+  if (typeof window === 'undefined') return false;
+  return window.location?.search?.includes('preview=1') || window.sessionStorage?.getItem('previewMode') === 'true';
+}
 
 export const pulseCache = { years: {}, loading: false, loaded: false, error: "", fromCache: false };
 const pulseCacheKey = () => `pulse-cache-${getCurrentOrgId()}`;
@@ -682,6 +686,14 @@ export async function updateSurveyInFirestore(id, data) {
 }
 
 export async function loadPulseYears() {
+  if (isLocalPreviewMode()) {
+    pulseCache.loaded = true;
+    pulseCache.loading = false;
+    pulseCache.error = "";
+    pulseCache.fromCache = false;
+    setDbStatus('connected');
+    return pulseCache.years;
+  }
   // 캐시로 이미 표시 중이어도(fromCache) 최신값으로 한 번 갱신한다.
   if (pulseCache.loaded && !pulseCache.fromCache) return pulseCache.years;
   if (pulseCache.loading) return pulseCache.years;
@@ -767,6 +779,14 @@ export async function savePulseResultToFirestore(payload) {
 }
 
 export async function loadPulseCommitments() {
+  if (isLocalPreviewMode()) {
+    commitmentsCache.loaded = true;
+    commitmentsCache.loading = false;
+    state.pulseCommitments = state.pulseCommitments || [];
+    saveState();
+    setDbStatus('connected');
+    return;
+  }
   if (commitmentsCache.loaded || commitmentsCache.loading) return;
   commitmentsCache.loading = true;
   try {

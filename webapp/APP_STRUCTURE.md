@@ -39,6 +39,12 @@ Current top-level routes:
 
 `operational/smokePlan.js` defines the current post-migration smoke flow: Dashboard -> Sessions -> Survey -> public `survey.html` -> Analytics -> Report/PDF -> Pulse Report.
 
+`scripts/smoke-preview.mjs` checks a running preview server for built operator and public-survey entries, including the legacy `/webapp/survey.html` QR path. Run it after starting Vite preview:
+
+```bash
+PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run smoke:preview -- http://127.0.0.1:4174/culture_platform_3.0/
+```
+
 ## Public Survey Entry
 
 The public mobile survey remains a separate Vite entry:
@@ -131,6 +137,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
    PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run smoke
    PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ./node_modules/vitest/vitest.mjs run
    PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run build
+   PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run smoke:preview -- http://127.0.0.1:4174/culture_platform_3.0/
    git diff --check
    ```
 

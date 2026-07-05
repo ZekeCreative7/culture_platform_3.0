@@ -29,6 +29,15 @@ describe("Operational quality guardrails", () => {
     expect(existsSync(new URL("../survey.html", import.meta.url))).toBe(true);
   });
 
+  it("keeps preview seeding bundled and avoids source-path JSON fetches", () => {
+    const source = readFileSync(new URL("../src/hooks/useInitApp.js", import.meta.url), "utf8");
+
+    expect(source).toContain("await import('../org_data.json')");
+    expect(source).not.toContain("fetch('./src/org_data.json')");
+    expect(source).toContain("pulseCache.loaded = true");
+    expect(source).toContain("commitmentsCache.loaded = true");
+  });
+
   it("distinguishes preview/cache/loading/error data states for the operations panel", async () => {
     const storage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
     globalThis.window = {
@@ -94,5 +103,14 @@ describe("Operational quality guardrails", () => {
     expect(PDF_EXPORT_WIDTH_PX).toBe(940);
     expect(PDF_CANVAS_SCALE).toBe(1.15);
     expect(typeof buildPdfBlocks).toBe("function");
+  });
+
+  it("documents a preview-server smoke check for built entries and legacy QR routing", () => {
+    const source = readFileSync(new URL("../scripts/smoke-preview.mjs", import.meta.url), "utf8");
+
+    expect(source).toContain("survey.html?surveyId=smoke");
+    expect(source).toContain("webapp/survey.html?surveyId=smoke");
+    expect(source).toContain("operator-index");
+    expect(source).toContain("dashboard-preview");
   });
 });

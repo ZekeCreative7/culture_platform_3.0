@@ -21,6 +21,8 @@ import {
   subscribeResponsesFromFirestore,
   syncSurveysToSessions,
   setDbStatus,
+  pulseCache,
+  commitmentsCache,
 } from '../state.js';
 
 if (window.location.search.includes('preview=1')) {
@@ -52,11 +54,10 @@ export function useInitApp(isAuthenticated, orgId) {
           || (vanillaState.orgDataVersion || 0) < ORG_DATA_VERSION;
         if (orgNeedsSeed) {
           try {
-            const response = await fetch('./src/org_data.json');
-            const data = await response.json();
-            vanillaState.orgUnits = data.units;
-            vanillaState.orgMembers = data.members;
-            vanillaState.orgDataVersion = data.version || ORG_DATA_VERSION;
+            const { default: orgData } = await import('../org_data.json');
+            vanillaState.orgUnits = orgData.units;
+            vanillaState.orgMembers = orgData.members;
+            vanillaState.orgDataVersion = orgData.version || ORG_DATA_VERSION;
             const ceo = vanillaState.orgUnits.find(u => u.level === 'company');
             if (ceo) {
               vanillaState.selectedCompany = ceo.id;
@@ -70,6 +71,12 @@ export function useInitApp(isAuthenticated, orgId) {
         vanillaState.sessionsLoaded = true;
         vanillaState.surveysLoaded = true;
         vanillaState.responsesLoaded = true;
+        pulseCache.loaded = true;
+        pulseCache.loading = false;
+        pulseCache.error = "";
+        pulseCache.fromCache = false;
+        commitmentsCache.loaded = true;
+        commitmentsCache.loading = false;
         setDbStatus('connected');
         return;
       }

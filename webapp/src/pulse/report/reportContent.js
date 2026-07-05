@@ -11,7 +11,7 @@
 import { DOMAINS, MANAGER_CLUSTER, CORE } from '../../config/domains.js';
 import { QUESTIONS } from '../../config/questions.js';
 import { ENGAGEMENT_SCORE_HISTORY } from '../../config/pulseDivisions.js';
-import { favFromItem, unfavFromItem, relationshipInsights, percentValue } from '../pulseEngine.js';
+import { favFromItem, unfavFromItem, relationshipInsights, percentValue, companyFav, careBelongingProfile } from '../pulseEngine.js';
 
 /**
  * 데이터 오염으로 판단돼 전사 긍정률·Engagement Score 집계에서 제외하는 본부.
@@ -262,17 +262,32 @@ export function divisionOverall(division) {
  * 두 값 모두 "본부 긍정률의 단순 평균"으로 동일하게 계산해 비교 가능하게 한다.
  * @returns [{ year, all, clean }]  값은 0~1
  */
+/** 전사(companywide) 22문항 favorability 평균. */
+function companywideFav(doc) {
+  const vals = [];
+  for (let q = 1; q <= 22; q++) {
+    const f = favFromItem(doc?.companywide?.[`Q${q}`]);
+    if (f !== null) vals.push(f);
+  }
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
 export function cleanFavSeries(yearDocs) {
   const years = Object.keys(yearDocs || {}).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
   return years.map((year) => {
     const doc = yearDocs[year];
     const entries = Object.entries(doc?.divisions || {})
       .map(([id, div]) => ({ id, overall: divisionOverall(div) }))
       .filter((e) => e.overall !== null);
+    const cwFav = companywideFav(doc);
+    if (entries.length === 0) {
+      // 본부 분해가 없는 연도(예: 전사만 입력된 2024)는 전사 집계값을 두 계열에 공통 사용.
+      return { year, all: cwFav, clean: cwFav, cwOnly: true };
+    }
     const allVals = entries.map((e) => e.overall);
     const cleanVals = entries.filter((e) => !isContaminated(e.id)).map((e) => e.overall);
-    const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
-    return { year, all: mean(allVals), clean: mean(cleanVals) };
+    return { year, all: mean(allVals), clean: mean(cleanVals), cwOnly: false };
   }).filter((d) => d.all !== null || d.clean !== null);
 }
 
@@ -289,8 +304,13 @@ export function cleanCompanyFav(yearDocs, year) {
  * @returns [{ year, full, clean, cleanProvided }]  값은 0~1
  */
 export function engagementSeries(yearDocs) {
-  const years = Object.keys(yearDocs || {}).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
   const hist = ENGAGEMENT_SCORE_HISTORY || {};
+  // 연도 출처 = 업로드 문서 + 본사 config(전사)의 y-연도 (2024 등 항상 포함)
+  const configYears = Object.keys(hist['전사'] || {})
+    .map((k) => (k.startsWith('y') ? Number(k.slice(1)) : null))
+    .filter(Number.isFinite);
+  const years = [...new Set([...Object.keys(yearDocs || {}).map(Number), ...configYears])]
+    .filter(Number.isFinite).sort((a, b) => a - b);
   return years.map((year) => {
     const doc = yearDocs[year];
     const company = doc?.engagementScore?.company || null;
@@ -306,8 +326,101 @@ export function engagementSeries(yearDocs) {
         .filter((v) => v !== null);
       clean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
     }
+    // 제외값을 못 구하는 연도(예: 2024, 본부 데이터 없음)는 오염 본부가 집계에
+    // 들어가 있지 않으므로 전체값과 같다고 본다.
+    if (clean === null) clean = full;
     return { year, full, clean, cleanProvided };
   }).filter((d) => d.full !== null || d.clean !== null);
+}
+
+/**
+ * 본부의 문항별 연도 추세 — 각 문항(Q1~22)의 연도별 favorability history.
+ * @returns [{ qNo, label, history:[{year,fav}], totalDelta, latest }]
+ */
+export function divisionQuestionTrends(yearDocs, divId) {
+  if (!yearDocs || !divId) return [];
+  return Array.from({ length: 22 }, (_, i) => {
+    const qNo = i + 1;
+    const history = Object.keys(yearDocs)
+      .map(Number)
+      .filter((y) => yearDocs[y]?.divisions?.[divId]?.items)
+      .sort((a, b) => a - b)
+      .map((y) => ({ year: y, fav: favFromItem(yearDocs[y].divisions[divId].items[`Q${qNo}`]) }))
+      .filter((p) => p.fav !== null);
+    const first = history[0];
+    const last = history[history.length - 1];
+    const totalDelta = first && last ? last.fav - first.fav : null;
+    return { qNo, label: QUESTIONS[qNo] || `Q${qNo}`, history, totalDelta, latest: last?.fav ?? null };
+  }).filter((t) => t.latest !== null);
+}
+
+/** 전사 평균 대비 가장 차이나는 문항 top N (강점/보완 단서). */
+export function divisionDiffs(divisionDoc, currentDoc, limit = 3) {
+  if (!divisionDoc?.items || !currentDoc) return [];
+  return Array.from({ length: 22 }, (_, i) => {
+    const qNo = i + 1;
+    const divFav = favFromItem(divisionDoc.items[`Q${qNo}`]);
+    const coFav = companyFav(currentDoc, qNo);
+    return { qNo, label: QUESTIONS[qNo] || `Q${qNo}`, divFav, coFav, diff: divFav !== null && coFav !== null ? divFav - coFav : null };
+  })
+    .filter((d) => d.diff !== null)
+    .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+    .slice(0, limit);
+}
+
+/** 적극 부정(1·2점) 비율이 높은 문항 top N — 급성 불만 신호(신뢰 높음). */
+export function strongUnfavQuestions(divisionDoc, limit = 3) {
+  if (!divisionDoc?.items) return [];
+  return Array.from({ length: 22 }, (_, i) => {
+    const qNo = i + 1;
+    const unfav = unfavFromItem(divisionDoc.items[`Q${qNo}`]);
+    return { qNo, label: QUESTIONS[qNo] || `Q${qNo}`, unfav };
+  })
+    .filter((d) => d.unfav !== null && d.unfav > 0.15)
+    .sort((a, b) => b.unfav - a.unfav)
+    .slice(0, limit);
+}
+
+/** 심리학적 관점(안전·에너지·소속) — 낮은 신뢰도, 가설 보조용 해석. */
+export function psychPerspective(row, divisionDoc) {
+  if (!row || !divisionDoc?.items) return [];
+  const issues = [];
+  if (row.overall !== null && row.overall < 0.5) {
+    issues.push('정서적 에너지·효능감의 동반 저하 신호. 노력과 개선 사이의 연결을 체감하지 못하는 구성원이 늘었을 가능성. 낙관을 설득하기보다 실제로 바뀐 작은 사례를 반복해 보여주는 접근이 필요합니다.');
+  }
+  const q17 = favFromItem(divisionDoc.items.Q17);
+  if (q17 !== null && q17 < 0.45) {
+    issues.push('발언 비용이 높아진 심리적 안전감. 회의의 침묵이 동의가 아니라 자기보호일 수 있습니다. 반대 의견을 받은 리더가 어떻게 답하고 후속하는지 공개적으로 축적돼야 안전감이 회복됩니다.');
+  } else {
+    issues.push('일상적 발언 기반은 유지되는 편. 다만 발언 가능성과 실제 영향력은 다르므로, 제안이 반영/미반영된 이유를 설명하는 피드백 루프까지 확인해야 신뢰 자산이 됩니다.');
+  }
+  const cb = careBelongingProfile(divisionDoc);
+  if (cb?.belonging !== null && cb?.belonging < 0.5) {
+    issues.push('관계적 소속감의 약화. 정보 공유·도움 요청·인정이 특정 관계망에 편중된 결과일 수 있습니다. "누가 소외됐나"보다 "어떤 순간·관행이 사람을 주변부로 미나"를 묻는 편이 생산적입니다.');
+  }
+  if (issues.length === 0) issues.push('심리적 에너지 양호. 서로 지지하고 협업을 시도하는 기초 동력이 있습니다.');
+  return issues;
+}
+
+/** 조직 운영 관점(리더십·의사결정·협업) — 낮은 신뢰도, 가설 보조용 해석. */
+export function orgPerspective(row, divisionDoc) {
+  if (!row || !divisionDoc?.items) return [];
+  const issues = [];
+  const q6 = favFromItem(divisionDoc.items.Q6);
+  if (q6 !== null && q6 < 0.55) {
+    issues.push('역할·의사결정권의 불명확성. 승인·조율에 인지 자원이 과소모될 수 있습니다. R&R 문서보다 반복 업무의 결정권과 예외 승인 기준부터 명료화하는 게 효과적입니다.');
+  }
+  if (row.manager !== null && row.manager < 0.55) {
+    issues.push('리더십 접점의 병목. 과도한 관리 범위·잦은 우선순위 변경·1:1 부재가 결합된 결과일 수 있습니다. 필요한 것은 더 많은 메시지가 아니라 판단 기준·막힘 제거·구체적 피드백입니다.');
+  } else {
+    issues.push('현장 리더십이 완충 장치로 작동 중. 다만 개인 리더의 헌신이 불명확한 제도를 계속 보상하는 구조라면 지속 불가능합니다. 정기 1:1·우선순위 조정권·상향 이슈 경로로 제도화가 필요합니다.');
+  }
+  const q9 = favFromItem(divisionDoc.items.Q9);
+  if (q9 !== null && q9 < 0.5) {
+    issues.push('협업 비용·사일로의 누적. 관계 캠페인보다 업무 인터페이스 결함을 먼저 의심해야 합니다. 최근 막혔던 업무 한 건의 전달·승인·수정 경로를 복기해 구조적 병목을 찾는 편이 생산적입니다.');
+  }
+  if (issues.length === 0) issues.push('운영 구조 최적화 상태. 책임 범위·리더십 피드백이 비교적 질서 있게 작동합니다.');
+  return issues;
 }
 
 /** RAG 색상 토큰 */

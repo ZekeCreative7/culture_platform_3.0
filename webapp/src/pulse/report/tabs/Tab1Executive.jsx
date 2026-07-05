@@ -142,69 +142,65 @@ export function Tab1Executive({
         />
       </section>
 
-      {/* ── 섹션 3: 전사 긍정률 변화 (전체 vs 오염 2본부 제외) ────────── */}
-      {favSeries && favSeries.length >= 2 && (
-        <section className="pr-section">
-          <div className="pr-section-eyebrow">판단 근거 · 전사 추이</div>
-          <h3 className="pr-section-title">전사 긍정률 변화 ({favSeries[0]?.year}–{favSeries[favSeries.length - 1]?.year})</h3>
-          <p className="pr-section-desc">
-            본부 긍정률의 단순 평균입니다. <strong>{CONTAMINATED_LABEL}</strong>는 데이터 신뢰도가 낮아
-            제외한 값(진한 선)을 대표로 봅니다.
-          </p>
-          <div className="pr-chart-card">
-            <DualTrendChart
-              series={[
-                { key: 'all', label: '전체 포함', color: 'var(--faint)', dashed: true, points: favSeries.map((d) => ({ year: d.year, value: d.all })) },
-                { key: 'clean', label: `오염 2본부 제외`, color: 'var(--blue-mid)', points: favSeries.map((d) => ({ year: d.year, value: d.clean })) },
-              ]}
-              note={`오염 2본부(${CONTAMINATED_LABEL})를 빼면 전사 긍정률이 낮아집니다. 이 두 본부는 응답 분포가 극단적이라 전사 평균을 왜곡합니다.`}
-            />
-          </div>
-        </section>
-      )}
+      {/* ── 섹션 3: 전사 긍정률 변화 + Engagement Score (PC 2컬럼) ────── */}
+      <div className="pr2-metric-duo">
+        {favSeries && favSeries.length >= 1 && (
+          <section className="pr-section pr2-metric-col">
+            <div className="pr-section-eyebrow">판단 근거 · 전사 추이</div>
+            <h3 className="pr-section-title">전사 긍정률 변화 ({favSeries[0]?.year}–{favSeries[favSeries.length - 1]?.year})</h3>
+            <p className="pr-section-desc">
+              본부 긍정률의 단순 평균입니다. <strong>{CONTAMINATED_LABEL}</strong>는 데이터 신뢰도가 낮아
+              제외한 값(진한 선)을 대표로 봅니다.
+            </p>
+            <div className="pr-chart-card pr2-metric-card">
+              <DualTrendChart
+                series={[
+                  { key: 'all', label: '전체 포함', color: 'var(--faint)', dashed: true, points: favSeries.map((d) => ({ year: d.year, value: d.all })) },
+                  { key: 'clean', label: '오염 2본부 제외', color: 'var(--blue-mid)', points: favSeries.map((d) => ({ year: d.year, value: d.clean })) },
+                ]}
+                note={`오염 2본부(${CONTAMINATED_LABEL})는 응답 분포가 극단적이라 전사 평균을 왜곡합니다.`}
+              />
+            </div>
+          </section>
+        )}
 
-      {/* ── 섹션 3b: Engagement Score (본사 공식값, 전체 vs 제외) ──────── */}
-      {engagementSeries && engagementSeries.length >= 1 && (
-        <section className="pr-section">
-          <div className="pr-section-eyebrow">본사 공식 지표 · Engagement Score</div>
-          <h3 className="pr-section-title">Engagement Score</h3>
-          <p className="pr-section-desc">
-            본사 글로벌 시스템이 산출한 공식값으로, 플랫폼에서 계산하지 않습니다.
-            긍정률과 마찬가지로 <strong>{CONTAMINATED_LABEL}</strong>를 제외한 값이 실제 조직 상태에 가깝습니다.
-          </p>
-          <div className="pr2-eng-grid">
-            <div className="pr-chart-card pr2-eng-cards">
+        {engagementSeries && engagementSeries.length >= 1 && (
+          <section className="pr-section pr2-metric-col">
+            <div className="pr-section-eyebrow">본사 공식 지표 · Engagement Score</div>
+            <h3 className="pr-section-title">Engagement Score</h3>
+            <p className="pr-section-desc">
+              본사 글로벌 시스템 산출 공식값(플랫폼 미계산). 긍정률과 마찬가지로
+              <strong> {CONTAMINATED_LABEL}</strong> 제외값이 실제 상태에 가깝습니다.
+            </p>
+            <div className="pr-chart-card pr2-metric-card">
               {(() => {
                 const last = engagementSeries[engagementSeries.length - 1];
                 return (
-                  <>
+                  <div className="pr2-eng-cards-row">
                     <div className="pr2-eng-card">
                       <span className="pr2-eng-card-label">전체 (공식)</span>
                       <span className="pr2-eng-card-value">{pct(last.full) ?? '–'}%</span>
-                      <span className="pr2-eng-card-sub">전체 응답 기준</span>
                     </div>
                     <div className="pr2-eng-card pr2-eng-card--primary">
                       <span className="pr2-eng-card-label">오염 2본부 제외</span>
                       <span className="pr2-eng-card-value">{pct(last.clean) ?? '–'}%</span>
-                      <span className="pr2-eng-card-sub">{last.cleanProvided ? '본사 제공 제외값' : '제외 근사값'}</span>
+                      <span className="pr2-eng-card-sub">{last.cleanProvided ? '본사 제공값' : '근사값'}</span>
                     </div>
-                  </>
+                  </div>
                 );
               })()}
-            </div>
-            <div className="pr-chart-card">
               <DualTrendChart
                 series={[
                   { key: 'full', label: '전체 (공식)', color: 'var(--faint)', dashed: true, points: engagementSeries.map((d) => ({ year: d.year, value: d.full })) },
                   { key: 'clean', label: '오염 2본부 제외', color: '#7c3aed', points: engagementSeries.map((d) => ({ year: d.year, value: d.clean })) },
                 ]}
-                height={220}
-                note={`${CONTAMINATED_LABEL}를 제외하면 ${pct(engagementSeries[engagementSeries.length - 1].clean)}% 수준으로 낮아집니다. 산출 근거는 본사 내부 계산입니다.`}
+                height={200}
+                note={`${CONTAMINATED_LABEL} 제외 시 ${pct(engagementSeries[engagementSeries.length - 1].clean)}% 수준. 산출 근거는 본사 내부 계산입니다.`}
               />
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
+      </div>
 
       {/* ── 섹션 4: 본부별 차이 요약 ────────────────────────────────── */}
       <section className="pr-section">
@@ -229,9 +225,29 @@ export function Tab1Executive({
         <div className="pr-section-eyebrow">확인 우선순위</div>
         <h3 className="pr-section-title">본부 확인 우선순위 매트릭스</h3>
         <p className="pr-section-desc">
-          X축은 근거 수준(응답 N), Y축은 조직 영향도(우선순위 점수)입니다.
-          우상단 본부부터 FGD를 먼저 진행합니다.
+          "어느 본부부터 FGD/IDI로 파고들지" 순서를 정하는 도구입니다. 점수표가 아니라 <strong>확인 순서</strong>를 봅니다.
         </p>
+
+        {/* 읽는 법 */}
+        <div className="pr2-matrix-help">
+          <div className="pr2-matrix-help-axes">
+            <div className="pr2-matrix-help-axis">
+              <span className="pr2-matrix-help-k">가로축 · 근거 수준</span>
+              <span>응답 N이 클수록 오른쪽. 오른쪽일수록 결과를 믿고 움직일 근거가 큽니다. <em>점 크기</em>도 N에 비례합니다.</span>
+            </div>
+            <div className="pr2-matrix-help-axis">
+              <span className="pr2-matrix-help-k">세로축 · 조직 영향도</span>
+              <span>우선순위 점수(낮은 긍정률·높은 적극부정·하락폭)가 높을수록 위쪽. 위쪽일수록 조직에 미치는 영향이 큽니다.</span>
+            </div>
+          </div>
+          <div className="pr2-matrix-help-quads">
+            <span className="pr2-matrix-help-q"><span className="pri-chip pri-chip--red">우상단</span> 영향 크고 근거 충분 → <strong>가장 먼저 확인</strong></span>
+            <span className="pr2-matrix-help-q"><span className="pri-chip pri-chip--amber">좌상단</span> 영향 크지만 표본 작음 → <strong>근거 더 모으고 확인</strong></span>
+            <span className="pr2-matrix-help-q"><span className="pri-chip pri-chip--blue">우하단</span> 근거 충분·영향 낮음 → <strong>관찰 유지</strong></span>
+            <span className="pr2-matrix-help-q"><span className="pri-chip pri-chip--slate">좌하단</span> 영향·근거 모두 낮음 → <strong>표본부터 검토</strong></span>
+          </div>
+        </div>
+
         <div className="pr-chart-card pr-chart-card--matrix">
           <QuadrantMatrix rows={rows} maxN={maxN} inferredConfidence={diagnostics?.inferredConfidence} />
         </div>

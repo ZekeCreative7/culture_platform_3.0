@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DivisionDetailCard } from '../panels/DivisionDetailCard.jsx';
+import { DivisionInsights } from '../panels/DivisionInsights.jsx';
 import { DivisionSmallMultiple } from '../charts/DivisionSmallMultiple.jsx';
 
 /**
@@ -95,15 +96,20 @@ export function Tab2Divisions({
         <div id="pr-div-detail-anchor" />
 
         {selectedRow ? (
-          <DivisionDetailCard
-            row={selectedRow}
-            companyOverall={companyOverall}
-            companyDomainMeans={companyDomainMeans}
-            rows={rows}
-            support={support}
-            divisionDoc={divisionDoc}
-            prevRow={null}
-          />
+          <>
+            <DivisionDetailCard
+              row={selectedRow}
+              companyOverall={companyOverall}
+              companyDomainMeans={companyDomainMeans}
+              rows={rows}
+              support={support}
+              divisionDoc={divisionDoc}
+              prevRow={null}
+            />
+            {divisionDoc && selectedRow.status !== 'masked' && (
+              <DivisionInsights row={selectedRow} divisionDoc={divisionDoc} currentDoc={currentDoc} />
+            )}
+          </>
         ) : (
           <div className="pr-div-select-placeholder">
             위에서 본부를 선택하면 상세 카드가 표시됩니다.

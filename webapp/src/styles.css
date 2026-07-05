@@ -7259,6 +7259,93 @@ button.disabled { opacity: .45; pointer-events: none; }
 .pr-data-warning--masked .pr-data-warn-icon { filter: grayscale(0.3); }
 .pr-data-warning--outlier .pr-data-warn-icon {}
 
+.pr-readiness {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 86%, var(--blue-mid) 14%);
+}
+.pr-readiness--ready {
+  background: color-mix(in srgb, var(--surface) 88%, var(--green) 12%);
+}
+.pr-readiness--caution {
+  background: color-mix(in srgb, var(--surface) 86%, var(--amber) 14%);
+}
+.pr-readiness--hold {
+  background: color-mix(in srgb, var(--surface) 86%, var(--red) 14%);
+}
+.pr-readiness-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pr-readiness-head strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+.pr-readiness-kicker {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.pr-readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.pr-readiness-item {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.72);
+}
+.pr-readiness-status {
+  display: block;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.pr-readiness-item strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.pr-readiness-item small {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pr-readiness-item--ok small { color: var(--green); }
+.pr-readiness-item--caution small { color: #b45309; }
+.pr-readiness-item--hold small { color: var(--red); }
+.pr-readiness-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+@media (max-width: 900px) {
+  .pr-readiness-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .pr-readiness-grid { grid-template-columns: 1fr; }
+  .pr-readiness-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+}
+
 /* ── Headline Card ────────────────────────────────────────────── */
 .pr-headline-card {
   background: var(--surface);

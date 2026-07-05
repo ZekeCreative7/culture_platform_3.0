@@ -119,6 +119,8 @@ export function Tab1Executive({
         isRealData={true}
         outliers={outliers ?? []}
         masked={masked ?? []}
+        rows={rows}
+        inferredConfidence={diagnostics?.inferredConfidence ?? 'none'}
       />
 
       {/* ── 섹션 2: 핵심 신호 3개 ───────────────────────────────────── */}

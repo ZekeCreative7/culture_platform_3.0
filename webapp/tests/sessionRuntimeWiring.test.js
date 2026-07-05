@@ -40,8 +40,14 @@ describe("Sessions runtime wiring", () => {
 
     const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
     const responseSubscriptionSource = readFileSync(new URL("../src/responses/responseSubscription.js", import.meta.url), "utf8");
+    const responseFirestoreSource = readFileSync(new URL("../src/responses/responseFirestoreSubscription.js", import.meta.url), "utf8");
     expect(stateSource).toContain("export function subscribeResponsesFromFirestore");
+    expect(stateSource).toContain("subscribeResponsesFromFirestoreAdapter");
+    expect(stateSource).not.toContain("responseUnsubscribes");
     expect(responseSubscriptionSource).toContain("responseSubscriptionSessionIds");
+    expect(responseFirestoreSource).toContain("export function subscribeResponsesFromFirestoreAdapter");
+    expect(responseFirestoreSource).toContain("responseUnsubscribes");
+    expect(responseFirestoreSource).toContain("onSnapshot(q");
   });
 
   it("renders the session list/cards as real React, not a legacy HTML string (calendar was later converted too, see dedicated test below)", () => {

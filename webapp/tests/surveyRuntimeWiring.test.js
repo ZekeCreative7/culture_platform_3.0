@@ -120,7 +120,13 @@ describe("Survey runtime wiring", () => {
     expect(surveyCardSource).not.toContain("window.uploadSurveyResults");
     expect(closedSurveyCardSource).not.toContain("window.reopenSurveyDistribution");
     expect(closedSurveyCardSource).not.toContain("window.deleteRecoveredSurveyCard");
-    expect(responseActionsSource).not.toContain("window.resetSurveyResponses");
+    for (const fn of [
+      "deleteSurvey", "uploadSurveyResults", "resetSurveyResponses", "deleteRecoveredSurveyCard",
+      "reopenSurveyDistribution", "scanForOrphanResponses", "recoverOrphanSurvey", "recoverAllOrphanSurveys",
+      "downloadSurveyTemplate", "saveSurveyAsTemplate", "deleteSurveyTemplate",
+    ]) {
+      expect(responseActionsSource).not.toContain(`window.${fn}`);
+    }
   });
 
   it("keeps survey template Firestore mechanics in the survey module while state.js exposes only facades", () => {

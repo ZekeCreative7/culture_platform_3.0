@@ -340,14 +340,3 @@ export function deleteRecoveredSurveyCard(id) {
     alert('화면에는 지워졌지만 서버 삭제에 실패했습니다: ' + e.message);
   });
 }
-
-window.uploadSurveyResults = uploadSurveyResults;
-window.downloadSurveyTemplate = downloadSurveyTemplate;
-window.deleteSurvey = deleteSurvey;
-window.reopenSurveyDistribution = reopenSurveyDistribution;
-window.saveSurveyAsTemplate = saveSurveyAsTemplate;
-window.deleteSurveyTemplate = deleteSurveyTemplate;
-window.scanForOrphanResponses = scanForOrphanResponses;
-window.recoverOrphanSurvey = recoverOrphanSurvey;
-window.recoverAllOrphanSurveys = recoverAllOrphanSurveys;
-window.deleteRecoveredSurveyCard = deleteRecoveredSurveyCard;

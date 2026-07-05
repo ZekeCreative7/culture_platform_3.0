@@ -434,6 +434,100 @@ main { display: flex; flex-direction: column; height: 100vh; overflow-y: auto; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .topbar-actions span { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
 
+.route-loading {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ops-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  margin: 0 24px 0;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+}
+.ops-status-summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.ops-status-summary strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ops-status-summary span:not(.ops-status-dot) {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ops-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+  flex: 0 0 auto;
+}
+.ops-status--loading .ops-status-dot,
+.ops-status-chip--loading::before { background: var(--amber); }
+.ops-status--warning .ops-status-dot,
+.ops-status-chip--warning::before { background: var(--amber); }
+.ops-status--danger .ops-status-dot,
+.ops-status-chip--danger::before { background: var(--red); }
+.ops-status--danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+.ops-status--loading,
+.ops-status--warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.ops-status-data {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ops-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.ops-status-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--green);
+}
+.ops-status-chip b {
+  color: var(--ink);
+  font-weight: 900;
+}
+
 .canvas { flex: 1; padding: 28px 28px; }
 
 /* ─── Typography ─── */

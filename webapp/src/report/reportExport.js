@@ -29,8 +29,13 @@ function loadScriptOnce(src) {
 const PHASE_ORDER = ["사전", "중간", "사후", "팔로우업"];
 // A4 portrait has much less horizontal room than the desktop canvas. Keep the
 // cloned export document narrow enough that html2pdf does not shrink or crop it.
-const PDF_EXPORT_WIDTH_PX = 940;
-const PDF_CANVAS_SCALE = 1.15;
+export const PDF_EXPORT_WIDTH_PX = 940;
+export const PDF_CANVAS_SCALE = 1.15;
+export const PDF_EXPORT_PROFILE = {
+  widthPx: PDF_EXPORT_WIDTH_PX,
+  canvasScale: PDF_CANVAS_SCALE,
+  strategy: 'block-sliced-a4',
+};
 
 function safeFilePart(value) {
   return String(value || "report")
@@ -289,7 +294,7 @@ export async function downloadReportPdf({ element, meta }) {
   }
 }
 
-function buildPdfBlocks(clone) {
+export function buildPdfBlocks(clone) {
   return Array.from(clone.children)
     .filter((child) => child.nodeType === Node.ELEMENT_NODE && child.getBoundingClientRect().height > 0)
     .map((child) => {

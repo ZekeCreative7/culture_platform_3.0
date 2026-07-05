@@ -6,8 +6,9 @@ import { useInitApp } from '../../hooks/useInitApp.js';
 import { clearUploadSyncWarning } from '../../upload/uploadActions.js';
 import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
+import { OperationalStatusPanel } from '../../operational/OperationalStatusPanel.jsx';
 
-const VALID_VIEWS = ['dashboard', 'sessions', 'org', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse'];
+const VALID_VIEWS = ['dashboard', 'sessions', 'org', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse', 'pulse-report'];
 
 export function AppLayout({ children }) {
   const navigate = useNavigate();
@@ -70,6 +71,7 @@ export function AppLayout({ children }) {
           userEmail={user?.email || ''}
           onLogout={logout}
         />
+        <OperationalStatusPanel />
         {uploadSyncWarning && (
           <div className="global-sync-warning">
             <span>{uploadSyncWarning}</span>

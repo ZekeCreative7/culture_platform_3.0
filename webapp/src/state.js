@@ -40,7 +40,7 @@ export const commitmentsCache = { loaded: false, loading: false };
 export let dbStatus = 'connecting';
 const listeners = [];
 
-async function writeAuditLog({ action, targetId, targetType, detail = '' }) {
+export async function recordAuditLog({ action, targetId, targetType, detail = '' }) {
   try {
     const userId = window.__currentUserEmail || 'unknown';
     await addDoc(collection(db, 'auditLogs'), {
@@ -56,6 +56,8 @@ async function writeAuditLog({ action, targetId, targetType, detail = '' }) {
     console.warn('[auditLog] write failed', e);
   }
 }
+
+const writeAuditLog = recordAuditLog;
 
 export function subscribe(listener) {
   listeners.push(listener);
@@ -494,12 +496,13 @@ export async function fetchAllResponsesFromFirestore() {
   });
 }
 
-export async function deleteResponseFromFirestore(id) {
+export async function deleteResponseFromFirestore(id, { throwOnError = false } = {}) {
   try {
     await deleteDoc(doc(db, 'responses', id));
     await writeAuditLog({ action: 'response_deleted', targetId: id, targetType: 'response' });
   } catch (e) {
     console.error('Firestore 응답 삭제 실패:', e);
+    if (throwOnError) throw e;
   }
 }
 

@@ -16,6 +16,8 @@ The app is a static React SPA served from `webapp/index.html`.
 
 `src/main.jsx` mounts React into `#react-root`, wraps the app in `HashRouter`, and routes authenticated users through `AppLayout`.
 
+Operator page routes are loaded through route-level `React.lazy()` boundaries. `vite.config.js` also splits React/Zustand and Firebase into vendor chunks so Report/Pulse growth does not keep inflating the initial `main` chunk.
+
 Current top-level routes:
 
 | Route | Page component |
@@ -32,6 +34,10 @@ Current top-level routes:
 | `#/pulse-report` | `pages/PulseReportPage.jsx` |
 
 `src/app.js`, `src/reactMode.js`, and `components/layout/VanillaCanvas.jsx` have been deleted. Do not reintroduce a full-page legacy shell to add new behavior.
+
+`operational/OperationalStatusPanel.jsx` is mounted under the topbar. It distinguishes preview mode, Firestore status, cached Pulse data, loading datasets, empty datasets, and error states.
+
+`operational/smokePlan.js` defines the current post-migration smoke flow: Dashboard -> Sessions -> Survey -> public `survey.html` -> Analytics -> Report/PDF -> Pulse Report.
 
 ## Public Survey Entry
 
@@ -122,6 +128,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
 
    ```bash
    PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run check
+   PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run smoke
    PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ./node_modules/vitest/vitest.mjs run
    PATH=/Users/zekedongwookrho/Desktop/Culture\ Platform\ 3.0/node_portable/bin:$PATH ../node_portable/bin/node ../node_portable/lib/node_modules/npm/bin/npm-cli.js run build
    git diff --check
@@ -150,6 +157,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
 The next cleanup passes should remove the remaining compatibility surface in small, browser-verified slices:
 
 1. Split the response listener/recovered-survey backfill behavior in `state.js` into a deeper responses subscription module.
-2. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
-3. Remove `window.*` attachments only after every real caller has a direct import or React handler.
-4. Reduce `views/*.js` to true pure helpers, then delete any helper file that no longer has live imports.
+2. Grow the smoke flow from structural guardrails into browser E2E once a stable local auth/preview fixture exists.
+3. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
+4. Remove `window.*` attachments only after every real caller has a direct import or React handler.
+5. Reduce `views/*.js` to true pure helpers, then delete any helper file that no longer has live imports.

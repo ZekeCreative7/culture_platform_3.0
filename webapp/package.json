@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "node scripts/check-imports.js"
+    "check": "node scripts/check-imports.js",
+    "smoke": "vitest run tests/operationalQuality.test.js"
   },
   "dependencies": {
     "firebase": "^10.14.1",

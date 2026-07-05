@@ -14,10 +14,12 @@ import {
   updateSurveyInFirestore,
   deleteSurveyDocFromFirestore,
   subscribeResponsesFromFirestore,
+  recordAuditLog,
 } from '../state.js';
 import { uid, sessionLabel, defaultQuestions } from '../utils.js';
 import { parseCSV } from '../upload/csvParser.js';
 import { ensureXlsxLoaded } from '../report/reportExport.js';
+import { runDestructiveAction } from '../operational/destructiveAction.js';
 
 export function uploadSurveyResults(surveyId) {
   const survey = (state.surveys || []).find((s) => s.id === surveyId);
@@ -72,26 +74,49 @@ export function downloadSurveyTemplate(surveyId) {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
-export function deleteSurvey(id) {
+export async function deleteSurvey(id) {
   const survey = (state.surveys || []).find((item) => item.id === id);
   if (!survey) return;
   const responseCount = surveyRows(survey).length;
-  if (!confirm(`이 설문의 배포를 종료하고 링크와 QR을 비활성화할까요?\n\n기존 응답 ${responseCount}건과 업로드 결과는 삭제되지 않으며 문항별 응답에서 계속 확인할 수 있습니다.`)) return;
+  const before = JSON.parse(JSON.stringify(survey));
   const now = new Date().toISOString();
-  survey.status = 'closed';
-  survey.distributionActive = false;
-  survey.distribution = {
-    ...(survey.distribution || {}),
-    id: survey.distribution?.id || `distribution-${id}`,
-    active: false,
-    status: 'closed',
-    closedAt: now,
-    deletedAt: now,
-  };
-  saveState();
-  setSurveyDistributionActiveInFirestore(id, false).catch((e) => {
-    console.error('Firestore 배포 종료 실패:', e);
-    alert('화면에서는 배포가 종료됐지만 서버 동기화에 실패했습니다: ' + e.message);
+  return runDestructiveAction({
+    title: '설문 배포를 종료할까요?',
+    body: `"${survey.title}" 링크와 QR을 비활성화합니다.`,
+    impact: [
+      `기존 응답 ${responseCount}건은 삭제하지 않습니다.`,
+      '문항별 응답과 분석 화면에서는 계속 확인할 수 있습니다.',
+    ],
+    applyLocal: () => {
+      survey.status = 'closed';
+      survey.distributionActive = false;
+      survey.distribution = {
+        ...(survey.distribution || {}),
+        id: survey.distribution?.id || `distribution-${id}`,
+        active: false,
+        status: 'closed',
+        closedAt: now,
+        deletedAt: now,
+      };
+      saveState();
+    },
+    rollbackLocal: () => {
+      Object.assign(survey, before);
+      saveState();
+    },
+    persistRemote: async () => {
+      await setSurveyDistributionActiveInFirestore(id, false);
+      await recordAuditLog({
+        action: 'survey_closed',
+        targetId: id,
+        targetType: 'survey',
+        detail: `${survey.title || ''} · 응답 ${responseCount}건 보존`,
+      });
+    },
+    onError: (e) => {
+      console.error('Firestore 배포 종료 실패:', e);
+      alert('서버 동기화에 실패해 배포 종료를 되돌렸습니다: ' + (e?.message || e));
+    },
   });
 }
 
@@ -145,16 +170,38 @@ export function deleteSurveyTemplate(id) {
   deleteSurveyTemplateFromFirestore(id).catch((e) => console.error('Firestore 템플릿 삭제 실패:', e));
 }
 
-export function resetSurveyResponses(id) {
+export async function resetSurveyResponses(id) {
   const survey = (state.surveys || []).find((s) => s.id === id);
   if (!survey) return;
   const rows = surveyRows(survey);
   if (!rows.length) { alert('리셋할 응답 데이터가 없습니다.'); return; }
-  if (!confirm(`고위험 작업입니다.\n\n"${survey.title}"의 링크/QR 응답과 업로드 결과 ${rows.length}건을 DB에서 완전히 삭제합니다. 배포 종료와 달리 되돌릴 수 없습니다.\n\n정말 응답을 완전 삭제하시겠습니까?`)) return;
+  const previousResponses = state.responses || [];
   const removedIds = new Set(rows.map((r) => r.id));
-  state.responses = (state.responses || []).filter((r) => !removedIds.has(r.id));
-  saveState();
-  Promise.all(rows.map((r) => deleteResponseFromFirestore(r.id))).catch((e) => console.error('Firestore 응답 삭제 실패:', e));
+  return runDestructiveAction({
+    title: '설문 응답을 완전 삭제할까요?',
+    body: `"${survey.title}"의 링크/QR 응답과 업로드 결과 ${rows.length}건을 DB에서 삭제합니다.`,
+    impact: [
+      '배포 종료와 달리 응답 데이터가 사라집니다.',
+      '서버 삭제가 성공한 뒤 화면에서 제거합니다.',
+    ],
+    persistRemote: async () => {
+      await Promise.all(rows.map((r) => deleteResponseFromFirestore(r.id, { throwOnError: true })));
+      await recordAuditLog({
+        action: 'survey_responses_reset',
+        targetId: id,
+        targetType: 'survey',
+        detail: `${survey.title || ''} · ${rows.length}건 삭제`,
+      });
+    },
+    onSuccess: () => {
+      state.responses = previousResponses.filter((r) => !removedIds.has(r.id));
+      saveState();
+    },
+    onError: (e) => {
+      console.error('Firestore 응답 삭제 실패:', e);
+      alert('서버 삭제에 실패해 화면 데이터는 유지했습니다: ' + (e?.message || e));
+    },
+  });
 }
 
 function orphanGroupKey(row) {

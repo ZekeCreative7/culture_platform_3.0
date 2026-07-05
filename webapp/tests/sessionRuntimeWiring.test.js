@@ -74,6 +74,33 @@ describe("Sessions runtime wiring", () => {
     expect(qualFirestoreSource).toContain("setDoc(doc(db, 'QualSignal'");
   });
 
+  it("keeps session Firestore mechanics in the sessions module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const sessionFirestoreSource = readFileSync(new URL("../src/sessions/sessionFirestore.js", import.meta.url), "utf8");
+
+    const sessionFacades = stateSource.slice(
+      stateSource.indexOf("export async function loadSessionsFromFirestore"),
+      stateSource.indexOf("export function subscribeQualSignalsFromFirestore")
+    ) + stateSource.slice(
+      stateSource.indexOf("export async function saveSessionToFirestore"),
+      stateSource.indexOf("export async function fetchResponseDocById")
+    );
+
+    expect(stateSource).toContain("loadSessionsFromFirestoreAdapter");
+    expect(stateSource).toContain("subscribeSessionsFromFirestoreAdapter");
+    expect(stateSource).toContain("saveSessionToFirestoreAdapter");
+    expect(stateSource).toContain("deleteSessionFromFirestoreAdapter");
+    expect(sessionFacades).not.toContain("collection(db, 'sessions')");
+    expect(sessionFacades).not.toContain("doc(db, 'sessions'");
+
+    expect(sessionFirestoreSource).toContain("export async function loadSessionsFromFirestoreAdapter");
+    expect(sessionFirestoreSource).toContain("export function subscribeSessionsFromFirestoreAdapter");
+    expect(sessionFirestoreSource).toContain("export async function saveSessionToFirestoreAdapter");
+    expect(sessionFirestoreSource).toContain("export async function deleteSessionFromFirestoreAdapter");
+    expect(sessionFirestoreSource).toContain("collection(db, 'sessions')");
+    expect(sessionFirestoreSource).toContain("doc(db, 'sessions'");
+  });
+
   it("keeps Pulse commitment Firestore mechanics in the pulse module while state.js exposes only facades", () => {
     const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
     const pulseCommitmentFirestoreSource = readFileSync(new URL("../src/pulse/pulseCommitmentFirestore.js", import.meta.url), "utf8");

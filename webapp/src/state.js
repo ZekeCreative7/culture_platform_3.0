@@ -42,6 +42,12 @@ import {
   saveResponsesToFirestoreAdapter
 } from './responses/responseFirestore.js';
 import {
+  deleteSessionFromFirestoreAdapter,
+  loadSessionsFromFirestoreAdapter,
+  saveSessionToFirestoreAdapter,
+  subscribeSessionsFromFirestoreAdapter
+} from './sessions/sessionFirestore.js';
+import {
   deleteSurveyDocFromFirestoreAdapter,
   loadSurveysFromFirestoreAdapter,
   setSurveyDistributionActiveInFirestoreAdapter,
@@ -423,34 +429,24 @@ export function subscribeSurveysFromFirestore(onChange = () => {}) {
 }
 
 export async function loadSessionsFromFirestore() {
-  try {
-    const snap = await getDocs(query(collection(db, 'sessions'), where('organizationId', '==', getCurrentOrgId())));
-    if (snap.docs.length > 0) {
-      const firestoreSessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
-      const firestoreIds = new Set(firestoreSessions.map(s => s.id));
-      const localOnly = (state.sessions || []).filter(s => !firestoreIds.has(s.id));
-      state.sessions = [...firestoreSessions, ...localOnly];
-    }
-    state.sessionsLoaded = true;
-    saveState();
-    setDbStatus('connected');
-  } catch (e) {
-    console.error('Firestore 세션 로드 실패:', e);
-    setDbStatus('error');
-  }
+  return loadSessionsFromFirestoreAdapter({
+    state,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    normalizeSessionRecord
+  });
 }
 
 export function subscribeSessionsFromFirestore(onChange = () => {}) {
-  return onSnapshot(query(collection(db, 'sessions'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
-    state.sessions = snap.docs.map(d => normalizeSessionRecord({ ...d.data(), id: d.id }));
-    state.sessionsLoaded = true;
-    syncSurveysToSessions();
-    saveState();
-    setDbStatus('connected');
-    onChange();
-  }, (e) => {
-    console.error('Firestore 세션 실시간 갱신 오류:', e);
-    setDbStatus('error');
+  return subscribeSessionsFromFirestoreAdapter({
+    state,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    normalizeSessionRecord,
+    syncSurveysToSessions,
+    onChange
   });
 }
 
@@ -465,31 +461,20 @@ export function subscribeQualSignalsFromFirestore(onChange = () => {}) {
 }
 
 export async function saveSessionToFirestore(session) {
-  try {
-    const { id, ...data } = session;
-    const docRef = doc(db, 'sessions', id);
-    const existing = await getDoc(docRef);
-    await setDoc(docRef, { ...data, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() });
-    await writeAuditLog({
-      action: existing.exists() ? 'session_updated' : 'session_created',
-      targetId: id,
-      targetType: 'session',
-      detail: sessionLabel(session)
-    });
-    setDbStatus('connected');
-  } catch (e) {
-    console.error('Firestore 세션 저장 실패:', e);
-    setDbStatus('error');
-  }
+  return saveSessionToFirestoreAdapter({
+    session,
+    setDbStatus,
+    getCurrentOrgId,
+    writeAuditLog,
+    sessionLabel
+  });
 }
 
 export async function deleteSessionFromFirestore(id) {
-  try {
-    await deleteDoc(doc(db, 'sessions', id));
-    await writeAuditLog({ action: 'session_deleted', targetId: id, targetType: 'session' });
-  } catch (e) {
-    console.error('Firestore 세션 삭제 실패:', e);
-  }
+  return deleteSessionFromFirestoreAdapter({
+    id,
+    writeAuditLog
+  });
 }
 
 export async function fetchResponseDocById(responseId) {

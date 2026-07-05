@@ -25,13 +25,16 @@ describe("Sessions runtime wiring", () => {
     const cardSource = readFileSync(new URL("../src/sessions/SessionCard.jsx", import.meta.url), "utf8");
     const listSectionSource = readFileSync(new URL("../src/sessions/SessionsListSection.jsx", import.meta.url), "utf8");
     const modalActionsSource = readFileSync(new URL("../src/sessions/sessionModalActions.js", import.meta.url), "utf8");
+    const calendarSource = readFileSync(new URL("../src/sessions/SessionsCalendar.jsx", import.meta.url), "utf8");
 
     expect(cardSource).toContain("from './sessionActions.js'");
     expect(listSectionSource).toContain("from './sessionActions.js'");
     expect(modalActionsSource).toContain("from './sessionActions.js'");
+    expect(calendarSource).toContain("from './sessionModalActions.js'");
     expect(actionsSource).not.toContain("window.startEditSession");
     expect(actionsSource).not.toContain("window.deleteSession");
     expect(actionsSource).not.toContain("window.toggleSessionTypeGroup");
+    expect(modalActionsSource).not.toContain("window.openAttendance");
     expect(pageSource).not.toContain("delete window.startEditSession");
     expect(pageSource).not.toContain("delete window.deleteSession");
     expect(pageSource).not.toContain("delete window.toggleSessionTypeGroup");
@@ -251,7 +254,8 @@ describe("Sessions runtime wiring", () => {
     // #save-attendance handler actually expects (absences array, completed
     // status, note), using real local React state instead of DOM queries.
     expect(sessionsSource).not.toContain("renderAttendanceModal");
-    expect(modalActionsSource).toContain("window.openAttendance = openAttendance");
+    expect(modalActionsSource).toContain("export function openAttendance");
+    expect(modalActionsSource).not.toContain("window.openAttendance");
     expect(attendanceModalSource).toContain("saveAttendance");
     expect(attendanceModalSource).not.toContain("document.querySelector");
 

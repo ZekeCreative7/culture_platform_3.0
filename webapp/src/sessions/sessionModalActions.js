@@ -1,8 +1,6 @@
 import { state, saveState } from '../state.js';
 import { startEditSession } from './sessionActions.js';
 
-// Still called via onclick="..." strings from the legacy calendar rendering
-// (views/survey.js's month/week/day views, mounted through SessionsBridge.js).
 export function openAttendance(sessionId, itemId) {
   state.showAttendanceModal = true;
   state.activeAttendanceSessionId = sessionId;
@@ -36,5 +34,3 @@ export function editDuplicateSession() {
   state.duplicateSessionWarning = null;
   startEditSession(id);
 }
-
-window.openAttendance = openAttendance;

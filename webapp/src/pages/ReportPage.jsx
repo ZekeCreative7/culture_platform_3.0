@@ -2,7 +2,7 @@ import React, { useEffect, useState, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../store/useAppStore.js';
 import { state as vanillaState, subscribe } from '../state.js';
-import { renderReport, getReportMetadata } from '../views/report.js';
+import { getReactReportMetadata, renderReactReportBodyHtml } from '../report/reportHtmlBridge.js';
 import { ReportControls } from '../report/ReportControls.jsx';
 import { ReportExportShell } from '../report/ReportExportShell.jsx';
 import { bindReportQualSignals } from '../report/reportQualSignals.js';
@@ -29,23 +29,9 @@ export const ReportPage = memo(function ReportPage() {
   useEffect(() => {
     store.setActiveView('report');
     function refresh() {
-      const meta = getReportMetadata();
+      const meta = getReactReportMetadata();
       setMetadata(meta);
-
-      setReportBodyHtml(renderReport({
-        includeControls: false,
-        includeShell: false,
-        includeOutcomeIntro: false,
-        includeExecSummary: false,
-        includeOutcomeStory: false,
-        includePulseInsight: false,
-        includeCompareSummary: false,
-        includeDimensionCards: false,
-        includeRecommendations: false,
-        includeChangeAnalysis: false,
-        includeQualSignals: false,
-        includeCompareRanking: false,
-      }));
+      setReportBodyHtml(renderReactReportBodyHtml());
     }
     refresh();
     let timer = null;

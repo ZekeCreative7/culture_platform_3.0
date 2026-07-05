@@ -4,11 +4,12 @@ import { describe, expect, it } from "vitest";
 describe("Report runtime wiring", () => {
   it("moves Report filter and export controls to React-owned modules", () => {
     const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
+    const bridgeSource = readFileSync(new URL("../src/report/reportHtmlBridge.js", import.meta.url), "utf8");
     const controlsSource = readFileSync(new URL("../src/report/ReportControls.jsx", import.meta.url), "utf8");
     const actionsSource = readFileSync(new URL("../src/report/reportActions.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("ReportControls");
-    expect(pageSource).toContain("includeControls: false");
+    expect(bridgeSource).toContain("includeControls: false");
     expect(controlsSource).toContain("applyReportFilter");
     expect(controlsSource).toContain("downloadReportPdf");
     expect(controlsSource).toContain("downloadReportXlsx");
@@ -17,6 +18,22 @@ describe("Report runtime wiring", () => {
     expect(actionsSource).toContain("export async function downloadReportXlsx");
     expect(actionsSource).toContain("downloadReportWorkbook");
     expect(actionsSource).toContain("exportReportPdf");
+  });
+
+  it("constrains the remaining Report HTML injection behind a React bridge", () => {
+    const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
+    const bridgeSource = readFileSync(new URL("../src/report/reportHtmlBridge.js", import.meta.url), "utf8");
+
+    expect(pageSource).toContain("from '../report/reportHtmlBridge.js'");
+    expect(pageSource).not.toContain("from '../views/report.js'");
+    expect(pageSource).toContain("renderReactReportBodyHtml()");
+    expect(pageSource).not.toContain("renderReport({");
+    expect(bridgeSource).toContain("REACT_REPORT_BODY_OPTIONS");
+    expect(bridgeSource).toContain("assertReactReportBodySafe");
+    expect(bridgeSource).toContain("includeControls: false");
+    expect(bridgeSource).toContain("includeQualSignals: false");
+    expect(bridgeSource).toContain("report-export-content");
+    expect(bridgeSource).toContain("INLINE_HANDLER_PATTERN");
   });
 
   it("lets the legacy report renderer omit inline controls for the React route", () => {
@@ -30,12 +47,13 @@ describe("Report runtime wiring", () => {
 
   it("moves the Report export shell and outcome intro to React", () => {
     const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
+    const bridgeSource = readFileSync(new URL("../src/report/reportHtmlBridge.js", import.meta.url), "utf8");
     const shellSource = readFileSync(new URL("../src/report/ReportExportShell.jsx", import.meta.url), "utf8");
     const reportSource = readFileSync(new URL("../src/views/report.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("ReportExportShell");
-    expect(pageSource).toContain("includeShell: false");
-    expect(pageSource).toContain("includeOutcomeIntro: false");
+    expect(bridgeSource).toContain("includeShell: false");
+    expect(bridgeSource).toContain("includeOutcomeIntro: false");
     expect(pageSource).not.toContain("divRef.current.innerHTML");
     expect(shellSource).toContain('id="report-export-content"');
     expect(shellSource).toContain("session-outcome-intro");
@@ -62,6 +80,7 @@ describe("Report runtime wiring", () => {
 
   it("wires new native React components for Executive Summary, Outcome Story, Pulse Insight, Compare Summary Cards, Dimension Cards, Recommendations, Change Analysis, Qualitative Signals, and Compare Ranking Table", () => {
     const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
+    const bridgeSource = readFileSync(new URL("../src/report/reportHtmlBridge.js", import.meta.url), "utf8");
     const reportSource = readFileSync(new URL("../src/views/report.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("ExecSummaryPanel");
@@ -73,7 +92,8 @@ describe("Report runtime wiring", () => {
     expect(pageSource).toContain("ReportChangeAnalysis");
     expect(pageSource).toContain("ReportQualSignals");
     expect(pageSource).toContain("CompareRankingTable");
-    expect(pageSource).toContain("getReportMetadata");
+    expect(pageSource).toContain("getReactReportMetadata");
+    expect(bridgeSource).toContain("getReportMetadata");
 
     expect(reportSource).toContain("export function getReportMetadata");
     expect(reportSource).toContain("export function renderSlopeChart");

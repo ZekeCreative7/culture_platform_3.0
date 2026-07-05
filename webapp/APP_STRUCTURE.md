@@ -117,6 +117,7 @@ Known remaining compatibility surfaces:
 
 - `views/*.js` files still exist as helper modules and partial HTML renderers.
 - `ReportPage.jsx` still injects HTML from `views/report.js` for the report body while React components fill key sections with portals.
+- `report/reportHtmlBridge.js` is the only allowed bridge from React Report to `views/report.js`. It forces all React-route omit flags and rejects inline handlers/export controls before the HTML reaches `dangerouslySetInnerHTML`.
 - Some action modules still attach functions to `window.*` for cross-screen compatibility or leftover inline HTML handlers.
 - `state.js` still exposes `collapsibleSectionHeader()` as an HTML string helper.
 

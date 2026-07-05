@@ -34,6 +34,14 @@ import {
 } from './qual/qualSignalFirestore.js';
 import { subscribeResponsesFromFirestoreAdapter } from './responses/responseFirestoreSubscription.js';
 import {
+  deleteResponseFromFirestoreAdapter,
+  fetchAllResponsesFromFirestoreAdapter,
+  fetchResponseDocByIdAdapter,
+  fetchResponsesBySessionIdAdapter,
+  fetchResponsesBySurveyIdAdapter,
+  saveResponsesToFirestoreAdapter
+} from './responses/responseFirestore.js';
+import {
   deleteSurveyTemplateFromFirestoreAdapter,
   loadSurveyTemplatesFromFirestoreAdapter,
   saveSurveyTemplateToFirestoreAdapter,
@@ -482,28 +490,15 @@ export async function deleteSessionFromFirestore(id) {
 }
 
 export async function fetchResponseDocById(responseId) {
-  const snap = await getDoc(doc(db, 'responses', responseId));
-  if (!snap.exists()) return null;
-  const data = snap.data();
-  return { ...data, id: snap.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
+  return fetchResponseDocByIdAdapter(responseId);
 }
 
 export async function fetchResponsesBySessionId(sessionId) {
-  if (!sessionId) return [];
-  const snap = await getDocs(query(collection(db, 'responses'), where('sessionId', '==', sessionId)));
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
-  });
+  return fetchResponsesBySessionIdAdapter(sessionId);
 }
 
 export async function fetchResponsesBySurveyId(surveyId) {
-  if (!surveyId) return [];
-  const snap = await getDocs(query(collection(db, 'responses'), where('surveyId', '==', surveyId)));
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
-  });
+  return fetchResponsesBySurveyIdAdapter(surveyId);
 }
 
 export async function deleteSurveyDocFromFirestore(id) {
@@ -511,35 +506,22 @@ export async function deleteSurveyDocFromFirestore(id) {
 }
 
 export async function fetchAllResponsesFromFirestore() {
-  const snap = await getDocs(query(collection(db, 'responses'), where('organizationId', '==', getCurrentOrgId())));
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return { ...data, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || "" };
-  });
+  return fetchAllResponsesFromFirestoreAdapter({ getCurrentOrgId });
 }
 
 export async function deleteResponseFromFirestore(id, { throwOnError = false } = {}) {
-  try {
-    await deleteDoc(doc(db, 'responses', id));
-    await writeAuditLog({ action: 'response_deleted', targetId: id, targetType: 'response' });
-  } catch (e) {
-    console.error('Firestore 응답 삭제 실패:', e);
-    if (throwOnError) throw e;
-  }
+  return deleteResponseFromFirestoreAdapter({
+    id,
+    writeAuditLog,
+    throwOnError
+  });
 }
 
 export async function saveResponsesToFirestore(rows) {
-  const chunkSize = 500;
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize);
-    const batch = writeBatch(db);
-    chunk.forEach(row => {
-      const { id, ...data } = row;
-      const docRef = doc(collection(db, 'responses'));
-      batch.set(docRef, { ...data, organizationId: getCurrentOrgId(), createdAt: serverTimestamp() });
-    });
-    await batch.commit();
-  }
+  return saveResponsesToFirestoreAdapter({
+    rows,
+    getCurrentOrgId
+  });
 }
 
 export function subscribeResponsesFromFirestore() {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   chunkResponseSessionIds,
@@ -48,5 +49,35 @@ describe("response subscription helpers", () => {
     ]);
 
     expect(sorted.map((row) => row.id)).toEqual(["new", "old", "invalid"]);
+  });
+
+  it("keeps response Firestore read/write/delete mechanics in the responses module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const responseFirestoreSource = readFileSync(new URL("../src/responses/responseFirestore.js", import.meta.url), "utf8");
+
+    const responseFacades = stateSource.slice(
+      stateSource.indexOf("export async function fetchResponseDocById"),
+      stateSource.indexOf("export function subscribeResponsesFromFirestore")
+    );
+
+    expect(stateSource).toContain("fetchResponseDocByIdAdapter");
+    expect(stateSource).toContain("fetchResponsesBySessionIdAdapter");
+    expect(stateSource).toContain("fetchResponsesBySurveyIdAdapter");
+    expect(stateSource).toContain("fetchAllResponsesFromFirestoreAdapter");
+    expect(stateSource).toContain("deleteResponseFromFirestoreAdapter");
+    expect(stateSource).toContain("saveResponsesToFirestoreAdapter");
+    expect(responseFacades).not.toContain("collection(db, 'responses')");
+    expect(responseFacades).not.toContain("doc(db, 'responses'");
+    expect(responseFacades).not.toContain("writeBatch(db)");
+
+    expect(responseFirestoreSource).toContain("export async function fetchResponseDocByIdAdapter");
+    expect(responseFirestoreSource).toContain("export async function fetchResponsesBySessionIdAdapter");
+    expect(responseFirestoreSource).toContain("export async function fetchResponsesBySurveyIdAdapter");
+    expect(responseFirestoreSource).toContain("export async function fetchAllResponsesFromFirestoreAdapter");
+    expect(responseFirestoreSource).toContain("export async function deleteResponseFromFirestoreAdapter");
+    expect(responseFirestoreSource).toContain("export async function saveResponsesToFirestoreAdapter");
+    expect(responseFirestoreSource).toContain("collection(db, 'responses')");
+    expect(responseFirestoreSource).toContain("doc(db, 'responses'");
+    expect(responseFirestoreSource).toContain("writeBatch(db)");
   });
 });

@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { pct, ppLabel, gaugeDash } from '../reportContent.js';
 
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /**
- * Gauge — SVG 도넛 게이지. 큰 숫자를 중앙에 배치.
+ * Gauge — SVG 도넛 게이지. 큰 숫자를 중앙에 배치. 마운트 시 호(arc)가 0→값으로 스윕.
  * @param value 0~1
  * @param size  px
  * @param color stroke color (default 값 구간별 자동)
@@ -16,6 +19,15 @@ export function Gauge({ value, size = 132, stroke = 12, label, color, sub }) {
     : value < 0.4 ? 'var(--red)' : value < 0.6 ? 'var(--amber)' : 'var(--green)';
   const arc = color || autoColor;
   const valueFont = Math.round(size * 0.27);
+
+  // 마운트 시 0 → value 스윕 (CSS transition이 dasharray 변화를 애니메이트)
+  const [shown, setShown] = useState(() => (prefersReducedMotion() ? value : 0));
+  useEffect(() => {
+    if (prefersReducedMotion()) { setShown(value); return; }
+    const raf = requestAnimationFrame(() => setShown(value));
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+
   return (
     <div className="pri-gauge" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -24,7 +36,7 @@ export function Gauge({ value, size = 132, stroke = 12, label, color, sub }) {
           className="pri-gauge-arc"
           cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke}
           stroke={arc}
-          strokeDasharray={gaugeDash(value, c)}
+          strokeDasharray={gaugeDash(shown, c)}
         />
       </svg>
       <div className="pri-gauge-center">
@@ -112,7 +124,7 @@ export function Sparkline({ points = [], width = 200, height = 56, color = 'var(
         </linearGradient>
       </defs>
       <path d={area} fill="url(#pri-spark-grad)" />
-      <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path className="pr-anim-line" pathLength="1" d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       {points.map((p, i) => (
         <circle key={i} cx={x(i)} cy={y(p.value)} r={i === points.length - 1 ? 4 : 2.5}
           fill={i === points.length - 1 ? color : 'var(--surface)'} stroke={color} strokeWidth="1.5" />
@@ -180,7 +192,7 @@ export function DualTrendChart({ series = [], height = 260, note }) {
           const d = pathOf(s.points);
           return (
             <g key={s.key}>
-              {d && <path d={d} fill="none" stroke={s.color} strokeWidth={s.dashed ? 2 : 2.6}
+              {d && <path className={s.dashed ? undefined : 'pr-anim-line'} pathLength={s.dashed ? undefined : '1'} d={d} fill="none" stroke={s.color} strokeWidth={s.dashed ? 2 : 2.6}
                 strokeDasharray={s.dashed ? '5 4' : undefined} strokeLinecap="round" strokeLinejoin="round" opacity={s.dashed ? 0.7 : 1} />}
               {s.points.filter((p) => p.value !== null && p.value !== undefined).map((p) => (
                 <g key={p.year}>

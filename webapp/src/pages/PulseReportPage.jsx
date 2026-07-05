@@ -35,7 +35,8 @@ export const PulseReportPage = memo(function PulseReportPage() {
 
   useEffect(() => {
     store.setActiveView('pulse-report');
-    if (!pulseCache.loaded) {
+    // 캐시로 표시 중(fromCache)이어도 최신값으로 백그라운드 갱신
+    if (!pulseCache.loaded || pulseCache.fromCache) {
       loadPulseYears();
     }
   }, []);
@@ -196,6 +197,33 @@ export const PulseReportPage = memo(function PulseReportPage() {
 
   function handleSelectDivision(divId) {
     selectPulseDivision(divId);
+  }
+
+  // ── Loading state (로드 완료/에러 전이면 '데이터 없음' 대신 스켈레톤) ──
+  if (!currentDoc && !pulseCache.loaded && !pulseCache.error) {
+    return (
+      <div className="pr-skeleton" aria-busy="true" aria-label="Pulse 보고서 불러오는 중">
+        <div className="pr-skel-head">
+          <div className="pr-skel-line pr-skel-line--eyebrow" />
+          <div className="pr-skel-line pr-skel-line--title" />
+          <div className="pr-skel-line pr-skel-line--desc" />
+        </div>
+        <div className="pr-skel-tabs">
+          <div className="pr-skel-tab" /><div className="pr-skel-tab" /><div className="pr-skel-tab" />
+        </div>
+        <div className="pr-skel-hero">
+          <div className="pr-skel-hero-main">
+            <div className="pr-skel-line pr-skel-line--title" />
+            <div className="pr-skel-line pr-skel-line--desc" />
+            <div className="pr-skel-line pr-skel-line--desc" style={{ width: '70%' }} />
+          </div>
+          <div className="pr-skel-hero-side"><div className="pr-skel-gauge" /></div>
+        </div>
+        <div className="pr-skel-cards">
+          <div className="pr-skel-card" /><div className="pr-skel-card" /><div className="pr-skel-card" />
+        </div>
+      </div>
+    );
   }
 
   // ── No data state ─────────────────────────────────────────────

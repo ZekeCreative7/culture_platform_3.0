@@ -24,7 +24,17 @@ export const PULSE_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 
 function getCurrentOrgId() { return window.__currentOrgId || 'lina'; }
 
-export const pulseCache = { years: {}, loading: false, loaded: false, error: "" };
+export const pulseCache = { years: {}, loading: false, loaded: false, error: "", fromCache: false };
+const pulseCacheKey = () => `pulse-cache-${getCurrentOrgId()}`;
+// 로컬 캐시로 초기 렌더에 즉시 데이터를 보여주고(플래시 제거), Firestore로 백그라운드 갱신한다.
+try {
+  const _cachedPulse = JSON.parse(localStorage.getItem(pulseCacheKey()));
+  if (_cachedPulse && _cachedPulse.years && Object.keys(_cachedPulse.years).length) {
+    pulseCache.years = _cachedPulse.years;
+    pulseCache.loaded = true;
+    pulseCache.fromCache = true;
+  }
+} catch { /* 캐시 없거나 파싱 실패 시 정상 로드 */ }
 export const commitmentsCache = { loaded: false, loading: false };
 
 export let dbStatus = 'connecting';
@@ -669,7 +679,8 @@ export async function updateSurveyInFirestore(id, data) {
 }
 
 export async function loadPulseYears() {
-  if (pulseCache.loaded) return pulseCache.years;
+  // 캐시로 이미 표시 중이어도(fromCache) 최신값으로 한 번 갱신한다.
+  if (pulseCache.loaded && !pulseCache.fromCache) return pulseCache.years;
   if (pulseCache.loading) return pulseCache.years;
   pulseCache.loading = true;
   pulseCache.error = "";
@@ -683,6 +694,8 @@ export async function loadPulseYears() {
       }
     });
     pulseCache.years = yearsData;
+    pulseCache.fromCache = false;
+    try { localStorage.setItem(pulseCacheKey(), JSON.stringify({ years: yearsData, ts: Date.now() })); } catch { /* quota */ }
 
     const availableYears = Object.keys(yearsData).map(Number).filter(Number.isFinite);
     if (availableYears.length > 0) {

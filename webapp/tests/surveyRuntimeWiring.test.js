@@ -91,6 +91,10 @@ describe("Survey runtime wiring", () => {
     expect(surveySource).not.toContain("export function renderSurveyRightColumnRest");
     expect(surveySource).not.toContain("export function renderSurveyOrphanAndTemplates");
     expect(surveySource).not.toContain("export function renderSurveyResponsePanel");
+    expect(surveySource).not.toContain("renderAttendanceModal");
+    expect(surveySource).not.toContain("renderDuplicateWarningModal");
+    expect(surveySource).not.toContain("onclick=");
+    expect(surveySource).not.toContain("onchange=");
     expect(surveySource).not.toContain("onclick=\"resetSurveyResponses");
     expect(surveySource).not.toContain("copySurveyLink");
     expect(surveySource).not.toContain("toggleSurveyCard");

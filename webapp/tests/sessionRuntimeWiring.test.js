@@ -237,22 +237,15 @@ describe("Sessions runtime wiring", () => {
     expect(sessionsSource).not.toContain("open-org-picker");
     expect(sessionsSource).not.toContain("renderOrgPopup");
 
-    // Duplicate-warning: the old call site invoked renderDuplicateWarningModal()
-    // with no arguments, but that function is actually Survey's CSV-upload
-    // date-conflict modal (renderDuplicateWarningModal(survey, matches)) —
-    // confirmed live to throw (matches.length on undefined), crashing the
-    // whole Sessions page with no error boundary to catch it.
+    // Duplicate-warning: the old call site invoked Survey's CSV-upload
+    // date-conflict modal with no arguments. That renderer has been retired
+    // from the legacy survey helper file, and Sessions owns its React modal.
     expect(sessionsSource).not.toContain("renderDuplicateWarningModal");
     expect(duplicateModalSource).toContain("dismissDuplicateWarning");
     expect(duplicateModalSource).toContain("editDuplicateSession");
 
-    // Attendance: the old call site also passed no arguments to
-    // renderAttendanceModal(sessionId, roundId), and even with arguments fixed
-    // that function's own onclick handlers (closeAttendance, toggleMemberAttendance)
-    // were never defined anywhere — a second, independent bug in the same
-    // dead code. Rebuilt to match what bindSessions()'s already-working
-    // #save-attendance handler actually expects (absences array, completed
-    // status, note), using real local React state instead of DOM queries.
+    // Attendance: the old HTML renderer had undefined inline handlers. The
+    // flow is React-owned now and uses real local state instead of DOM queries.
     expect(sessionsSource).not.toContain("renderAttendanceModal");
     expect(modalActionsSource).toContain("export function openAttendance");
     expect(modalActionsSource).not.toContain("window.openAttendance");

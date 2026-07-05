@@ -1,8 +1,7 @@
 import {
   db, collection, doc, getDoc, getDocs, setDoc, writeBatch, query, where,
 } from './firebase.js';
-
-function getCurrentOrgId() { return window.__currentOrgId || 'lina'; }
+import { getCurrentOrgId } from './auth/currentAuthContext.js';
 
 const BACKUP_COLLECTIONS = ['sessions', 'surveys', 'responses', 'QualSignal'];
 

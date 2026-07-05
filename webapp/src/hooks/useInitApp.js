@@ -24,6 +24,7 @@ import {
   pulseCache,
   commitmentsCache,
 } from '../state.js';
+import { setCurrentOrgId } from '../auth/currentAuthContext.js';
 
 if (window.location.search.includes('preview=1')) {
   sessionStorage.setItem('previewMode', 'true');
@@ -42,8 +43,7 @@ export function useInitApp(isAuthenticated, orgId) {
     if (!isAuthenticated || initialized.current) return;
     initialized.current = true;
 
-    // orgId를 전역에 등록 — state.js의 getCurrentOrgId()가 참조함
-    if (orgId) window.__currentOrgId = orgId;
+    if (orgId) setCurrentOrgId(orgId);
 
     (async () => {
       if (LOCAL_PREVIEW) {

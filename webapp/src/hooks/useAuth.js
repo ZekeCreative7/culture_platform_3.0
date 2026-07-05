@@ -12,6 +12,11 @@
 import { createContext, createElement, useContext, useEffect, useState } from 'react';
 import { auth, onAuthStateChanged, signOut } from '../firebase.js';
 import { getDoc, doc, db } from '../firebase.js';
+import {
+  getCurrentOrgId,
+  setCurrentOrgId,
+  setCurrentUserEmail,
+} from '../auth/currentAuthContext.js';
 
 const MASTER_EMAIL = 'rhokoo7@naver.com';
 
@@ -45,8 +50,8 @@ function useAuthState() {
   useEffect(() => {
     if (LOCAL_PREVIEW) {
       const previewUser = { email: 'local-preview@example.com', uid: 'local-preview-uid' };
-      window.__currentUserEmail = previewUser.email;
-      window.__currentOrgId = 'lina';
+      setCurrentUserEmail(previewUser.email);
+      setCurrentOrgId('lina');
       setUser(previewUser);
       setStatus('granted');
       setOrgId('lina');
@@ -55,20 +60,20 @@ function useAuthState() {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
-        window.__currentUserEmail = '';
+        setCurrentUserEmail('');
         setUser(null);
         setStatus('unauthenticated');
         return;
       }
 
-      window.__currentUserEmail = firebaseUser.email || '';
+      setCurrentUserEmail(firebaseUser.email || '');
       setUser(firebaseUser);
 
       // 마스터 계정은 즉시 승인
       if (firebaseUser.email?.toLowerCase() === MASTER_EMAIL) {
-        window.__currentOrgId = window.__currentOrgId || 'lina';
+        setCurrentOrgId(getCurrentOrgId());
         setStatus('granted');
-        setOrgId(window.__currentOrgId || 'lina');
+        setOrgId(getCurrentOrgId());
         return;
       }
 
@@ -78,7 +83,7 @@ function useAuthState() {
         const data = snap.data();
         if (data?.status === 'approved') {
           const nextOrgId = data.organizationId || 'lina';
-          window.__currentOrgId = nextOrgId;
+          setCurrentOrgId(nextOrgId);
           setOrgId(nextOrgId);
           setStatus('granted');
         } else {

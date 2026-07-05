@@ -187,6 +187,26 @@ describe("Operational quality guardrails", () => {
     expect(auditLogFirestoreSource).toContain("getDocs(");
   });
 
+  it("keeps current organization and user identity in an auth context module instead of window globals", () => {
+    const contextSource = readFileSync(new URL("../src/auth/currentAuthContext.js", import.meta.url), "utf8");
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const backupSource = readFileSync(new URL("../src/backup.js", import.meta.url), "utf8");
+    const auditLogFirestoreSource = readFileSync(new URL("../src/operational/auditLogFirestore.js", import.meta.url), "utf8");
+    const useAuthSource = readFileSync(new URL("../src/hooks/useAuth.js", import.meta.url), "utf8");
+    const useInitAppSource = readFileSync(new URL("../src/hooks/useInitApp.js", import.meta.url), "utf8");
+    const authGateSource = readFileSync(new URL("../src/authGate.js", import.meta.url), "utf8");
+
+    expect(contextSource).toContain("export function getCurrentOrgId");
+    expect(contextSource).toContain("export function setCurrentOrgId");
+    expect(contextSource).toContain("export function getCurrentUserEmail");
+    expect(contextSource).toContain("export function setCurrentUserEmail");
+    for (const source of [stateSource, backupSource, auditLogFirestoreSource, useAuthSource, useInitAppSource, authGateSource]) {
+      expect(source).not.toContain("window.__currentOrgId");
+      expect(source).not.toContain("window.__currentUserEmail");
+      expect(source).toContain("currentAuthContext.js");
+    }
+  });
+
   it("keeps organization-id migration Firestore mechanics in the operational module while state.js exposes only a facade", () => {
     const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
     const migrationSource = readFileSync(new URL("../src/operational/organizationMigrationFirestore.js", import.meta.url), "utf8");

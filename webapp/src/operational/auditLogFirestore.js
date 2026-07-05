@@ -1,4 +1,5 @@
 import { db, addDoc, collection, getDocs, limit as firestoreLimit, orderBy, query, serverTimestamp } from '../firebase.js';
+import { getCurrentUserEmail } from '../auth/currentAuthContext.js';
 
 export async function recordAuditLogAdapter({
   action,
@@ -9,7 +10,7 @@ export async function recordAuditLogAdapter({
   onWarn = console.warn,
 }) {
   try {
-    const userId = window.__currentUserEmail || 'unknown';
+    const userId = getCurrentUserEmail() || 'unknown';
     await addDoc(collection(db, 'auditLogs'), {
       action,
       userId,

@@ -2,6 +2,11 @@ import {
   auth, db, collection, doc, getDoc, getDocs, setDoc, onSnapshot, serverTimestamp, writeBatch,
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
 } from './firebase.js';
+import {
+  getCurrentOrgId as getAuthCurrentOrgId,
+  setCurrentOrgId,
+  setCurrentUserEmail,
+} from './auth/currentAuthContext.js';
 
 export const MASTER_EMAIL = 'rhokoo7@naver.com';
 
@@ -95,17 +100,17 @@ async function ensurePendingRequest(user) {
 }
 
 async function resolveOrgId(user) {
-  if (isMaster(user)) { window.__currentOrgId = 'lina'; return; }
+  if (isMaster(user)) { setCurrentOrgId('lina'); return; }
   try {
     const snap = await getDoc(doc(db, 'accessRequests', user.uid));
-    window.__currentOrgId = snap.data()?.organizationId || 'lina';
+    setCurrentOrgId(snap.data()?.organizationId || 'lina');
   } catch (_) {
-    window.__currentOrgId = 'lina';
+    setCurrentOrgId('lina');
   }
 }
 
 export function getCurrentOrgId() {
-  return window.__currentOrgId || 'lina';
+  return getAuthCurrentOrgId();
 }
 
 async function grantAccess(user) {
@@ -191,7 +196,7 @@ async function logout() {
   clearPendingListener();
   accessGrantedUid = '';
   currentUser = null;
-  window.__currentUserEmail = '';
+  setCurrentUserEmail('');
   await signOut(auth);
 }
 
@@ -311,7 +316,7 @@ export function initializeAuthGate({ onAccessGranted }) {
 
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
-    window.__currentUserEmail = user?.email || '';
+    setCurrentUserEmail(user?.email || '');
     if (!user) {
       accessGrantedUid = '';
       clearPendingListener();

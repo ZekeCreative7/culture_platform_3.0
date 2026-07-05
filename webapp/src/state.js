@@ -72,12 +72,12 @@ import {
   saveSurveyTemplateToFirestoreAdapter,
   subscribeSurveyTemplatesFromFirestoreAdapter
 } from './survey/surveyTemplateFirestore.js';
+import { getCurrentOrgId } from './auth/currentAuthContext.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
 export const ORG_STORE_KEY = "culture-platform-org-v1";
 export const PULSE_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 
-function getCurrentOrgId() { return window.__currentOrgId || 'lina'; }
 export function isLocalPreviewMode() {
   if (typeof window === 'undefined') return false;
   return window.location?.search?.includes('preview=1') || window.sessionStorage?.getItem('previewMode') === 'true';

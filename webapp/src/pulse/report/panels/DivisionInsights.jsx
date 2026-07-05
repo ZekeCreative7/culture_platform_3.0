@@ -5,6 +5,7 @@ import {
   divisionQuestionTrends,
   divisionDiffs,
   strongUnfavQuestions,
+  benchmarkComparison,
   divisionInsights,
   psychPerspective,
   orgPerspective,
@@ -52,6 +53,7 @@ export function DivisionInsights({ row, divisionDoc, currentDoc }) {
 
   const diffs = divisionDiffs(divisionDoc, currentDoc, 3);
   const strongUnfav = strongUnfavQuestions(divisionDoc, 3);
+  const benchmarks = benchmarkComparison(divisionDoc, 4);
   const mismatch = divisionInsights(divisionDoc, row);
   const psych = psychPerspective(row, divisionDoc);
   const org = orgPerspective(row, divisionDoc);
@@ -123,6 +125,32 @@ export function DivisionInsights({ row, divisionDoc, currentDoc }) {
           )}
         </section>
       </div>
+
+      {/* 외부 벤치마크 대비 (신뢰 높음) */}
+      {benchmarks.length > 0 && (
+        <section className="pr2-di-section">
+          <TierHead tier="high" eyebrow="본부 심층 · 관찰"
+            title="외부 벤치마크 대비 (Medallia · Chubb APAC)"
+            desc="본사 제공 외부 기준치와의 격차입니다. 가장 많이 미달한 문항 순 — '업계 대비 어디가 약한가' 가설의 근거입니다." />
+          <div className="pr2-di-bench">
+            <div className="pr2-di-bench-head">
+              <span>문항</span><span>본부</span><span>Medallia</span><span>Chubb APAC</span>
+            </div>
+            {benchmarks.map((b) => (
+              <div className="pr2-di-bench-row" key={b.qNo}>
+                <span className="pr2-di-bench-q"><b>Q{b.qNo}</b> {b.label}</span>
+                <span className="pr2-di-bench-val">{pct(b.divFav)}%</span>
+                <span className="pr2-di-bench-cell">
+                  {b.medallia !== null ? <>{pct(b.medallia)}% <DeltaPill value={b.gapMedallia} /></> : '–'}
+                </span>
+                <span className="pr2-di-bench-cell">
+                  {b.chubb !== null ? <>{pct(b.chubb)}% <DeltaPill value={b.gapChubb} /></> : '–'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ─ TIER 2: 패턴 가설 (신뢰 중간) ────────────────────────── */}
       <section className="pr2-di-section">

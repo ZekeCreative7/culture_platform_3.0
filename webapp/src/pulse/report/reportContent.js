@@ -9,7 +9,7 @@
  */
 
 import { DOMAINS, MANAGER_CLUSTER, CORE } from '../../config/domains.js';
-import { QUESTIONS } from '../../config/questions.js';
+import { QUESTIONS, QUESTION_BENCHMARKS } from '../../config/questions.js';
 import { ENGAGEMENT_SCORE_HISTORY } from '../../config/pulseDivisions.js';
 import { favFromItem, unfavFromItem, relationshipInsights, percentValue, companyFav, careBelongingProfile } from '../pulseEngine.js';
 
@@ -378,6 +378,42 @@ export function strongUnfavQuestions(divisionDoc, limit = 3) {
   })
     .filter((d) => d.unfav !== null && d.unfav > 0.15)
     .sort((a, b) => b.unfav - a.unfav)
+    .slice(0, limit);
+}
+
+/**
+ * 외부 벤치마크(Medallia·Chubb APAC) 대비 비교 — 신뢰 높음(공식 기준치).
+ * 본부 긍정률이 벤치마크보다 가장 많이 낮은/높은 문항을 반환.
+ * @returns [{ qNo, label, divFav, medallia, chubb, gapMedallia, gapChubb }]
+ */
+export function benchmarkComparison(divisionDoc, limit = 4) {
+  if (!divisionDoc?.items) return [];
+  return Array.from({ length: 22 }, (_, i) => {
+    const qNo = i + 1;
+    const divFav = favFromItem(divisionDoc.items[`Q${qNo}`]);
+    const bench = QUESTION_BENCHMARKS[qNo] || {};
+    const medallia = percentValue(bench.medallia);
+    const chubb = percentValue(bench.chubbApac);
+    // 벤치마크가 없거나 0%(미입력)인 문항은 제외
+    const validM = medallia !== null && medallia > 0;
+    const validC = chubb !== null && chubb > 0;
+    if (divFav === null || (!validM && !validC)) return null;
+    return {
+      qNo,
+      label: QUESTIONS[qNo] || `Q${qNo}`,
+      divFav,
+      medallia: validM ? medallia : null,
+      chubb: validC ? chubb : null,
+      gapMedallia: validM ? divFav - medallia : null,
+      gapChubb: validC ? divFav - chubb : null,
+    };
+  })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const ga = a.gapMedallia ?? a.gapChubb ?? 0;
+      const gb = b.gapMedallia ?? b.gapChubb ?? 0;
+      return ga - gb; // 가장 많이 미달인 문항 우선
+    })
     .slice(0, limit);
 }
 

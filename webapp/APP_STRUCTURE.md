@@ -71,6 +71,7 @@ Core listener and persistence responsibilities live in `src/state.js`:
 - `pulseCache`, `commitmentsCache`, and `dbStatus`
 - local persistence helpers
 - Firestore subscribe/save/delete helpers
+- appState upload/download Firestore helpers, thin state facades over `operational/appStateFirestore.js`
 - organization save/subscribe helpers, thin state facades over `org/organizationFirestore.js`
 - session load/subscribe/save/delete helpers, thin state facades over `sessions/sessionFirestore.js`
 - `subscribeResponsesFromFirestore()`, a thin state facade over `responses/responseFirestoreSubscription.js`
@@ -177,7 +178,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
 
 The next cleanup passes should remove the remaining compatibility surface in small, browser-verified slices:
 
-1. Keep shrinking `state.js` by moving remaining Firestore adapters into domain modules; organization save/subscribe mechanics now live under `org/`, session Firestore mechanics now live under `sessions/`, response rules/listeners and response fetch/save/delete mechanics now live under `responses/`, survey and survey template Firestore mechanics now live under `survey/`, Pulse result and commitment Firestore mechanics now live under `pulse/`, and QualSignal listener/save mechanics now live under `qual/`.
+1. Keep shrinking `state.js` by moving remaining Firestore adapters into domain modules; appState upload/download mechanics now live under `operational/`, organization save/subscribe mechanics now live under `org/`, session Firestore mechanics now live under `sessions/`, response rules/listeners and response fetch/save/delete mechanics now live under `responses/`, survey and survey template Firestore mechanics now live under `survey/`, Pulse result and commitment Firestore mechanics now live under `pulse/`, and QualSignal listener/save mechanics now live under `qual/`.
 2. Grow the smoke flow from structural guardrails into browser E2E once a stable local auth/preview fixture exists.
 3. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
 4. Remove `window.*` attachments only after every real caller has a direct import or React handler.

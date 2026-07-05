@@ -127,4 +127,25 @@ describe("Operational quality guardrails", () => {
     expect(source).toContain("dashboard-preview");
     expect(source).toContain("culture-platform-build-commit");
   });
+
+  it("keeps appState upload/download Firestore mechanics in the operational module while state.js handles UI flow", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const appStateFirestoreSource = readFileSync(new URL("../src/operational/appStateFirestore.js", import.meta.url), "utf8");
+
+    const appStateFacades = stateSource.slice(
+      stateSource.indexOf("export async function uploadStateToDb"),
+      stateSource.indexOf("export async function saveQualSignalToFirestore")
+    );
+
+    expect(stateSource).toContain("uploadAppStateToFirestoreAdapter");
+    expect(stateSource).toContain("fetchAppStateFromFirestoreAdapter");
+    expect(appStateFacades).not.toContain("doc(db, 'appState'");
+    expect(appStateFacades).not.toContain("setDoc(doc");
+    expect(appStateFacades).not.toContain("getDoc(doc");
+    expect(appStateFacades).toContain("document.querySelector");
+
+    expect(appStateFirestoreSource).toContain("export async function uploadAppStateToFirestoreAdapter");
+    expect(appStateFirestoreSource).toContain("export async function fetchAppStateFromFirestoreAdapter");
+    expect(appStateFirestoreSource).toContain("doc(db, 'appState'");
+  });
 });

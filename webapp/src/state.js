@@ -21,6 +21,10 @@ import {
   subscribeOrganizationFromFirestoreAdapter
 } from './org/organizationFirestore.js';
 import {
+  fetchAppStateFromFirestoreAdapter,
+  uploadAppStateToFirestoreAdapter
+} from './operational/appStateFirestore.js';
+import {
   deletePulseCommitmentFromFirestoreAdapter,
   loadPulseCommitmentsAdapter,
   savePulseCommitmentToFirestoreAdapter,
@@ -661,13 +665,7 @@ export async function uploadStateToDb() {
   const btn = document.querySelector("#btn-db-upload");
   if (btn) { btn.disabled = true; btn.textContent = '전송 중...'; }
   try {
-    await setDoc(doc(db, 'appState', 'main'), {
-      sessions:    state.sessions    || [],
-      surveys:     state.surveys     || [],
-      orgUnits:    state.orgUnits    || [],
-      orgMembers:  state.orgMembers  || [],
-      savedAt:     serverTimestamp(),
-    });
+    await uploadAppStateToFirestoreAdapter({ state });
     alert('현재 상태가 DB에 저장되었습니다.');
   } catch (e) {
     alert('DB 전송 실패: ' + e.message);
@@ -695,9 +693,8 @@ export async function downloadStateFromDb() {
   const btn = document.querySelector("#btn-db-download");
   if (btn) { btn.disabled = true; btn.textContent = '다운로드 중...'; }
   try {
-    const snap = await getDoc(doc(db, 'appState', 'main'));
-    if (!snap.exists()) { alert('저장된 DB 상태가 없습니다. 먼저 DB 전송을 해주세요.'); return; }
-    const data = snap.data();
+    const data = await fetchAppStateFromFirestoreAdapter();
+    if (!data) { alert('저장된 DB 상태가 없습니다. 먼저 DB 전송을 해주세요.'); return; }
     const savedAt = data.savedAt?.toDate?.()?.toLocaleString('ko-KR') || '알 수 없음';
     if (!confirm(`저장 시각: ${savedAt}\n\n현재 로컬 데이터를 DB 상태로 덮어쓸까요?`)) return;
     if (data.sessions)    state.sessions    = data.sessions.map(normalizeSessionRecord);

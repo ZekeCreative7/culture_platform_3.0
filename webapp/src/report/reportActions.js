@@ -86,14 +86,6 @@ export function applyReportFilter({ type, cohort, sessionId }) {
   saveState();
 }
 
-export function applyReportFilterFromDom() {
-  applyReportFilter({
-    type: document.querySelector('#report-type-select')?.value || '',
-    cohort: document.querySelector('#report-cohort-select')?.value || '',
-    sessionId: document.querySelector('#report-session-select')?.value || '',
-  });
-}
-
 function buttonFrom(input, selector) {
   return input?.currentTarget || input || document.querySelector(selector);
 }
@@ -161,7 +153,3 @@ export async function downloadReportPdf(input) {
     window.alert(error.message || 'PDF 파일을 만들지 못했습니다.');
   }
 }
-
-window.downloadReportXlsx = downloadReportXlsx;
-window.downloadReportPdf = downloadReportPdf;
-window.applyReportFilter = applyReportFilterFromDom;

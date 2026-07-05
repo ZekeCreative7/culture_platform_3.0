@@ -134,6 +134,7 @@ Known remaining compatibility surfaces:
 - Survey list, draft, and response/recovery actions are React-owned direct imports and should not attach `window.*` handlers again.
 - Session list/drawer actions are React-owned direct imports and should not attach `window.*` handlers again.
 - Session attendance actions are React-owned direct imports and should not attach `window.openAttendance` again.
+- Report filter/export actions are React-owned direct imports and should not attach `window.*` handlers again.
 - `state.js` still exposes `collapsibleSectionHeader()` as an HTML string helper.
 
 Treat these as cleanup targets, not as permission to add new string-rendered UI. New UI should be React components with explicit action imports.

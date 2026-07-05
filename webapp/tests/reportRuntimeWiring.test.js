@@ -18,6 +18,10 @@ describe("Report runtime wiring", () => {
     expect(actionsSource).toContain("export async function downloadReportXlsx");
     expect(actionsSource).toContain("downloadReportWorkbook");
     expect(actionsSource).toContain("exportReportPdf");
+    expect(actionsSource).not.toContain("window.downloadReportXlsx");
+    expect(actionsSource).not.toContain("window.downloadReportPdf");
+    expect(actionsSource).not.toContain("window.applyReportFilter");
+    expect(actionsSource).not.toContain("applyReportFilterFromDom");
   });
 
   it("constrains the remaining Report HTML injection behind a React bridge", () => {

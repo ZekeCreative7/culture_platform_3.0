@@ -93,12 +93,16 @@ export function Sparkline({ points = [], width = 200, height = 56, color = 'var(
   const min = Math.min(...vals) - 0.03;
   const max = Math.max(...vals) + 0.03;
   const span = max - min || 1;
-  const pad = 8;
-  const x = (i) => pad + (i * (width - pad * 2)) / (points.length - 1);
-  const y = (v) => height - pad - ((v - min) / span) * (height - pad * 2);
+  // 값 라벨이 위에 붙으므로 상단 여백을 넉넉히 둬 잘리지 않게 한다.
+  const padTop = 15;
+  const padBottom = 8;
+  const padX = 8;
+  const x = (i) => padX + (i * (width - padX * 2)) / (points.length - 1);
+  const y = (v) => padTop + (1 - (v - min) / span) * (height - padTop - padBottom);
   const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
-  const area = `${line} L${x(points.length - 1).toFixed(1)},${height - pad} L${x(0).toFixed(1)},${height - pad} Z`;
+  const area = `${line} L${x(points.length - 1).toFixed(1)},${height - padBottom} L${x(0).toFixed(1)},${height - padBottom} Z`;
   const last = points[points.length - 1];
+  const labelY = Math.max(11, y(last.value) - 8);
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="pri-spark">
       <defs>
@@ -113,7 +117,7 @@ export function Sparkline({ points = [], width = 200, height = 56, color = 'var(
         <circle key={i} cx={x(i)} cy={y(p.value)} r={i === points.length - 1 ? 4 : 2.5}
           fill={i === points.length - 1 ? color : 'var(--surface)'} stroke={color} strokeWidth="1.5" />
       ))}
-      <text x={x(points.length - 1)} y={y(last.value) - 9} textAnchor="middle"
+      <text x={x(points.length - 1)} y={labelY} textAnchor="middle"
         fontSize="11" fontWeight="800" fill="var(--ink)">{pct(last.value)}%</text>
     </svg>
   );

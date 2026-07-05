@@ -8835,3 +8835,6 @@ button.disabled { opacity: .45; pointer-events: none; }
   .pr2-di-bench-row { grid-template-columns: 1fr 1fr; gap: 4px 10px; }
   .pr2-di-bench-q { grid-column: 1 / -1; font-weight: 700; }
 }
+
+/* 스파크라인 값 라벨이 상단에서 잘리지 않도록 */
+.pri-spark { overflow: visible; }

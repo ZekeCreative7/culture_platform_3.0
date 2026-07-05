@@ -270,7 +270,7 @@ Completed:
 - Split `renderSurveyCreator()` (`views/survey.js`) into `renderSurveyWizardPanel()` (left panel) and `renderSurveyRightColumnRest()` (closed surveys, orphan scan, templates — not yet converted).
 - `SurveyPage.jsx` now owns the `page-head` + `workspace-grid` shell directly (via the existing `PageHead` component), with two independent legacy bridge mount points (`mountSurveyWizard`, `mountSurveyRightColumnRest` in `SurveyCreatorBridge.js`) plus a real React `<ActiveSurveysSection />` in between — avoiding a nested-React-root-inside-innerHTML pattern, which would break on every bridge refresh.
 - New `webapp/src/survey/ActiveSurveysSection.jsx`: subscribes to `vanillaState` directly (same subscribe+debounce convention as every other converted page), renders the section header, conditional collapse-all buttons, and the card list.
-- New `webapp/src/survey/SurveyCard.jsx`: real JSX for both collapsed and expanded card variants, QR generation (`getQrCodeFactory()(0, 'L')`, unchanged), and the response-stats panel still rendered via `renderSurveyResponsePanel(...)` through `dangerouslySetInnerHTML` (deliberately deferred — it's a distinct ~100-line data-viz widget, not "card chrome").
+- New `webapp/src/survey/SurveyCard.jsx`: real JSX for both collapsed and expanded card variants, QR generation (`getQrCodeFactory()(0, 'L')`, unchanged), and at this point the response-stats panel was deliberately deferred as a separate data-viz widget. It was later converted in Post-Migration Cleanup Pass 2.
 - Already-extracted actions (`copySurveyLink`, `toggleSurveyCard`, `downloadQrCode`, `collapseAllSurveys`) are imported directly from `surveyActions.js`; not-yet-extracted actions (`startEditSurvey`, `deleteSurvey`, `downloadSurveyTemplate`, `saveSurveyAsTemplate`, `uploadSurveyResults`) still go through `window.*`, per the Step 3 sequence (items 7-8 move those later).
 - Fixed `app.js`'s now-broken import of the old `renderSurveyCreator` name — its only remaining caller (`renderView()`) is confirmed dead code (unreachable once `window.__reactMode` is true, which it always is; `VanillaCanvas`'s `VANILLA_VIEWS = []` means it never renders for any view either) — updated to call both new functions for correctness, not because the path is live.
 - Updated `tests/surveyRuntimeWiring.test.js` for the new function/file names and added a test asserting the active-card list is real React, not a legacy HTML string.
@@ -346,7 +346,7 @@ Completed:
 - Converted the last legacy-rendered fragment into real React: `webapp/src/survey/OrphanScanSection.jsx` (scan button, loading/error states, recover-all button, result cards) and `TemplatesSection.jsx` (template card list). Both use the established `useVanillaStateTick` pattern and import directly from `surveyResponseActions.js` — no `window.*` needed since item 8 already extracted every action these sections call.
 - Deleted `SurveyCreatorBridge.js` entirely (nothing left to bridge) and removed `renderSurveyOrphanAndTemplates()`/`bindSurveyCreator()` from `views/survey.js` (the latter was already a no-op stub).
 - Fixed `app.js`'s three remaining dead-code references (import list, the unreachable `renderView()` branch, the unreachable `bindCanvasEvents()` branch) and removed `bindSurveyCreator` from the bind-export list at the bottom of `app.js`.
-- `views/survey.js` now only serves calendar views, `surveySessionCohortKey`/`surveySessionTargetLabel`, and `renderSurveyResponsePanel` — the latter still deliberately used by `SurveyCard.jsx` via `dangerouslySetInnerHTML`, per the item-4 decision to treat the response panel as a separate future item, not "card chrome."
+- At this point `views/survey.js` still served calendar views, `surveySessionCohortKey`/`surveySessionTargetLabel`, and the deferred response panel helper. The response panel helper was later removed in Post-Migration Cleanup Pass 2.
 - Verified: `npm run check`, full `vitest run` (43 tests, rewritten to check the bridge file no longer exists and every section uses `useVanillaStateTick`), `npm run build` all pass. Browser-verified the full page layout end-to-end (all 4 right-column sections in correct order/spacing, matching the original design exactly), and — critically — got a full real round-trip on two actions rather than just guard-clause checks: clicked "DB에서 연결 끊긴 응답 찾기" and watched the complete flow execute (click → async Firestore call → real permission-denied response in this unauthenticated preview env → caught by the function's own error handler → state updated → re-render showing "스캔 실패: ..." in the UI); injected a real template, clicked its delete button, and confirmed it disappeared from the list (local state round-trip fully verified; the Firestore delete call failed with the same expected permission error, caught correctly, not a regression).
 - Survey's screen shell is now fully React-native — only `bindOrg`/`bindSessions`/`bindUpload`/`bindReportQualSignals` bridges remain for the other, not-yet-converted screens.
 
@@ -975,6 +975,22 @@ Completed:
 - Rewrote `webapp/APP_STRUCTURE.md` from the obsolete `app.js`/query-string architecture to the current React Router structure.
 - Corrected this plan's completion wording so it distinguishes the completed React route/shell migration from the remaining Survey/Report compatibility cleanup.
 
-Next recommended cleanup:
+Next recommended cleanup at that point:
 
 - Convert `renderSurveyResponsePanel()` into a React component first. It is a small, operationally important leftover because it still injects HTML into `SurveyCard.jsx` and contains the reset-response inline handler.
+
+### 2026-07-05 - Post-Migration Cleanup Pass 2
+
+Completed:
+
+- Added `webapp/src/survey/SurveyResponsePanel.jsx` as the React-owned replacement for `views/survey.js`'s `renderSurveyResponsePanel()`.
+- Updated `SurveyCard.jsx` to render `SurveyResponsePanel` directly instead of injecting HTML with `dangerouslySetInnerHTML`.
+- Removed the `renderSurveyResponsePanel()` string renderer and its inline `onclick="resetSurveyResponses(...)"` reset button from `views/survey.js`.
+- Removed the now-unneeded `window.resetSurveyResponses` compatibility export; the reset button calls `resetSurveyResponses()` through a direct React import.
+- Updated the Survey runtime wiring test to lock this down.
+
+Verified: `npm run check`, `vitest run tests/surveyRuntimeWiring.test.js`, full `vitest run` (64 tests), `npm run build`, and `git diff --check` all pass. The only build warning remains the existing large chunk warning.
+
+Next recommended cleanup:
+
+- Extract `subscribeResponsesFromFirestore()` into a deeper responses subscription module. It currently owns listener lifecycle, Firestore chunking, recovered-survey backfill, readiness state, and `saveState()` orchestration inside `state.js`.

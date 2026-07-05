@@ -1,7 +1,5 @@
 import {
   state,
-  surveyRows,
-  surveyQuestionsForDistribution,
   rowMatchesSurvey
 } from '../state.js';
 import {
@@ -9,9 +7,7 @@ import {
   escapeHtml,
   sessionLabel,
   defaultQuestions,
-  scoreOf,
   normalizeSessionType,
-  targetCountForSession,
   sessionYear,
   lockSvg
 } from '../utils.js';
@@ -92,86 +88,6 @@ export function renderDuplicateWarningModal(survey, matches) {
         <button class="ghost compact" onclick="window.cancelSurveyImport()">업로드 취소</button>
         <button class="primary compact danger" onclick="window.forceSurveyImport()">강제 업로드 진행</button>
       </footer>
-    </div>
-  `;
-}
-
-export function renderSurveyResponsePanel(survey, session, showReset = true) {
-  const rows = surveyRows(survey);
-  const target = targetCountForSession(session);
-  const answered = rows.length;
-  const uploadedCount = rows.filter((row) => String(row.sourceType || "").includes("업로드")).length;
-  const linkedCount = answered - uploadedCount;
-  const rate = target ? Math.min(100, Math.round((answered / target) * 100)) : 0;
-  const resetBtn = showReset
-    ? `<button class="ghost compact" style="font-size:11px; color:#ef4444; border-color:#fecaca;" onclick="resetSurveyResponses('${survey.id}')" ${answered ? "" : "disabled"}>응답 완전 삭제</button>`
-    : "";
-  const configuredQuant = (survey.questions || []).filter((q) => q.type === "quant");
-  const hasQuestionConfig = (survey.questions || []).length > 0;
-  if (hasQuestionConfig && !configuredQuant.length) {
-    return `
-      <div class="survey-live-panel">
-        <div class="survey-live-head">
-          <div>
-            <strong>${answered}건 응답 · 객관식 없음</strong>
-            <span>링크/QR ${linkedCount}건 · 파일 업로드 ${uploadedCount}건 · 응답 내용은 정성 응답 영역에서 확인하세요.</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:10px;">${resetBtn}</div>
-        </div>
-        <div class="empty" style="margin-top:12px;">집계할 객관식(척도) 문항이 없습니다.</div>
-      </div>
-    `;
-  }
-
-  const questions = surveyQuestionsForDistribution(survey);
-
-  const distributionRows = questions.map((q) => {
-    const counts = [5, 4, 3, 2, 1].map((score) => rows.filter((row) => scoreOf(row[q.id]) === score).length);
-    const total = counts.reduce((sum, value) => sum + value, 0);
-    const avg = total
-      ? [5, 4, 3, 2, 1].reduce((sum, score, index) => sum + score * counts[index], 0) / total
-      : null;
-    return { ...q, counts, total, avg };
-  });
-
-  return `
-    <div class="survey-live-panel">
-      <div class="survey-live-head">
-        <div>
-          <strong>${target ? `${target}명 대상 · ${answered}건 응답` : `${answered}건 응답`}</strong>
-          <span>${target ? `진행률 ${rate}%${answered > target ? " · 중복/재제출 포함" : ""}` : "대상 인원은 세션 구성원 등록 후 표시"} · 링크/QR ${linkedCount}건 · 파일 업로드 ${uploadedCount}건</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <b>${answered}</b>
-          ${resetBtn}
-        </div>
-      </div>
-      ${target ? `
-        <div class="survey-progress"><i style="width:${rate}%"></i></div>
-      ` : ""}
-      <div class="survey-distribution-list">
-        ${distributionRows.map((q) => `
-          <article>
-            <div class="survey-dist-title">
-              <strong>${escapeHtml(q.text)}</strong>
-              <span>${q.avg !== null ? `${q.avg.toFixed(2)} / 5` : "응답 없음"}</span>
-            </div>
-            <div class="survey-dist-bars" aria-label="${escapeHtml(q.text)} 응답 분포">
-              ${[5, 4, 3, 2, 1].map((score, index) => {
-                const count = q.counts[index];
-                const pct = q.total ? Math.round((count / q.total) * 100) : 0;
-                return `
-                  <div>
-                    <em>${score}</em>
-                    <span><i style="width:${pct}%"></i></span>
-                    <b>${count}</b>
-                  </div>
-                `;
-              }).join("")}
-            </div>
-          </article>
-        `).join("")}
-      </div>
     </div>
   `;
 }

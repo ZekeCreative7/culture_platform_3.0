@@ -2,10 +2,10 @@ import React from 'react';
 import { state as vanillaState, surveyRows } from '../state.js';
 import { sessionLabel, targetCountForSession } from '../utils.js';
 import { getQrCodeFactory } from '../qrCode.js';
-import { renderSurveyResponsePanel } from '../views/survey.js';
 import { copySurveyLink, toggleSurveyCard, downloadQrCode } from './surveyActions.js';
 import { startEditSurvey } from './surveyDraftActions.js';
 import { deleteSurvey, downloadSurveyTemplate, saveSurveyAsTemplate, uploadSurveyResults } from './surveyResponseActions.js';
+import { SurveyResponsePanel } from './SurveyResponsePanel.jsx';
 
 function buildSurveyLink(survey) {
   if (survey.googleFormUrl) return survey.googleFormUrl;
@@ -102,7 +102,7 @@ export function SurveyCard({ survey, session }) {
           <button onClick={() => downloadQrCode(survey.id)} className="secondary compact" style={{ display: 'block', width: '100%', textAlign: 'center', marginTop: '4px', fontSize: '10px' }}>QR 다운로드</button>
         </div>
       </div>
-      <div dangerouslySetInnerHTML={{ __html: renderSurveyResponsePanel(survey, session) }} />
+      <SurveyResponsePanel survey={survey} session={session} />
     </div>
   );
 }

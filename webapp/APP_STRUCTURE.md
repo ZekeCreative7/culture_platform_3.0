@@ -101,7 +101,6 @@ Known remaining compatibility surfaces:
 
 - `views/*.js` files still exist as helper modules and partial HTML renderers.
 - `ReportPage.jsx` still injects HTML from `views/report.js` for the report body while React components fill key sections with portals.
-- `SurveyCard.jsx` still injects `renderSurveyResponsePanel()` from `views/survey.js`; that HTML includes the reset-response button.
 - Some action modules still attach functions to `window.*` for cross-screen compatibility or leftover inline HTML handlers.
 - `state.js` still exposes `collapsibleSectionHeader()` as an HTML string helper.
 
@@ -150,7 +149,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
 
 The next cleanup passes should remove the remaining compatibility surface in small, browser-verified slices:
 
-1. Convert `renderSurveyResponsePanel()` into a React component and remove its inline reset handler.
+1. Split the response listener/recovered-survey backfill behavior in `state.js` into a deeper responses subscription module.
 2. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
 3. Remove `window.*` attachments only after every real caller has a direct import or React handler.
 4. Reduce `views/*.js` to true pure helpers, then delete any helper file that no longer has live imports.

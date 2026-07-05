@@ -300,7 +300,6 @@ window.deleteSurvey = deleteSurvey;
 window.reopenSurveyDistribution = reopenSurveyDistribution;
 window.saveSurveyAsTemplate = saveSurveyAsTemplate;
 window.deleteSurveyTemplate = deleteSurveyTemplate;
-window.resetSurveyResponses = resetSurveyResponses;
 window.scanForOrphanResponses = scanForOrphanResponses;
 window.recoverOrphanSurvey = recoverOrphanSurvey;
 window.recoverAllOrphanSurveys = recoverAllOrphanSurveys;

@@ -42,6 +42,7 @@ describe("Survey runtime wiring", () => {
     const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
     const closedSurveysSectionSource = readFileSync(new URL("../src/survey/ClosedSurveysSection.jsx", import.meta.url), "utf8");
     const closedSurveyCardSource = readFileSync(new URL("../src/survey/ClosedSurveyCard.jsx", import.meta.url), "utf8");
+    const responsePanelSource = readFileSync(new URL("../src/survey/SurveyResponsePanel.jsx", import.meta.url), "utf8");
     const orphanScanSectionSource = readFileSync(new URL("../src/survey/OrphanScanSection.jsx", import.meta.url), "utf8");
     const templatesSectionSource = readFileSync(new URL("../src/survey/TemplatesSection.jsx", import.meta.url), "utf8");
     const tickHookSource = readFileSync(new URL("../src/hooks/useVanillaStateTick.js", import.meta.url), "utf8");
@@ -49,7 +50,9 @@ describe("Survey runtime wiring", () => {
 
     expect(activeSurveysSectionSource).toContain("SurveyCard");
     expect(activeSurveysSectionSource).toContain("useVanillaStateTick");
-    expect(surveyCardSource).toContain("renderSurveyResponsePanel");
+    expect(surveyCardSource).toContain("SurveyResponsePanel");
+    expect(surveyCardSource).not.toContain("dangerouslySetInnerHTML");
+    expect(responsePanelSource).toContain("resetSurveyResponses");
     expect(closedSurveysSectionSource).toContain("ClosedSurveyCard");
     expect(closedSurveysSectionSource).toContain("useVanillaStateTick");
     expect(closedSurveyCardSource).toContain("reopenSurveyDistribution");
@@ -62,6 +65,8 @@ describe("Survey runtime wiring", () => {
     expect(surveySource).not.toContain("export function renderSurveyWizardPanel");
     expect(surveySource).not.toContain("export function renderSurveyRightColumnRest");
     expect(surveySource).not.toContain("export function renderSurveyOrphanAndTemplates");
+    expect(surveySource).not.toContain("export function renderSurveyResponsePanel");
+    expect(surveySource).not.toContain("onclick=\"resetSurveyResponses");
     expect(surveySource).not.toContain("export function bindSurveyCreator");
     expect(surveySource).not.toContain("activeSurveys.map");
     expect(surveySource).not.toContain("closedSurveys.map");
@@ -115,5 +120,6 @@ describe("Survey runtime wiring", () => {
     expect(surveyCardSource).not.toContain("window.uploadSurveyResults");
     expect(closedSurveyCardSource).not.toContain("window.reopenSurveyDistribution");
     expect(closedSurveyCardSource).not.toContain("window.deleteRecoveredSurveyCard");
+    expect(responseActionsSource).not.toContain("window.resetSurveyResponses");
   });
 });

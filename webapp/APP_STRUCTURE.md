@@ -37,6 +37,8 @@ Current top-level routes:
 
 `operational/OperationalStatusPanel.jsx` is mounted under the topbar. It distinguishes preview mode, Firestore status, cached Pulse data, loading datasets, empty datasets, and error states.
 
+The same panel also shows build provenance from `operational/deploymentInfo.js`: current commit and build time. Vite injects matching `<meta name="culture-platform-build-*">` tags into built HTML, and `scripts/smoke-preview.mjs` checks those tags on the preview server.
+
 `operational/smokePlan.js` defines the current post-migration smoke flow: Dashboard -> Sessions -> Survey -> public `survey.html` -> Analytics -> Report/PDF -> Pulse Report.
 
 `report/pdfExportReadiness.js` checks the PDF export document before html2pdf runs. It blocks empty/stale export markup, duplicate critical export IDs, and legacy inline `window.*` handlers from entering the generated report.
@@ -152,6 +154,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
    - Analytics and Report render against an existing session.
    - Pulse and Pulse Report load without console errors.
    - `/webapp/survey.html?surveyId=...` redirects to `/survey.html?surveyId=...`.
+   - If the browser still shows an old asset name or old behavior, add a cache-bust query such as `?preview=1&v=<timestamp>` and confirm the operations panel's commit matches the built commit.
 
 3. For GitHub Pages deploy checks, confirm the built entries:
 
@@ -165,7 +168,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
 
 The next cleanup passes should remove the remaining compatibility surface in small, browser-verified slices:
 
-1. Split the response listener/recovered-survey backfill behavior in `state.js` into a deeper responses subscription module.
+1. Continue splitting the response listener in `state.js`. `responses/responseSubscription.js` now owns the pure subscription rules: session-id union, Firestore chunking, recovered-survey response merge, and newest-first sorting. The remaining follow-up is moving the Firestore listener adapter itself.
 2. Grow the smoke flow from structural guardrails into browser E2E once a stable local auth/preview fixture exists.
 3. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
 4. Remove `window.*` attachments only after every real caller has a direct import or React handler.

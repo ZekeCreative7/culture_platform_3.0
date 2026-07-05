@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore.js';
 import { commitmentsCache, pulseCache } from '../state.js';
+import { buildDeploymentInfo } from './deploymentInfo.js';
 
 function statusTone(status) {
   if (status === 'error') return 'danger';
@@ -17,7 +18,7 @@ function dataStatus({ loaded, count, loading = false, error = '' }) {
   return { status: 'ready', label: '준비됨', detail: `${count.toLocaleString()}건` };
 }
 
-export function buildOperationalStatusSnapshot({ state, pulse, commitments, location }) {
+export function buildOperationalStatusSnapshot({ state, pulse, commitments, location, deployment = buildDeploymentInfo() }) {
   const search = new URLSearchParams(location?.search || '');
   const isPreview = search.get('preview') === '1';
   const dbStatus = state.dbStatus || 'connecting';
@@ -77,6 +78,8 @@ export function buildOperationalStatusSnapshot({ state, pulse, commitments, loca
     dbStatus,
     dbLabel,
     sourceLabel,
+    deploymentLabel: deployment.label,
+    deployment,
     isPreview,
     datasets,
   };
@@ -90,6 +93,7 @@ export function OperationalStatusPanel() {
       pulse: pulseCache,
       commitments: commitmentsCache,
       location: window.location,
+      deployment: buildDeploymentInfo(),
     }),
     [
       state.dbStatus,
@@ -116,6 +120,7 @@ export function OperationalStatusPanel() {
         <strong>{snapshot.headline}</strong>
         <span>{snapshot.dbLabel}</span>
         <span>{snapshot.sourceLabel}</span>
+        <span>{snapshot.deploymentLabel}</span>
       </div>
       <div className="ops-status-data">
         {snapshot.datasets.map((item) => (

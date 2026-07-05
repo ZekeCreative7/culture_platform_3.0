@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore.js';
 import { uid } from '../utils.js';
-import { savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore } from '../state.js';
+import { state as vanillaState, saveState, savePulseCommitmentToFirestore, deletePulseCommitmentFromFirestore } from '../state.js';
 import { clearPulseAutoOpenCommitmentForm } from './pulseActions.js';
+import { runDestructiveAction } from '../operational/destructiveAction.js';
 
 const PII_PATTERN = /(이름|성명|사번|이메일|email|전화|phone|휴대폰|주민|주소)/i;
 
@@ -74,12 +75,26 @@ export function PulseCommitmentsBoard({ year, scopeId }) {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("정말로 이 약속을 삭제하시겠습니까? 데이터가 데이터베이스에서 완전히 삭제됩니다.")) return;
-    try {
-      await deletePulseCommitmentFromFirestore(id);
-    } catch (e) {
-      alert("약속 삭제 실패: " + e.message);
-    }
+    const previous = [...(vanillaState.pulseCommitments || [])];
+    const target = previous.find((commitment) => commitment.id === id);
+
+    await runDestructiveAction({
+      title: '신뢰 회복 약속 삭제',
+      body: `"${target?.commitment || '선택한 약속'}" 항목을 삭제할까요?`,
+      impact: ['약속 보드에서 즉시 제거됩니다.', 'Firestore에서도 삭제됩니다.', '실패하면 화면 상태를 되돌립니다.'],
+      applyLocal: () => {
+        vanillaState.pulseCommitments = previous.filter((commitment) => commitment.id !== id);
+        saveState();
+      },
+      rollbackLocal: () => {
+        vanillaState.pulseCommitments = previous;
+        saveState();
+      },
+      persistRemote: () => deletePulseCommitmentFromFirestore(id),
+      onError: (e) => {
+        alert("약속 삭제 실패: " + (e.message || e));
+      },
+    });
   };
 
   return (

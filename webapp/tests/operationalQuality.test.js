@@ -62,6 +62,7 @@ describe("Operational quality guardrails", () => {
         responses: [],
         pulseCommitments: [],
       },
+      deployment: { commit: "abc123", buildTime: "2026-07-05T10:00:00.000Z", label: "배포 abc123 · 2026-07-05 10:00" },
       pulse: { loaded: true, loading: false, error: "", fromCache: true, years: { 2026: {} } },
       commitments: { loaded: false, loading: true },
       location: { search: "?preview=1" },
@@ -69,6 +70,7 @@ describe("Operational quality guardrails", () => {
 
     expect(snapshot.headline).toBe("운영 확인 필요");
     expect(snapshot.sourceLabel).toBe("로컬 미리보기");
+    expect(snapshot.deploymentLabel).toBe("배포 abc123 · 2026-07-05 10:00");
     expect(snapshot.datasets.find((item) => item.id === "surveys")?.label).toBe("대기 중");
     expect(snapshot.datasets.find((item) => item.id === "responses")?.label).toBe("비어 있음");
   });
@@ -89,6 +91,18 @@ describe("Operational quality guardrails", () => {
 
     expect(result.ok).toBe(false);
     expect(calls).toEqual(["local", "rollback", "error"]);
+  });
+
+  it("routes session and Pulse commitment deletes through the destructive-action guard", () => {
+    const sessionActions = readFileSync(new URL("../src/sessions/sessionActions.js", import.meta.url), "utf8");
+    const commitmentsBoard = readFileSync(new URL("../src/pulse/PulseCommitmentsBoard.jsx", import.meta.url), "utf8");
+
+    expect(sessionActions).toContain("runDestructiveAction");
+    expect(sessionActions).toContain("rollbackLocal");
+    expect(sessionActions).toContain("deleteSessionFromFirestore");
+    expect(commitmentsBoard).toContain("runDestructiveAction");
+    expect(commitmentsBoard).toContain("deletePulseCommitmentFromFirestore");
+    expect(commitmentsBoard).toContain("rollbackLocal");
   });
 
   it("keeps the PDF exporter on the block-sliced reliability profile", async () => {
@@ -112,5 +126,6 @@ describe("Operational quality guardrails", () => {
     expect(source).toContain("webapp/survey.html?surveyId=smoke");
     expect(source).toContain("operator-index");
     expect(source).toContain("dashboard-preview");
+    expect(source).toContain("culture-platform-build-commit");
   });
 });

@@ -17,6 +17,12 @@ import {
 } from './utils.js';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
 import { assertNotQuantInput } from './qual/qual-signal.js';
+import {
+  chunkResponseSessionIds,
+  mergeRecoveredSurveyResponses,
+  responseSubscriptionSessionIds,
+  sortResponsesNewestFirst
+} from './responses/responseSubscription.js';
 
 export const STORE_KEY = "culture-platform-webapp-v1";
 export const ORG_STORE_KEY = "culture-platform-org-v1";
@@ -535,10 +541,7 @@ export function subscribeResponsesFromFirestore() {
   state.responsesLoaded = false;
   saveState();
 
-  const sessionIds = Array.from(new Set([
-    ...(state.sessions || []).map(s => s.id),
-    ...(state.surveys || []).map(s => s.sessionId),
-  ].filter(Boolean)));
+  const sessionIds = responseSubscriptionSessionIds(state);
   if (sessionIds.length === 0) {
     state.responses = [];
     state.responsesLoaded = true;
@@ -547,10 +550,7 @@ export function subscribeResponsesFromFirestore() {
   }
 
   // Chunk session IDs into arrays of max 30 items (Firestore 'in' query limit)
-  const chunks = [];
-  for (let i = 0; i < sessionIds.length; i += 30) {
-    chunks.push(sessionIds.slice(i, i + 30));
-  }
+  const chunks = chunkResponseSessionIds(sessionIds);
 
   const chunkResponses = {};
   const chunkReady = {};
@@ -584,32 +584,20 @@ export function subscribeResponsesFromFirestore() {
       // lines up cleanly with the chunk query above (e.g. malformed or missing
       // sessionId on very old rows) — backstop with a direct fetch+match so a
       // recovered survey's results don't silently stay empty.
-      const recoveredSurveys = (state.surveys || []).filter((s) => s.recoveredAt);
-      if (recoveredSurveys.length) {
+      if ((state.surveys || []).some((s) => s.recoveredAt)) {
         try {
           const everything = await fetchAllResponsesFromFirestore();
-          const seen = new Set(allResponses.map((r) => r.id));
-          everything.forEach((row) => {
-            if (seen.has(row.id)) return;
-            const matches = recoveredSurveys.some((survey) =>
-              row.surveyId === survey.id
-              || (row.sessionId === survey.sessionId && row.phase === survey.phase
-                && (Number(row.cohort) || 0) === (Number(survey.sessionCohort) || 0))
-            );
-            if (matches) { allResponses.push(row); seen.add(row.id); }
+          allResponses = mergeRecoveredSurveyResponses({
+            currentResponses: allResponses,
+            allResponses: everything,
+            surveys: state.surveys,
           });
         } catch (e) {
           console.error('복구된 설문 응답 보강 조회 실패:', e);
         }
       }
 
-      allResponses.sort((a, b) => {
-        const aTime = Date.parse(a.createdAt) || 0;
-        const bTime = Date.parse(b.createdAt) || 0;
-        return bTime - aTime;
-      });
-
-      state.responses = allResponses;
+      state.responses = sortResponsesNewestFirst(allResponses);
       state.responsesLoaded = Object.keys(chunkReady).length === chunks.length;
       saveState();
     }, (err) => {

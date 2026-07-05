@@ -1,5 +1,6 @@
 import { state, saveState, deleteSessionFromFirestore, subscribeResponsesFromFirestore } from '../state.js';
 import { normalizeSessionType } from '../utils.js';
+import { runDestructiveAction } from '../operational/destructiveAction.js';
 
 export function toggleSessionTypeGroup(type) {
   state.collapsedSessionTypeGroups = state.collapsedSessionTypeGroups || [];
@@ -35,15 +36,37 @@ export function startEditSession(id) {
 }
 
 export function deleteSession(id) {
-  if (!confirm('이 세션을 삭제하시겠습니까?\n세션에 연결된 설문 및 응답 데이터는 유지됩니다.')) return;
-  state.sessions = state.sessions.filter((s) => s.id !== id);
-  if (state.editingSessionId === id) {
-    state.editingSessionId = null;
-    state.sessionDrawerOpen = false;
-  }
-  saveState();
-  deleteSessionFromFirestore(id);
-  subscribeResponsesFromFirestore();
+  const previousSessions = [...(state.sessions || [])];
+  const previousEditingSessionId = state.editingSessionId;
+  const previousSessionDrawerOpen = state.sessionDrawerOpen;
+  const target = previousSessions.find((session) => session.id === id);
+
+  return runDestructiveAction({
+    title: '세션 삭제',
+    body: `"${target?.team || target?.type || '선택한 세션'}" 세션을 삭제할까요?`,
+    impact: ['세션 목록에서 제거됩니다.', '연결된 설문 및 응답 데이터는 유지됩니다.'],
+    applyLocal: () => {
+      state.sessions = previousSessions.filter((s) => s.id !== id);
+      if (state.editingSessionId === id) {
+        state.editingSessionId = null;
+        state.sessionDrawerOpen = false;
+      }
+      saveState();
+    },
+    rollbackLocal: () => {
+      state.sessions = previousSessions;
+      state.editingSessionId = previousEditingSessionId;
+      state.sessionDrawerOpen = previousSessionDrawerOpen;
+      saveState();
+    },
+    persistRemote: async () => {
+      await deleteSessionFromFirestore(id);
+      subscribeResponsesFromFirestore();
+    },
+    onError: (error) => {
+      alert(`세션 삭제 실패: ${error.message || error}`);
+    },
+  });
 }
 
 export function openSessionDrawer({ switchToSessions = false } = {}) {

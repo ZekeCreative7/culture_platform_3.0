@@ -447,6 +447,7 @@ main { display: flex; flex-direction: column; height: 100vh; overflow-y: auto; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   min-height: 42px;
   margin: 0 24px 0;
@@ -459,6 +460,7 @@ main { display: flex; flex-direction: column; height: 100vh; overflow-y: auto; }
 .ops-status-summary {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 9px;
   min-width: 0;
 }

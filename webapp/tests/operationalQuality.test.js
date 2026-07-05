@@ -148,4 +148,29 @@ describe("Operational quality guardrails", () => {
     expect(appStateFirestoreSource).toContain("export async function fetchAppStateFromFirestoreAdapter");
     expect(appStateFirestoreSource).toContain("doc(db, 'appState'");
   });
+
+  it("keeps audit log Firestore mechanics in the operational module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const auditLogFirestoreSource = readFileSync(new URL("../src/operational/auditLogFirestore.js", import.meta.url), "utf8");
+
+    const auditFacades = stateSource.slice(
+      stateSource.indexOf("export async function recordAuditLog"),
+      stateSource.indexOf("export function subscribe")
+    ) + stateSource.slice(
+      stateSource.indexOf("export async function fetchRecentAuditLogs"),
+      stateSource.indexOf("// 설문을 지워도")
+    );
+
+    expect(stateSource).toContain("recordAuditLogAdapter");
+    expect(stateSource).toContain("fetchRecentAuditLogsAdapter");
+    expect(auditFacades).not.toContain("collection(db, 'auditLogs')");
+    expect(auditFacades).not.toContain("addDoc(");
+    expect(auditFacades).not.toContain("getDocs(");
+
+    expect(auditLogFirestoreSource).toContain("export async function recordAuditLogAdapter");
+    expect(auditLogFirestoreSource).toContain("export async function fetchRecentAuditLogsAdapter");
+    expect(auditLogFirestoreSource).toContain("collection(db, 'auditLogs')");
+    expect(auditLogFirestoreSource).toContain("addDoc(");
+    expect(auditLogFirestoreSource).toContain("getDocs(");
+  });
 });

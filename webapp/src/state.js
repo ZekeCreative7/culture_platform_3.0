@@ -21,6 +21,10 @@ import {
   subscribeOrganizationFromFirestoreAdapter
 } from './org/organizationFirestore.js';
 import {
+  fetchRecentAuditLogsAdapter,
+  recordAuditLogAdapter
+} from './operational/auditLogFirestore.js';
+import {
   fetchAppStateFromFirestoreAdapter,
   uploadAppStateToFirestoreAdapter
 } from './operational/appStateFirestore.js';
@@ -96,20 +100,13 @@ export let dbStatus = 'connecting';
 const listeners = [];
 
 export async function recordAuditLog({ action, targetId, targetType, detail = '' }) {
-  try {
-    const userId = window.__currentUserEmail || 'unknown';
-    await addDoc(collection(db, 'auditLogs'), {
-      action,
-      userId,
-      targetId,
-      targetType,
-      detail,
-      organizationId: getCurrentOrgId(),
-      timestamp: serverTimestamp()
-    });
-  } catch (e) {
-    console.warn('[auditLog] write failed', e);
-  }
+  return recordAuditLogAdapter({
+    action,
+    targetId,
+    targetType,
+    detail,
+    getCurrentOrgId
+  });
 }
 
 const writeAuditLog = recordAuditLog;
@@ -537,13 +534,7 @@ export async function setSurveyDistributionActiveInFirestore(id, active) {
 }
 
 export async function fetchRecentAuditLogs(count = 20) {
-  const auditQuery = query(
-    collection(db, 'auditLogs'),
-    orderBy('timestamp', 'desc'),
-    firestoreLimit(count)
-  );
-  const snap = await getDocs(auditQuery);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return fetchRecentAuditLogsAdapter(count);
 }
 
 // 설문을 지워도 다음 세션 만들 때 불러올 예시 질문이 남도록, 배포 설문과는 별도 컬렉션에 저장한다.

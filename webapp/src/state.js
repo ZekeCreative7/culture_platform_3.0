@@ -22,6 +22,11 @@ import {
   savePulseCommitmentToFirestoreAdapter,
   subscribePulseCommitmentsFromFirestoreAdapter
 } from './pulse/pulseCommitmentFirestore.js';
+import {
+  loadPulseYearsAdapter,
+  savePulseResultToFirestoreAdapter,
+  subscribePulseYearsFromFirestoreAdapter
+} from './pulse/pulseResultFirestore.js';
 import { assertNotQuantInput } from './qual/qual-signal.js';
 import {
   saveQualSignalToFirestoreAdapter,
@@ -606,96 +611,38 @@ export async function updateSurveyInFirestore(id, data) {
 }
 
 export async function loadPulseYears() {
-  if (isLocalPreviewMode()) {
-    pulseCache.loaded = true;
-    pulseCache.loading = false;
-    pulseCache.error = "";
-    pulseCache.fromCache = false;
-    setDbStatus('connected');
-    return pulseCache.years;
-  }
-  // 캐시로 이미 표시 중이어도(fromCache) 최신값으로 한 번 갱신한다.
-  if (pulseCache.loaded && !pulseCache.fromCache) return pulseCache.years;
-  if (pulseCache.loading) return pulseCache.years;
-  pulseCache.loading = true;
-  pulseCache.error = "";
-  try {
-    const snap = await getDocs(query(collection(db, 'pulseResults'), where('organizationId', '==', getCurrentOrgId())));
-    const yearsData = {};
-    snap.docs.forEach((d) => {
-      const year = Number(d.id);
-      if (Number.isFinite(year)) {
-        yearsData[year] = normalizePulseDoc(d.data(), year);
-      }
-    });
-    pulseCache.years = yearsData;
-    pulseCache.fromCache = false;
-    try { localStorage.setItem(pulseCacheKey(), JSON.stringify({ years: yearsData, ts: Date.now() })); } catch { /* quota */ }
-
-    const availableYears = Object.keys(yearsData).map(Number).filter(Number.isFinite);
-    if (availableYears.length > 0) {
-      const maxYear = Math.max(...availableYears);
-      if (!state.pulseYear || !availableYears.includes(state.pulseYear)) {
-        state.pulseYear = maxYear;
-        saveState();
-      }
-    }
-
-    pulseCache.loaded = true;
-    setDbStatus('connected');
-  } catch (e) {
-    pulseCache.error = e.message || "알 수 없는 오류";
-    console.error('Firestore Pulse 로드 실패:', e);
-    setDbStatus('error');
-  } finally {
-    pulseCache.loading = false;
-  }
-  return pulseCache.years;
+  return loadPulseYearsAdapter({
+    state,
+    pulseCache,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    isLocalPreviewMode,
+    normalizePulseDoc,
+    pulseCacheKey
+  });
 }
 
 export function subscribePulseYearsFromFirestore(onChange = () => {}) {
-  return onSnapshot(query(collection(db, 'pulseResults'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
-    const yearsData = {};
-    snap.docs.forEach((d) => {
-      const year = Number(d.id);
-      if (Number.isFinite(year)) {
-        yearsData[year] = normalizePulseDoc(d.data(), year);
-      }
-    });
-    pulseCache.years = yearsData;
-    pulseCache.loaded = true;
-    pulseCache.loading = false;
-    pulseCache.error = "";
-
-    const availableYears = Object.keys(yearsData).map(Number).filter(Number.isFinite);
-    if (availableYears.length > 0) {
-      const maxYear = Math.max(...availableYears);
-      if (!state.pulseYear || !availableYears.includes(state.pulseYear)) {
-        state.pulseYear = maxYear;
-      }
-    }
-    saveState();
-    setDbStatus('connected');
-    onChange();
-  }, (e) => {
-    pulseCache.error = e.message || "알 수 없는 오류";
-    pulseCache.loading = false;
-    console.error('Firestore Pulse 실시간 갱신 오류:', e);
-    setDbStatus('error');
+  return subscribePulseYearsFromFirestoreAdapter({
+    state,
+    pulseCache,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    normalizePulseDoc,
+    onChange
   });
 }
 
 export async function savePulseResultToFirestore(payload) {
-  if (!payload?.year) throw new Error("저장할 Pulse 연도가 없습니다.");
-  const normalized = normalizePulseDoc(payload, payload.year);
-  await setDoc(doc(db, 'pulseResults', String(payload.year)), {
-    ...normalized,
-    organizationId: getCurrentOrgId(),
-    updatedAt: serverTimestamp(),
+  return savePulseResultToFirestoreAdapter({
+    payload,
+    pulseCache,
+    setDbStatus,
+    getCurrentOrgId,
+    normalizePulseDoc
   });
-  pulseCache.years[payload.year] = normalized;
-  pulseCache.loaded = true;
-  setDbStatus('connected');
 }
 
 export async function loadPulseCommitments() {

@@ -72,6 +72,7 @@ Core listener and persistence responsibilities live in `src/state.js`:
 - local persistence helpers
 - Firestore subscribe/save/delete helpers
 - `subscribeResponsesFromFirestore()`, a thin state facade over `responses/responseFirestoreSubscription.js`
+- `loadPulseYears()`, `subscribePulseYearsFromFirestore()`, and `savePulseResultToFirestore()`, thin state facades over `pulse/pulseResultFirestore.js`
 - `loadPulseCommitments()`, `subscribePulseCommitmentsFromFirestore()`, `savePulseCommitmentToFirestore()`, and `deletePulseCommitmentFromFirestore()`, thin state facades over `pulse/pulseCommitmentFirestore.js`
 - `subscribeQualSignalsFromFirestore()` and `saveQualSignalToFirestore()`, thin state facades over `qual/qualSignalFirestore.js`
 
@@ -171,7 +172,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
 
 The next cleanup passes should remove the remaining compatibility surface in small, browser-verified slices:
 
-1. Keep shrinking `state.js` by moving remaining Firestore adapters into domain modules; response rules/listeners now live under `responses/`, Pulse commitment load/listener/save/delete mechanics now live under `pulse/`, and QualSignal listener/save mechanics now live under `qual/`.
+1. Keep shrinking `state.js` by moving remaining Firestore adapters into domain modules; response rules/listeners now live under `responses/`, Pulse result and commitment Firestore mechanics now live under `pulse/`, and QualSignal listener/save mechanics now live under `qual/`.
 2. Grow the smoke flow from structural guardrails into browser E2E once a stable local auth/preview fixture exists.
 3. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
 4. Remove `window.*` attachments only after every real caller has a direct import or React handler.

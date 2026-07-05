@@ -98,6 +98,29 @@ describe("Sessions runtime wiring", () => {
     expect(pulseCommitmentFirestoreSource).toContain("doc(db, 'pulseCommitments'");
   });
 
+  it("keeps Pulse result Firestore mechanics in the pulse module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const pulseResultFirestoreSource = readFileSync(new URL("../src/pulse/pulseResultFirestore.js", import.meta.url), "utf8");
+
+    const resultFacades = stateSource.slice(
+      stateSource.indexOf("export async function loadPulseYears"),
+      stateSource.indexOf("export async function loadPulseCommitments")
+    );
+
+    expect(stateSource).toContain("loadPulseYearsAdapter");
+    expect(stateSource).toContain("subscribePulseYearsFromFirestoreAdapter");
+    expect(stateSource).toContain("savePulseResultToFirestoreAdapter");
+    expect(resultFacades).not.toContain("collection(db, 'pulseResults')");
+    expect(resultFacades).not.toContain("doc(db, 'pulseResults'");
+
+    expect(pulseResultFirestoreSource).toContain("export async function loadPulseYearsAdapter");
+    expect(pulseResultFirestoreSource).toContain("export function subscribePulseYearsFromFirestoreAdapter");
+    expect(pulseResultFirestoreSource).toContain("export async function savePulseResultToFirestoreAdapter");
+    expect(pulseResultFirestoreSource).toContain("collection(db, 'pulseResults')");
+    expect(pulseResultFirestoreSource).toContain("doc(db, 'pulseResults'");
+    expect(pulseResultFirestoreSource).toContain("normalizePulseDoc");
+  });
+
   it("renders the session list/cards as real React, not a legacy HTML string (calendar was later converted too, see dedicated test below)", () => {
     const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
     const listSectionSource = readFileSync(new URL("../src/sessions/SessionsListSection.jsx", import.meta.url), "utf8");

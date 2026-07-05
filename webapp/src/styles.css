@@ -9047,34 +9047,60 @@ button.disabled { opacity: .45; pointer-events: none; }
 @media (max-width: 760px) { .pr-skel-cards { grid-template-columns: 1fr; } }
 .pr-skel-card { height: 220px; border-radius: var(--radius-lg); }
 
-/* ═══ 인포그래픽 모션 ═════════════════════════════════════════════ */
-@keyframes pr-fade-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+/* ═══ 인포그래픽 모션 — 스크롤로 화면에 들어올 때(.pr-inview) 실행 ═══
+   원리: JS(IntersectionObserver)가 뷰포트에 들어온 카드에 .pr-inview를 붙인다.
+   .pr-anim-ready(=JS 활성)일 때만 미리 숨겨 두고, 관찰되면 그때 애니메이션.
+   JS가 없거나 실패하면 .pr-anim-ready가 없어 전부 그대로 보인다(안전). */
+@keyframes pr-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes pr-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-@keyframes pr-draw { to { stroke-dashoffset: 0; } }
-@keyframes pr-pop { 0% { opacity: 0; transform: scale(.6); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes pr-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes pr-pop { 0% { opacity: 0; transform: scale(.55); } 100% { opacity: 1; transform: scale(1); } }
 
-/* 카드 등장 (탭 진입 시) */
-.pr2-hero, .pr2-ev, .pr-chart-card, .pr2-di-section, .pr2-dd, .pr2-metric-col {
-  animation: pr-fade-up .5s cubic-bezier(.22,1,.36,1) both;
+/* 관찰 대상 카드: JS 활성 시 미리 숨김(위로 살짝 내려둠) */
+.pr-anim-ready .pr2-hero,
+.pr-anim-ready .pr2-ev,
+.pr-anim-ready .pr-chart-card,
+.pr-anim-ready .pr2-di-section,
+.pr-anim-ready .pr2-dd,
+.pr-anim-ready .pr2-metric-col,
+.pr-anim-ready .pr-small-card {
+  opacity: 0;
 }
-.pr-evidence-cards .pr2-ev:nth-child(2) { animation-delay: .08s; }
-.pr-evidence-cards .pr2-ev:nth-child(3) { animation-delay: .16s; }
 
-/* 막대 성장 (왼쪽 기준) */
-.pri-domain-fill, .pr2-hbar-fill, .pr-small-card-bar-fill, .pr-evidence-bar-fill, .pri-dist-bar {
+/* 화면에 들어오면 카드 등장 */
+.pr2-hero.pr-inview,
+.pr2-ev.pr-inview,
+.pr-chart-card.pr-inview,
+.pr2-di-section.pr-inview,
+.pr2-dd.pr-inview,
+.pr2-metric-col.pr-inview,
+.pr-small-card.pr-inview {
+  animation: pr-fade-up .55s cubic-bezier(.22,1,.36,1) both;
+}
+.pr-evidence-cards .pr2-ev.pr-inview:nth-child(2) { animation-delay: .1s; }
+.pr-evidence-cards .pr2-ev.pr-inview:nth-child(3) { animation-delay: .2s; }
+
+/* 카드가 들어오면 내부 막대 성장 (왼쪽 기준) */
+.pr-inview .pri-domain-fill,
+.pr-inview .pr2-hbar-fill,
+.pr-inview .pr-small-card-bar-fill,
+.pr-inview .pr-evidence-bar-fill,
+.pr-inview .pri-dist-bar {
   transform-origin: left center;
-  animation: pr-grow-x .8s cubic-bezier(.22,1,.36,1) both;
+  animation: pr-grow-x .85s cubic-bezier(.22,1,.36,1) both;
 }
 
-/* 라인 그리기 (스파크라인 / 추이) */
-.pr-anim-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: pr-draw 1.1s ease .1s forwards; }
+/* 카드가 들어오면 라인 그리기 (스파크라인 / 추이) */
+.pr-inview .pr-anim-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: pr-draw 1.1s ease .12s forwards; }
 
-/* 사분면 dot 팝 */
-.pr2-quad-svg circle { animation: pr-pop .5s cubic-bezier(.34,1.56,.64,1) both; }
+/* 매트릭스가 들어오면 dot 팝 */
+.pr-inview.pr2-quad-svg circle,
+.pr-inview .pr2-quad-svg circle { animation: pr-pop .5s cubic-bezier(.34,1.56,.64,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pr2-hero, .pr2-ev, .pr-chart-card, .pr2-di-section, .pr2-dd, .pr2-metric-col,
-  .pri-domain-fill, .pr2-hbar-fill, .pr-small-card-bar-fill, .pr-evidence-bar-fill, .pri-dist-bar,
-  .pr-anim-line, .pr2-quad-svg circle { animation: none !important; }
-  .pr-anim-line { stroke-dashoffset: 0; }
+  .pr-anim-ready .pr2-hero, .pr-anim-ready .pr2-ev, .pr-anim-ready .pr-chart-card,
+  .pr-anim-ready .pr2-di-section, .pr-anim-ready .pr2-dd, .pr-anim-ready .pr2-metric-col,
+  .pr-anim-ready .pr-small-card { opacity: 1 !important; }
+  .pr-inview, .pr-inview * { animation: none !important; }
+  .pr-anim-line { stroke-dashoffset: 0 !important; }
 }

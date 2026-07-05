@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { pct, ppLabel, gaugeDash } from '../reportContent.js';
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
- * Gauge — SVG 도넛 게이지. 큰 숫자를 중앙에 배치. 마운트 시 호(arc)가 0→값으로 스윕.
+ * Gauge — SVG 도넛 게이지. 큰 숫자를 중앙에 배치.
+ * 화면에 스크롤되어 들어오면 호(arc)가 0→값으로 스윕한다.
  * @param value 0~1
  * @param size  px
  * @param color stroke color (default 값 구간별 자동)
@@ -20,16 +21,26 @@ export function Gauge({ value, size = 132, stroke = 12, label, color, sub }) {
   const arc = color || autoColor;
   const valueFont = Math.round(size * 0.27);
 
-  // 마운트 시 0 → value 스윕 (CSS transition이 dasharray 변화를 애니메이트)
+  // 화면에 들어올 때 0 → value 스윕 (CSS transition이 dasharray 변화를 애니메이트)
+  const wrapRef = useRef(null);
   const [shown, setShown] = useState(() => (prefersReducedMotion() ? value : 0));
   useEffect(() => {
-    if (prefersReducedMotion()) { setShown(value); return; }
-    const raf = requestAnimationFrame(() => setShown(value));
-    return () => cancelAnimationFrame(raf);
+    if (prefersReducedMotion() || typeof IntersectionObserver === 'undefined') { setShown(value); return; }
+    const el = wrapRef.current;
+    if (!el) { setShown(value); return; }
+    setShown(0);
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        requestAnimationFrame(() => setShown(value));
+        io.disconnect();
+      }
+    }, { threshold: 0.25 });
+    io.observe(el);
+    return () => io.disconnect();
   }, [value]);
 
   return (
-    <div className="pri-gauge" style={{ width: size, height: size }}>
+    <div className="pri-gauge" ref={wrapRef} style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle className="pri-gauge-track" cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} />
         <circle

@@ -25,8 +25,8 @@ const DEFAULT_YEARS = [2024, 2025, 2026, new Date().getFullYear() + 1];
 
 /**
  * PulseReportPage
- * 새 Pulse 경영 보고서 페이지. /pulse-report route에서 진입.
- * 기존 /pulse 페이지(PulsePage.jsx)는 건드리지 않습니다.
+ * Pulse 경영 보고서 페이지. /pulse-report route에서 진입.
+ * (기존 /pulse 페이지는 제거됨 — 이 페이지가 유일한 Pulse 화면입니다.)
  *
  * 모든 계산은 pulseEngine.js를 재사용. 이 컴포넌트는 조립과 props 전달만 담당.
  */

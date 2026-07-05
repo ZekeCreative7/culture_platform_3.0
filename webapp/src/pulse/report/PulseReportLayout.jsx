@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Tab1Executive } from './tabs/Tab1Executive.jsx';
 import { Tab2Divisions } from './tabs/Tab2Divisions.jsx';
 import { Tab3Causation } from './tabs/Tab3Causation.jsx';
@@ -41,13 +41,48 @@ export function PulseReportLayout({
   onSelectDivision,
 }) {
   const [activeTab, setActiveTab] = useState('executive');
+  const rootRef = useRef(null);
+
+  // 스크롤로 화면에 들어오는 인포그래픽에 .pr-inview를 붙여 그때 애니메이션 실행.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return; // 모션 최소화 설정 시 그대로 표시
+
+    root.classList.add('pr-anim-ready');
+    const SEL = '.pr2-hero, .pr2-ev, .pr-chart-card, .pr2-di-section, .pr2-dd, .pr2-metric-col, .pr-small-card';
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add('pr-inview');
+          io.unobserve(e.target);
+        }
+      }
+    }, { threshold: 0.01, rootMargin: '0px 0px -12% 0px' });
+
+    let scheduled = false;
+    const scan = () => {
+      scheduled = false;
+      root.querySelectorAll(SEL).forEach((el) => {
+        if (!el.classList.contains('pr-inview')) io.observe(el);
+      });
+    };
+    scan();
+    const mo = new MutationObserver(() => {
+      if (!scheduled) { scheduled = true; requestAnimationFrame(scan); }
+    });
+    mo.observe(root, { childList: true, subtree: true });
+
+    return () => { io.disconnect(); mo.disconnect(); root.classList.remove('pr-anim-ready'); };
+  }, []);
 
   const outliers = diagnostics?.outliers ?? [];
   const masked   = diagnostics?.masked   ?? [];
   const ranked   = diagnostics?.ranked   ?? [];
 
   return (
-    <div className="pr-layout">
+    <div className="pr-layout" ref={rootRef}>
       {/* ── Page Head ─────────────────────────────────────────────── */}
       <section className="page-head pr-page-head">
         <div>

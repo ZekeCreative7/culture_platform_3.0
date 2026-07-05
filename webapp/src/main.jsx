@@ -17,7 +17,6 @@ const AnalyticsPage = lazyNamed(() => import('./pages/AnalyticsPage.jsx'), 'Anal
 const ReportPage = lazyNamed(() => import('./pages/ReportPage.jsx'), 'ReportPage');
 const SurveyPage = lazyNamed(() => import('./pages/SurveyPage.jsx'), 'SurveyPage');
 const CommPage = lazyNamed(() => import('./pages/CommPage.jsx'), 'CommPage');
-const PulsePage = lazyNamed(() => import('./pages/PulsePage.jsx'), 'PulsePage');
 const PulseReportPage = lazyNamed(() => import('./pages/PulseReportPage.jsx'), 'PulseReportPage');
 
 const BASE = '/culture_platform_3.0';
@@ -76,7 +75,7 @@ function App() {
                 <Route path="/report" element={<ReportPage />} />
                 <Route path="/survey" element={<SurveyPage />} />
                 <Route path="/comm" element={<CommPage />} />
-                <Route path="/pulse" element={<PulsePage />} />
+                <Route path="/pulse" element={<Navigate to="/pulse-report" replace />} />
                 <Route path="/pulse-report" element={<PulseReportPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>

@@ -8,7 +8,7 @@ import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { OperationalStatusPanel } from '../../operational/OperationalStatusPanel.jsx';
 
-const VALID_VIEWS = ['dashboard', 'sessions', 'org', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse', 'pulse-report'];
+const VALID_VIEWS = ['dashboard', 'sessions', 'org', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse-report'];
 
 export function AppLayout({ children }) {
   const navigate = useNavigate();

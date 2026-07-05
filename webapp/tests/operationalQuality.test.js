@@ -12,6 +12,19 @@ describe("Operational quality guardrails", () => {
     expect(source).not.toContain("import { PulsePage } from './pages/PulsePage.jsx'");
   });
 
+  it("keeps legacy /pulse as a route redirect while internal navigation uses pulse-report", () => {
+    const mainSource = readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
+    const appLayoutSource = readFileSync(new URL("../src/components/layout/AppLayout.jsx", import.meta.url), "utf8");
+    const dashboardComponentsSource = readFileSync(new URL("../src/dashboard/DashboardComponents.jsx", import.meta.url), "utf8");
+    const dashboardEngineSource = readFileSync(new URL("../src/dashboard/dashboardEngine.js", import.meta.url), "utf8");
+
+    expect(mainSource).toContain('<Route path="/pulse" element={<Navigate to="/pulse-report" replace />} />');
+    expect(appLayoutSource).not.toContain("'pulse', 'pulse-report'");
+    expect(dashboardComponentsSource).not.toContain("onNavigate('pulse'");
+    expect(dashboardEngineSource).not.toContain('targetView: "pulse"');
+    expect(dashboardComponentsSource).toContain("onNavigate('pulse-report'");
+  });
+
   it("keeps a smoke manifest for the post-migration core workflow", async () => {
     const { CORE_OPERATIONAL_SMOKE_FLOW, smokeRoutePaths } = await import("../src/operational/smokePlan.js");
 

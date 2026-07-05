@@ -78,7 +78,7 @@ export function DashboardStatusStrip({ snapshot, pulseYear, onNavigate }) {
         <div className="strip-quick-actions">
           <button className="primary compact quick-action-btn" onClick={() => onNavigate('sessions')}>세션 만들기</button>
           <button className="secondary compact quick-action-btn" onClick={() => onNavigate('survey')}>설문 만들기</button>
-          <button className="secondary compact quick-action-btn" onClick={() => onNavigate('pulse')}>약속 보드</button>
+          <button className="secondary compact quick-action-btn" onClick={() => onNavigate('pulse-report')}>약속 보드</button>
         </div>
       </div>
     </div>
@@ -103,7 +103,7 @@ export function DashboardKPIGrid({ isLoading, actionsReady, todayActionsCount, r
         value={isLoading ? '—' : responseWaiting}
         desc="공감 피드백 미등록"
         highlightClass="highlight-purple"
-        onClick={() => onNavigate('pulse', '', '', 'listening')}
+        onClick={() => onNavigate('pulse-report', '', '', 'listening')}
       />
       <KPICard
         label="이번 주 세션"
@@ -260,7 +260,7 @@ export function SupportTeamsSection({ supportTeams, pulseLoaded, onNavigate }) {
               <div
                 className="support-team-card cursor-pointer"
                 key={team.teamName}
-                onClick={() => onNavigate('pulse', '', team.pulseDivisionId)}
+                onClick={() => onNavigate('pulse-report', '', team.pulseDivisionId)}
               >
                 <div className="support-team-head">
                   <strong>{team.teamName}</strong>
@@ -357,7 +357,7 @@ export function OperatingLoopSection({ loop, pulseYear, pulseLoaded, onNavigate 
       </div>
       <div className="operating-loop-container">
         <div className="loop-nodes">
-          <div className="loop-node cursor-pointer" onClick={() => onNavigate('pulse')}>
+          <div className="loop-node cursor-pointer" onClick={() => onNavigate('pulse-report')}>
             <div className={`node-circle ${pulseLoaded ? 'success' : 'empty'}`}>
               <span className="node-num">{loop.diagnosticLabel === '데이터 없음' ? '—' : (pulseYear || '—')}</span>
             </div>
@@ -377,7 +377,7 @@ export function OperatingLoopSection({ loop, pulseYear, pulseLoaded, onNavigate 
             </div>
           </div>
           <div className="loop-arrow">→</div>
-          <div className="loop-node cursor-pointer" onClick={() => onNavigate('pulse')} style={{ position: 'relative' }}>
+          <div className="loop-node cursor-pointer" onClick={() => onNavigate('pulse-report')} style={{ position: 'relative' }}>
             <div className={`node-circle ${loop.commitmentsCount > 0 ? 'active' : 'empty'}`}>
               <span className="node-num">{loop.commitmentsCount}</span>
               {loop.hasRedDot && <span className="node-red-dot"></span>}
@@ -733,7 +733,7 @@ export function PulseSignalsSection({ pulseSignals, pulseYear, pulseLoaded, onNa
                     className="signal-row cursor-pointer"
                     key={sig.label}
                     title={tooltipContent}
-                    onClick={() => onNavigate('pulse')}
+                    onClick={() => onNavigate('pulse-report')}
                   >
                     <div className="signal-info">
                       <span className="signal-label">{sig.label}</span>
@@ -782,7 +782,7 @@ export function TrustFunnelSection({ funnel, onNavigate }) {
           <div className="empty-state-card">
             <p className="empty-state-title">등록된 약속이 아직 없습니다</p>
             <p className="empty-state-desc">구성원의 정성 의견을 조직의 행동 약속으로 연결합니다.<br />첫 약속을 등록하면 이행 현황과 신뢰 회복 흐름이 여기 표시됩니다.</p>
-            <button className="primary compact margin-top" onClick={() => onNavigate('pulse', '', '', 'listening', true)}>첫 약속 등록</button>
+            <button className="primary compact margin-top" onClick={() => onNavigate('pulse-report', '', '', 'listening', true)}>첫 약속 등록</button>
           </div>
         ) : (
           <>
@@ -958,7 +958,7 @@ export function SupportOrgsSection({ supportOrgs, pulseLoaded, onNavigate }) {
                 <div
                   className="support-org-card cursor-pointer"
                   key={org.id}
-                  onClick={() => onNavigate('pulse', '', org.id)}
+                  onClick={() => onNavigate('pulse-report', '', org.id)}
                 >
                   <div className="org-card-head">
                     <span className={`rank-badge ${rankColor}`}>{index + 1}순위</span>

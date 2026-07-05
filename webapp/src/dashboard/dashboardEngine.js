@@ -196,7 +196,7 @@ export function dashboardActionQueue({ state, today }) {
           priority: 1,
           date: c.dueDate,
           title: `[기한초과 약속] ${c.commitment} (담당: ${c.ownerRole || '미정'})`,
-          targetView: "pulse",
+          targetView: "pulse-report",
           id: c.id
         });
       } else if (c.dueDate >= today && c.dueDate <= todayPlus7) {
@@ -206,7 +206,7 @@ export function dashboardActionQueue({ state, today }) {
           priority: 3,
           date: c.dueDate,
           title: `[약속 마감] ${c.commitment} (기한: ${c.dueDate})`,
-          targetView: "pulse",
+          targetView: "pulse-report",
           id: c.id
         });
       }

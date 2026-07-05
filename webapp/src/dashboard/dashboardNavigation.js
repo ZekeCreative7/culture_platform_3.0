@@ -5,6 +5,10 @@ import {
   sessionYear
 } from '../utils.js';
 
+export function normalizeDashboardTargetView(targetView) {
+  return targetView === "pulse" ? "pulse-report" : targetView;
+}
+
 export function applyDashboardNavigationState(state, { targetView, sessionId = "", scopeId = "", pulseView = "", openCommitmentForm = false } = {}) {
   if (sessionId) {
     state.selectedReportSessionId = sessionId;
@@ -30,7 +34,7 @@ export function applyDashboardNavigationState(state, { targetView, sessionId = "
   }
 
   if (targetView) {
-    state.activeView = targetView;
+    state.activeView = normalizeDashboardTargetView(targetView);
   }
 }
 
@@ -42,7 +46,7 @@ export function applyDashboardActionState(state, { targetView, actionType = "", 
     state.pulseView = "listening";
   }
 
-  if (targetView === "survey" && sessionId) {
+  if (normalizeDashboardTargetView(targetView) === "survey" && sessionId) {
     const targetSess = (state.sessions || []).find(s => s.id === sessionId);
     if (targetSess && actionType === "followup_survey_create") {
       state.editingSurveyId = null;

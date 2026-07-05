@@ -317,7 +317,7 @@ describe('applyDashboardNavigationState', () => {
       scopeId: '고객솔루션본부UW',
     });
 
-    expect(state.activeView).toBe('pulse');
+    expect(state.activeView).toBe('pulse-report');
     expect(state.pulseScopeId).toBe('고객솔루션본부UW');
     expect(state.pulseView).toBe('listening');
   });
@@ -361,7 +361,7 @@ describe('applyDashboardNavigationState', () => {
       openCommitmentForm: true,
     });
 
-    expect(state.activeView).toBe('pulse');
+    expect(state.activeView).toBe('pulse-report');
     expect(state.pulseView).toBe('listening');
     expect(state.pulseAutoOpenCommitmentForm).toBe(true);
   });

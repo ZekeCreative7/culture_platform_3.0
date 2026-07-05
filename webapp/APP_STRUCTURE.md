@@ -134,6 +134,7 @@ Known remaining compatibility surfaces:
 - Session list/drawer actions are React-owned direct imports and should not attach `window.*` handlers again.
 - Session attendance actions are React-owned direct imports and should not attach `window.openAttendance` again.
 - Report filter/export actions are React-owned direct imports and should not attach `window.*` handlers again.
+- Report filter/export controls are React-owned and should not return to `views/report.js` inline HTML.
 - Report qualitative-analysis actions are React-owned direct imports and should not attach `window.openQualAnalysisModal` again.
 - Current organization/user identity is owned by `auth/currentAuthContext.js` and should not use `window.__current*` globals again.
 - QR generation is module-cached in `qrCode.js` and should not attach `globalThis.qrcode` again.

@@ -9,10 +9,13 @@ describe("Report runtime wiring", () => {
     const actionsSource = readFileSync(new URL("../src/report/reportActions.js", import.meta.url), "utf8");
 
     expect(pageSource).toContain("ReportControls");
-    expect(bridgeSource).toContain("includeControls: false");
+    expect(bridgeSource).not.toContain("includeControls");
     expect(controlsSource).toContain("applyReportFilter");
     expect(controlsSource).toContain("downloadReportPdf");
     expect(controlsSource).toContain("downloadReportXlsx");
+    expect(controlsSource).toContain("id=\"download-report-xlsx\"");
+    expect(controlsSource).toContain("id=\"download-report-pdf\"");
+    expect(controlsSource).toContain("id=\"apply-report-filter\"");
     expect(actionsSource).toContain("export function applyReportFilter");
     expect(actionsSource).toContain("export async function downloadReportPdf");
     expect(actionsSource).toContain("export async function downloadReportXlsx");
@@ -34,19 +37,22 @@ describe("Report runtime wiring", () => {
     expect(pageSource).not.toContain("renderReport({");
     expect(bridgeSource).toContain("REACT_REPORT_BODY_OPTIONS");
     expect(bridgeSource).toContain("assertReactReportBodySafe");
-    expect(bridgeSource).toContain("includeControls: false");
     expect(bridgeSource).toContain("includeQualSignals: false");
     expect(bridgeSource).toContain("report-export-content");
     expect(bridgeSource).toContain("INLINE_HANDLER_PATTERN");
   });
 
-  it("lets the legacy report renderer omit inline controls for the React route", () => {
+  it("retires legacy inline Report controls from the HTML renderer", () => {
     const reportSource = readFileSync(new URL("../src/views/report.js", import.meta.url), "utf8");
 
-    expect(reportSource).toContain("includeControls = options.includeControls !== false");
     expect(reportSource).toContain("renderCompareReport(type, cohort, options)");
-    expect(reportSource).toContain("${includeControls ? `<section class=\"panel filters-panel\"");
-    expect(reportSource).toContain("${includeControls && cohort && session ? `");
+    expect(reportSource).not.toContain("includeControls");
+    expect(reportSource).not.toContain("onclick=\"window.downloadReportPdf");
+    expect(reportSource).not.toContain("onclick=\"window.downloadReportXlsx");
+    expect(reportSource).not.toContain("onclick=\"window.applyReportFilter");
+    expect(reportSource).not.toContain("onchange=\"refreshScoped");
+    expect(reportSource).not.toContain("report-export-actions\" data-html2canvas-ignore=\"true\"");
+    expect(reportSource).not.toContain("filters-panel\" data-html2canvas-ignore=\"true\"");
   });
 
   it("moves the Report export shell and outcome intro to React", () => {

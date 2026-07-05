@@ -5,7 +5,6 @@ const LEGACY_EXPORT_ROOT_PATTERN = /\sid=["']report-export-content["']/i;
 const LEGACY_EXPORT_CONTROL_PATTERN = /\sid=["'](?:download-report-pdf|download-report-xlsx|apply-report-filter)["']/i;
 
 export const REACT_REPORT_BODY_OPTIONS = Object.freeze({
-  includeControls: false,
   includeShell: false,
   includeOutcomeIntro: false,
   includeExecSummary: false,

@@ -1,4 +1,5 @@
 import React from 'react';
+import { isContaminated } from '../reportContent.js';
 
 const pctLabel = (v) => (v === null || v === undefined ? '-' : `${Math.round(v * 100)}%`);
 const deltaLabel = (v) => {
@@ -39,8 +40,9 @@ function SmallMultipleCard({ row, companyOverall, onSelect }) {
       <div className="pr-small-card-header">
         <span className="pr-small-card-name">{row.id}</span>
         {isMasked && <span className="pr-small-card-badge pr-small-card-badge--masked">마스킹</span>}
-        {isOutlier && <span className="pr-small-card-badge pr-small-card-badge--outlier">이상치</span>}
-        {!isMasked && !isOutlier && (
+        {!isMasked && isContaminated(row.id) && <span className="pr-small-card-badge pr-small-card-badge--outlier">오염·제외</span>}
+        {isOutlier && !isContaminated(row.id) && <span className="pr-small-card-badge pr-small-card-badge--outlier">이상치</span>}
+        {!isMasked && !isOutlier && !isContaminated(row.id) && (
           <span className="pr-small-card-rag" style={{ color: ragColor }}>●</span>
         )}
       </div>

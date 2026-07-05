@@ -11,11 +11,13 @@ export function Tab2Divisions({
   prevDoc,
   year,
   prevYear,
+  cleanFav = null,
   getSupportSummary,   // (row) => supportSummary
   onSelectDivision,
 }) {
   const rows = diagnostics?.rows ?? [];
-  const companyOverall = diagnostics?.overallCompany ?? null;
+  // 전사 대비 기준선도 오염 2본부(고객혁신본부CE·Data Control) 제외 값으로 통일.
+  const companyOverall = cleanFav !== null && cleanFav !== undefined ? cleanFav : (diagnostics?.overallCompany ?? null);
   const companyDomainMeans = diagnostics?.companyDomainMeans ?? {};
 
   const [selectedId, setSelectedId] = useState(() => {

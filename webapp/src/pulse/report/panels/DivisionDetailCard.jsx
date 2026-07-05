@@ -9,6 +9,7 @@ import {
   idiConditions,
   ragColor,
   pct,
+  isContaminated,
 } from '../reportContent.js';
 
 const pctLabel = (v) => (v === null || v === undefined ? '-' : `${Math.round(v * 100)}%`);
@@ -57,6 +58,7 @@ export function DivisionDetailCard({ row, companyOverall, companyDomainMeans = {
           <h3 className="pr2-dd-name">{row.id}</h3>
           <span className="pri-chip" style={{ color: rc, background: 'rgba(0,0,0,0.04)' }}>● {row.rag?.label ?? '-'}</span>
           {isOutlier && <span className="pri-chip pri-chip--amber">이상치 — 분포 검토</span>}
+          {isContaminated(row.id) && <span className="pri-chip pri-chip--red">데이터 오염 · 전사 집계 제외</span>}
           {row.flags?.reorg && <span className="pri-chip pri-chip--slate">조직개편 연도</span>}
         </div>
       </div>
@@ -75,7 +77,7 @@ export function DivisionDetailCard({ row, companyOverall, companyDomainMeans = {
           <div className="pri-stat">
             <span className="pri-stat-label">전사 대비</span>
             <span className="pri-stat-value">{gapFromCompany !== null ? <DeltaPill value={gapFromCompany} /> : '–'}</span>
-            <span className="pri-stat-sub">전사 {pctLabel(companyOverall)} 기준</span>
+            <span className="pri-stat-sub">전사 {pctLabel(companyOverall)} 기준 · 오염 2본부 제외</span>
           </div>
           <div className="pri-stat">
             <span className="pri-stat-label">응답 규모</span>

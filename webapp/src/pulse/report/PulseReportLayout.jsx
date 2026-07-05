@@ -128,6 +128,7 @@ export function PulseReportLayout({
             prevDoc={prevDoc}
             year={year}
             prevYear={previousYear}
+            cleanFav={cleanFav}
             getSupportSummary={getSupportSummary}
             onSelectDivision={onSelectDivision}
           />

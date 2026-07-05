@@ -236,17 +236,3 @@ export function submitSurveyDraft() {
     );
   });
 }
-
-window.setSurveyCreatorStep = setSurveyCreatorStep;
-window.updateSurveyDraftField = updateSurveyDraftField;
-window.updateSurveyDraftSessionType = updateSurveyDraftSessionType;
-window.updateSurveyDraftCohort = updateSurveyDraftCohort;
-window.updateSurveyDraftPhase = updateSurveyDraftPhase;
-window.updateSurveyDraftQuestionText = updateSurveyDraftQuestionText;
-window.updateSurveyDraftQuestionType = updateSurveyDraftQuestionType;
-window.addSurveyDraftQuestion = addSurveyDraftQuestion;
-window.deleteSurveyDraftQuestion = deleteSurveyDraftQuestion;
-window.loadSurveyTemplate = loadSurveyTemplate;
-window.startEditSurvey = startEditSurvey;
-window.cancelSurveyEdit = cancelSurveyEdit;
-window.submitSurveyDraft = submitSurveyDraft;

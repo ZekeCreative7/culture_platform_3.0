@@ -88,6 +88,9 @@ describe("Survey runtime wiring", () => {
 
   it("keeps edit/cancel/save draft actions in surveyDraftActions.js, not app.js or a component", () => {
     const draftActionsSource = readFileSync(new URL("../src/survey/surveyDraftActions.js", import.meta.url), "utf8");
+    const wizardSource = readFileSync(new URL("../src/survey/SurveyWizardPanel.jsx", import.meta.url), "utf8");
+    const surveyCardSource = readFileSync(new URL("../src/survey/SurveyCard.jsx", import.meta.url), "utf8");
+    const closedSurveyCardSource = readFileSync(new URL("../src/survey/ClosedSurveyCard.jsx", import.meta.url), "utf8");
 
     for (const fn of [
       "startEditSurvey", "cancelSurveyEdit", "submitSurveyDraft", "setSurveyCreatorStep",
@@ -96,7 +99,15 @@ describe("Survey runtime wiring", () => {
       "addSurveyDraftQuestion", "deleteSurveyDraftQuestion", "loadSurveyTemplate",
     ]) {
       expect(draftActionsSource).toContain(`export function ${fn}`);
+      expect(draftActionsSource).not.toContain(`window.${fn}`);
     }
+
+    expect(wizardSource).toContain("from './surveyDraftActions.js'");
+    expect(surveyCardSource).toContain("from './surveyDraftActions.js'");
+    expect(closedSurveyCardSource).toContain("from './surveyDraftActions.js'");
+    expect(wizardSource).not.toContain("window.startEditSurvey");
+    expect(surveyCardSource).not.toContain("window.startEditSurvey");
+    expect(closedSurveyCardSource).not.toContain("window.startEditSurvey");
   });
 
   it("keeps upload/reset/delete/recover orphan response actions in surveyResponseActions.js, not app.js or a component", () => {

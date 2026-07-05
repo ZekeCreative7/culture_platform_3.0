@@ -5,7 +5,6 @@ import { state as vanillaState, subscribe } from '../state.js';
 import { getReactReportMetadata, renderReactReportBodyHtml } from '../report/reportHtmlBridge.js';
 import { ReportControls } from '../report/ReportControls.jsx';
 import { ReportExportShell } from '../report/ReportExportShell.jsx';
-import { bindReportQualSignals } from '../report/reportQualSignals.js';
 import { ExecSummaryPanel } from '../report/ExecSummaryPanel.jsx';
 import { OutcomeStoryPanel } from '../report/OutcomeStoryPanel.jsx';
 import { PulseSessionInsightPanel } from '../report/PulseSessionInsightPanel.jsx';
@@ -43,7 +42,6 @@ export const ReportPage = memo(function ReportPage() {
   }, []);
 
   useEffect(() => {
-    bindReportQualSignals();
     setDimPlaceholderEl(document.getElementById('react-dimension-cards-placeholder'));
     setRecsPlaceholderEl(document.getElementById('react-recommendations-placeholder'));
     setChangePlaceholderEl(document.getElementById('react-change-analysis-placeholder'));

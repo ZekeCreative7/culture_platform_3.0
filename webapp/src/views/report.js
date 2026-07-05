@@ -995,7 +995,6 @@ export function renderReport(options = {}) {
   const includeDimensionCards = options.includeDimensionCards !== false;
   const includeRecommendations = options.includeRecommendations !== false;
   const includeChangeAnalysis = options.includeChangeAnalysis !== false;
-  const includeQualSignals = options.includeQualSignals !== false;
   const scope = ensureScopedSelection("report");
   const type = scope.type;
   const cohort = scope.cohort;
@@ -1285,72 +1284,7 @@ export function renderReport(options = {}) {
     ` : `<div id="react-change-analysis-placeholder"></div>`}
 
     <!-- ④ 현장의 목소리 (정성 신호) -->
-    ${includeQualSignals ? (() => {
-      if (!session) return '';
-
-      const preSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
-      const postSig = (state.qualSignals || []).find(q => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
-
-      const preQual = analyticsQualResponseRows(session.cohort, session.type, session.id, "사전");
-      const postQual = analyticsQualResponseRows(session.cohort, session.type, session.id, "사후");
-
-      const hasPreQual = preQual.rows.length > 0;
-      const hasPostQual = postQual.rows.length > 0;
-
-      if (!hasPreQual && !hasPostQual) {
-        return `
-          <section class="report-export-section" style="margin-bottom:28px;">
-            <div class="section-title" style="margin-bottom:16px;">
-              <h2>④ 현장의 목소리 (정성 신호)</h2>
-            </div>
-            <div class="empty">이 세션에는 분석할 주관식 응답 데이터가 없습니다.</div>
-          </section>
-        `;
-      }
-
-      return `
-        <section class="report-export-section" style="margin-bottom:28px;">
-          <div class="section-title" style="margin-bottom:16px;">
-            <h2>④ 현장의 목소리 (정성 신호)</h2>
-            <span>사전 / 사후 주관식 텍스트 AI 분석 (키워드/테마/대표발언)</span>
-          </div>
-
-          <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:16px;">
-            <!-- Pre Qual -->
-            <div class="qual-phase-col">
-              <h3 style="font-size:13.5px; font-weight:800; color:#475569; border-bottom:1.5px solid #cbd5e1; padding-bottom:8px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-                <span style="width:7px; height:7px; border-radius:50%; background:#94a3b8;"></span>사전 설문 목소리
-              </h3>
-              ${preSig
-                ? `<div id="qual-signal-pre-container"></div>`
-                : hasPreQual
-                  ? `<div class="empty" style="padding:20px;">
-                       <p style="font-size:12px; margin-bottom:10px;">주관식 데이터 ${preQual.rows.length}건이 있습니다.</p>
-                       <button class="primary compact" onclick="window.openQualAnalysisModal('${session.id}', 'pre')">AI 분석 생성</button>
-                     </div>`
-                  : `<div class="empty" style="padding:20px; font-size:12px;">사전 주관식 응답이 없습니다.</div>`
-              }
-            </div>
-
-            <!-- Post Qual -->
-            <div class="qual-phase-col">
-              <h3 style="font-size:13.5px; font-weight:800; color:#0052ff; border-bottom:1.5px solid #0052ff44; padding-bottom:8px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-                <span style="width:7px; height:7px; border-radius:50%; background:#0052ff;"></span>사후 설문 목소리
-              </h3>
-              ${postSig
-                ? `<div id="qual-signal-post-container"></div>`
-                : hasPostQual
-                  ? `<div class="empty" style="padding:20px;">
-                       <p style="font-size:12px; margin-bottom:10px;">주관식 데이터 ${postQual.rows.length}건이 있습니다.</p>
-                       <button class="primary compact" onclick="window.openQualAnalysisModal('${session.id}', 'post')">AI 분석 생성</button>
-                     </div>`
-                  : `<div class="empty" style="padding:20px; font-size:12px;">사후 주관식 응답이 없습니다.</div>`
-              }
-            </div>
-          </div>
-        </section>
-      `;
-    })() : `<div id="react-qual-signals-placeholder"></div>`}
+    <div id="react-qual-signals-placeholder"></div>
     
     `}
     ${includeShell ? "</div>" : ""}

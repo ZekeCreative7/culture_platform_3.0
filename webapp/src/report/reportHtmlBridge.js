@@ -14,7 +14,6 @@ export const REACT_REPORT_BODY_OPTIONS = Object.freeze({
   includeDimensionCards: false,
   includeRecommendations: false,
   includeChangeAnalysis: false,
-  includeQualSignals: false,
   includeCompareRanking: false,
 });
 

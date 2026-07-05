@@ -37,7 +37,7 @@ describe("Report runtime wiring", () => {
     expect(pageSource).not.toContain("renderReport({");
     expect(bridgeSource).toContain("REACT_REPORT_BODY_OPTIONS");
     expect(bridgeSource).toContain("assertReactReportBodySafe");
-    expect(bridgeSource).toContain("includeQualSignals: false");
+    expect(bridgeSource).not.toContain("includeQualSignals");
     expect(bridgeSource).toContain("report-export-content");
     expect(bridgeSource).toContain("INLINE_HANDLER_PATTERN");
   });
@@ -80,15 +80,19 @@ describe("Report runtime wiring", () => {
     const sessionCardSource = readFileSync(new URL("../src/sessions/SessionCard.jsx", import.meta.url), "utf8");
     const qualSignalsSource = readFileSync(new URL("../src/report/reportQualSignals.js", import.meta.url), "utf8");
 
-    expect(pageSource).toContain("from '../report/reportQualSignals.js'");
+    expect(pageSource).toContain("ReportQualSignals");
+    expect(pageSource).toContain("from '../report/ReportQualSignals.jsx'");
     expect(pageSource).not.toContain("from '../app.js'");
+    expect(pageSource).not.toContain("bindReportQualSignals");
     expect(reportQualSignalsComponentSource).toContain("from './reportQualSignals.js'");
+    expect(reportQualSignalsComponentSource).toContain("renderQualSignalPanel");
     expect(sessionCardSource).toContain("from '../report/reportQualSignals.js'");
     expect(reportQualSignalsComponentSource).not.toContain("window.openQualAnalysisModal");
     expect(sessionCardSource).not.toContain("window.openQualAnalysisModal");
-    expect(qualSignalsSource).toContain("export function bindReportQualSignals");
     expect(qualSignalsSource).toContain("export function openQualAnalysisModal");
-    expect(qualSignalsSource).toContain("renderQualSignalPanel");
+    expect(qualSignalsSource).not.toContain("qual-signal-pre-container");
+    expect(qualSignalsSource).not.toContain("qual-signal-post-container");
+    expect(qualSignalsSource).not.toContain("renderQualSignalPanel");
     expect(qualSignalsSource).toContain("renderQualAnalysisModal");
     expect(qualSignalsSource).toContain("qualResponseRows");
     expect(qualSignalsSource).not.toContain("window.openQualAnalysisModal");
@@ -120,7 +124,9 @@ describe("Report runtime wiring", () => {
     expect(reportSource).toContain("includeDimensionCards = options.includeDimensionCards !== false");
     expect(reportSource).toContain("includeRecommendations = options.includeRecommendations !== false");
     expect(reportSource).toContain("includeChangeAnalysis = options.includeChangeAnalysis !== false");
-    expect(reportSource).toContain("includeQualSignals = options.includeQualSignals !== false");
+    expect(reportSource).not.toContain("includeQualSignals");
+    expect(reportSource).not.toContain("window.openQualAnalysisModal");
+    expect(reportSource).toContain("react-qual-signals-placeholder");
     expect(reportSource).toContain("includeCompareRanking = options.includeCompareRanking !== false");
   });
 });

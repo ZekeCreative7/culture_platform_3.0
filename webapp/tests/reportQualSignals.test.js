@@ -50,7 +50,6 @@ async function loadReportQualSignals({ stateOverrides = {}, rows = [] } = {}) {
     ...stateOverrides,
   };
   const renderQualAnalysisModal = vi.fn();
-  const renderQualSignalPanel = vi.fn();
   const saveQualSignalToFirestore = vi.fn(async () => {});
   const ensureScopedSelection = vi.fn(() => ({ session: state.sessions[0] }));
   const qualResponseRows = vi.fn(() => ({
@@ -60,7 +59,6 @@ async function loadReportQualSignals({ stateOverrides = {}, rows = [] } = {}) {
   const qualQuestionLabel = vi.fn((qid) => `Question ${qid}`);
 
   vi.doMock("../src/qual/qual-analysis-modal.js", () => ({ renderQualAnalysisModal }));
-  vi.doMock("../src/qual/qual-signal-panel.js", () => ({ renderQualSignalPanel }));
   vi.doMock("../src/state.js", () => ({
     state,
     ensureScopedSelection,
@@ -82,7 +80,6 @@ async function loadReportQualSignals({ stateOverrides = {}, rows = [] } = {}) {
     qualQuestionLabel,
     qualResponseRows,
     renderQualAnalysisModal,
-    renderQualSignalPanel,
     saveQualSignalToFirestore,
     state,
   };
@@ -96,27 +93,6 @@ afterEach(() => {
 });
 
 describe("reportQualSignals", () => {
-  it("binds confirmed pre and post qualitative signals into Report containers", async () => {
-    const preSignal = { id: "pre", session_id: "session-1", phase: "pre", review: { status: "confirmed" } };
-    const postSignal = { id: "post", session_id: "session-1", phase: "post", review: { status: "confirmed" } };
-    const {
-      bindReportQualSignals,
-      documentStub,
-      ensureScopedSelection,
-      renderQualSignalPanel,
-    } = await loadReportQualSignals({
-      stateOverrides: { qualSignals: [preSignal, postSignal] },
-    });
-    const preContainer = documentStub.addNode("qual-signal-pre-container");
-    const postContainer = documentStub.addNode("qual-signal-post-container");
-
-    bindReportQualSignals();
-
-    expect(ensureScopedSelection).toHaveBeenCalledWith("report");
-    expect(renderQualSignalPanel).toHaveBeenCalledWith(preContainer, { qualSignal: preSignal });
-    expect(renderQualSignalPanel).toHaveBeenCalledWith(postContainer, { qualSignal: postSignal });
-  });
-
   it("opens the qualitative analysis modal with grouped respondent answers", async () => {
     const {
       openQualAnalysisModal,

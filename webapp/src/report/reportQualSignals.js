@@ -1,8 +1,6 @@
 import { renderQualAnalysisModal } from '../qual/qual-analysis-modal.js';
-import { renderQualSignalPanel } from '../qual/qual-signal-panel.js';
 import {
   state,
-  ensureScopedSelection,
   saveQualSignalToFirestore,
 } from '../state.js';
 import { isQualText } from '../utils.js';
@@ -10,30 +8,6 @@ import {
   qualQuestionLabel,
   qualResponseRows,
 } from '../views/analytics.js';
-
-export function bindReportQualSignals() {
-  const preContainer = document.getElementById('qual-signal-pre-container');
-  const postContainer = document.getElementById('qual-signal-post-container');
-  if (!preContainer && !postContainer) return;
-
-  const scope = ensureScopedSelection('report');
-  const session = scope.session;
-  if (!session) return;
-
-  if (preContainer) {
-    const preSig = (state.qualSignals || []).find((signal) =>
-      signal.session_id === session.id && signal.phase === 'pre' && signal.review?.status === 'confirmed'
-    );
-    if (preSig) renderQualSignalPanel(preContainer, { qualSignal: preSig });
-  }
-
-  if (postContainer) {
-    const postSig = (state.qualSignals || []).find((signal) =>
-      signal.session_id === session.id && signal.phase === 'post' && signal.review?.status === 'confirmed'
-    );
-    if (postSig) renderQualSignalPanel(postContainer, { qualSignal: postSig });
-  }
-}
 
 export function openQualAnalysisModal(sessionId, phase) {
   const session = (state.sessions || []).find((item) => item.id === sessionId);

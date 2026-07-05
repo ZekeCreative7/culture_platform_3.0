@@ -136,6 +136,7 @@ Known remaining compatibility surfaces:
 - Report filter/export actions are React-owned direct imports and should not attach `window.*` handlers again.
 - Report filter/export controls are React-owned and should not return to `views/report.js` inline HTML.
 - Report qualitative-analysis actions are React-owned direct imports and should not attach `window.openQualAnalysisModal` again.
+- Report qualitative-signal panels are React-owned and should not return to `views/report.js` inline HTML.
 - Current organization/user identity is owned by `auth/currentAuthContext.js` and should not use `window.__current*` globals again.
 - QR generation is module-cached in `qrCode.js` and should not attach `globalThis.qrcode` again.
 - Survey helper modules should not reintroduce retired modal HTML or inline handlers.

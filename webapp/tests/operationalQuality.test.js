@@ -173,4 +173,23 @@ describe("Operational quality guardrails", () => {
     expect(auditLogFirestoreSource).toContain("addDoc(");
     expect(auditLogFirestoreSource).toContain("getDocs(");
   });
+
+  it("keeps organization-id migration Firestore mechanics in the operational module while state.js exposes only a facade", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const migrationSource = readFileSync(new URL("../src/operational/organizationMigrationFirestore.js", import.meta.url), "utf8");
+
+    const migrationFacade = stateSource.slice(
+      stateSource.indexOf("export async function migrateOrganizationId"),
+      stateSource.indexOf("export function sessionsSortedByStart")
+    );
+
+    expect(stateSource).toContain("migrateOrganizationIdAdapter");
+    expect(stateSource).not.toContain("from './firebase.js'");
+    expect(migrationFacade).not.toContain("getDocs(collection");
+    expect(migrationFacade).not.toContain("writeBatch(db)");
+
+    expect(migrationSource).toContain("export async function migrateOrganizationIdAdapter");
+    expect(migrationSource).toContain("getDocs(collection");
+    expect(migrationSource).toContain("writeBatch(db)");
+  });
 });

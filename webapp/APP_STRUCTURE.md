@@ -30,7 +30,7 @@ Current top-level routes:
 | `#/report` | `pages/ReportPage.jsx` |
 | `#/survey` | `pages/SurveyPage.jsx` |
 | `#/comm` | `pages/CommPage.jsx` |
-| `#/pulse` | `pages/PulsePage.jsx` |
+| `#/pulse` | redirects to `#/pulse-report` |
 | `#/pulse-report` | `pages/PulseReportPage.jsx` |
 
 `src/app.js`, `src/reactMode.js`, and `components/layout/VanillaCanvas.jsx` have been deleted. Do not reintroduce a full-page legacy shell to add new behavior.
@@ -73,6 +73,7 @@ Core listener and persistence responsibilities live in `src/state.js`:
 - Firestore subscribe/save/delete helpers
 - audit log write/read helpers, thin state facades over `operational/auditLogFirestore.js`
 - appState upload/download Firestore helpers, thin state facades over `operational/appStateFirestore.js`
+- organization-id migration helper, thin state facade over `operational/organizationMigrationFirestore.js`
 - organization save/subscribe helpers, thin state facades over `org/organizationFirestore.js`
 - session load/subscribe/save/delete helpers, thin state facades over `sessions/sessionFirestore.js`
 - `subscribeResponsesFromFirestore()`, a thin state facade over `responses/responseFirestoreSubscription.js`
@@ -179,7 +180,7 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
 
 The next cleanup passes should remove the remaining compatibility surface in small, browser-verified slices:
 
-1. Keep shrinking `state.js` by moving remaining Firestore adapters into domain modules; audit log and appState upload/download mechanics now live under `operational/`, organization save/subscribe mechanics now live under `org/`, session Firestore mechanics now live under `sessions/`, response rules/listeners and response fetch/save/delete mechanics now live under `responses/`, survey and survey template Firestore mechanics now live under `survey/`, Pulse result and commitment Firestore mechanics now live under `pulse/`, and QualSignal listener/save mechanics now live under `qual/`.
+1. Keep shrinking `state.js` by moving remaining compatibility logic into domain modules. Direct Firestore mechanics from `state.js` now live under `operational/`, `org/`, `sessions/`, `responses/`, `survey/`, `pulse/`, and `qual/`; `state.js` keeps stable compatibility facades for callers that have not moved yet.
 2. Grow the smoke flow from structural guardrails into browser E2E once a stable local auth/preview fixture exists.
 3. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
 4. Remove `window.*` attachments only after every real caller has a direct import or React handler.

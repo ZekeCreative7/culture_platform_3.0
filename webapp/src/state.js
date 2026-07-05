@@ -1,4 +1,3 @@
-import { db, collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, limit as firestoreLimit } from './firebase.js';
 import { 
   PHASES, 
   normalizeSessionType, 
@@ -28,6 +27,7 @@ import {
   fetchAppStateFromFirestoreAdapter,
   uploadAppStateToFirestoreAdapter
 } from './operational/appStateFirestore.js';
+import { migrateOrganizationIdAdapter } from './operational/organizationMigrationFirestore.js';
 import {
   deletePulseCommitmentFromFirestoreAdapter,
   loadPulseCommitmentsAdapter,
@@ -719,23 +719,7 @@ export async function saveQualSignalToFirestore(qualSignal) {
  * 마스터 계정으로 1회 실행: await migrateOrganizationId()
  */
 export async function migrateOrganizationId(orgId = 'lina') {
-  const targets = ['sessions', 'surveys', 'responses', 'surveyTemplates', 'pulseResults', 'pulseCommitments', 'QualSignal'];
-  let total = 0;
-  for (const colName of targets) {
-    const snap = await getDocs(collection(db, colName));
-    const toUpdate = snap.docs.filter(d => !d.data().organizationId);
-    if (!toUpdate.length) continue;
-    const CHUNK = 500;
-    for (let i = 0; i < toUpdate.length; i += CHUNK) {
-      const batch = writeBatch(db);
-      toUpdate.slice(i, i + CHUNK).forEach(d => batch.set(d.ref, { organizationId: orgId }, { merge: true }));
-      await batch.commit();
-    }
-    total += toUpdate.length;
-    console.log(`[migrate] ${colName}: ${toUpdate.length}건 태깅 완료`);
-  }
-  console.log(`[migrate] 완료 — 총 ${total}건 organizationId='${orgId}' 적용`);
-  return total;
+  return migrateOrganizationIdAdapter({ orgId });
 }
 
 export function sessionsSortedByStart() {

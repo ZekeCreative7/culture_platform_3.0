@@ -132,6 +132,7 @@ Known remaining compatibility surfaces:
 - React Report and Session components call qualitative-analysis actions by direct import; `window.openQualAnalysisModal` remains only for legacy `views/report.js` HTML until that section is retired.
 - Some action modules still attach functions to `window.*` for cross-screen compatibility or leftover inline HTML handlers.
 - Survey list, draft, and response/recovery actions are React-owned direct imports and should not attach `window.*` handlers again.
+- Session list/drawer actions are React-owned direct imports and should not attach `window.*` handlers again.
 - `state.js` still exposes `collapsibleSectionHeader()` as an HTML string helper.
 
 Treat these as cleanup targets, not as permission to add new string-rendered UI. New UI should be React components with explicit action imports.

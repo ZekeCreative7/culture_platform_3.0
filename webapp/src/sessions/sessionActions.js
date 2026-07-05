@@ -85,11 +85,3 @@ export function closeSessionDrawer() {
   state.editingSessionId = null;
   saveState();
 }
-
-// Registered once at module load (not scoped to a page mount/unmount lifecycle)
-// so Dashboard's synchronous window.startEditSession(id) calls
-// (dashboard/dashboardViews.js) work correctly even when the user reaches a
-// session quick-action without SessionsPage ever having (re-)mounted first.
-window.toggleSessionTypeGroup = toggleSessionTypeGroup;
-window.startEditSession = startEditSession;
-window.deleteSession = deleteSession;

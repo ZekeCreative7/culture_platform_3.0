@@ -19,13 +19,19 @@ describe("Sessions runtime wiring", () => {
     expect(drawerSource).toContain("sessionActions.js");
   });
 
-  it("registers startEditSession/deleteSession/toggleSessionTypeGroup permanently at module load, not scoped to SessionsPage mount/unmount", () => {
+  it("keeps session actions as direct React imports without window compatibility exports", () => {
     const actionsSource = readFileSync(new URL("../src/sessions/sessionActions.js", import.meta.url), "utf8");
     const pageSource = readFileSync(new URL("../src/pages/SessionsPage.jsx", import.meta.url), "utf8");
+    const cardSource = readFileSync(new URL("../src/sessions/SessionCard.jsx", import.meta.url), "utf8");
+    const listSectionSource = readFileSync(new URL("../src/sessions/SessionsListSection.jsx", import.meta.url), "utf8");
+    const modalActionsSource = readFileSync(new URL("../src/sessions/sessionModalActions.js", import.meta.url), "utf8");
 
-    expect(actionsSource).toContain("window.startEditSession = startEditSession");
-    expect(actionsSource).toContain("window.deleteSession = deleteSession");
-    expect(actionsSource).toContain("window.toggleSessionTypeGroup = toggleSessionTypeGroup");
+    expect(cardSource).toContain("from './sessionActions.js'");
+    expect(listSectionSource).toContain("from './sessionActions.js'");
+    expect(modalActionsSource).toContain("from './sessionActions.js'");
+    expect(actionsSource).not.toContain("window.startEditSession");
+    expect(actionsSource).not.toContain("window.deleteSession");
+    expect(actionsSource).not.toContain("window.toggleSessionTypeGroup");
     expect(pageSource).not.toContain("delete window.startEditSession");
     expect(pageSource).not.toContain("delete window.deleteSession");
     expect(pageSource).not.toContain("delete window.toggleSessionTypeGroup");

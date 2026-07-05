@@ -16,6 +16,12 @@ import {
   SESSION_TYPES
 } from './utils.js';
 import { normalizePulseDoc } from './pulse/pulseEngine.js';
+import {
+  deletePulseCommitmentFromFirestoreAdapter,
+  loadPulseCommitmentsAdapter,
+  savePulseCommitmentToFirestoreAdapter,
+  subscribePulseCommitmentsFromFirestoreAdapter
+} from './pulse/pulseCommitmentFirestore.js';
 import { assertNotQuantInput } from './qual/qual-signal.js';
 import {
   saveQualSignalToFirestoreAdapter,
@@ -693,76 +699,44 @@ export async function savePulseResultToFirestore(payload) {
 }
 
 export async function loadPulseCommitments() {
-  if (isLocalPreviewMode()) {
-    commitmentsCache.loaded = true;
-    commitmentsCache.loading = false;
-    state.pulseCommitments = state.pulseCommitments || [];
-    saveState();
-    setDbStatus('connected');
-    return;
-  }
-  if (commitmentsCache.loaded || commitmentsCache.loading) return;
-  commitmentsCache.loading = true;
-  try {
-    const snap = await getDocs(query(collection(db, 'pulseCommitments'), where('organizationId', '==', getCurrentOrgId())));
-    state.pulseCommitments = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    commitmentsCache.loaded = true;
-    saveState();
-  } catch (e) {
-    console.error('Firestore 약속 로드 실패:', e);
-  } finally {
-    commitmentsCache.loading = false;
-  }
+  return loadPulseCommitmentsAdapter({
+    state,
+    commitmentsCache,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    isLocalPreviewMode
+  });
 }
 
 export function subscribePulseCommitmentsFromFirestore(onChange = () => {}) {
-  return onSnapshot(query(collection(db, 'pulseCommitments'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
-    state.pulseCommitments = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-    commitmentsCache.loaded = true;
-    commitmentsCache.loading = false;
-    saveState();
-    setDbStatus('connected');
-    onChange();
-  }, (e) => {
-    commitmentsCache.loading = false;
-    console.error('Firestore 약속 실시간 갱신 오류:', e);
-    setDbStatus('error');
+  return subscribePulseCommitmentsFromFirestoreAdapter({
+    state,
+    commitmentsCache,
+    saveState,
+    setDbStatus,
+    getCurrentOrgId,
+    onChange
   });
 }
 
 export async function savePulseCommitmentToFirestore(commitment) {
-  try {
-    const { id, ...data } = commitment;
-    await setDoc(doc(db, 'pulseCommitments', id), { ...data, organizationId: getCurrentOrgId(), updatedAt: serverTimestamp() });
-    await writeAuditLog({
-      action: 'commitment_saved',
-      targetId: id,
-      targetType: 'commitment',
-      detail: commitment.title || commitment.owner || commitment.department || ''
-    });
-    const idx = state.pulseCommitments.findIndex(c => c.id === id);
-    if (idx >= 0) {
-      state.pulseCommitments[idx] = commitment;
-    } else {
-      state.pulseCommitments.push(commitment);
-    }
-    saveState();
-  } catch (e) {
-    console.error('Firestore 약속 저장 실패:', e);
-    throw e;
-  }
+  return savePulseCommitmentToFirestoreAdapter({
+    commitment,
+    state,
+    saveState,
+    getCurrentOrgId,
+    writeAuditLog
+  });
 }
 
 export async function deletePulseCommitmentFromFirestore(id) {
-  try {
-    await deleteDoc(doc(db, 'pulseCommitments', id));
-    await writeAuditLog({ action: 'commitment_deleted', targetId: id, targetType: 'commitment' });
-    state.pulseCommitments = state.pulseCommitments.filter(c => c.id !== id);
-    saveState();
-  } catch (e) {
-    console.error('Firestore 약속 삭제 실패:', e);
-    throw e;
-  }
+  return deletePulseCommitmentFromFirestoreAdapter({
+    id,
+    state,
+    saveState,
+    writeAuditLog
+  });
 }
 
 export async function uploadStateToDb() {

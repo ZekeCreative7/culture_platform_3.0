@@ -74,6 +74,30 @@ describe("Sessions runtime wiring", () => {
     expect(qualFirestoreSource).toContain("setDoc(doc(db, 'QualSignal'");
   });
 
+  it("keeps Pulse commitment Firestore mechanics in the pulse module while state.js exposes only facades", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const pulseCommitmentFirestoreSource = readFileSync(new URL("../src/pulse/pulseCommitmentFirestore.js", import.meta.url), "utf8");
+
+    const commitmentFacades = stateSource.slice(
+      stateSource.indexOf("export async function loadPulseCommitments"),
+      stateSource.indexOf("export async function uploadStateToDb")
+    );
+
+    expect(stateSource).toContain("loadPulseCommitmentsAdapter");
+    expect(stateSource).toContain("subscribePulseCommitmentsFromFirestoreAdapter");
+    expect(stateSource).toContain("savePulseCommitmentToFirestoreAdapter");
+    expect(stateSource).toContain("deletePulseCommitmentFromFirestoreAdapter");
+    expect(commitmentFacades).not.toContain("collection(db, 'pulseCommitments')");
+    expect(commitmentFacades).not.toContain("doc(db, 'pulseCommitments'");
+
+    expect(pulseCommitmentFirestoreSource).toContain("export async function loadPulseCommitmentsAdapter");
+    expect(pulseCommitmentFirestoreSource).toContain("export function subscribePulseCommitmentsFromFirestoreAdapter");
+    expect(pulseCommitmentFirestoreSource).toContain("export async function savePulseCommitmentToFirestoreAdapter");
+    expect(pulseCommitmentFirestoreSource).toContain("export async function deletePulseCommitmentFromFirestoreAdapter");
+    expect(pulseCommitmentFirestoreSource).toContain("collection(db, 'pulseCommitments')");
+    expect(pulseCommitmentFirestoreSource).toContain("doc(db, 'pulseCommitments'");
+  });
+
   it("renders the session list/cards as real React, not a legacy HTML string (calendar was later converted too, see dedicated test below)", () => {
     const sessionsSource = readFileSync(new URL("../src/views/sessions.js", import.meta.url), "utf8");
     const listSectionSource = readFileSync(new URL("../src/sessions/SessionsListSection.jsx", import.meta.url), "utf8");

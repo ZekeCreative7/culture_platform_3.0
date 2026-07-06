@@ -36,14 +36,17 @@ const LOCAL_PREVIEW = window.location.search.includes('preview=1')
   || sessionStorage.getItem('previewMode') === 'true';
 
 export function useInitApp(isAuthenticated, orgId) {
-  const initialized = useRef(false);
+  const initializedKey = useRef('');
   const unsubs = useRef([]);
 
   useEffect(() => {
-    if (!isAuthenticated || initialized.current) return;
-    initialized.current = true;
+    if (!isAuthenticated) return;
+    const nextOrgId = orgId || 'lina';
+    const nextKey = `${LOCAL_PREVIEW ? 'preview' : 'live'}:${nextOrgId}`;
+    if (initializedKey.current === nextKey) return;
+    initializedKey.current = nextKey;
 
-    if (orgId) setCurrentOrgId(orgId);
+    setCurrentOrgId(nextOrgId);
 
     (async () => {
       if (LOCAL_PREVIEW) {
@@ -96,16 +99,17 @@ export function useInitApp(isAuthenticated, orgId) {
         subscribePulseYearsFromFirestore(),
         subscribePulseCommitmentsFromFirestore(),
         subscribeQualSignalsFromFirestore(),
+        subscribeResponsesFromFirestore({ force: true }),
       ].filter(Boolean);
 
       // 각 subscribe 함수의 첫 스냅샷이 초기 로드 역할을 겸한다.
       // 세션/설문 스냅샷이 도착하면 콜백에서 responses 구독도 재설정된다.
-      subscribeResponsesFromFirestore();
     })();
 
     return () => {
       unsubs.current.forEach(fn => fn?.());
       unsubs.current = [];
+      initializedKey.current = '';
     };
   }, [isAuthenticated, orgId]);
 }

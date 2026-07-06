@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/check-build-budget.mjs",
     "preview": "vite preview",
-    "check": "node scripts/check-imports.js",
+    "check": "node scripts/check-imports.js && node scripts/check-source-guardrails.js",
     "smoke": "vitest run tests/operationalQuality.test.js tests/reportPdfReadiness.test.js tests/responseSubscription.test.js",
     "smoke:preview": "node scripts/smoke-preview.mjs"
   },

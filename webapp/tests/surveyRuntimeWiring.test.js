@@ -49,6 +49,15 @@ describe("Survey runtime wiring", () => {
     expect(viteConfigSource).toContain("survey.html");
   });
 
+  it("writes public survey responses with organization ownership and retry state", () => {
+    const publicSurveySource = readFileSync(new URL("../survey.html", import.meta.url), "utf8");
+
+    expect(publicSurveySource).toContain("organizationId: survey.organizationId || 'lina'");
+    expect(publicSurveySource).toContain("submitSurveyResponse(db, addDoc, collection, responseData)");
+    expect(publicSurveySource).toContain("culture-platform:pending-survey-response");
+    expect(publicSurveySource).not.toContain("alert('제출 중 오류가 발생했습니다");
+  });
+
   it("keeps the React Survey page fully React-native, with no legacy bridge left", () => {
     const pageSource = readFileSync(new URL("../src/pages/SurveyPage.jsx", import.meta.url), "utf8");
 

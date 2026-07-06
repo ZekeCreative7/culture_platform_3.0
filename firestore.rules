@@ -18,6 +18,83 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/accessRequests/$(request.auth.uid)).data.status == 'approved');
     }
 
+    function approvedAccess() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/accessRequests/$(request.auth.uid))
+        && get(/databases/$(database)/documents/accessRequests/$(request.auth.uid)).data.status == 'approved';
+    }
+
+    function approvedOrgId() {
+      return get(/databases/$(database)/documents/accessRequests/$(request.auth.uid)).data.organizationId;
+    }
+
+    function sameOrg(data) {
+      return isMaster()
+        || (approvedAccess()
+          && data.organizationId is string
+          && data.organizationId == approvedOrgId());
+    }
+
+    function sameOrgRead() {
+      return sameOrg(resource.data);
+    }
+
+    function sameOrgWrite() {
+      return sameOrg(request.resource.data);
+    }
+
+    function sameOrgUpdate() {
+      return sameOrg(resource.data) && sameOrg(request.resource.data);
+    }
+
+    function surveyActive(data) {
+      return data.status != 'closed'
+        && data.deletedAt == null
+        && (
+          data.distributionActive == true
+          || (data.keys().hasAny(['distribution'])
+            && data.distribution.keys().hasAny(['active'])
+            && data.distribution.active == true)
+          || (!data.keys().hasAny(['distribution'])
+            && !data.keys().hasAny(['distributionActive'])
+            && data.status != 'closed')
+        );
+    }
+
+    function linkedSurvey(responseData) {
+      return get(/databases/$(database)/documents/surveys/$(responseData.surveyId));
+    }
+
+    function distributionIdMatchesSurvey(responseData, surveyData) {
+      return responseData.distributionId == 'distribution-' + responseData.surveyId
+        || (surveyData.keys().hasAny(['distribution'])
+          && surveyData.distribution.keys().hasAny(['id'])
+          && responseData.distributionId == surveyData.distribution.id);
+    }
+
+    function publicResponseCreateAllowed() {
+      return request.resource.data.keys().hasAll([
+          'surveyId',
+          'distributionId',
+          'sessionId',
+          'organizationId',
+          'phase',
+          'cohort',
+          'sourceType',
+          'createdAt'
+        ])
+        && request.resource.data.keys().size() <= 80
+        && request.resource.data.surveyId is string
+        && exists(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId))
+        && surveyActive(linkedSurvey(request.resource.data).data)
+        && request.resource.data.organizationId == linkedSurvey(request.resource.data).data.organizationId
+        && request.resource.data.sessionId == linkedSurvey(request.resource.data).data.sessionId
+        && request.resource.data.phase == linkedSurvey(request.resource.data).data.phase
+        && distributionIdMatchesSurvey(request.resource.data, linkedSurvey(request.resource.data).data)
+        && request.resource.data.sourceType == '링크 응답'
+        && request.resource.data.createdAt == request.time;
+    }
+
     match /accessRequests/{userId} {
       allow create: if signedIn()
         && request.auth.uid == userId
@@ -32,16 +109,18 @@ service cloud.firestore {
     // configured survey and create a response tied to that exact survey,
     // but cannot list surveys or read any submitted response.
     match /surveys/{surveyId} {
-      allow get: if true;
-      allow list, create, update, delete: if isApproved();
+      allow get: if sameOrgRead() || surveyActive(resource.data);
+      allow list: if sameOrgRead();
+      allow create: if sameOrgWrite();
+      allow update: if sameOrgUpdate();
+      allow delete: if sameOrgRead();
     }
 
     match /responses/{responseId} {
-      allow create: if request.resource.data.surveyId is string
-        && exists(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId))
-        && request.resource.data.sessionId == get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data.sessionId
-        && request.resource.data.phase == get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data.phase;
-      allow read, update, delete: if isApproved();
+      allow create: if publicResponseCreateAllowed() || (isApproved() && sameOrgWrite());
+      allow read: if sameOrgRead();
+      allow update: if sameOrgUpdate();
+      allow delete: if sameOrgRead();
     }
 
     // A new member may trigger exactly one fixed approval notification to the
@@ -64,29 +143,42 @@ service cloud.firestore {
 
     // Secure operational collections to approved users
     match /sessions/{document=**} {
-      allow read, write: if isApproved();
+      allow read: if sameOrgRead();
+      allow create: if sameOrgWrite();
+      allow update: if sameOrgUpdate();
+      allow delete: if sameOrgRead();
     }
 
     match /pulseResults/{document=**} {
-      allow read, write: if isApproved();
+      allow read: if sameOrgRead();
+      allow create: if sameOrgWrite();
+      allow update: if sameOrgUpdate();
+      allow delete: if sameOrgRead();
     }
 
     match /pulseCommitments/{document=**} {
-      allow read, write: if isApproved();
+      allow read: if sameOrgRead();
+      allow create: if sameOrgWrite();
+      allow update: if sameOrgUpdate();
+      allow delete: if sameOrgRead();
     }
 
     match /auditLogs/{logId} {
       allow read: if isMaster();
-      allow write: if signedIn();
+      allow create: if isApproved() && sameOrgWrite();
+      allow update, delete: if isMaster();
     }
 
     match /QualSignal/{document=**} {
-      allow read, write: if isApproved();
+      allow read: if sameOrgRead();
+      allow create: if sameOrgWrite();
+      allow update: if sameOrgUpdate();
+      allow delete: if sameOrgRead();
     }
 
     // Fallback for other collections (except accessRequests, mail, appState, responses, surveys, sessions, pulseResults, pulseCommitments, auditLogs, QualSignal)
     match /{collectionName}/{document=**} {
-      allow read, write: if collectionName != 'accessRequests'
+      allow read: if collectionName != 'accessRequests'
         && collectionName != 'mail'
         && collectionName != 'appState'
         && collectionName != 'responses'
@@ -96,7 +188,44 @@ service cloud.firestore {
         && collectionName != 'pulseCommitments'
         && collectionName != 'auditLogs'
         && collectionName != 'QualSignal'
-        && isApproved();
+        && isApproved()
+        && sameOrgRead();
+      allow create: if collectionName != 'accessRequests'
+        && collectionName != 'mail'
+        && collectionName != 'appState'
+        && collectionName != 'responses'
+        && collectionName != 'surveys'
+        && collectionName != 'sessions'
+        && collectionName != 'pulseResults'
+        && collectionName != 'pulseCommitments'
+        && collectionName != 'auditLogs'
+        && collectionName != 'QualSignal'
+        && isApproved()
+        && sameOrgWrite();
+      allow update: if collectionName != 'accessRequests'
+        && collectionName != 'mail'
+        && collectionName != 'appState'
+        && collectionName != 'responses'
+        && collectionName != 'surveys'
+        && collectionName != 'sessions'
+        && collectionName != 'pulseResults'
+        && collectionName != 'pulseCommitments'
+        && collectionName != 'auditLogs'
+        && collectionName != 'QualSignal'
+        && isApproved()
+        && sameOrgUpdate();
+      allow delete: if collectionName != 'accessRequests'
+        && collectionName != 'mail'
+        && collectionName != 'appState'
+        && collectionName != 'responses'
+        && collectionName != 'surveys'
+        && collectionName != 'sessions'
+        && collectionName != 'pulseResults'
+        && collectionName != 'pulseCommitments'
+        && collectionName != 'auditLogs'
+        && collectionName != 'QualSignal'
+        && isApproved()
+        && sameOrgRead();
     }
   }
 }

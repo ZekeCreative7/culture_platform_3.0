@@ -18,6 +18,58 @@ function dataStatus({ loaded, count, loading = false, error = '' }) {
   return { status: 'ready', label: '준비됨', detail: `${count.toLocaleString()}건` };
 }
 
+function timestampOf(value) {
+  if (!value) return 0;
+  if (typeof value === 'string') return Date.parse(value) || 0;
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  return 0;
+}
+
+function latestTimestamp(rows) {
+  return Math.max(0, ...(rows || []).map((row) => Math.max(
+    timestampOf(row.updatedAt),
+    timestampOf(row.createdAt),
+    timestampOf(row.savedAt),
+  )));
+}
+
+function freshnessLabel(rows) {
+  const latest = latestTimestamp(rows);
+  if (!latest) return '최신시각 없음';
+  return `최신 ${new Date(latest).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}`;
+}
+
+export function buildResponseIntegritySnapshot(state) {
+  const sessions = state.sessions || [];
+  const surveys = state.surveys || [];
+  const responses = state.responses || [];
+  const sessionIds = new Set(sessions.map((session) => session.id));
+  const surveyById = new Map(surveys.map((survey) => [survey.id, survey]));
+  const closedSurveyIds = new Set(surveys
+    .filter((survey) => survey.status === 'closed' || survey.deletedAt || survey.distributionActive === false || survey.distribution?.active === false)
+    .map((survey) => survey.id));
+
+  const missingOrgId = responses.filter((row) => !row.organizationId).length;
+  const orphanSession = responses.filter((row) => row.sessionId && !sessionIds.has(row.sessionId)).length;
+  const closedSurveySubmission = responses.filter((row) => row.surveyId && closedSurveyIds.has(row.surveyId)).length;
+  const emptyRequiredAnswer = responses.filter((row) => {
+    const survey = surveyById.get(row.surveyId);
+    if (!survey?.questions?.length) return false;
+    return survey.questions.some((question) => row[question.id] === undefined || row[question.id] === null || row[question.id] === '');
+  }).length;
+  const issueCount = missingOrgId + orphanSession + closedSurveySubmission + emptyRequiredAnswer;
+
+  return {
+    status: issueCount ? 'warning' : 'ready',
+    label: issueCount ? `무결성 확인 ${issueCount}건` : '응답 무결성 정상',
+    issueCount,
+    missingOrgId,
+    orphanSession,
+    closedSurveySubmission,
+    emptyRequiredAnswer,
+  };
+}
+
 export function buildOperationalStatusSnapshot({ state, pulse, commitments, location, deployment = buildDeploymentInfo() }) {
   const search = new URLSearchParams(location?.search || '');
   const isPreview = search.get('preview') === '1';
@@ -36,9 +88,9 @@ export function buildOperationalStatusSnapshot({ state, pulse, commitments, loca
         : '데이터 출처 확인 중';
 
   const datasets = [
-    { id: 'sessions', title: 'Sessions', ...dataStatus({ loaded: state.sessionsLoaded, count: (state.sessions || []).length }) },
-    { id: 'surveys', title: 'Survey', ...dataStatus({ loaded: state.surveysLoaded, count: (state.surveys || []).length }) },
-    { id: 'responses', title: 'Responses', ...dataStatus({ loaded: state.responsesLoaded, count: (state.responses || []).length }) },
+    { id: 'sessions', title: 'Sessions', freshness: freshnessLabel(state.sessions), ...dataStatus({ loaded: state.sessionsLoaded, count: (state.sessions || []).length }) },
+    { id: 'surveys', title: 'Survey', freshness: freshnessLabel(state.surveys), ...dataStatus({ loaded: state.surveysLoaded, count: (state.surveys || []).length }) },
+    { id: 'responses', title: 'Responses', freshness: freshnessLabel(state.responses), ...dataStatus({ loaded: state.responsesLoaded, count: (state.responses || []).length }) },
     {
       id: 'pulse',
       title: 'Pulse',
@@ -63,6 +115,7 @@ export function buildOperationalStatusSnapshot({ state, pulse, commitments, loca
   const hasLoading = datasets.some((item) => item.status === 'loading');
   const hasError = dbStatus === 'error' || datasets.some((item) => item.status === 'error');
   const hasCache = Boolean(pulse?.fromCache);
+  const integrity = buildResponseIntegritySnapshot(state);
   const headlineStatus = hasError ? 'error' : hasLoading ? 'loading' : hasCache ? 'stale' : 'ready';
   const headline = headlineStatus === 'error'
     ? '운영 확인 필요'
@@ -82,6 +135,7 @@ export function buildOperationalStatusSnapshot({ state, pulse, commitments, loca
     deployment,
     isPreview,
     datasets,
+    integrity,
   };
 }
 
@@ -127,8 +181,13 @@ export function OperationalStatusPanel() {
           <span key={item.id} className={`ops-status-chip ops-status-chip--${statusTone(item.status)}`} title={item.detail}>
             <b>{item.title}</b>
             {item.label}
+            {item.freshness && <small>{item.freshness}</small>}
           </span>
         ))}
+        <span className={`ops-status-chip ops-status-chip--${statusTone(snapshot.integrity.status)}`} title={`조직 누락 ${snapshot.integrity.missingOrgId} · 고아 응답 ${snapshot.integrity.orphanSession} · 닫힌 설문 ${snapshot.integrity.closedSurveySubmission} · 빈 답변 ${snapshot.integrity.emptyRequiredAnswer}`}>
+          <b>Integrity</b>
+          {snapshot.integrity.label}
+        </span>
       </div>
     </section>
   );

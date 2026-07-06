@@ -85,6 +85,31 @@ describe("Operational quality guardrails", () => {
     expect(snapshot.deploymentLabel).toBe("배포 abc123 · 2026-07-05 10:00");
     expect(snapshot.datasets.find((item) => item.id === "surveys")?.label).toBe("대기 중");
     expect(snapshot.datasets.find((item) => item.id === "responses")?.label).toBe("비어 있음");
+    expect(snapshot.datasets.find((item) => item.id === "sessions")?.freshness).toBe("최신시각 없음");
+    expect(snapshot.integrity.label).toBe("응답 무결성 정상");
+  });
+
+  it("surfaces response integrity issues in the operations panel snapshot", async () => {
+    const { buildResponseIntegritySnapshot } = await import("../src/operational/OperationalStatusPanel.jsx");
+
+    const integrity = buildResponseIntegritySnapshot({
+      sessions: [{ id: "s1" }],
+      surveys: [
+        { id: "survey-closed", status: "closed", questions: [{ id: "q1" }] },
+        { id: "survey-open", questions: [{ id: "q1" }] },
+      ],
+      responses: [
+        { id: "r1", surveyId: "survey-open", sessionId: "s1", q1: 5 },
+        { id: "r2", surveyId: "survey-open", sessionId: "missing", q1: 4 },
+        { id: "r3", surveyId: "survey-closed", sessionId: "s1", organizationId: "lina" },
+      ],
+    });
+
+    expect(integrity.status).toBe("warning");
+    expect(integrity.missingOrgId).toBe(2);
+    expect(integrity.orphanSession).toBe(1);
+    expect(integrity.closedSurveySubmission).toBe(1);
+    expect(integrity.emptyRequiredAnswer).toBe(1);
   });
 
   it("wraps destructive actions with confirmation and rollback hooks", async () => {
@@ -219,7 +244,22 @@ describe("Operational quality guardrails", () => {
     expect(migrationFacade).not.toContain("writeBatch(db)");
 
     expect(migrationSource).toContain("export async function migrateOrganizationIdAdapter");
+    expect(migrationSource).toContain("buildOrganizationLookups");
+    expect(migrationSource).toContain("organizationIdForDoc");
     expect(migrationSource).toContain("getDocs(collection");
     expect(migrationSource).toContain("writeBatch(db)");
+  });
+
+  it("checks source guardrails and build budgets in the standard scripts", () => {
+    const packageJson = readFileSync(new URL("../package.json", import.meta.url), "utf8");
+    const sourceGuardrails = readFileSync(new URL("../scripts/check-source-guardrails.js", import.meta.url), "utf8");
+    const buildBudget = readFileSync(new URL("../scripts/check-build-budget.mjs", import.meta.url), "utf8");
+
+    expect(packageJson).toContain("check-source-guardrails.js");
+    expect(packageJson).toContain("check-build-budget.mjs");
+    expect(sourceGuardrails).toContain("ALLOW_DANGEROUS_HTML");
+    expect(sourceGuardrails).toContain("assertReactReportBodySafe");
+    expect(buildBudget).toContain("vendor-firebase");
+    expect(buildBudget).toContain("xlsx\\.full\\.min");
   });
 });

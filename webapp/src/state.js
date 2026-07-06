@@ -44,7 +44,10 @@ import {
   saveQualSignalToFirestoreAdapter,
   subscribeQualSignalsFromFirestoreAdapter
 } from './qual/qualSignalFirestore.js';
-import { subscribeResponsesFromFirestoreAdapter } from './responses/responseFirestoreSubscription.js';
+import {
+  subscribeResponsesFromFirestoreAdapter,
+  unsubscribeResponsesFromFirestoreAdapter
+} from './responses/responseFirestoreSubscription.js';
 import {
   deleteResponseFromFirestoreAdapter,
   fetchAllResponsesFromFirestoreAdapter,
@@ -525,6 +528,10 @@ export function subscribeResponsesFromFirestore({ force = false } = {}) {
     force,
   });
 }
+
+export function unsubscribeResponsesFromFirestore() {
+  return unsubscribeResponsesFromFirestoreAdapter();
+}
 export async function setSurveyDistributionActiveInFirestore(id, active) {
   return setSurveyDistributionActiveInFirestoreAdapter({
     id,
@@ -535,7 +542,7 @@ export async function setSurveyDistributionActiveInFirestore(id, active) {
 }
 
 export async function fetchRecentAuditLogs(count = 20) {
-  return fetchRecentAuditLogsAdapter(count);
+  return fetchRecentAuditLogsAdapter({ count, getCurrentOrgId });
 }
 
 // 설문을 지워도 다음 세션 만들 때 불러올 예시 질문이 남도록, 배포 설문과는 별도 컬렉션에 저장한다.

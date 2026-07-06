@@ -1,4 +1,4 @@
-import { db, collection, doc, onSnapshot, serverTimestamp, setDoc } from '../firebase.js';
+import { db, collection, doc, onSnapshot, query, serverTimestamp, setDoc, where } from '../firebase.js';
 
 export function subscribeQualSignalsFromFirestoreAdapter({
   state,
@@ -8,10 +8,9 @@ export function subscribeQualSignalsFromFirestoreAdapter({
   onChange = () => {},
   onError = console.error,
 }) {
-  return onSnapshot(collection(db, 'QualSignal'), (snap) => {
+  return onSnapshot(query(collection(db, 'QualSignal'), where('organizationId', '==', getCurrentOrgId())), (snap) => {
     state.qualSignals = snap.docs
-      .map(d => ({ ...d.data(), id: d.id }))
-      .filter(q => !q.organizationId || q.organizationId === getCurrentOrgId());
+      .map(d => ({ ...d.data(), id: d.id }));
     saveState();
     setDbStatus('connected');
     onChange();

@@ -1,4 +1,4 @@
-import { db, addDoc, collection, getDocs, limit as firestoreLimit, orderBy, query, serverTimestamp } from '../firebase.js';
+import { db, addDoc, collection, getDocs, limit as firestoreLimit, orderBy, query, serverTimestamp, where } from '../firebase.js';
 import { getCurrentUserEmail } from '../auth/currentAuthContext.js';
 
 export async function recordAuditLogAdapter({
@@ -25,9 +25,10 @@ export async function recordAuditLogAdapter({
   }
 }
 
-export async function fetchRecentAuditLogsAdapter(count = 20) {
+export async function fetchRecentAuditLogsAdapter({ count = 20, getCurrentOrgId }) {
   const auditQuery = query(
     collection(db, 'auditLogs'),
+    where('organizationId', '==', getCurrentOrgId()),
     orderBy('timestamp', 'desc'),
     firestoreLimit(count)
   );

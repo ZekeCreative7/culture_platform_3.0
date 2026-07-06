@@ -118,4 +118,16 @@ describe("response subscription helpers", () => {
     expect(responseFirestoreSource).toContain("doc(db, 'responses'");
     expect(responseFirestoreSource).toContain("writeBatch(db)");
   });
+
+  it("returns an explicit response subscription cleanup hook to app initialization", () => {
+    const stateSource = readFileSync(new URL("../src/state.js", import.meta.url), "utf8");
+    const useInitAppSource = readFileSync(new URL("../src/hooks/useInitApp.js", import.meta.url), "utf8");
+    const responseSubscriptionSource = readFileSync(new URL("../src/responses/responseFirestoreSubscription.js", import.meta.url), "utf8");
+
+    expect(responseSubscriptionSource).toContain("export function unsubscribeResponsesFromFirestoreAdapter");
+    expect(responseSubscriptionSource).toContain("return unsubscribeResponsesFromFirestoreAdapter");
+    expect(stateSource).toContain("export function unsubscribeResponsesFromFirestore");
+    expect(useInitAppSource).toContain("initializedKey");
+    expect(useInitAppSource).toContain("subscribeResponsesFromFirestore({ force: true })");
+  });
 });

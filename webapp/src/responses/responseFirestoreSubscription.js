@@ -15,6 +15,12 @@ import {
 let responseUnsubscribes = [];
 let previousResponseSessionIdsKey = null;
 
+export function unsubscribeResponsesFromFirestoreAdapter() {
+  responseUnsubscribes.forEach(unsub => unsub());
+  responseUnsubscribes = [];
+  previousResponseSessionIdsKey = null;
+}
+
 export function subscribeResponsesFromFirestoreAdapter({
   state,
   saveState,
@@ -31,12 +37,12 @@ export function subscribeResponsesFromFirestoreAdapter({
   if (!force && responseUnsubscribes.length > 0 && sessionIdsKey === previousResponseSessionIdsKey) {
     refreshResponseCohorts(state);
     saveState();
-    return;
+    return unsubscribeResponsesFromFirestoreAdapter;
   }
   previousResponseSessionIdsKey = sessionIdsKey;
 
-  responseUnsubscribes.forEach(unsub => unsub());
-  responseUnsubscribes = [];
+  unsubscribeResponsesFromFirestoreAdapter();
+  previousResponseSessionIdsKey = sessionIdsKey;
   state.responsesLoaded = false;
   saveState();
 
@@ -45,7 +51,7 @@ export function subscribeResponsesFromFirestoreAdapter({
     state.responses = [];
     state.responsesLoaded = true;
     saveState();
-    return;
+    return unsubscribeResponsesFromFirestoreAdapter;
   }
 
   const chunks = chunkResponseSessionIds(sessionIds);
@@ -91,4 +97,6 @@ export function subscribeResponsesFromFirestoreAdapter({
     });
     responseUnsubscribes.push(unsub);
   });
+
+  return unsubscribeResponsesFromFirestoreAdapter;
 }

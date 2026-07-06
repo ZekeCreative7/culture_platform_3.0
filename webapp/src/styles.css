@@ -529,6 +529,11 @@ main { display: flex; flex-direction: column; height: 100vh; overflow-y: auto; }
   color: var(--ink);
   font-weight: 900;
 }
+.ops-status-chip small {
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 800;
+}
 
 .canvas { flex: 1; padding: 28px 28px; }
 

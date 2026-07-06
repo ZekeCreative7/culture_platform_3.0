@@ -1,6 +1,6 @@
 # Culture Platform Web App Structure
 
-Last updated: 2026-07-05
+Last updated: 2026-07-07
 
 This document describes the current React-era web app structure after the React migration retired the old `app.js` shell. Keep it current when changing routing, shared state, Firestore listener startup, compatibility globals, or legacy helper modules.
 
@@ -35,13 +35,17 @@ Current top-level routes:
 
 `src/app.js`, `src/reactMode.js`, and `components/layout/VanillaCanvas.jsx` have been deleted. Do not reintroduce a full-page legacy shell to add new behavior.
 
-`operational/OperationalStatusPanel.jsx` is mounted under the topbar. It distinguishes preview mode, Firestore status, cached Pulse data, loading datasets, empty datasets, and error states.
+`operational/OperationalStatusPanel.jsx` is mounted under the topbar. It distinguishes preview mode, Firestore status, cached Pulse data, loading datasets, empty datasets, error states, dataset freshness, and response-integrity issues such as missing organization ownership, orphan responses, closed-survey submissions, and empty required answers.
 
 The same panel also shows build provenance from `operational/deploymentInfo.js`: current commit and build time. Vite injects matching `<meta name="culture-platform-build-*">` tags into built HTML, and `scripts/smoke-preview.mjs` checks those tags on the preview server.
 
 `operational/smokePlan.js` defines the current post-migration smoke flow: Dashboard -> Sessions -> Survey -> public `survey.html` -> Analytics -> Report/PDF -> Pulse Report.
 
 `report/pdfExportReadiness.js` checks the PDF export document before html2pdf runs. It blocks empty/stale export markup, duplicate critical export IDs, and legacy inline `window.*` handlers from entering the generated report.
+
+`scripts/check-source-guardrails.js` runs as part of `npm run check`. It preserves the remaining approved HTML bridge surfaces and blocks new inline handler or unreviewed `dangerouslySetInnerHTML` additions.
+
+`scripts/check-build-budget.mjs` runs after `vite build`. It enforces route/chunk size budgets while allowing the SheetJS bundle to remain a lazy export/upload chunk.
 
 `scripts/smoke-preview.mjs` checks a running preview server for built operator and public-survey entries, including the legacy `/webapp/survey.html` QR path. Run it after starting Vite preview:
 
@@ -59,11 +63,13 @@ The public mobile survey remains a separate Vite entry:
 
 Old QR codes may still open `/culture_platform_3.0/webapp/survey.html?surveyId=...`. That redirect must continue forwarding query string and hash to `/culture_platform_3.0/survey.html?surveyId=...`.
 
+Public survey responses must include `organizationId` copied from the linked survey. Firestore Rules also require the submitted response to match the linked active survey's `organizationId`, `distributionId`, `sessionId`, and `phase`.
+
 ## App Initialization
 
 `hooks/useAuth.js` owns auth/preview-mode user state.
 
-`hooks/useInitApp.js` starts the app data listeners and seeds local preview data when needed. It replaces the old `app.js` `initApp()` responsibility without doing full DOM rendering.
+`hooks/useInitApp.js` starts the app data listeners and seeds local preview data when needed. It replaces the old `app.js` `initApp()` responsibility without doing full DOM rendering. Listener ownership is keyed by preview/live mode and `orgId`; when the organization changes, the hook tears down existing listeners and initializes them again.
 
 Core listener and persistence responsibilities live in `src/state.js`:
 
@@ -76,7 +82,7 @@ Core listener and persistence responsibilities live in `src/state.js`:
 - organization-id migration helper, thin state facade over `operational/organizationMigrationFirestore.js`
 - organization save/subscribe helpers, thin state facades over `org/organizationFirestore.js`
 - session load/subscribe/save/delete helpers, thin state facades over `sessions/sessionFirestore.js`
-- `subscribeResponsesFromFirestore()`, a thin state facade over `responses/responseFirestoreSubscription.js`
+- `subscribeResponsesFromFirestore()` and `unsubscribeResponsesFromFirestore()`, thin state facades over `responses/responseFirestoreSubscription.js`
 - response fetch/save/delete helpers, thin state facades over `responses/responseFirestore.js`
 - survey load/subscribe/update/delete/distribution helpers, thin state facades over `survey/surveyFirestore.js`
 - `loadSurveyTemplatesFromFirestore()`, `subscribeSurveyTemplatesFromFirestore()`, `saveSurveyTemplateToFirestore()`, and `deleteSurveyTemplateFromFirestore()`, thin state facades over `survey/surveyTemplateFirestore.js`
@@ -85,6 +91,8 @@ Core listener and persistence responsibilities live in `src/state.js`:
 - `subscribeQualSignalsFromFirestore()` and `saveQualSignalToFirestore()`, thin state facades over `qual/qualSignalFirestore.js`
 
 React components still use the shared mutable `state` as the compatibility source of truth, usually through `useVanillaStateTick()` or `useAppStore()`.
+
+Firestore Rules enforce `organizationId` on organization-owned collections. Reads and writes for `sessions`, `surveys`, `responses`, `surveyTemplates` through fallback, `pulseResults`, `pulseCommitments`, `QualSignal`, and audit log creation must stay aligned with the current auth context's organization. If a new collection is organization-owned, it must either be added explicitly to `firestore.rules` or rely on the fallback with an `organizationId` field.
 
 ## State Contract
 
@@ -178,6 +186,8 @@ After changing routing, `state.js`, listener startup, a public Survey path, or a
    - Pulse and Pulse Report load without console errors.
    - `/webapp/survey.html?surveyId=...` redirects to `/survey.html?surveyId=...`.
    - If the browser still shows an old asset name or old behavior, add a cache-bust query such as `?preview=1&v=<timestamp>` and confirm the operations panel's commit matches the built commit.
+   - For public survey changes, confirm submitted response docs include `organizationId`.
+   - For Rules changes, run the source contract tests and, before deployment, verify the same contract against Firebase Rules/emulator.
 
 3. For GitHub Pages deploy checks, confirm the built entries:
 
@@ -196,3 +206,4 @@ The next cleanup passes should remove the remaining compatibility surface in sma
 3. Split the remaining report body HTML from `views/report.js` into React sections, preserving PDF/export behavior.
 4. Remove `window.*` attachments only after every real caller has a direct import or React handler.
 5. Reduce `views/*.js` to true pure helpers, then delete any helper file that no longer has live imports.
+6. Replace source-contract Rules tests with Firebase Rules emulator tests once the local Firebase test runtime is available.

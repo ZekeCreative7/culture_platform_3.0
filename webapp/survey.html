@@ -393,6 +393,7 @@
             surveyId: survey.id,
             distributionId: survey.distribution?.id || `distribution-${survey.id}`,
             sessionId: survey.sessionId,
+            organizationId: survey.organizationId || 'lina',
             phase: survey.phase,
             cohort: Number(survey.sessionCohort) || 0,
             sourceType: '링크 응답',
@@ -404,7 +405,7 @@
           });
 
           try {
-            await addDoc(collection(db, 'responses'), responseData);
+            await submitSurveyResponse(db, addDoc, collection, responseData);
             document.getElementById('survey-content').innerHTML = `
               <div class="success-view">
                 <div class="success-icon">✓</div>
@@ -413,11 +414,45 @@
               </div>
             `;
           } catch (err) {
+            cachePendingResponse(survey.id, responseData);
             btn.disabled = false;
-            btn.textContent = '설문 제출하기';
-            alert('제출 중 오류가 발생했습니다. 다시 시도해 주세요.\n' + err.message);
+            btn.textContent = '다시 제출하기';
+            showSubmitError(err);
           }
         });
+      }
+
+      async function submitSurveyResponse(db, addDoc, collection, responseData) {
+        await addDoc(collection(db, 'responses'), responseData);
+        localStorage.removeItem(pendingResponseKey(responseData.surveyId));
+      }
+
+      function pendingResponseKey(surveyId) {
+        return `culture-platform:pending-survey-response:${surveyId}`;
+      }
+
+      function cachePendingResponse(surveyId, responseData) {
+        try {
+          localStorage.setItem(pendingResponseKey(surveyId), JSON.stringify({
+            ...responseData,
+            createdAt: new Date().toISOString()
+          }));
+        } catch {
+          // Storage can be unavailable in private browsing; the visible retry state remains.
+        }
+      }
+
+      function showSubmitError(err) {
+        const message = escapeHtml(err?.message || '네트워크 상태를 확인한 뒤 다시 시도해 주세요.');
+        const form = document.getElementById('survey-form');
+        form?.querySelector('[data-submit-error]')?.remove();
+        const notice = document.createElement('div');
+        notice.className = 'section-info';
+        notice.dataset.submitError = 'true';
+        notice.style.borderColor = 'rgba(239,68,68,0.35)';
+        notice.style.color = '#991b1b';
+        notice.innerHTML = `제출이 완료되지 않았습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.<br/><small>${message}</small>`;
+        form?.prepend(notice);
       }
 
       function escapeHtml(value) {

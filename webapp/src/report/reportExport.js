@@ -1,5 +1,5 @@
 import { scoreOf } from "../utils.js";
-import { assertPdfExportReady } from "./pdfExportReadiness.js";
+import { assertPdfExportReady, inspectPdfExportWidth } from "./pdfExportReadiness.js";
 
 // Vendor bundles are executed from their raw source (like qrCode.js does for
 // qrcode.min.js) instead of a `<script src="./src/vendor/...">` tag. A plain
@@ -222,14 +222,6 @@ export async function downloadReportPdf({ element, meta }) {
   const margin = [8, 8, 10, 8];
   const pdfOptions = { unit: "mm", format: "a4", orientation: "portrait", compress: true };
   const imageOptions = { type: "jpeg", quality: 0.96 };
-  const html2canvasOptions = {
-    scale: PDF_CANVAS_SCALE,
-    useCORS: true,
-    backgroundColor: "#f7f7f7",
-    logging: false,
-    scrollX: 0,
-    scrollY: 0,
-  };
 
   const stage = document.createElement("div");
   stage.className = "report-export-stage";
@@ -248,6 +240,32 @@ export async function downloadReportPdf({ element, meta }) {
 
   await document.fonts?.ready;
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+  // ── 폭 방어의 핵심 ──────────────────────────────────────────────
+  // html2canvas는 windowWidth(기본값 = 현재 브라우저 창 폭) 크기의 가상 뷰포트에
+  // 문서를 복제해 렌더한다. 창이 export 문서(940px)보다 좁으면 그 폭을 넘는 부분이
+  // 통째로 잘린다(= 지금까지 오른쪽이 잘리던 원인). 그래서 windowWidth/width를
+  // 실제 콘텐츠 폭으로 '명시'해 절대 잘리지 않게 한다.
+  const widthReport = inspectPdfExportWidth(clone, PDF_EXPORT_WIDTH_PX);
+  const contentWidth = Math.max(PDF_EXPORT_WIDTH_PX, Math.ceil(clone.scrollWidth), widthReport.contentWidth);
+  if (!widthReport.fits) {
+    // 콘텐츠가 export 폭을 넘겼다 → 예전엔 여기서 오른쪽이 잘렸다.
+    // 이제는 전체 폭으로 캡처해 잘림은 막되(살짝 축소될 수 있음), 어떤 요소가 넘치는지 로그로 남긴다.
+    console.warn(
+      `[PDF] 콘텐츠가 export 폭(${PDF_EXPORT_WIDTH_PX}px)을 초과합니다 → 전체 폭(${contentWidth}px)으로 캡처해 잘림 방지. 넘치는 요소:`,
+      widthReport.overflowing,
+    );
+  }
+  const html2canvasOptions = {
+    scale: PDF_CANVAS_SCALE,
+    useCORS: true,
+    backgroundColor: "#f7f7f7",
+    logging: false,
+    scrollX: 0,
+    scrollY: 0,
+    width: contentWidth,
+    windowWidth: contentWidth,
+  };
 
   try {
     assertPdfExportReady(clone);

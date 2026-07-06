@@ -227,8 +227,6 @@ export async function downloadReportPdf({ element, meta }) {
     useCORS: true,
     backgroundColor: "#f7f7f7",
     logging: false,
-    width: PDF_EXPORT_WIDTH_PX,
-    windowWidth: PDF_EXPORT_WIDTH_PX,
     scrollX: 0,
     scrollY: 0,
   };

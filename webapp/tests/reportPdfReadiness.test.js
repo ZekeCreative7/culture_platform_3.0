@@ -26,6 +26,26 @@ describe("Report PDF readiness kit", () => {
     expect(report.blockers.join(" ")).toContain("legacy window");
   });
 
+  it("accepts a detached printable clone that has report sections", async () => {
+    const { inspectPdfExportDocument } = await import("../src/report/pdfExportReadiness.js");
+
+    const report = inspectPdfExportDocument({
+      outerHTML: REPORT_EXPORT_GOLDEN_HTML,
+      children: [
+        {
+          nodeType: 1,
+          isConnected: false,
+          textContent: "변화 분석 리포트",
+          getBoundingClientRect: () => ({ height: 0 }),
+        },
+      ],
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.visibleBlockCount).toBe(1);
+    expect(report.blockers).not.toContain("PDF로 변환할 가시 리포트 블록이 없습니다.");
+  });
+
   it("runs readiness assertions before opening the browser print export", () => {
     const source = readFileSync(new URL("../src/report/reportExport.js", import.meta.url), "utf8");
 

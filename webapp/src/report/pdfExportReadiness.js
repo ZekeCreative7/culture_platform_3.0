@@ -30,6 +30,9 @@ function collectDuplicateIds(source) {
 
 function isVisibleElement(child) {
   if (!child || child.nodeType !== 1) return false;
+  if (child.isConnected === false) {
+    return Boolean(String(child.textContent || child.innerHTML || child.outerHTML || "").trim());
+  }
   if (typeof child.getBoundingClientRect !== "function") return true;
   return child.getBoundingClientRect().height > 0;
 }

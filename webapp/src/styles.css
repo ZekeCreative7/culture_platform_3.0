@@ -2118,61 +2118,67 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 
 /* ─── Report export controls ─── */
 .report-export-header { align-items: center; }
+.report-react-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin: 6px 0 18px;
+  padding: 0 2px;
+}
 .report-export-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
   flex: 0 0 auto;
 }
 .report-export-button {
   appearance: none;
-  min-width: 180px;
-  min-height: 68px;
-  padding: 11px 14px;
-  border: 1.5px solid rgba(48, 91, 139, .18);
-  border-radius: 14px;
+  min-width: 186px;
+  min-height: 60px;
+  padding: 10px 15px 10px 12px;
+  border: 0;
+  border-radius: 15px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 11px;
   text-align: left;
-  color: var(--ink);
-  background: rgba(255,255,255,.76);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 10px 22px rgba(31,70,114,.09);
+  color: #fff;
+  background: linear-gradient(135deg, #0272d9 0%, #0052ff 100%);
+  box-shadow: 0 12px 24px rgba(0,82,255,.18);
   cursor: pointer;
-  transition: transform .2s var(--ease-premium), box-shadow .2s var(--ease-premium), border-color .2s ease, background .2s ease;
+  transition: transform .2s var(--ease-premium), box-shadow .2s var(--ease-premium), filter .2s ease;
 }
 .report-export-button svg {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   padding: 7px;
   border-radius: 12px;
+  background: rgba(255,255,255,.18);
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .report-export-button span, .report-export-button b, .report-export-button small { display: block; }
-.report-export-button b { font-size: 14px; font-weight: 850; letter-spacing: 0; line-height: 1.2; }
-.report-export-button small { margin-top: 4px; color: currentColor; font-size: 11px; font-weight: 700; line-height: 1.2; opacity: .76; white-space: nowrap; }
+.report-export-button b { font-size: 13.5px; font-weight: 800; letter-spacing: 0; line-height: 1.2; }
+.report-export-button small { margin-top: 3px; color: currentColor; font-size: 10.5px; font-weight: 650; line-height: 1.2; opacity: .82; white-space: nowrap; }
 .report-export-button.excel {
-  color: #116b43;
-  background: linear-gradient(145deg, #effcf5, #ffffff);
-  border-color: rgba(17,107,67,.30);
+  color: #fff;
+  background: linear-gradient(135deg, #00a66a 0%, #0272d9 100%);
+  box-shadow: 0 12px 24px rgba(0,138,84,.18);
 }
 .report-export-button.pdf {
-  color: #244fa8;
-  background: linear-gradient(145deg, #eef4ff, #ffffff);
-  border-color: rgba(36,79,168,.32);
+  color: #fff;
+  background: linear-gradient(135deg, #0272d9 0%, #0052ff 55%, #4f46e5 100%);
+  box-shadow: 0 12px 24px rgba(0,82,255,.20);
 }
-.report-export-button.excel svg { background: rgba(17,107,67,.11); }
-.report-export-button.pdf svg { background: rgba(36,79,168,.12); }
-.report-export-button.excel:hover { border-color: rgba(17,107,67,.48); box-shadow: 0 13px 28px rgba(17,107,67,.15); }
-.report-export-button.pdf:hover { border-color: rgba(36,79,168,.50); box-shadow: 0 13px 28px rgba(36,79,168,.16); }
-.report-export-button:hover { transform: translateY(-2px); }
+.report-export-button.excel:hover { box-shadow: 0 16px 30px rgba(0,138,84,.22); }
+.report-export-button.pdf:hover { box-shadow: 0 16px 30px rgba(0,82,255,.24); }
+.report-export-button:hover { transform: translateY(-2px); filter: saturate(1.04); }
 .report-export-button:active { transform: translateY(1px); }
-.report-export-button:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+.report-export-button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(0,82,255,.18), 0 14px 28px rgba(0,82,255,.24); }
 .report-export-button:disabled { opacity: .68; }
 .report-export-button.is-loading { min-width: 176px; cursor: progress; }
 
@@ -5979,7 +5985,6 @@ main { background: var(--cb-soft); }
 .secondary,
 .ghost,
 .danger,
-.report-export-button,
 .pulse-file-button,
 .tab-button,
 .toggle-btn {
@@ -6162,22 +6167,22 @@ td.minus { color: #b4232f; }
   box-shadow: none;
 }
 .report-export-button.excel {
-  color: #116b43 !important;
-  background: linear-gradient(145deg, #effcf5, #ffffff) !important;
-  border-color: rgba(17,107,67,.30) !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #00a66a 0%, #0272d9 100%) !important;
+  border: 0 !important;
+  box-shadow: 0 12px 24px rgba(0,138,84,.18) !important;
 }
 .report-export-button.pdf {
-  color: #244fa8 !important;
-  background: linear-gradient(145deg, #eef4ff, #ffffff) !important;
-  border-color: rgba(36,79,168,.32) !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #0272d9 0%, #0052ff 55%, #4f46e5 100%) !important;
+  border: 0 !important;
+  box-shadow: 0 12px 24px rgba(0,82,255,.20) !important;
 }
 .report-export-button.excel:hover {
-  border-color: rgba(17,107,67,.48) !important;
-  box-shadow: 0 13px 28px rgba(17,107,67,.15) !important;
+  box-shadow: 0 16px 30px rgba(0,138,84,.22) !important;
 }
 .report-export-button.pdf:hover {
-  border-color: rgba(36,79,168,.50) !important;
-  box-shadow: 0 13px 28px rgba(36,79,168,.16) !important;
+  box-shadow: 0 16px 30px rgba(0,82,255,.24) !important;
 }
 
 .org-workspace { gap: 16px; }

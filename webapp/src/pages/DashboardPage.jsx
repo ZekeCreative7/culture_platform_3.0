@@ -53,7 +53,10 @@ export const DashboardPage = memo(function DashboardPage() {
   const isLoading = store.dbStatus === 'connecting' || store.dbStatus === undefined;
   
   // Memoized computations using reactive Zustand store variables
-  const actionsReady = useMemo(() => dashboardActionDataReady({ state: store, commitmentsCache }), [store.pulseCommitments]);
+  const actionsReady = useMemo(
+    () => dashboardActionDataReady({ state: store, commitmentsCache }),
+    [store.sessionsLoaded, store.surveysLoaded, store.responsesLoaded, commitmentsCache.loaded]
+  );
   const snapshot = useMemo(() => dashboardSnapshot({ state: store, pulseCache, today }), [store.sessions, store.responses, today]);
   
   const allActions = useMemo(() => actionsReady ? dashboardActionQueue({ state: store, today }) : [], [actionsReady, store.sessions, store.responses, store.pulseCommitments, today]);

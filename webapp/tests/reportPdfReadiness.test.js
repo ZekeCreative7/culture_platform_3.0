@@ -31,6 +31,8 @@ describe("Report PDF readiness kit", () => {
 
     expect(source).toContain("assertPdfExportReady(clone)");
     expect(source).toContain("openReportPrintWindow");
+    expect(source).toContain("openReportPrintFrame");
+    expect(source).toContain('id = "report-print-fallback-frame"');
     expect(source).not.toContain("window.html2pdf()");
     expect(source).not.toContain("toCanvas()");
     expect(source.indexOf("assertPdfExportReady(clone)")).toBeLessThan(source.indexOf("openReportPrintWindow"));

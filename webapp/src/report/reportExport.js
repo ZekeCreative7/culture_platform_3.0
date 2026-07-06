@@ -287,11 +287,44 @@ function printWindowHtml({ title, bodyHtml }) {
 
 function openReportPrintWindow({ title, bodyHtml }) {
   const printWindow = window.open("", "_blank", "width=1100,height=1200");
-  if (!printWindow) {
-    throw new Error("PDF 인쇄 창이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+  if (!printWindow || printWindow.closed) {
+    return openReportPrintFrame({ title, bodyHtml });
   }
   printWindow.document.open();
   printWindow.document.write(printWindowHtml({ title, bodyHtml }));
   printWindow.document.close();
   return printWindow;
+}
+
+function openReportPrintFrame({ title, bodyHtml }) {
+  document.getElementById("report-print-fallback-frame")?.remove();
+
+  const frame = document.createElement("iframe");
+  frame.id = "report-print-fallback-frame";
+  frame.title = "PDF 인쇄용 리포트";
+  frame.style.position = "fixed";
+  frame.style.right = "0";
+  frame.style.bottom = "0";
+  frame.style.width = "0";
+  frame.style.height = "0";
+  frame.style.border = "0";
+  frame.style.opacity = "0";
+  frame.style.pointerEvents = "none";
+  frame.setAttribute("aria-hidden", "true");
+  document.body.appendChild(frame);
+
+  const frameWindow = frame.contentWindow;
+  const frameDocument = frame.contentDocument || frameWindow?.document;
+  if (!frameWindow || !frameDocument) {
+    frame.remove();
+    throw new Error("PDF 인쇄 화면을 열지 못했습니다. 브라우저 설정을 확인해 주세요.");
+  }
+
+  frameWindow.addEventListener("afterprint", () => {
+    setTimeout(() => frame.remove(), 1000);
+  }, { once: true });
+  frameDocument.open();
+  frameDocument.write(printWindowHtml({ title, bodyHtml }));
+  frameDocument.close();
+  return frameWindow;
 }

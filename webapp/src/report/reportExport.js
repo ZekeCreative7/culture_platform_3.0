@@ -1,30 +1,15 @@
 import { scoreOf } from "../utils.js";
 import { assertPdfExportReady } from "./pdfExportReadiness.js";
 
-function loadScriptOnce(src) {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === 'true') {
-        resolve();
-      } else {
-        existing.addEventListener('load', () => resolve());
-        existing.addEventListener('error', (e) => reject(e));
-      }
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = () => {
-      script.dataset.loaded = 'true';
-      resolve();
-    };
-    script.onerror = (e) => {
-      script.remove();
-      reject(new Error(`스크립트를 로드하지 못했습니다: ${src}`));
-    };
-    document.body.appendChild(script);
-  });
+// Vendor bundles are executed from their raw source (like qrCode.js does for
+// qrcode.min.js) instead of a `<script src="./src/vendor/...">` tag. A plain
+// script tag resolves that path against the deployed page's URL, but the
+// production build never copies src/vendor/* to dist/ — it only works in
+// Vite's dev server, which serves the whole project tree. Dynamic `?raw`
+// import keeps these large bundles lazy (fetched only when export runs) while
+// working identically in dev and in the built GitHub Pages site.
+function runVendorScript(source) {
+  new Function(source)();
 }
 
 const PHASE_ORDER = ["사전", "중간", "사후", "팔로우업"];
@@ -82,7 +67,8 @@ function reportBaseName(meta) {
 
 export async function ensureXlsxLoaded() {
   if (!window.XLSX) {
-    await loadScriptOnce('./src/vendor/xlsx.full.min.js');
+    const { default: source } = await import('../vendor/xlsx.full.min.js?raw');
+    runVendorScript(source);
   }
   return window.XLSX;
 }
@@ -228,7 +214,8 @@ export async function downloadReportWorkbook(payload) {
 export async function downloadReportPdf({ element, meta }) {
   if (!element) throw new Error("PDF로 변환할 리포트 영역을 찾지 못했습니다.");
   if (typeof window.html2pdf !== "function") {
-    await loadScriptOnce('./src/vendor/html2pdf.bundle.min.js');
+    const { default: source } = await import('../vendor/html2pdf.bundle.min.js?raw');
+    runVendorScript(source);
   }
   if (typeof window.html2pdf !== "function") throw new Error("PDF 내보내기 모듈을 불러오지 못했습니다.");
 

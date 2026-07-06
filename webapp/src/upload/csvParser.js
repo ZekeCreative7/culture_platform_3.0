@@ -45,12 +45,25 @@ export function parseCSV(text, sessionId, phase, sessionType = null) {
   });
   if (errors.length) return { parsed: [], errors };
 
+  const badCohortValues = new Set();
   const parsed = matrix.slice(1).filter(cells => cells.some(c => String(c).trim() !== "")).map((cells) => {
+    const rawCohort = String(cells[tagToIndex["기수"]] ?? "").trim();
+    const cohortNumber = Number(rawCohort);
+    if (!rawCohort || !Number.isFinite(cohortNumber) || cohortNumber <= 0) {
+      badCohortValues.add(rawCohort || "(비어 있음)");
+    }
+
     const row = {
       id: uid(),
       sessionId,
+      // A survey already registered for this session+phase is the authoritative
+      // match target. Tag it directly instead of relying only on the
+      // sessionId+phase+cohort fallback in rowMatchesSurvey() — that fallback
+      // silently drops responses whenever the [기수] cell is blank or a typo
+      // (e.g. "3기" instead of "3"), since Number(...) coerces those to 0.
+      surveyId: survey?.id || null,
       phase,
-      cohort: Number(cells[tagToIndex["기수"]] || 0),
+      cohort: cohortNumber,
       createdAt: new Date().toISOString(),
     };
 
@@ -68,5 +81,13 @@ export function parseCSV(text, sessionId, phase, sessionType = null) {
 
     return row;
   });
+
+  if (badCohortValues.size) {
+    return {
+      parsed: [],
+      errors: [`[기수] 값이 올바르지 않은 행이 있습니다: ${[...badCohortValues].join(", ")} (1 이상의 숫자여야 합니다)`],
+    };
+  }
+
   return { parsed, errors: [], droppedPii };
 }

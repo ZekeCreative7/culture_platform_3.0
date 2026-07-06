@@ -173,5 +173,5 @@ export function createOrUpdateSession() {
   state.draftSchedule = makeSchedule(type);
   saveState();
   saveSessionToFirestore(session);
-  subscribeResponsesFromFirestore();
+  subscribeResponsesFromFirestore({ force: true });
 }

@@ -13,6 +13,37 @@ export function chunkResponseSessionIds(sessionIds, size = 30) {
   return chunks;
 }
 
+// Derives a stable key for the current response-relevant session set so callers
+// can tell whether the Firestore listeners actually need to be torn down and
+// rebuilt, or whether only locally-derived fields (like cohort) need a refresh.
+export function responseSubscriptionSessionIdsKey(state) {
+  return responseSubscriptionSessionIds(state).sort().join('|');
+}
+
+export function computeResponseCohort(data, { surveyMap, sessionMap }) {
+  let cohort = Number(data.cohort) || 0;
+  const sess = data.sessionId ? sessionMap[data.sessionId] : null;
+  if (sess && Number(sess.cohort)) {
+    cohort = Number(sess.cohort);
+  } else if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
+    cohort = Number(surveyMap[data.surveyId].sessionCohort) || 0;
+  }
+  return cohort;
+}
+
+// Sessions/surveys can change (e.g. a cohort number edit) without the set of
+// session ids backing the response listeners changing. Re-derive the cohort
+// field on cached responses locally instead of tearing down live Firestore
+// listeners just to pick up the new mapping.
+export function refreshResponseCohorts(state) {
+  const surveyMap = Object.fromEntries((state.surveys || []).map(s => [s.id, s]));
+  const sessionMap = Object.fromEntries((state.sessions || []).map(s => [s.id, s]));
+  state.responses = (state.responses || []).map((response) => ({
+    ...response,
+    cohort: computeResponseCohort(response, { surveyMap, sessionMap }),
+  }));
+}
+
 function recoveredSurveyMatchesResponse(survey, row) {
   return row.surveyId === survey.id
     || (row.sessionId === survey.sessionId

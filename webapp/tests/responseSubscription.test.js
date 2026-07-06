@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   chunkResponseSessionIds,
+  computeResponseCohort,
   mergeRecoveredSurveyResponses,
+  refreshResponseCohorts,
   responseSubscriptionSessionIds,
+  responseSubscriptionSessionIdsKey,
   sortResponsesNewestFirst,
 } from "../src/responses/responseSubscription.js";
 
@@ -39,6 +42,41 @@ describe("response subscription helpers", () => {
     });
 
     expect(merged.map((row) => row.id)).toEqual(["r1", "r2", "r3"]);
+  });
+
+  it("keeps the session-ids key stable across re-renders when the underlying set is unchanged", () => {
+    const stateA = { sessions: [{ id: "s2" }, { id: "s1" }], surveys: [{ sessionId: "s2" }] };
+    const stateB = { sessions: [{ id: "s1" }, { id: "s2" }], surveys: [{ sessionId: "s2" }] };
+
+    expect(responseSubscriptionSessionIdsKey(stateA)).toBe(responseSubscriptionSessionIdsKey(stateB));
+  });
+
+  it("changes the session-ids key when a session is actually added or removed", () => {
+    const before = responseSubscriptionSessionIdsKey({ sessions: [{ id: "s1" }], surveys: [] });
+    const after = responseSubscriptionSessionIdsKey({ sessions: [{ id: "s1" }, { id: "s2" }], surveys: [] });
+
+    expect(before).not.toBe(after);
+  });
+
+  it("prefers the live session cohort over the survey's cached cohort or the response's own cohort", () => {
+    const sessionMap = { "s1": { id: "s1", cohort: 5 } };
+    const surveyMap = { "survey-a": { id: "survey-a", sessionCohort: 3 } };
+
+    expect(computeResponseCohort({ sessionId: "s1", surveyId: "survey-a", cohort: 1 }, { surveyMap, sessionMap })).toBe(5);
+    expect(computeResponseCohort({ sessionId: "missing", surveyId: "survey-a", cohort: 0 }, { surveyMap, sessionMap })).toBe(3);
+    expect(computeResponseCohort({ sessionId: "missing", surveyId: "missing", cohort: 7 }, { surveyMap, sessionMap })).toBe(7);
+  });
+
+  it("refreshes cached response cohorts locally after a session cohort edit, without touching other fields", () => {
+    const state = {
+      sessions: [{ id: "s1", cohort: 9 }],
+      surveys: [],
+      responses: [{ id: "r1", sessionId: "s1", cohort: 2, employeeVoice: "keep me" }],
+    };
+
+    refreshResponseCohorts(state);
+
+    expect(state.responses).toEqual([{ id: "r1", sessionId: "s1", cohort: 9, employeeVoice: "keep me" }]);
   });
 
   it("sorts responses newest first with invalid dates last", () => {

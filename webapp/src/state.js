@@ -517,11 +517,12 @@ export async function saveResponsesToFirestore(rows) {
   });
 }
 
-export function subscribeResponsesFromFirestore() {
+export function subscribeResponsesFromFirestore({ force = false } = {}) {
   return subscribeResponsesFromFirestoreAdapter({
     state,
     saveState,
     fetchAllResponsesFromFirestore,
+    force,
   });
 }
 export async function setSurveyDistributionActiveInFirestore(id, active) {

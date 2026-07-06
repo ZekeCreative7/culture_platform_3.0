@@ -304,7 +304,7 @@ export function recoverOrphanSurvey(key) {
   // they'll all show up under this one recovered card via the legacy fallback match.
   state.orphanScanResult = (state.orphanScanResult || []).filter((g) => dedupeKeyForGroup(g) !== slotKey);
   saveState();
-  subscribeResponsesFromFirestore();
+  subscribeResponsesFromFirestore({ force: true });
   updateSurveyInFirestore(survey.id, survey).catch((e) => {
     console.error('Firestore 복구 설문 저장 실패:', e);
     alert('화면에는 복구됐지만 서버 저장에 실패했습니다: ' + e.message);
@@ -321,7 +321,7 @@ export function recoverAllOrphanSurveys() {
   state.surveys = [...(state.surveys || []), ...newSurveys];
   state.orphanScanResult = [];
   saveState();
-  subscribeResponsesFromFirestore();
+  subscribeResponsesFromFirestore({ force: true });
   Promise.all(newSurveys.map((survey) => updateSurveyInFirestore(survey.id, survey))).catch((e) => {
     console.error('Firestore 전체 복구 저장 실패:', e);
     alert('화면에는 복구됐지만 일부 서버 저장에 실패했습니다: ' + e.message);
@@ -334,7 +334,7 @@ export function deleteRecoveredSurveyCard(id) {
   if (!confirm(`"${survey.title}" 카드를 목록에서 지울까요?\n\n카드만 지워지고 원본 응답 데이터는 전혀 삭제되지 않습니다. 결과는 Change(변화 분석) 화면에서 세션·단계로 계속 조회할 수 있습니다.`)) return;
   state.surveys = (state.surveys || []).filter((s) => s.id !== id);
   saveState();
-  subscribeResponsesFromFirestore();
+  subscribeResponsesFromFirestore({ force: true });
   deleteSurveyDocFromFirestore(id).catch((e) => {
     console.error('Firestore 설문 카드 삭제 실패:', e);
     alert('화면에는 지워졌지만 서버 삭제에 실패했습니다: ' + e.message);

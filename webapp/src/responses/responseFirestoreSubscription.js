@@ -1,8 +1,11 @@
 import { db, collection, onSnapshot, query, where } from '../firebase.js';
 import {
   chunkResponseSessionIds,
+  computeResponseCohort,
   mergeRecoveredSurveyResponses,
+  refreshResponseCohorts,
   responseSubscriptionSessionIds,
+  responseSubscriptionSessionIdsKey,
   sortResponsesNewestFirst
 } from './responseSubscription.js';
 
@@ -10,13 +13,28 @@ import {
 // under was later deleted. Keep the Firestore listener mechanics next to the
 // response subscription rules so state.js only exposes the app-level facade.
 let responseUnsubscribes = [];
+let previousResponseSessionIdsKey = null;
 
 export function subscribeResponsesFromFirestoreAdapter({
   state,
   saveState,
   fetchAllResponsesFromFirestore,
   onError = console.error,
+  force = false,
 }) {
+  const sessionIdsKey = responseSubscriptionSessionIdsKey(state);
+
+  // Sessions/surveys fire this on every doc change, not just when a session
+  // is added or removed. If the response-relevant session set is unchanged,
+  // the live listeners are still correct — just refresh derived fields
+  // instead of tearing down and re-querying Firestore from scratch.
+  if (!force && responseUnsubscribes.length > 0 && sessionIdsKey === previousResponseSessionIdsKey) {
+    refreshResponseCohorts(state);
+    saveState();
+    return;
+  }
+  previousResponseSessionIdsKey = sessionIdsKey;
+
   responseUnsubscribes.forEach(unsub => unsub());
   responseUnsubscribes = [];
   state.responsesLoaded = false;
@@ -42,13 +60,7 @@ export function subscribeResponsesFromFirestoreAdapter({
 
       chunkResponses[chunkIdx] = snap.docs.map(d => {
         const data = d.data();
-        let cohort = Number(data.cohort) || 0;
-        const sess = data.sessionId ? sessionMap[data.sessionId] : null;
-        if (sess && Number(sess.cohort)) {
-          cohort = Number(sess.cohort);
-        } else if (!cohort && data.surveyId && surveyMap[data.surveyId]) {
-          cohort = Number(surveyMap[data.surveyId].sessionCohort) || 0;
-        }
+        const cohort = computeResponseCohort(data, { surveyMap, sessionMap });
         return { ...data, cohort, id: d.id, createdAt: data.createdAt?.toDate?.()?.toISOString() || "" };
       });
       chunkReady[chunkIdx] = true;

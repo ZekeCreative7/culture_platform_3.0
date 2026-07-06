@@ -61,7 +61,7 @@ export function deleteSession(id) {
     },
     persistRemote: async () => {
       await deleteSessionFromFirestore(id);
-      subscribeResponsesFromFirestore();
+      subscribeResponsesFromFirestore({ force: true });
     },
     onError: (error) => {
       alert(`세션 삭제 실패: ${error.message || error}`);

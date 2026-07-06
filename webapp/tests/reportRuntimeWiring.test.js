@@ -15,6 +15,11 @@ describe("Report runtime wiring", () => {
     expect(controlsSource).toContain("downloadReportXlsx");
     expect(controlsSource).toContain("id=\"download-report-xlsx\"");
     expect(controlsSource).toContain("id=\"download-report-pdf\"");
+    expect(controlsSource).toContain("aria-label=\"엑셀 데이터 파일 다운로드\"");
+    expect(controlsSource).toContain("aria-label=\"PDF 리포트 저장 또는 인쇄\"");
+    expect(controlsSource).toContain("엑셀 데이터 받기");
+    expect(controlsSource).toContain("질문·익명 응답 .xlsx");
+    expect(controlsSource).toContain("PDF 저장/인쇄");
     expect(controlsSource).toContain("id=\"apply-report-filter\"");
     expect(actionsSource).toContain("export function applyReportFilter");
     expect(actionsSource).toContain("export async function downloadReportPdf");

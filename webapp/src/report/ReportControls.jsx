@@ -101,14 +101,28 @@ export function ReportControls() {
         {canExportPdf && (
           <div className="report-export-actions">
             {canExportSingle && (
-              <button className="report-export-button excel" id="download-report-xlsx" type="button" onClick={(event) => downloadReportXlsx(event.currentTarget)}>
+              <button
+                aria-label="엑셀 데이터 파일 다운로드"
+                className="report-export-button excel"
+                id="download-report-xlsx"
+                title="엑셀 데이터 파일 다운로드"
+                type="button"
+                onClick={(event) => downloadReportXlsx(event.currentTarget)}
+              >
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 10l2 3m0-3-2 3m4-3h2v3h-2" /></svg>
-                <span><b>엑셀 다운로드</b><small>질문·익명 응답</small></span>
+                <span><b>엑셀 데이터 받기</b><small>질문·익명 응답 .xlsx</small></span>
               </button>
             )}
-            <button className="report-export-button pdf" id="download-report-pdf" type="button" onClick={(event) => downloadReportPdf(event.currentTarget)}>
+            <button
+              aria-label="PDF 리포트 저장 또는 인쇄"
+              className="report-export-button pdf"
+              id="download-report-pdf"
+              title="PDF 리포트 저장 또는 인쇄"
+              type="button"
+              onClick={(event) => downloadReportPdf(event.currentTarget)}
+            >
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 11h6M7 14h4" /></svg>
-              <span><b>PDF 리포트</b><small>{isCompareReport ? '전체 비교 인쇄용' : '인쇄용 화면 열기'}</small></span>
+              <span><b>PDF 저장/인쇄</b><small>{isCompareReport ? '전체 비교 리포트' : '리포트 화면 열기'}</small></span>
             </button>
           </div>
         )}

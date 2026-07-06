@@ -108,7 +108,7 @@ export function ReportControls() {
             )}
             <button className="report-export-button pdf" id="download-report-pdf" type="button" onClick={(event) => downloadReportPdf(event.currentTarget)}>
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm7 1.5V7h3.5M7 11h6M7 14h4" /></svg>
-              <span><b>PDF 리포트</b><small>{isCompareReport ? '전체 비교 화면 디자인' : '화면 디자인 포함'}</small></span>
+              <span><b>PDF 리포트</b><small>{isCompareReport ? '전체 비교 인쇄용' : '인쇄용 화면 열기'}</small></span>
             </button>
           </div>
         )}

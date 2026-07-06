@@ -128,7 +128,7 @@ export async function downloadReportPdf(input) {
   try {
     await runWithButtonLoading(
       button,
-      '<span><b>PDF 생성 중</b><small>분석 화면을 정리하고 있어요</small></span>',
+      '<span><b>인쇄 창 여는 중</b><small>PDF로 저장할 수 있어요</small></span>',
       async () => {
         const scope = ensureScopedSelection('report');
         let meta;

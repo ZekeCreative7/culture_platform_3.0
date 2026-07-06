@@ -117,18 +117,15 @@ describe("Operational quality guardrails", () => {
     expect(surveyActions).toContain("rollbackLocal");
   });
 
-  it("keeps the PDF exporter on the block-sliced reliability profile", async () => {
+  it("keeps the PDF exporter on the browser-print reliability profile", async () => {
     globalThis.window = {};
-    const { PDF_EXPORT_PROFILE, PDF_EXPORT_WIDTH_PX, PDF_CANVAS_SCALE, buildPdfBlocks } = await import("../src/report/reportExport.js");
+    const { PDF_EXPORT_PROFILE } = await import("../src/report/reportExport.js");
 
     expect(PDF_EXPORT_PROFILE).toEqual({
-      widthPx: 940,
-      canvasScale: 1.15,
-      strategy: "block-sliced-a4",
+      strategy: "browser-print-a4",
+      pageSize: "A4 portrait",
+      opensPrintWindow: true,
     });
-    expect(PDF_EXPORT_WIDTH_PX).toBe(940);
-    expect(PDF_CANVAS_SCALE).toBe(1.15);
-    expect(typeof buildPdfBlocks).toBe("function");
   });
 
   it("documents a preview-server smoke check for built entries and legacy QR routing", () => {

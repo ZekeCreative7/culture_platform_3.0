@@ -94,40 +94,6 @@ export function inspectPdfExportDocument(root) {
   };
 }
 
-/**
- * PDF export 폭 검사 — 콘텐츠가 export 폭(940px)을 넘어가는(오른쪽으로 삐져나가는)
- * 요소를 찾아낸다. html2canvas는 요소의 offsetWidth로 캡처하므로, 이 폭을 넘는
- * 자식이 있으면 그동안 오른쪽이 잘렸다. (지금은 scrollWidth로 캡처해 잘림은 막지만,
- * 여기서 잡아 두면 어떤 요소가 넘치는지 로그로 확인/수정할 수 있다.)
- */
-export function inspectPdfExportWidth(root, exportWidth) {
-  if (!root || typeof root.getBoundingClientRect !== "function") {
-    return { fits: true, contentWidth: 0, overflowing: [] };
-  }
-  const rootLeft = root.getBoundingClientRect().left;
-  const limit = rootLeft + exportWidth;
-  const overflowing = [];
-  root.querySelectorAll("*").forEach((el) => {
-    const rect = el.getBoundingClientRect();
-    const overflow = rect.right - limit;
-    if (overflow > 2 && rect.width > 0) {
-      overflowing.push({
-        tag: el.tagName.toLowerCase(),
-        cls: typeof el.className === "string" ? el.className.slice(0, 60) : "",
-        overflowPx: Math.round(overflow),
-        width: Math.round(rect.width),
-      });
-    }
-  });
-  overflowing.sort((a, b) => b.overflowPx - a.overflowPx);
-  return {
-    fits: overflowing.length === 0,
-    contentWidth: Math.ceil(root.scrollWidth || 0),
-    exportWidth,
-    overflowing: overflowing.slice(0, 12),
-  };
-}
-
 export function assertPdfExportReady(root) {
   const report = inspectPdfExportDocument(root);
   if (!report.ok) {

@@ -26,10 +26,13 @@ describe("Report PDF readiness kit", () => {
     expect(report.blockers.join(" ")).toContain("legacy window");
   });
 
-  it("runs readiness assertions before html2pdf receives the cloned report", () => {
+  it("runs readiness assertions before opening the browser print export", () => {
     const source = readFileSync(new URL("../src/report/reportExport.js", import.meta.url), "utf8");
 
     expect(source).toContain("assertPdfExportReady(clone)");
-    expect(source.indexOf("assertPdfExportReady(clone)")).toBeLessThan(source.indexOf("window.html2pdf().set(options)"));
+    expect(source).toContain("openReportPrintWindow");
+    expect(source).not.toContain("window.html2pdf()");
+    expect(source).not.toContain("toCanvas()");
+    expect(source.indexOf("assertPdfExportReady(clone)")).toBeLessThan(source.indexOf("openReportPrintWindow"));
   });
 });

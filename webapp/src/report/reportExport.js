@@ -1,5 +1,5 @@
 import { scoreOf } from "../utils.js";
-import { assertPdfExportReady, inspectPdfExportWidth } from "./pdfExportReadiness.js";
+import { assertPdfExportReady } from "./pdfExportReadiness.js";
 
 // Vendor bundles are executed from their raw source (like qrCode.js does for
 // qrcode.min.js) instead of a `<script src="./src/vendor/...">` tag. A plain
@@ -13,14 +13,10 @@ function runVendorScript(source) {
 }
 
 const PHASE_ORDER = ["사전", "중간", "사후", "팔로우업"];
-// A4 portrait has much less horizontal room than the desktop canvas. Keep the
-// cloned export document narrow enough that html2pdf does not shrink or crop it.
-export const PDF_EXPORT_WIDTH_PX = 940;
-export const PDF_CANVAS_SCALE = 1.15;
 export const PDF_EXPORT_PROFILE = {
-  widthPx: PDF_EXPORT_WIDTH_PX,
-  canvasScale: PDF_CANVAS_SCALE,
-  strategy: 'block-sliced-a4',
+  strategy: "browser-print-a4",
+  pageSize: "A4 portrait",
+  opensPrintWindow: true,
 };
 
 function safeFilePart(value) {
@@ -213,142 +209,89 @@ export async function downloadReportWorkbook(payload) {
 
 export async function downloadReportPdf({ element, meta }) {
   if (!element) throw new Error("PDF로 변환할 리포트 영역을 찾지 못했습니다.");
-  if (typeof window.html2pdf !== "function") {
-    const { default: source } = await import('../vendor/html2pdf.bundle.min.js?raw');
-    runVendorScript(source);
-  }
-  if (typeof window.html2pdf !== "function") throw new Error("PDF 내보내기 모듈을 불러오지 못했습니다.");
 
-  const margin = [8, 8, 10, 8];
-  const pdfOptions = { unit: "mm", format: "a4", orientation: "portrait", compress: true };
-  const imageOptions = { type: "jpeg", quality: 0.96 };
-
-  const stage = document.createElement("div");
-  stage.className = "report-export-stage";
   const clone = element.cloneNode(true);
-  clone.classList.add("report-pdf-document");
-  clone.style.width = `${PDF_EXPORT_WIDTH_PX}px`;
-  clone.style.maxWidth = "none";
-  clone.style.position = "relative";
-  clone.style.left = "0";
-  clone.style.top = "0";
-  clone.style.transform = "none";
-  clone.querySelectorAll("[data-html2canvas-ignore]").forEach((node) => node.remove());
-  clone.removeAttribute("id");
-  stage.appendChild(clone);
-  document.body.appendChild(stage);
+  clone.classList.add("report-print-document");
+  clone.querySelectorAll("[data-html2canvas-ignore], .report-react-controls, .filters-panel, .report-export-actions")
+    .forEach((node) => node.remove());
 
-  await document.fonts?.ready;
-  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-  // ── 폭 방어의 핵심 ──────────────────────────────────────────────
-  // html2canvas는 windowWidth(기본값 = 현재 브라우저 창 폭) 크기의 가상 뷰포트에
-  // 문서를 복제해 렌더한다. 창이 export 문서(940px)보다 좁으면 그 폭을 넘는 부분이
-  // 통째로 잘린다(= 지금까지 오른쪽이 잘리던 원인). 그래서 windowWidth/width를
-  // 실제 콘텐츠 폭으로 '명시'해 절대 잘리지 않게 한다.
-  const widthReport = inspectPdfExportWidth(clone, PDF_EXPORT_WIDTH_PX);
-  const contentWidth = Math.max(PDF_EXPORT_WIDTH_PX, Math.ceil(clone.scrollWidth), widthReport.contentWidth);
-  if (!widthReport.fits) {
-    // 콘텐츠가 export 폭을 넘겼다 → 예전엔 여기서 오른쪽이 잘렸다.
-    // 이제는 전체 폭으로 캡처해 잘림은 막되(살짝 축소될 수 있음), 어떤 요소가 넘치는지 로그로 남긴다.
-    console.warn(
-      `[PDF] 콘텐츠가 export 폭(${PDF_EXPORT_WIDTH_PX}px)을 초과합니다 → 전체 폭(${contentWidth}px)으로 캡처해 잘림 방지. 넘치는 요소:`,
-      widthReport.overflowing,
-    );
-  }
-  const html2canvasOptions = {
-    scale: PDF_CANVAS_SCALE,
-    useCORS: true,
-    backgroundColor: "#f7f7f7",
-    logging: false,
-    scrollX: 0,
-    scrollY: 0,
-    width: contentWidth,
-    windowWidth: contentWidth,
-  };
-
-  try {
-    assertPdfExportReady(clone);
-    const blocks = buildPdfBlocks(clone);
-    if (!blocks.length) throw new Error("PDF로 변환할 리포트 내용이 없습니다.");
-
-    const options = {
-      margin,
-      filename: `${reportBaseName(meta)}.pdf`,
-      image: imageOptions,
-      html2canvas: html2canvasOptions,
-      jsPDF: pdfOptions,
-    };
-
-    const firstWorker = window.html2pdf().set(options).from(blocks[0]).toPdf();
-    const pdf = await firstWorker.get("pdf");
-    const page = pdf.internal.pageSize;
-    const pageWidth = typeof page.getWidth === "function" ? page.getWidth() : page.width;
-    const pageHeight = typeof page.getHeight === "function" ? page.getHeight() : page.height;
-    const innerWidth = pageWidth - margin[1] - margin[3];
-    const innerHeight = pageHeight - margin[0] - margin[2];
-
-    for (const block of blocks.slice(1)) {
-      const canvas = await renderPdfBlockToCanvas(block, options);
-      appendCanvasToPdf(pdf, canvas, { margin, innerWidth, innerHeight, imageOptions });
-    }
-
-    pdf.save(`${reportBaseName(meta)}.pdf`);
-  } finally {
-    stage.remove();
-  }
+  assertPdfExportReady(clone);
+  openReportPrintWindow({
+    title: reportBaseName(meta),
+    bodyHtml: clone.outerHTML,
+  });
 }
 
-export function buildPdfBlocks(clone) {
-  return Array.from(clone.children)
-    .filter((child) => child.nodeType === Node.ELEMENT_NODE && child.getBoundingClientRect().height > 0)
-    .map((child) => {
-      const block = document.createElement("div");
-      block.className = "report-pdf-document report-pdf-block";
-      block.style.width = `${PDF_EXPORT_WIDTH_PX}px`;
-      block.style.maxWidth = "none";
-      block.style.boxSizing = "border-box";
-      block.style.overflow = "visible";
-      block.style.margin = "0";
-      block.style.position = "relative";
-      block.style.left = "0";
-      block.style.top = "0";
-      block.style.transform = "none";
-      block.appendChild(child.cloneNode(true));
-      return block;
-    });
+function escapeAttr(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
-async function renderPdfBlockToCanvas(block, options) {
-  return window.html2pdf()
-    .set(options)
-    .from(block)
-    .toCanvas()
-    .get("canvas");
+function currentStyleMarkup() {
+  return Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map((node) => {
+      if (node.tagName === "LINK") {
+        return `<link rel="stylesheet" href="${escapeAttr(node.href)}">`;
+      }
+      return node.outerHTML;
+    })
+    .join("\n");
 }
 
-function appendCanvasToPdf(pdf, canvas, { margin, innerWidth, innerHeight, imageOptions }) {
-  const sliceHeight = Math.floor(canvas.width * (innerHeight / innerWidth));
-  const pageCanvas = document.createElement("canvas");
-  const pageContext = pageCanvas.getContext("2d");
-  pageCanvas.width = canvas.width;
+function printWindowHtml({ title, bodyHtml }) {
+  return `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="${escapeAttr(document.baseURI)}">
+    <title>${escapeAttr(title)}</title>
+    ${currentStyleMarkup()}
+  </head>
+  <body class="report-print-body">
+    <main class="report-print-shell">
+      ${bodyHtml}
+    </main>
+    <script>
+      function waitForImages() {
+        return Promise.all(Array.from(document.images).map(function(img) {
+          if (img.complete) return Promise.resolve();
+          return new Promise(function(resolve) {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        }));
+      }
+      window.addEventListener("load", function() {
+        Promise.resolve(document.fonts && document.fonts.ready)
+          .then(waitForImages)
+          .then(function() {
+            return new Promise(function(resolve) {
+              requestAnimationFrame(function() {
+                requestAnimationFrame(resolve);
+              });
+            });
+          })
+          .then(function() {
+            window.focus();
+            window.print();
+          });
+      });
+    </script>
+  </body>
+</html>`;
+}
 
-  for (let y = 0; y < canvas.height; y += sliceHeight) {
-    const currentSliceHeight = Math.min(sliceHeight, canvas.height - y);
-    pageCanvas.height = currentSliceHeight;
-    pageContext.fillStyle = "#ffffff";
-    pageContext.fillRect(0, 0, pageCanvas.width, currentSliceHeight);
-    pageContext.drawImage(canvas, 0, y, canvas.width, currentSliceHeight, 0, 0, canvas.width, currentSliceHeight);
-
-    const imageHeight = (currentSliceHeight * innerWidth) / canvas.width;
-    pdf.addPage();
-    pdf.addImage(
-      pageCanvas.toDataURL(`image/${imageOptions.type}`, imageOptions.quality),
-      imageOptions.type,
-      margin[1],
-      margin[0],
-      innerWidth,
-      imageHeight,
-    );
+function openReportPrintWindow({ title, bodyHtml }) {
+  const printWindow = window.open("", "_blank", "width=1100,height=1200");
+  if (!printWindow) {
+    throw new Error("PDF 인쇄 창이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
   }
+  printWindow.document.open();
+  printWindow.document.write(printWindowHtml({ title, bodyHtml }));
+  printWindow.document.close();
+  return printWindow;
 }

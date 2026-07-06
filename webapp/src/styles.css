@@ -2245,6 +2245,77 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 .report-pdf-document .report-change-card { box-shadow: 0 8px 24px rgba(28,74,125,.08); }
 .report-pdf-document .panel:hover { transform: none; }
 
+.report-print-body {
+  margin: 0;
+  background: #eef3f8;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report-print-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px;
+}
+.report-print-document {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 32px;
+  overflow: visible;
+  background:
+    radial-gradient(circle at 85% 3%, rgba(91,138,221,.16), transparent 25%),
+    linear-gradient(145deg, #eef6fc 0%, #f5f8fc 50%, #eef0fb 100%);
+  color: var(--ink);
+}
+.report-print-document * { box-sizing: border-box; }
+.report-print-document .report-diagnosis-grid,
+.report-print-document .report-change-grid {
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+}
+.report-print-document .report-summary,
+.report-print-document .report-dimension-grid,
+.report-print-document .metric-grid,
+.report-print-document .metric-grid.slim,
+.report-print-document .report-commitments-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+.report-print-document .report-summary > *,
+.report-print-document .report-dimension-grid > *,
+.report-print-document .report-diagnosis-grid > *,
+.report-print-document .report-change-grid > *,
+.report-print-document .metric-grid > *,
+.report-print-document .report-commitments-grid > * {
+  min-width: 0;
+}
+.report-print-document .page-head,
+.report-print-document .panel,
+.report-print-document .report-export-section {
+  width: 100%;
+  max-width: 100%;
+}
+.report-print-document img,
+.report-print-document svg,
+.report-print-document canvas {
+  max-width: 100% !important;
+}
+.report-print-document table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+}
+.report-print-document th,
+.report-print-document td {
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.report-print-document [style*="overflow-x:auto"],
+.report-print-document [style*="overflow-x: auto"] {
+  overflow-x: visible !important;
+}
+
 /* ── Team Pipeline Tracker ─────────────────────────────── */
 .pipeline-view-toggle { display: flex; gap: 4px; }
 .pipeline-toggle-btn {
@@ -2308,10 +2379,44 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 }
 
 @media print {
+  @page { size: A4 portrait; margin: 10mm; }
   .sidebar, .topbar, .filters-panel, .report-export-actions { display: none !important; }
   #app, main, .canvas { display: block !important; width: 100% !important; height: auto !important; overflow: visible !important; }
   .report-export-content { background: #fff; }
   .report-export-section { break-inside: avoid; page-break-inside: avoid; }
+  .report-print-body {
+    background: #fff !important;
+  }
+  .report-print-shell {
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .report-print-document {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+  }
+  .report-print-document .page-head,
+  .report-print-document .panel,
+  .report-print-document .report-radar-card,
+  .report-print-document .report-change-card,
+  .report-print-document .report-dimension-grid > div,
+  .report-print-document .report-recommendation-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .report-print-document .report-export-section {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .report-print-document .section-title {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
 }
 
 /* ─── Tabs ─── */

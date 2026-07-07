@@ -62,4 +62,15 @@ describe('org map model', () => {
     expect(nonLeaders.map((member) => member.name).sort()).toEqual(['김권수', '안병덕']);
     expect(nonLeaders.map((member) => model.memberJobTitle(member, hq))).toEqual(['', '']);
   });
+
+  it('sorts displayed members by leader role, seniority, then Korean name', () => {
+    const data = loadOrgData();
+    const model = buildOrgMapModel(data.units, data.members);
+    const customerSolutionNames = model.directMembers('CUSTOMER_SOLUTION').map((member) => member.name);
+    const strategyManagementMembers = model.directMembers('STRATEGY_MGMT_TEAM');
+
+    expect(customerSolutionNames).toEqual(['도기철', '김권수', '안병덕']);
+    expect(strategyManagementMembers[0]?.id).toBe('person-STRATEGY_MGMT_TEAM-61');
+    expect(model.memberJobTitle(strategyManagementMembers[0], model.unitById.get('STRATEGY_MGMT_TEAM'))).toBe('팀장');
+  });
 });

@@ -1,4 +1,4 @@
-import { normalizePosition, UNIT_LABELS, UNIT_LEADER_LABELS } from '../utils.js';
+import { normalizePosition, POSITION_OPTIONS, UNIT_LABELS, UNIT_LEADER_LABELS } from '../utils.js';
 
 function asList(value) {
   return Array.isArray(value) ? value : [];
@@ -14,6 +14,16 @@ const ROLE_TITLE_LABELS = {
   팀장: '팀장',
   리더: '조직장',
   조직장: '조직장',
+};
+
+const JOB_TITLE_RANKS = {
+  대표: 0,
+  대표이사: 0,
+  사장: 0,
+  부문장: 1,
+  본부장: 2,
+  팀장: 3,
+  조직장: 3,
 };
 
 function normalizedGrade(value, fallback = '직급 미지정') {
@@ -39,6 +49,26 @@ function memberJobTitle(member, parentUnit) {
 
   const roleTitle = ROLE_TITLE_LABELS[normalizePosition(rawMemberPosition(member), '')];
   return parentUnit?.leaderMemberId === member?.id ? roleTitle || '' : '';
+}
+
+function positionRank(value) {
+  const normalized = normalizePosition(value, '');
+  const index = POSITION_OPTIONS.indexOf(normalized);
+  return index >= 0 ? index : POSITION_OPTIONS.length;
+}
+
+function memberSortRank(member, parentUnit) {
+  const titleRank = JOB_TITLE_RANKS[memberJobTitle(member, parentUnit)];
+  if (titleRank !== undefined) return titleRank;
+  return 10 + positionRank(memberGrade(member));
+}
+
+function sortMembersForUnit(list, parentUnit) {
+  return [...list].sort((a, b) => {
+    const rankDelta = memberSortRank(a, parentUnit) - memberSortRank(b, parentUnit);
+    if (rankDelta) return rankDelta;
+    return trimText(a.name).localeCompare(trimText(b.name), 'ko');
+  });
 }
 
 function includesQuery(value, query) {
@@ -77,7 +107,10 @@ export function buildOrgMapModel(unitsInput = [], membersInput = []) {
   }
 
   function directMembers(unitId) {
-    return members.filter((member) => member.parentId === unitId);
+    return sortMembersForUnit(
+      members.filter((member) => member.parentId === unitId),
+      unitById.get(unitId)
+    );
   }
 
   function leaderFor(unit) {
@@ -185,6 +218,7 @@ export function buildOrgMapModel(unitsInput = [], membersInput = []) {
     leaderRoleLabel,
     memberGrade,
     memberJobTitle,
+    memberSortRank,
   };
 }
 
@@ -229,6 +263,11 @@ export function searchOrgMap(model, rawQuery) {
       || includesQuery(member.jobGrade, query)
       || includesQuery(member.position, query)
     )
+    .sort((a, b) => {
+      const rankDelta = model.memberSortRank(a, model.unitById.get(a.parentId)) - model.memberSortRank(b, model.unitById.get(b.parentId));
+      if (rankDelta) return rankDelta;
+      return trimText(a.name).localeCompare(trimText(b.name), 'ko');
+    })
     .map((member) => {
       const parent = model.unitById.get(member.parentId);
       const isDirect = parent && parent.level !== 'team';

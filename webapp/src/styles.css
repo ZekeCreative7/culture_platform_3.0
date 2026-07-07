@@ -7393,6 +7393,12 @@ button.disabled { opacity: .45; pointer-events: none; }
   gap: 10px;
 }
 
+.org-map-lane > .org-map-branch {
+  margin-top: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+}
+
 .org-map-top-card {
   display: flex;
   flex-direction: column;
@@ -7496,6 +7502,10 @@ button.disabled { opacity: .45; pointer-events: none; }
   padding: 16px;
   border-bottom: 1px solid var(--border);
   background: #f8fafc;
+}
+
+.org-map-lane > .org-map-branch .org-map-branch-head {
+  background: #f0fdfa;
 }
 
 .org-map-branch-head h2,

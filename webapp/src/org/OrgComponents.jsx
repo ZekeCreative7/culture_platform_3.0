@@ -519,6 +519,8 @@ function UnitEditor({ editor, units, onClose }) {
   }
   if (isEdit) label = `${UNIT_LABELS[unit?.level || "team"]} 정보 수정`;
 
+  const leaderRoleLabel = UNIT_LEADER_LABELS[level] || '조직장';
+
   const levelOptions = [];
   if (isEdit && unit) {
     levelOptions.push(<option key={unit.level} value={unit.level}>{UNIT_LABELS[unit.level]}</option>);
@@ -580,13 +582,13 @@ function UnitEditor({ editor, units, onClose }) {
             </label>
             {isEdit && (
               <>
-                <label>부서 팀장 지정
+                <label>{leaderRoleLabel} 지정
                   <select
                     value={leaderVal}
                     onChange={(e) => setLeaderVal(e.target.value)}
                     className="input-text"
                   >
-                    <option value="">-- 팀장 없음/직접 입력 --</option>
+                    <option value="">-- {leaderRoleLabel} 없음/직접 입력 --</option>
                     {leaderOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.name} ({opt.position} · {opt.orgLabel})
@@ -595,7 +597,7 @@ function UnitEditor({ editor, units, onClose }) {
                   </select>
                 </label>
                 <div className="form-grid compact" style={{ gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '-4px' }}>
-                  <label>팀장 이름 (직접 지정 시)
+                  <label>{leaderRoleLabel} 이름 (직접 지정 시)
                     <input
                       type="text"
                       value={isManualDisabled ? '' : manualName}
@@ -605,7 +607,7 @@ function UnitEditor({ editor, units, onClose }) {
                       disabled={isManualDisabled}
                     />
                   </label>
-                  <label>팀장 직위/직급
+                  <label>{leaderRoleLabel} 직위/직급
                     <select
                       value={isManualDisabled ? '' : manualTitle}
                       onChange={(e) => setManualTitle(e.target.value)}

@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore.js';
+import { OrgEditorModal } from '../org/OrgComponents.jsx';
 import { buildOrgMapModel, searchOrgMap } from '../org/orgMapModel.js';
 
 function Metric({ label, value }) {
@@ -41,7 +41,7 @@ function TopUnitCard({ unit, model, selected, onSelect }) {
   );
 }
 
-function TopUnitSection({ title, units, model, selectedUnitId, onSelect }) {
+function TopUnitSection({ title, units, model, selectedUnitId, expandedUnit, selectedMemberId, onSelect, onSelectMember }) {
   return (
     <section className="org-map-lane" aria-label={title}>
       <div className="org-map-lane-head">
@@ -59,6 +59,16 @@ function TopUnitSection({ title, units, model, selectedUnitId, onSelect }) {
           />
         ))}
       </div>
+      {expandedUnit && (
+        <BranchMap
+          rootUnit={expandedUnit}
+          model={model}
+          selectedUnitId={selectedUnitId}
+          selectedMemberId={selectedMemberId}
+          onSelect={onSelect}
+          onSelectMember={onSelectMember}
+        />
+      )}
     </section>
   );
 }
@@ -313,10 +323,10 @@ function SearchResults({ results, onSelect, onManage }) {
 
 export const OrgMapPage = memo(function OrgMapPage() {
   const store = useAppStore();
-  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [editor, setEditor] = useState(null);
 
   useEffect(() => {
     store.setActiveView('org-map');
@@ -352,16 +362,51 @@ export const OrgMapPage = memo(function OrgMapPage() {
     setSelectedMemberId(memberId);
   };
 
-  const navigateToOrgAction = (orgAction) => {
-    navigate('/org', { state: { orgAction } });
+  const openUnitEditor = (unitId) => {
+    const unit = model.unitById.get(unitId);
+    if (!unit) return;
+    setSelectedUnitId(unit.id);
+    setSelectedMemberId('');
+    setEditor({
+      kind: 'unit',
+      mode: 'edit',
+      id: unit.id,
+      level: unit.level,
+      parentId: unit.parentId,
+    });
+  };
+
+  const openMemberEditor = (memberId) => {
+    const member = model.memberById.get(memberId);
+    if (!member) return;
+    setSelectedUnitId(member.parentId);
+    setSelectedMemberId(member.id);
+    setEditor({
+      kind: 'member',
+      mode: 'edit',
+      id: member.id,
+      parentId: member.parentId,
+    });
+  };
+
+  const openAddMemberEditor = (unitId) => {
+    const unit = model.unitById.get(unitId);
+    if (!unit) return;
+    setSelectedUnitId(unit.id);
+    setSelectedMemberId('');
+    setEditor({
+      kind: 'member',
+      mode: 'add',
+      parentId: unit.id,
+    });
   };
 
   const handleManageSearchResult = (result) => {
     if (result.kind === 'member') {
-      navigateToOrgAction({ kind: 'member', mode: 'edit', id: result.memberId });
+      openMemberEditor(result.memberId);
       return;
     }
-    navigateToOrgAction({ kind: 'unit', mode: 'edit', id: result.unitId });
+    openUnitEditor(result.unitId);
   };
 
   return (
@@ -375,7 +420,14 @@ export const OrgMapPage = memo(function OrgMapPage() {
           </p>
         </div>
         <div className="org-map-page-actions">
-          <button className="secondary compact" type="button" onClick={() => navigate('/org')}>관리 화면</button>
+          <button
+            className="secondary compact"
+            type="button"
+            disabled={!selectedUnit}
+            onClick={() => selectedUnit && openUnitEditor(selectedUnit.id)}
+          >
+            선택 조직 설정
+          </button>
         </div>
       </section>
 
@@ -409,36 +461,34 @@ export const OrgMapPage = memo(function OrgMapPage() {
               units={model.ceoDivisions}
               model={model}
               selectedUnitId={rootUnit?.id || selectedUnitId}
+              expandedUnit={rootUnit?.level === 'division' ? rootUnit : null}
+              selectedMemberId={selectedMemberId}
               onSelect={handleSelectUnit}
+              onSelectMember={handleSelectMember}
             />
             <TopUnitSection
               title="CEO 직속 본부"
               units={model.ceoHqs}
               model={model}
               selectedUnitId={rootUnit?.id || selectedUnitId}
+              expandedUnit={rootUnit?.level === 'hq' ? rootUnit : null}
+              selectedMemberId={selectedMemberId}
               onSelect={handleSelectUnit}
+              onSelectMember={handleSelectMember}
             />
           </div>
-
-          <BranchMap
-            rootUnit={rootUnit}
-            model={model}
-            selectedUnitId={selectedUnitId}
-            selectedMemberId={selectedMemberId}
-            onSelect={handleSelectUnit}
-            onSelectMember={handleSelectMember}
-          />
         </div>
 
         <DetailPanel
           unit={selectedUnit}
           model={model}
           selectedMemberId={selectedMemberId}
-          onManageUnit={(unitId) => navigateToOrgAction({ kind: 'unit', mode: 'edit', id: unitId })}
-          onAddMember={(unitId) => navigateToOrgAction({ kind: 'member', mode: 'add', parentId: unitId })}
-          onManageMember={(memberId) => navigateToOrgAction({ kind: 'member', mode: 'edit', id: memberId })}
+          onManageUnit={openUnitEditor}
+          onAddMember={openAddMemberEditor}
+          onManageMember={openMemberEditor}
         />
       </div>
+      {editor && <OrgEditorModal editor={editor} onClose={() => setEditor(null)} />}
     </>
   );
 });

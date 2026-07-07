@@ -51,7 +51,7 @@ export function useInitApp(isAuthenticated, orgId) {
     (async () => {
       if (LOCAL_PREVIEW) {
         // 로컬 미리보기 모드: Firebase 호출 우회 및 로컬 데이터 시딩
-        const ORG_DATA_VERSION = 5;
+        const ORG_DATA_VERSION = 6;
         const orgNeedsSeed = !vanillaState.orgUnits || vanillaState.orgUnits.length < 10
           || !vanillaState.orgMembers || vanillaState.orgMembers.length < 10
           || (vanillaState.orgDataVersion || 0) < ORG_DATA_VERSION;

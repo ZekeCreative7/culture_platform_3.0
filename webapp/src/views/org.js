@@ -77,8 +77,11 @@ export const positionRank = (value) => {
   return index < 0 ? POSITION_OPTIONS.length : index;
 };
 
+const ROLE_ONLY_POSITION_VALUES = new Set(["구성원", "팀원", "팀장", "리더", "조직장"]);
+
 export function memberGrade(member) {
-  return normalizePosition(member?.jobGrade || member?.position);
+  const normalized = normalizePosition(member?.jobGrade || member?.position, "");
+  return !normalized || ROLE_ONLY_POSITION_VALUES.has(normalized) ? "직급 미지정" : normalized;
 }
 
 export function memberJobTitle(member) {
@@ -411,5 +414,4 @@ export function persistOrganization() {
     setDbStatus("error");
   });
 }
-
 

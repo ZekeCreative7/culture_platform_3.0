@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState, memo } from 'react';
+import React, { useEffect, useMemo, useRef, useState, memo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore.js';
 import {
   childUnits,
@@ -11,6 +12,8 @@ import {
   toggleOrgUnitExpanded,
   selectOrgTeam,
   closeOrgTeamPanel,
+  focusOrgMember,
+  focusOrgUnit,
   reparentOrgUnit,
   reparentOrgMember
 } from '../org/orgActions.js';
@@ -24,6 +27,9 @@ import {
 
 export const OrgPage = memo(function OrgPage() {
   const store = useAppStore();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const handledRouteActionRef = useRef('');
 
   useEffect(() => {
     store.setActiveView('org');
@@ -46,6 +52,43 @@ export const OrgPage = memo(function OrgPage() {
 
   const selectedTeamId = store.orgSelectedTeamId || '';
   const expandedIds = store.orgExpandedUnitIds || [];
+
+  useEffect(() => {
+    const action = location.state?.orgAction;
+    if (!action || !(store.orgUnits || []).length) return;
+
+    const actionKey = JSON.stringify(action);
+    if (handledRouteActionRef.current === actionKey) return;
+    handledRouteActionRef.current = actionKey;
+
+    setSearchQuery('');
+    if (action.kind === 'member') {
+      const member = action.mode === 'add'
+        ? null
+        : focusOrgMember(action.id);
+      if (action.mode === 'add') focusOrgUnit(action.parentId);
+      setEditor({
+        kind: 'member',
+        mode: action.mode || 'edit',
+        id: action.id,
+        parentId: action.mode === 'add' ? action.parentId : member?.parentId,
+      });
+    } else if (action.kind === 'unit') {
+      const unit = action.mode === 'add'
+        ? null
+        : focusOrgUnit(action.id);
+      if (action.mode === 'add') focusOrgUnit(action.parentId);
+      setEditor({
+        kind: 'unit',
+        mode: action.mode || 'edit',
+        id: action.id,
+        parentId: action.mode === 'add' ? action.parentId : unit?.parentId,
+        level: action.level || unit?.level,
+      });
+    }
+
+    navigate('/org', { replace: true, state: null });
+  }, [location.state, navigate, store.orgUnits]);
 
   const handleOpenEditor = (kind, mode, targetIdOrParentId) => {
     if (mode === 'add') {

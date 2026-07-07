@@ -30,12 +30,15 @@ function memberGrade(member) {
   return normalizedGrade(rawMemberPosition(member));
 }
 
-function memberJobTitle(member) {
-  const explicitTitle = trimText(member?.jobTitle || member?.role);
+function memberJobTitle(member, parentUnit) {
+  const explicitTitle = trimText(member?.jobTitle);
   if (explicitTitle) return explicitTitle;
+  if (parentUnit?.leaderMemberId === member?.id) {
+    return UNIT_LEADER_LABELS[parentUnit.level] || parentUnit.leaderRole || '';
+  }
 
   const roleTitle = ROLE_TITLE_LABELS[normalizePosition(rawMemberPosition(member), '')];
-  return roleTitle || '';
+  return parentUnit?.leaderMemberId === member?.id ? roleTitle || '' : '';
 }
 
 function includesQuery(value, query) {
@@ -85,7 +88,7 @@ export function buildOrgMapModel(unitsInput = [], membersInput = []) {
         id: linked.id,
         name: linked.name,
         grade: memberGrade(linked),
-        jobTitle: memberJobTitle(linked),
+        jobTitle: memberJobTitle(linked, unit),
         role: UNIT_LEADER_LABELS[unit.level] || unit.leaderRole || '',
         linked: true,
       };
@@ -222,7 +225,7 @@ export function searchOrgMap(model, rawQuery) {
     .filter((member) =>
       includesQuery(member.name, query)
       || includesQuery(model.memberGrade(member), query)
-      || includesQuery(model.memberJobTitle(member), query)
+      || includesQuery(model.memberJobTitle(member, model.unitById.get(member.parentId)), query)
       || includesQuery(member.jobGrade, query)
       || includesQuery(member.position, query)
     )
@@ -236,7 +239,7 @@ export function searchOrgMap(model, rawQuery) {
         unitId: member.parentId,
         badge: '구성원',
         title: member.name,
-        meta: [model.memberGrade(member), model.memberJobTitle(member)].filter(Boolean).join(' · '),
+        meta: [model.memberGrade(member), model.memberJobTitle(member, parent)].filter(Boolean).join(' · '),
         path: `${model.pathLabel(member.parentId)}${isDirect ? ' > 직속 인원' : ''}`,
       };
     });

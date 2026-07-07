@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "units": [
     {
       "recordType": "unit",
@@ -83,7 +83,7 @@
       "parentId": "STRATEGY",
       "name": "고객솔루션본부",
       "leader": "도기철",
-      "leaderTitle": "리더",
+      "leaderTitle": "이사",
       "leaderRole": "본부장",
       "leaderMemberId": "person-CUSTOMER_SOLUTION-13"
     },
@@ -3627,11 +3627,11 @@
       "name": "김권수",
       "parentId": "CUSTOMER_SOLUTION",
       "level": "member",
-      "position": "리더",
-      "role": "고객솔루션본부 본부장",
-      "tags": "조직장;표시 리더",
+      "position": "구성원",
+      "role": "",
+      "tags": "팀원",
       "generation": "40대",
-      "jobGrade": "리더",
+      "jobGrade": "구성원",
       "jobTitle": "",
       "employmentStatus": "재직"
     },
@@ -3641,12 +3641,12 @@
       "name": "도기철",
       "parentId": "CUSTOMER_SOLUTION",
       "level": "member",
-      "position": "리더",
+      "position": "이사",
       "role": "고객솔루션본부 본부장",
       "tags": "조직장;표시 리더",
       "generation": "50대",
-      "jobGrade": "리더",
-      "jobTitle": "",
+      "jobGrade": "이사",
+      "jobTitle": "본부장",
       "employmentStatus": "재직"
     },
     {
@@ -3655,11 +3655,11 @@
       "name": "안병덕",
       "parentId": "CUSTOMER_SOLUTION",
       "level": "member",
-      "position": "리더",
-      "role": "고객솔루션본부 본부장",
-      "tags": "조직장;표시 리더",
+      "position": "구성원",
+      "role": "",
+      "tags": "팀원",
       "generation": "40대",
-      "jobGrade": "리더",
+      "jobGrade": "구성원",
       "jobTitle": "",
       "employmentStatus": "재직"
     },

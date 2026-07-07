@@ -83,6 +83,58 @@ export function closeOrgTeamPanel() {
   saveState();
 }
 
+function orgAncestorIds(unitId) {
+  const ancestors = [];
+  const seen = new Set();
+  let unit = (state.orgUnits || []).find((item) => item.id === unitId);
+  while (unit && unit.parentId && !seen.has(unit.id)) {
+    seen.add(unit.id);
+    const parent = (state.orgUnits || []).find((item) => item.id === unit.parentId);
+    if (parent && parent.level !== 'company') ancestors.unshift(parent.id);
+    unit = parent;
+  }
+  return ancestors;
+}
+
+export function focusOrgUnit(unitId) {
+  const unit = (state.orgUnits || []).find((item) => item.id === unitId);
+  if (!unit) return null;
+
+  const expanded = new Set(state.orgExpandedUnitIds || []);
+  orgAncestorIds(unit.id).forEach((id) => expanded.add(id));
+  if (unit.level !== 'team') expanded.add(unit.id);
+  state.orgExpandedUnitIds = [...expanded];
+
+  if (unit.level === 'division') {
+    state.selectedDivision = unit.id;
+    state.selectedHq = '';
+    state.selectedTeam = '';
+    state.orgSelectedTeamId = '';
+  } else if (unit.level === 'hq') {
+    state.selectedDivision = unit.parentId;
+    state.selectedHq = unit.id;
+    state.selectedTeam = '';
+    state.orgSelectedTeamId = '';
+  } else if (unit.level === 'team') {
+    const parent = (state.orgUnits || []).find((item) => item.id === unit.parentId);
+    state.selectedDivision = parent?.level === 'hq' ? parent.parentId : unit.parentId;
+    state.selectedHq = parent?.level === 'hq' ? parent.id : '';
+    state.selectedTeam = unit.id;
+    state.orgSelectedTeamId = unit.id;
+  }
+
+  state.orgSearchQuery = '';
+  saveState();
+  return unit;
+}
+
+export function focusOrgMember(memberId) {
+  const member = (state.orgMembers || []).find((item) => item.id === memberId);
+  if (!member) return null;
+  focusOrgUnit(member.parentId);
+  return member;
+}
+
 export function resetOrganizationData() {
   state.orgUnits = [];
   state.orgMembers = [];

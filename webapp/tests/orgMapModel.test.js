@@ -37,14 +37,29 @@ describe('org map model', () => {
     expect(result?.unitId).toBe('CUSTOMER_SOLUTION');
   });
 
-  it('does not display role-only values as member grades', () => {
+  it('displays the explicitly assigned hq leader grade and role', () => {
     const data = loadOrgData();
     const model = buildOrgMapModel(data.units, data.members);
     const member = model.memberById.get('person-CUSTOMER_SOLUTION-13');
     const result = searchOrgMap(model, '도기철').find((item) => item.kind === 'member');
 
-    expect(model.memberGrade(member)).toBe('직급 미지정');
-    expect(model.memberJobTitle(member)).toBe('고객솔루션본부 본부장');
-    expect(result?.meta).toBe('직급 미지정 · 고객솔루션본부 본부장');
+    expect(model.memberGrade(member)).toBe('이사');
+    expect(model.memberJobTitle(member, model.unitById.get(member.parentId))).toBe('본부장');
+    expect(result?.meta).toBe('이사 · 본부장');
+  });
+
+  it('does not treat all hq direct members as hq leaders', () => {
+    const data = loadOrgData();
+    const model = buildOrgMapModel(data.units, data.members);
+    const hq = model.unitById.get('CUSTOMER_SOLUTION');
+    const leader = model.leaderFor(hq);
+    const directMembers = model.directMembers('CUSTOMER_SOLUTION');
+    const nonLeaders = directMembers.filter((member) => member.id !== hq.leaderMemberId);
+
+    expect(leader?.name).toBe('도기철');
+    expect(leader?.grade).toBe('이사');
+    expect(leader?.jobTitle).toBe('본부장');
+    expect(nonLeaders.map((member) => member.name).sort()).toEqual(['김권수', '안병덕']);
+    expect(nonLeaders.map((member) => model.memberJobTitle(member, hq))).toEqual(['', '']);
   });
 });

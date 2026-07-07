@@ -18,4 +18,18 @@ describe('org map runtime wiring', () => {
     expect(layoutSource).toContain("'org-map'");
     expect(sidebarSource).toContain("['org-map', 'Org Map', '조직 지도']");
   });
+
+  it('wires org map management actions into the org editor page', () => {
+    const orgPageSource = readSource('../src/pages/OrgPage.jsx');
+    const orgMapSource = readSource('../src/pages/OrgMapPage.jsx');
+    const orgActionsSource = readSource('../src/org/orgActions.js');
+
+    expect(orgMapSource).toContain("navigate('/org', { state: { orgAction } })");
+    expect(orgMapSource).toContain('정보 수정 / 부서 이동');
+    expect(orgMapSource).toContain('수정/이동');
+    expect(orgPageSource).toContain('location.state?.orgAction');
+    expect(orgPageSource).toContain('focusOrgMember(action.id)');
+    expect(orgActionsSource).toContain('export function focusOrgUnit(unitId)');
+    expect(orgActionsSource).toContain('export function focusOrgMember(memberId)');
+  });
 });

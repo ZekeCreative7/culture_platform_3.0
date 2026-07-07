@@ -63,7 +63,7 @@ function TopUnitSection({ title, units, model, selectedUnitId, onSelect }) {
   );
 }
 
-function DirectMembers({ unit, model, selectedMemberId }) {
+function DirectMembers({ unit, model, selectedMemberId, onSelectMember }) {
   const members = model.directMembers(unit.id);
   if (!members.length) return null;
 
@@ -75,15 +75,17 @@ function DirectMembers({ unit, model, selectedMemberId }) {
       </div>
       <div className="org-map-member-chips">
         {members.map((member) => {
-          const memberMeta = [model.memberGrade(member), model.memberJobTitle(member)].filter(Boolean).join(' · ');
+          const memberMeta = [model.memberGrade(member), model.memberJobTitle(member, unit)].filter(Boolean).join(' · ');
           return (
-            <span
+            <button
+              type="button"
               key={member.id}
               className={`org-map-member-chip ${member.id === selectedMemberId ? 'is-selected' : ''}`}
+              onClick={() => onSelectMember(unit.id, member.id)}
             >
               <strong>{member.name}</strong>
               <small>{memberMeta}</small>
-            </span>
+            </button>
           );
         })}
       </div>
@@ -106,7 +108,7 @@ function TeamPill({ team, model, selected, onSelect }) {
   );
 }
 
-function BranchMap({ rootUnit, model, selectedUnitId, selectedMemberId, onSelect }) {
+function BranchMap({ rootUnit, model, selectedUnitId, selectedMemberId, onSelect, onSelectMember }) {
   if (!rootUnit) {
     return (
       <section className="panel org-map-branch">
@@ -130,7 +132,7 @@ function BranchMap({ rootUnit, model, selectedUnitId, selectedMemberId, onSelect
         <button type="button" className="ghost compact" onClick={() => onSelect(rootUnit.id)}>상세</button>
       </div>
 
-      <DirectMembers unit={rootUnit} model={model} selectedMemberId={selectedMemberId} />
+      <DirectMembers unit={rootUnit} model={model} selectedMemberId={selectedMemberId} onSelectMember={onSelectMember} />
 
       {childHqs.map((hq) => {
         const teams = model.childrenOf(hq.id, 'team');
@@ -147,7 +149,7 @@ function BranchMap({ rootUnit, model, selectedUnitId, selectedMemberId, onSelect
                 {leader?.name ? `${model.leaderRoleLabel(hq)} ${leader.name} · ` : ''}{teams.length}팀 · {stats.totalMemberCount}명
               </small>
             </button>
-            <DirectMembers unit={hq} model={model} selectedMemberId={selectedMemberId} />
+            <DirectMembers unit={hq} model={model} selectedMemberId={selectedMemberId} onSelectMember={onSelectMember} />
             <div className="org-map-team-grid">
               {teams.map((team) => (
                 <TeamPill
@@ -187,7 +189,7 @@ function BranchMap({ rootUnit, model, selectedUnitId, selectedMemberId, onSelect
   );
 }
 
-function DetailPanel({ unit, model, selectedMemberId }) {
+function DetailPanel({ unit, model, selectedMemberId, onManageUnit, onAddMember, onManageMember }) {
   if (!unit) return null;
 
   const stats = model.statsFor(unit.id);
@@ -199,9 +201,15 @@ function DetailPanel({ unit, model, selectedMemberId }) {
   return (
     <aside className="panel org-map-detail">
       <div className="org-map-detail-head">
-        <UnitBadge unit={unit} model={model} />
-        <h2>{unit.name}</h2>
-        <p>{model.pathLabel(unit.id)}</p>
+        <div>
+          <UnitBadge unit={unit} model={model} />
+          <h2>{unit.name}</h2>
+          <p>{model.pathLabel(unit.id)}</p>
+        </div>
+        <div className="org-map-detail-actions">
+          <button type="button" className="secondary compact" onClick={() => onManageUnit(unit.id)}>조직 설정</button>
+          <button type="button" className="ghost compact" onClick={() => onAddMember(unit.id)}>구성원 추가</button>
+        </div>
       </div>
 
       <div className="org-map-detail-metrics">
@@ -219,8 +227,11 @@ function DetailPanel({ unit, model, selectedMemberId }) {
         <div className="org-map-detail-section is-highlighted">
           <h3>검색한 구성원</h3>
           <p>
-            {highlightedMember.name} · {[model.memberGrade(highlightedMember), model.memberJobTitle(highlightedMember)].filter(Boolean).join(' · ')}
+            {highlightedMember.name} · {[model.memberGrade(highlightedMember), model.memberJobTitle(highlightedMember, unit)].filter(Boolean).join(' · ')}
           </p>
+          <button type="button" className="secondary compact" onClick={() => onManageMember(highlightedMember.id)}>
+            정보 수정 / 부서 이동
+          </button>
         </div>
       )}
 
@@ -249,10 +260,17 @@ function DetailPanel({ unit, model, selectedMemberId }) {
         {directMembers.length ? (
           <div className="org-map-detail-list">
             {directMembers.map((member) => (
-              <span key={member.id} className={member.id === selectedMemberId ? 'is-selected' : ''}>
-                {member.name}
-                <small>{model.memberGrade(member)}{model.memberJobTitle(member) ? ` · ${model.memberJobTitle(member)}` : ''}</small>
-              </span>
+              <div key={member.id} className={`org-map-detail-member ${member.id === selectedMemberId ? 'is-selected' : ''}`}>
+                <span>
+                  {member.name}
+                  <small>
+                    {[model.memberGrade(member), model.memberJobTitle(member, unit)].filter(Boolean).join(' · ')}
+                  </small>
+                </span>
+                <button type="button" className="ghost compact" onClick={() => onManageMember(member.id)}>
+                  수정/이동
+                </button>
+              </div>
             ))}
           </div>
         ) : (
@@ -263,7 +281,7 @@ function DetailPanel({ unit, model, selectedMemberId }) {
   );
 }
 
-function SearchResults({ results, onSelect }) {
+function SearchResults({ results, onSelect, onManage }) {
   if (!results.length) {
     return <div className="panel org-map-search-results"><div className="org-search-empty">검색 결과가 없습니다.</div></div>;
   }
@@ -272,19 +290,22 @@ function SearchResults({ results, onSelect }) {
     <section className="panel org-map-search-results">
       <div className="org-search-count">{results.length}개 결과</div>
       {results.map((result) => (
-        <button
+        <div
           key={`${result.kind}:${result.id}`}
-          type="button"
           className="org-map-search-item"
-          onClick={() => onSelect(result)}
         >
-          <span className="org-map-search-badge">{result.badge}</span>
-          <span>
-            <strong>{result.title}</strong>
-            <small>{result.meta}</small>
-            <em>{result.path}</em>
-          </span>
-        </button>
+          <button type="button" className="org-map-search-main" onClick={() => onSelect(result)}>
+            <span className="org-map-search-badge">{result.badge}</span>
+            <span>
+              <strong>{result.title}</strong>
+              <small>{result.meta}</small>
+              <em>{result.path}</em>
+            </span>
+          </button>
+          <button type="button" className="ghost compact" onClick={() => onManage(result)}>
+            {result.kind === 'member' ? '수정/이동' : '조직 설정'}
+          </button>
+        </div>
       ))}
     </section>
   );
@@ -326,6 +347,23 @@ export const OrgMapPage = memo(function OrgMapPage() {
     setSelectedMemberId(result.memberId || '');
   };
 
+  const handleSelectMember = (unitId, memberId) => {
+    setSelectedUnitId(unitId);
+    setSelectedMemberId(memberId);
+  };
+
+  const navigateToOrgAction = (orgAction) => {
+    navigate('/org', { state: { orgAction } });
+  };
+
+  const handleManageSearchResult = (result) => {
+    if (result.kind === 'member') {
+      navigateToOrgAction({ kind: 'member', mode: 'edit', id: result.memberId });
+      return;
+    }
+    navigateToOrgAction({ kind: 'unit', mode: 'edit', id: result.unitId });
+  };
+
   return (
     <>
       <section className="page-head org-map-page-head">
@@ -353,7 +391,7 @@ export const OrgMapPage = memo(function OrgMapPage() {
       </div>
 
       {query.trim() && (
-        <SearchResults results={searchResults} onSelect={handleSelectSearchResult} />
+        <SearchResults results={searchResults} onSelect={handleSelectSearchResult} onManage={handleManageSearchResult} />
       )}
 
       <div className="org-map-summary-strip">
@@ -363,20 +401,30 @@ export const OrgMapPage = memo(function OrgMapPage() {
         <Metric label="직속 인원" value={model.directNonTeamMembers.length} />
       </div>
 
-      <div className="org-map-lanes">
-        <TopUnitSection
-          title="CEO 직속 부문"
-          units={model.ceoDivisions}
+      <div className="org-map-top-workspace">
+        <div className="org-map-lanes">
+          <TopUnitSection
+            title="CEO 직속 부문"
+            units={model.ceoDivisions}
+            model={model}
+            selectedUnitId={rootUnit?.id || selectedUnitId}
+            onSelect={handleSelectUnit}
+          />
+          <TopUnitSection
+            title="CEO 직속 본부"
+            units={model.ceoHqs}
+            model={model}
+            selectedUnitId={rootUnit?.id || selectedUnitId}
+            onSelect={handleSelectUnit}
+          />
+        </div>
+        <DetailPanel
+          unit={selectedUnit}
           model={model}
-          selectedUnitId={rootUnit?.id || selectedUnitId}
-          onSelect={handleSelectUnit}
-        />
-        <TopUnitSection
-          title="CEO 직속 본부"
-          units={model.ceoHqs}
-          model={model}
-          selectedUnitId={rootUnit?.id || selectedUnitId}
-          onSelect={handleSelectUnit}
+          selectedMemberId={selectedMemberId}
+          onManageUnit={(unitId) => navigateToOrgAction({ kind: 'unit', mode: 'edit', id: unitId })}
+          onAddMember={(unitId) => navigateToOrgAction({ kind: 'member', mode: 'add', parentId: unitId })}
+          onManageMember={(memberId) => navigateToOrgAction({ kind: 'member', mode: 'edit', id: memberId })}
         />
       </div>
 
@@ -387,8 +435,8 @@ export const OrgMapPage = memo(function OrgMapPage() {
           selectedUnitId={selectedUnitId}
           selectedMemberId={selectedMemberId}
           onSelect={handleSelectUnit}
+          onSelectMember={handleSelectMember}
         />
-        <DetailPanel unit={selectedUnit} model={model} selectedMemberId={selectedMemberId} />
       </div>
     </>
   );

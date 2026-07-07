@@ -686,7 +686,7 @@ function MemberEditor({ editor, units, members, onClose }) {
                 className="input-text"
               />
             </label>
-            <label>소속 부서
+            <label>{isEdit ? '소속 부서 / 부서 이동' : '소속 부서'}
               <select
                 value={selectedParentId}
                 onChange={(e) => setSelectedParentId(e.target.value)}

@@ -103,6 +103,24 @@ describe("Report runtime wiring", () => {
     expect(qualSignalsSource).not.toContain("window.openQualAnalysisModal");
   });
 
+  it("keeps Report qualitative signals responsive on mobile", () => {
+    const reportQualSignalsComponentSource = readFileSync(new URL("../src/report/ReportQualSignals.jsx", import.meta.url), "utf8");
+    const qualSignalPanelSource = readFileSync(new URL("../src/qual/qual-signal-panel.js", import.meta.url), "utf8");
+    const stylesSource = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+
+    expect(reportQualSignalsComponentSource).toContain('className="report-qual-signals-grid"');
+    expect(qualSignalPanelSource).toContain('class="qual-signal-card"');
+    expect(qualSignalPanelSource).toContain('class="qual-signal-meta"');
+    expect(qualSignalPanelSource).toContain('class="qual-axis-strip"');
+    expect(qualSignalPanelSource).toContain('class="qual-axis-item"');
+    expect(stylesSource).toContain(".report-qual-signals-grid");
+    expect(stylesSource).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(stylesSource).toContain("@media (max-width: 900px)");
+    expect(stylesSource).toContain(".report-qual-signals-grid { grid-template-columns: 1fr; }");
+    expect(stylesSource).toContain("@media (max-width: 480px)");
+    expect(stylesSource).toContain(".qual-axis-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }");
+  });
+
   it("wires new native React components for Executive Summary, Outcome Story, Pulse Insight, Compare Summary Cards, Dimension Cards, Recommendations, Change Analysis, Qualitative Signals, and Compare Ranking Table", () => {
     const pageSource = readFileSync(new URL("../src/pages/ReportPage.jsx", import.meta.url), "utf8");
     const bridgeSource = readFileSync(new URL("../src/report/reportHtmlBridge.js", import.meta.url), "utf8");

@@ -2083,6 +2083,31 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 .qual-group-head { display: flex; align-items: center; gap: 8px; }
 .qual-group-head strong { color: var(--ink); font-size: var(--fs-card-title); font-weight: 800; }
 .qual-group-head span { color: var(--faint); font-size: var(--fs-caption); font-weight: 700; }
+.report-qual-signals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.qual-phase-col,
+.qual-signal-card {
+  min-width: 0;
+  max-width: 100%;
+}
+.qual-signal-meta {
+  flex-wrap: wrap;
+}
+.qual-signal-card,
+.qual-signal-card * {
+  overflow-wrap: anywhere;
+}
+.qual-axis-strip {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px !important;
+}
+.qual-axis-item {
+  min-width: 0 !important;
+}
 
 .executive { padding: 28px; }
 .report-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; margin-bottom: 20px; }
@@ -2396,11 +2421,13 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
   .report-export-header { align-items: flex-start; }
   .report-export-actions { width: 100%; max-width: 390px; }
   .report-export-button { min-width: 0; width: 100%; }
+  .report-qual-signals-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
   .report-export-actions { grid-template-columns: 1fr; max-width: none; }
   .report-export-button { min-height: 54px; }
+  .qual-axis-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media print {

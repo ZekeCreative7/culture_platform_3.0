@@ -24,14 +24,14 @@ export function renderQualSignalPanel(mount, { qualSignal }) {
     const axisStrip = AXIS_KEYS.map(k => {
       const a = qs.axis_signals?.[k] || { mentioned: false };
       if (!a.mentioned) {
-        return `<div style="flex:1;min-width:0;text-align:center">
+        return `<div class="qual-axis-item" style="flex:1;min-width:0;text-align:center">
           <div style="height:34px;border-radius:6px;background:var(--color-background-secondary,#f0f0f0);
             display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--color-text-tertiary)">미언급</div>
           <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">${AXIS_LABEL[k]}</div></div>`;
       }
       const color = DIR_COLOR[a.direction] || 'var(--provenance-masked)';
       const op = STRENGTH_OPACITY[a.strength] || '0.5';
-      return `<div style="flex:1;min-width:0;text-align:center" title="${escapeAttr(a.evidence_quote || '')}">
+      return `<div class="qual-axis-item" style="flex:1;min-width:0;text-align:center" title="${escapeAttr(a.evidence_quote || '')}">
         <div style="height:34px;border-radius:6px;background:${color};opacity:${op};
           display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff">${a.strength}</div>
         <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px">${AXIS_LABEL[k]}</div></div>`;
@@ -59,8 +59,8 @@ export function renderQualSignalPanel(mount, { qualSignal }) {
     const when = (qs.analysis_meta?.analyzed_at || '').slice(0, 10);
 
     mount.innerHTML = `
-    <div style="border:0.5px solid var(--color-border-tertiary,#ddd);border-radius:12px;padding:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <div class="qual-signal-card" style="border:0.5px solid var(--color-border-tertiary,#ddd);border-radius:12px;padding:16px">
+      <div class="qual-signal-meta" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
         <span style="font-size:12px;padding:3px 8px;border-radius:6px;background:var(--provenance-masked,#888);color:#fff">AI 정성 분석 · 측정값 아님 · 참고</span>
         <span style="font-size:12px;color:var(--color-text-tertiary)">${escapeHtml(qs.team_id)} · 응답 ${qs.analyzed_n} · ${when}</span>
       </div>
@@ -72,7 +72,7 @@ export function renderQualSignalPanel(mount, { qualSignal }) {
       <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">긍정 ${tone.positive} · 중립 ${tone.neutral} · 부정 ${tone.negative}</div>
 
       <div style="font-size:13px;font-weight:500;margin:16px 0 6px">6축 신호 <span style="font-weight:400;color:var(--color-text-tertiary);font-size:12px">(점수 아님 · 색=방향 · 농도=강도)</span></div>
-      <div style="display:flex;gap:6px">${axisStrip}</div>
+      <div class="qual-axis-strip" style="display:flex;gap:6px">${axisStrip}</div>
 
       <div style="font-size:13px;font-weight:500;margin:16px 0 4px">테마</div>
       ${themes || '<div style="font-size:13px;color:var(--color-text-tertiary)">테마 없음</div>'}

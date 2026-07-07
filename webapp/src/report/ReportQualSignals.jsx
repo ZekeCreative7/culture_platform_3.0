@@ -50,7 +50,7 @@ export function ReportQualSignals({ session }) {
         <span>사전 / 사후 주관식 텍스트 AI 분석 (키워드/테마/대표발언)</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+      <div className="report-qual-signals-grid">
         {/* Pre Qual */}
         <div className="qual-phase-col">
           <h3 style={{ fontSize: '13.5px', fontWeight: 800, color: '#475569', borderBottom: '1.5px solid #cbd5e1', paddingBottom: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>

@@ -401,23 +401,35 @@ export const OrgMapPage = memo(function OrgMapPage() {
         <Metric label="직속 인원" value={model.directNonTeamMembers.length} />
       </div>
 
-      <div className="org-map-top-workspace">
-        <div className="org-map-lanes">
-          <TopUnitSection
-            title="CEO 직속 부문"
-            units={model.ceoDivisions}
+      <div className="org-map-main-workspace">
+        <div className="org-map-left-rail">
+          <div className="org-map-lanes">
+            <TopUnitSection
+              title="CEO 직속 부문"
+              units={model.ceoDivisions}
+              model={model}
+              selectedUnitId={rootUnit?.id || selectedUnitId}
+              onSelect={handleSelectUnit}
+            />
+            <TopUnitSection
+              title="CEO 직속 본부"
+              units={model.ceoHqs}
+              model={model}
+              selectedUnitId={rootUnit?.id || selectedUnitId}
+              onSelect={handleSelectUnit}
+            />
+          </div>
+
+          <BranchMap
+            rootUnit={rootUnit}
             model={model}
-            selectedUnitId={rootUnit?.id || selectedUnitId}
+            selectedUnitId={selectedUnitId}
+            selectedMemberId={selectedMemberId}
             onSelect={handleSelectUnit}
-          />
-          <TopUnitSection
-            title="CEO 직속 본부"
-            units={model.ceoHqs}
-            model={model}
-            selectedUnitId={rootUnit?.id || selectedUnitId}
-            onSelect={handleSelectUnit}
+            onSelectMember={handleSelectMember}
           />
         </div>
+
         <DetailPanel
           unit={selectedUnit}
           model={model}
@@ -425,17 +437,6 @@ export const OrgMapPage = memo(function OrgMapPage() {
           onManageUnit={(unitId) => navigateToOrgAction({ kind: 'unit', mode: 'edit', id: unitId })}
           onAddMember={(unitId) => navigateToOrgAction({ kind: 'member', mode: 'add', parentId: unitId })}
           onManageMember={(memberId) => navigateToOrgAction({ kind: 'member', mode: 'edit', id: memberId })}
-        />
-      </div>
-
-      <div className="org-map-workspace">
-        <BranchMap
-          rootUnit={rootUnit}
-          model={model}
-          selectedUnitId={selectedUnitId}
-          selectedMemberId={selectedMemberId}
-          onSelect={handleSelectUnit}
-          onSelectMember={handleSelectMember}
         />
       </div>
     </>

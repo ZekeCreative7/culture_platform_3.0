@@ -27,6 +27,8 @@ describe('org map runtime wiring', () => {
     expect(orgMapSource).toContain("navigate('/org', { state: { orgAction } })");
     expect(orgMapSource).toContain('정보 수정 / 부서 이동');
     expect(orgMapSource).toContain('수정/이동');
+    expect(orgMapSource).toContain('org-map-main-workspace');
+    expect(orgMapSource).toContain('org-map-left-rail');
     expect(orgPageSource).toContain('location.state?.orgAction');
     expect(orgPageSource).toContain('focusOrgMember(action.id)');
     expect(orgActionsSource).toContain('export function focusOrgUnit(unitId)');

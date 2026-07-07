@@ -7343,12 +7343,18 @@ button.disabled { opacity: .45; pointer-events: none; }
   gap: 14px;
 }
 
-.org-map-top-workspace {
+.org-map-main-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   gap: 16px;
   align-items: start;
   margin-bottom: 16px;
+}
+
+.org-map-left-rail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
 
 .org-map-lane {
@@ -7469,12 +7475,6 @@ button.disabled { opacity: .45; pointer-events: none; }
   font-size: 12px;
   line-height: 1.35;
   color: var(--text-secondary);
-}
-
-.org-map-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
 }
 
 .org-map-branch,
@@ -7814,8 +7814,7 @@ button.disabled { opacity: .45; pointer-events: none; }
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .org-map-top-workspace,
-  .org-map-workspace {
+  .org-map-main-workspace {
     grid-template-columns: 1fr;
   }
 

@@ -12,6 +12,7 @@ function lazyNamed(loader, exportName) {
 const DashboardPage = lazyNamed(() => import('./pages/DashboardPage.jsx'), 'DashboardPage');
 const SessionsPage = lazyNamed(() => import('./pages/SessionsPage.jsx'), 'SessionsPage');
 const OrgPage = lazyNamed(() => import('./pages/OrgPage.jsx'), 'OrgPage');
+const OrgMapPage = lazyNamed(() => import('./pages/OrgMapPage.jsx'), 'OrgMapPage');
 const UploadPage = lazyNamed(() => import('./pages/UploadPage.jsx'), 'UploadPage');
 const AnalyticsPage = lazyNamed(() => import('./pages/AnalyticsPage.jsx'), 'AnalyticsPage');
 const ReportPage = lazyNamed(() => import('./pages/ReportPage.jsx'), 'ReportPage');
@@ -70,6 +71,7 @@ function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/sessions" element={<SessionsPage />} />
                 <Route path="/org" element={<OrgPage />} />
+                <Route path="/org-map" element={<OrgMapPage />} />
                 <Route path="/upload" element={<UploadPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/report" element={<ReportPage />} />

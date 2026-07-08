@@ -3,7 +3,7 @@ import { REPORT_DIMS, dimAvg, ragInfo } from '../views/report.js';
 import { sessionLabel } from '../utils.js';
 
 export function ExecSummaryPanel({ session, diagnosis }) {
-  const hasDiagnosisData = Boolean(diagnosis?.n >= 1);
+  const hasDiagnosisData = Boolean(diagnosis?.n >= 3);
   if (!hasDiagnosisData || !session) return null;
 
   const scores = REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs) })).filter(d => d.score !== null).sort((a,b) => a.score - b.score);

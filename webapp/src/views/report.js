@@ -706,12 +706,12 @@ export function renderCompareReport(type, cohort, options = {}) {
     const mid = stats.find(s => s.phase === '중간') || null;
     const post = stats.find(s => s.phase === '사후') || null;
     
-    const diagnosis = (post && post.n >= 1) ? post : ((mid && mid.n >= 1) ? mid : ((pre && pre.n >= 1) ? pre : null));
-    
+    const diagnosis = (post && post.n >= 3) ? post : ((mid && mid.n >= 3) ? mid : ((pre && pre.n >= 3) ? pre : null));
+
     if (!diagnosis) {
       return { session, hasData: false, overall: null };
     }
-    
+
     const psych = dimAvg(diagnosis, ['q1', 'q2', 'q3']);
     const silo = dimAvg(diagnosis, ['q4', 'q5', 'q6']);
     const resilience = dimAvg(diagnosis, ['q7']);
@@ -913,7 +913,7 @@ export function getReportMetadata() {
     const sPre = sStats.find(x => x.phase === '사전') || null;
     const sMid = sStats.find(x => x.phase === '중간') || null;
     const sPost = sStats.find(x => x.phase === '사후') || null;
-    const sDiagnosis = (sPost && sPost.n >= 1) ? sPost : ((sMid && sMid.n >= 1) ? sMid : ((sPre && sPre.n >= 1) ? sPre : null));
+    const sDiagnosis = (sPost && sPost.n >= 3) ? sPost : ((sMid && sMid.n >= 3) ? sMid : ((sPre && sPre.n >= 3) ? sPre : null));
     
     if (!sDiagnosis) {
       return { session: s, hasData: false, overall: null };
@@ -1023,7 +1023,8 @@ export function renderReport(options = {}) {
   
   const diagnosis = hasPostData ? post : (mid?.n >= 1 ? mid : (hasPreData ? pre : null));
   const diagnosisPhase = diagnosis?.phase || '사전';
-  const hasDiagnosisData = Boolean(diagnosis?.n >= 1);
+  const hasDiagnosisData = Boolean(diagnosis?.n >= 3);
+  const isDiagnosisMasked = Boolean(diagnosis && diagnosis.n > 0 && diagnosis.n < 3);
   const diagnosisTarget = session ? targetCountForSession(session) : 0;
   const diagnosisResponseRate = diagnosis && diagnosisTarget ? Math.round((diagnosis.n / diagnosisTarget) * 100) : null;
   const pulseSessionInsight = session
@@ -1111,12 +1112,12 @@ export function renderReport(options = {}) {
         <h2>① 현 상황 진단</h2>
         <span>${diagnosisPhase} 설문 기준 · ${session ? escapeHtml(sessionLabel(session)) : `${sessionTypeLabel(type)} · ${yearForCohortType(cohort, type) ? yearForCohortType(cohort, type) + '년 ' : ''}${cohort}기`} · N=${diagnosis ? diagnosis.n : 0}${diagnosisResponseRate !== null ? ` (응답률 ${diagnosisResponseRate}%)` : ''}</span>
       </div>
-      ${!hasDiagnosisData ? `<div class="empty">진단에 사용할 설문 응답이 없습니다.</div>` : `
+      ${!hasDiagnosisData ? `<div class="empty">${isDiagnosisMasked ? `${lockSvg} 익명 보호를 위해 N&lt;3인 응답은 진단 결과로 표시되지 않습니다.` : '진단에 사용할 설문 응답이 없습니다.'}</div>` : `
       <div class="report-diagnosis-grid">
         <!-- Radar Chart Overlay (Pre vs Post) -->
         <div class="report-radar-card" style="position:relative;">
           <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px;">4대 영역 변화 추이 (Pre vs Post)</div>
-          ${hasPreData && hasPostData 
+          ${pre?.n >= 3 && post?.n >= 3
             ? renderCompareRadarChart(
                 REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(pre, d.qs) })),
                 REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(post, d.qs) }))
@@ -1124,7 +1125,7 @@ export function renderReport(options = {}) {
             : renderRadarChart(REPORT_DIMS.map(d => ({ label: d.label, score: dimAvg(diagnosis, d.qs), color: d.color, singleItem: d.qs.length === 1 })))
           }
           <div style="font-size:10.5px; color:#94a3b8; text-align:center; line-height:1.5; margin-top:8px;">
-            ${hasPreData && hasPostData ? '점선: 사전 진단 점수 | 실선: 사후 진단 점수' : `${diagnosisPhase} 설문 · N=${diagnosis.n}`}
+            ${pre?.n >= 3 && post?.n >= 3 ? '점선: 사전 진단 점수 | 실선: 사후 진단 점수' : `${diagnosisPhase} 설문 · N=${diagnosis.n}`}
           </div>
         </div>
         <!-- Dimension Score Cards -->
@@ -1189,7 +1190,7 @@ export function renderReport(options = {}) {
         <h2>② 세션 운영 제안</h2>
         <span>${diagnosisPhase} 진단 기반 퍼실리테이션 가이드</span>
       </div>
-      ${!hasDiagnosisData ? `<div class="empty">설문 데이터가 있어야 제안을 생성할 수 있습니다.</div>` : `
+      ${!hasDiagnosisData ? `<div class="empty">${isDiagnosisMasked ? `${lockSvg} 익명 보호를 위해 N&lt;3인 응답에는 제안을 생성하지 않습니다.` : '설문 데이터가 있어야 제안을 생성할 수 있습니다.'}</div>` : `
       <div style="display:flex; flex-direction:column; gap:12px;">
         ${REPORT_DIMS.map((dim, idx) => {
           const score = dimAvg(diagnosis, dim.qs);

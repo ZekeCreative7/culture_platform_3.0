@@ -48,7 +48,7 @@ export function buildReportExportPayload() {
   const mid = stats.find((item) => item.phase === '중간') || null;
   const post = stats.find((item) => item.phase === '사후') || null;
   const followup = stats.find((item) => item.phase === '팔로우업') || null;
-  const current = post?.n ? post : (mid?.n ? mid : pre);
+  const current = post?.n >= 3 ? post : (mid?.n >= 3 ? mid : (pre?.n >= 3 ? pre : null));
   const analysis = REPORT_DIMS.map((dimension) => {
     const currentScore = current ? dimAvg(current, dimension.qs) : null;
     const preScore = pre?.n >= 3 ? dimAvg(pre, dimension.qs) : null;

@@ -202,17 +202,10 @@ export function pulseDiagnostics(currentDoc, previousDoc) {
     const z = companySd ? (row.overall - companyMean) / companySd : 0;
     row.z = z;
     
-    let isOutlier = row.status !== "masked"
+    const isOutlier = row.status !== "masked"
       && row.overall !== null
       && (row.share5 >= OUTLIER.share5Max || (z >= OUTLIER.zMax && row.unfavAvg <= OUTLIER.unfavFloor));
-      
-    if (row.id === "고객혁신본부CE") {
-      isOutlier = true;
-    }
-    if (row.id === "고객혁신본부본사") {
-      isOutlier = false;
-    }
-    
+
     row.flags.outlier = isOutlier;
   });
 

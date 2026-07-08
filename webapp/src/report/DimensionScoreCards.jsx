@@ -2,9 +2,14 @@ import React from 'react';
 import { REPORT_DIMS, dimAvg, dimSpread, ragInfo } from '../views/report.js';
 
 export function DimensionScoreCards({ session, diagnosis, diagnosisPhase }) {
-  const hasDiagnosisData = Boolean(diagnosis?.n >= 1);
+  const hasDiagnosisData = Boolean(diagnosis?.n >= 3);
   if (!hasDiagnosisData) {
-    return <div className="empty">진단에 사용할 설문 응답이 없습니다.</div>;
+    const isDiagnosisMasked = Boolean(diagnosis && diagnosis.n > 0 && diagnosis.n < 3);
+    return (
+      <div className="empty">
+        {isDiagnosisMasked ? '익명 보호를 위해 N<3인 응답은 진단 결과로 표시되지 않습니다.' : '진단에 사용할 설문 응답이 없습니다.'}
+      </div>
+    );
   }
 
   const sessionId = session?.id || "";

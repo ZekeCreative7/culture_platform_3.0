@@ -1,13 +1,23 @@
 import { state, saveState, saveSessionToFirestore, subscribeResponsesFromFirestore } from '../state.js';
 import { normalizeSessionType, sameSessionType, makeSchedule, sessionTypeDef, uid } from '../utils.js';
 import { syncDraftOrgFromTeam } from '../views/org.js';
-import { selectedCrossMembers, resetCrossDraft, canCreateDraftSession } from '../views/sessions.js';
+import { selectedCrossMembers, resetCrossDraft, selectedCustomMembers, resetCustomScopeDraft, canCreateDraftSession } from '../views/sessions.js';
 
 export function updateSessionType(value) {
   state.draftType = normalizeSessionType(value);
   state.draftSchedule = makeSchedule(state.draftType);
   if (!sameSessionType(state.draftType, '협업')) {
     resetCrossDraft();
+  }
+  if (!sameSessionType(state.draftType, '커스텀') && !sameSessionType(state.draftType, '운영 서베이')) {
+    resetCustomScopeDraft();
+  }
+  if (sameSessionType(state.draftType, '운영 서베이')) {
+    // 운영 서베이는 기수(시간 배치) 대신 주제로 묶이므로 기수 입력을 숨기고
+    // 기존 cohort 기반 파이프라인이 깨지지 않도록 값만 고정해 둔다.
+    state.draftCohort = 1;
+  } else {
+    state.draftSubject = '';
   }
   saveState();
 }
@@ -73,6 +83,27 @@ export function createOrUpdateSession() {
         });
         state.draftCrossMemberIds = [];
         state.draftCrossTeamIds = [];
+      } else if (type === '커스텀') {
+        const scope = state.draftAudienceScope;
+        const members = scope === '전사' ? [] : selectedCustomMembers();
+        Object.assign(updatedSession, {
+          audienceScope: scope,
+          sourceTeamIds: scope === '팀별' ? [...state.draftCustomTeamIds] : [],
+          participatingTeams: scope === '전사' ? '전사' : [...new Set(members.map((m) => m.teamName))].join(', '),
+          members: members.map((m) => ({ id: m.id, memberId: m.memberId, name: m.name, position: m.position, teamId: m.teamId, teamName: m.teamName, divisionName: m.divisionName, hqName: m.hqName })),
+        });
+        resetCustomScopeDraft();
+      } else if (type === '운영 서베이') {
+        const scope = state.draftAudienceScope;
+        const members = scope === '전사' ? [] : selectedCustomMembers();
+        Object.assign(updatedSession, {
+          subject: state.draftSubject,
+          audienceScope: scope,
+          sourceTeamIds: scope === '팀별' ? [...state.draftCustomTeamIds] : [],
+          participatingTeams: scope === '전사' ? '전사' : [...new Set(members.map((m) => m.teamName))].join(', '),
+          members: members.map((m) => ({ id: m.id, memberId: m.memberId, name: m.name, position: m.position, teamId: m.teamId, teamName: m.teamName, divisionName: m.divisionName, hqName: m.hqName })),
+        });
+        resetCustomScopeDraft();
       }
 
       state.sessions[idx] = updatedSession;
@@ -91,6 +122,8 @@ export function createOrUpdateSession() {
     if (!sameSessionType(s.type, type) || Number(s.cohort) !== Number(cohort)) return false;
     if (type === '팀빌딩') return s.teamId === state.draftTeamId;
     if (type === '협업') return s.sourceMode === state.draftCrossMode;
+    if (type === '커스텀') return s.audienceScope === state.draftAudienceScope;
+    if (type === '운영 서베이') return s.subject === state.draftSubject && s.audienceScope === state.draftAudienceScope;
     return true; // 리더십: one group per cohort
   });
   if (duplicate) {
@@ -166,6 +199,45 @@ export function createOrUpdateSession() {
     });
     state.draftCrossMemberIds = [];
     state.draftCrossTeamIds = [];
+  } else if (type === '커스텀') {
+    const scope = state.draftAudienceScope;
+    const members = scope === '전사' ? [] : selectedCustomMembers();
+    Object.assign(session, {
+      audienceScope: scope,
+      sourceTeamIds: scope === '팀별' ? [...state.draftCustomTeamIds] : [],
+      participatingTeams: scope === '전사' ? '전사' : [...new Set(members.map((member) => member.teamName))].join(', '),
+      members: members.map((member) => ({
+        id: member.id,
+        memberId: member.memberId,
+        name: member.name,
+        position: member.position,
+        teamId: member.teamId,
+        teamName: member.teamName,
+        divisionName: member.divisionName,
+        hqName: member.hqName,
+      })),
+    });
+    resetCustomScopeDraft();
+  } else if (type === '운영 서베이') {
+    const scope = state.draftAudienceScope;
+    const members = scope === '전사' ? [] : selectedCustomMembers();
+    Object.assign(session, {
+      subject: state.draftSubject,
+      audienceScope: scope,
+      sourceTeamIds: scope === '팀별' ? [...state.draftCustomTeamIds] : [],
+      participatingTeams: scope === '전사' ? '전사' : [...new Set(members.map((member) => member.teamName))].join(', '),
+      members: members.map((member) => ({
+        id: member.id,
+        memberId: member.memberId,
+        name: member.name,
+        position: member.position,
+        teamId: member.teamId,
+        teamName: member.teamName,
+        divisionName: member.divisionName,
+        hqName: member.hqName,
+      })),
+    });
+    resetCustomScopeDraft();
   }
 
   state.sessions.unshift(session);

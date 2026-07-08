@@ -14,6 +14,10 @@ import { ReportRecommendations } from '../report/ReportRecommendations.jsx';
 import { ReportChangeAnalysis } from '../report/ReportChangeAnalysis.jsx';
 import { ReportQualSignals } from '../report/ReportQualSignals.jsx';
 import { CompareRankingTable } from '../report/CompareRankingTable.jsx';
+import { OperationalQuestionResultsPanel } from '../report/OperationalQuestionResultsPanel.jsx';
+import { OperationalDistributionPanel } from '../report/OperationalDistributionPanel.jsx';
+import { OperationalAnalysisPanel } from '../report/OperationalAnalysisPanel.jsx';
+import { OperationalCompareTable } from '../report/OperationalCompareTable.jsx';
 
 export const ReportPage = memo(function ReportPage() {
   const store = useAppStore();
@@ -30,7 +34,10 @@ export const ReportPage = memo(function ReportPage() {
     function refresh() {
       const meta = getReactReportMetadata();
       setMetadata(meta);
-      setReportBodyHtml(renderReactReportBodyHtml());
+      // 운영 서베이는 REPORT_DIMS(문화 4차원) 전제인 HTML 본문을 쓰지 않는다 — 빈 값으로
+      // 두면 그 안의 문화 전용 플레이스홀더(dim/recs/change/qual/compareRanking)도
+      // 자연히 안 잡혀서 아래 각 createPortal이 개별 분기 없이도 no-op된다.
+      setReportBodyHtml(meta?.type === '운영 서베이' ? '' : renderReactReportBodyHtml());
     }
     refresh();
     let timer = null;
@@ -54,7 +61,19 @@ export const ReportPage = memo(function ReportPage() {
       <ReportControls />
       <ReportExportShell>
 
-        {metadata && vanillaState.selectedReportSessionId !== 'all' && (
+        {metadata && metadata.type === '운영 서베이' && vanillaState.selectedReportSessionId !== 'all' && (
+          <>
+            <OperationalQuestionResultsPanel session={metadata.session} />
+            <OperationalDistributionPanel session={metadata.session} />
+            <OperationalAnalysisPanel session={metadata.session} />
+          </>
+        )}
+
+        {metadata && metadata.type === '운영 서베이' && vanillaState.selectedReportSessionId === 'all' && metadata.cohort && (
+          <OperationalCompareTable sessions={metadata.sessions} />
+        )}
+
+        {metadata && metadata.type !== '운영 서베이' && vanillaState.selectedReportSessionId !== 'all' && (
           <>
             <ExecSummaryPanel session={metadata.session} diagnosis={metadata.diagnosis} />
             <OutcomeStoryPanel story={metadata.outcomeStory} />
@@ -62,7 +81,7 @@ export const ReportPage = memo(function ReportPage() {
           </>
         )}
 
-        {metadata && vanillaState.selectedReportSessionId === 'all' && metadata.cohort && (
+        {metadata && metadata.type !== '운영 서베이' && vanillaState.selectedReportSessionId === 'all' && metadata.cohort && (
           <CompareSummaryCards
             sessionsCount={metadata.sessions.length}
             rankedSessionsCount={metadata.rankedSessions.length}
@@ -92,6 +111,7 @@ export const ReportPage = memo(function ReportPage() {
             hasPreData={metadata.hasPreData}
             hasPostData={metadata.hasPostData}
             hasFollowupData={metadata.hasFollowupData}
+            isChangeExcluded={metadata.isChangeExcluded}
           />,
           changePlaceholderEl
         )}

@@ -31,6 +31,8 @@ export function startEditSession(id) {
   state.draftMembers = session.members || [];
   state.draftLeaderGroup = session.leaderGroup || [];
   state.draftCrossTeams = session.crossTeams || [];
+  state.draftAudienceScope = session.audienceScope || '팀별';
+  state.draftSubject = session.subject || '';
   saveState();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }

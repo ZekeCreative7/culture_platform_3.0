@@ -1,4 +1,4 @@
-export const PHASES = ["사전", "사후", "팔로우업", "타운홀피드백"];
+export const PHASES = ["사전", "사후", "팔로우업", "타운홀피드백", "실시"];
 
 export const QUANT_LABELS = {
   q1: "심리안전 1",
@@ -71,6 +71,14 @@ export const SESSION_TYPES = {
     desc: "자유롭게 구성하는 커스텀 세션입니다.",
     template: [{ content: "커스텀 회차", roundType: "기타" }],
     duration: 60,
+  },
+  "운영 서베이": {
+    english: "Operational Survey",
+    weeks: 1,
+    accent: "#ff375f",
+    desc: "안전·시설 등 조직문화 밖 주제의 단발 운영 서베이입니다.",
+    template: [{ content: "운영 서베이 실시", roundType: "기타" }],
+    duration: 30,
   },
 };
 
@@ -175,6 +183,10 @@ export const sessionTypeLabel = (value) => {
 export const sessionTypeDef = (value) => SESSION_TYPES[normalizeSessionType(value)] || SESSION_TYPES.리더십;
 
 export const sameSessionType = (a, b) => normalizeSessionType(a) === normalizeSessionType(b);
+
+// 세션 타입에서 파생되는 분석 렌즈. '조직문화'는 REPORT_DIMS(q1~q8 고정 4차원) 리포트를,
+// '범용'은 문항별 결과·분포도·자유 텍스트 분석 붙여넣기 리포트를 쓴다.
+export const instrumentForType = (value) => (normalizeSessionType(value) === "운영 서베이" ? "범용" : "조직문화");
 
 export const normalizePosition = (value, fallback = "Specialist") => {
   const clean = String(value || "").trim();
@@ -343,6 +355,7 @@ export function sessionLabel(session) {
   if (!session) return "";
   const type = normalizeSessionType(session.type);
   if (type === "팀빌딩") return `${session.team || "팀 미지정"}(${sessionYear(session)})`;
+  if (type === "운영 서베이") return `${session.subject || "주제 미지정"} · ${session.participatingTeams || "대상 미지정"}`;
   return cohortPrefix(session);
 }
 
@@ -400,8 +413,17 @@ export function maskIfSmall(n, value) {
 
 export const lockSvg = `<svg viewBox="0 0 24 24" width="11" height="11" style="fill:currentColor; display:inline-block; vertical-align:middle; margin-right:2px;"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>`;
 
+// 전사 스코프(커스텀 세션)는 명단을 저장하지 않고 조직 전체 인원을 그때그때 세어
+// 보여주기로 했기 때문에, org.js가 회원 풀을 계산하는 방법을 여기 등록해 둔다.
+// (utils.js는 views/org.js가 이미 이 파일을 참조하고 있어 직접 import할 수 없다.)
+let orgHeadcountProvider = () => 0;
+export function setOrgHeadcountProvider(fn) {
+  if (typeof fn === "function") orgHeadcountProvider = fn;
+}
+
 export function targetCountForSession(session) {
   if (!session) return 0;
+  if (session.audienceScope === "전사") return orgHeadcountProvider();
   if (Array.isArray(session.members) && session.members.length) return session.members.length;
   if (Array.isArray(session.leaderGroup) && session.leaderGroup.length) return session.leaderGroup.length;
   return 0;

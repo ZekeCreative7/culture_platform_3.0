@@ -21,8 +21,14 @@ function EventPill({ session, item }) {
   const type = normalizeSessionType(session.type);
   const accent = sessionTypeDef(type).accent;
   const label = type === '팀빌딩' ? session.team : sessionLabel(session);
+  const attendanceDisabled = session.audienceScope === '전사';
   return (
-    <div className="calendar-event-pill" style={{ '--accent': accent }} onClick={() => openAttendance(session.id, item.id)}>
+    <div
+      className="calendar-event-pill"
+      style={{ '--accent': accent, cursor: attendanceDisabled ? 'default' : 'pointer' }}
+      title={attendanceDisabled ? '전사 스코프는 명단이 없어 출석 체크를 지원하지 않습니다.' : undefined}
+      onClick={() => { if (!attendanceDisabled) openAttendance(session.id, item.id); }}
+    >
       <strong>{item.seq}회</strong> {label}
     </div>
   );
@@ -102,8 +108,15 @@ function DayCalendar({ baseDate }) {
           const type = normalizeSessionType(session.type);
           const accent = sessionTypeDef(type).accent;
           const label = type === '팀빌딩' ? session.team : sessionLabel(session);
+          const attendanceDisabled = session.audienceScope === '전사';
           return (
-            <div className="day-event-card" style={{ borderLeftColor: accent }} onClick={() => openAttendance(session.id, item.id)} key={item.id}>
+            <div
+              className="day-event-card"
+              style={{ borderLeftColor: accent, cursor: attendanceDisabled ? 'default' : 'pointer' }}
+              title={attendanceDisabled ? '전사 스코프는 명단이 없어 출석 체크를 지원하지 않습니다.' : undefined}
+              onClick={() => { if (!attendanceDisabled) openAttendance(session.id, item.id); }}
+              key={item.id}
+            >
               <div className="time">{item.startTime || '시간 미정'} ({item.duration || 0}분)</div>
               <h3><strong>{item.seq}회차</strong> · {label}</h3>
               <p>{item.content || '세션 내용 없음'}</p>

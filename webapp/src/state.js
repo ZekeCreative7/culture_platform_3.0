@@ -216,6 +216,11 @@ export const blankState = () => ({
   draftCrossTeamIds: [],
   draftCrossMemberIds: [],
   draftCrossRandomCount: 6,
+  draftAudienceScope: "팀별",
+  draftCustomTeamIds: [],
+  draftCustomMemberIds: [],
+  draftCustomRandomCount: 6,
+  draftSubject: "",
   orgEditor: null,
   sidebarCollapsed: false,
   collapsedSurveyIds: [],
@@ -325,6 +330,7 @@ function persistState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
+    draftAudienceScope, draftCustomTeamIds, draftCustomMemberIds, draftCustomRandomCount, draftSubject,
     sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups,
@@ -339,6 +345,7 @@ function persistState() {
     selectedAnalyticsCohort, selectedAnalyticsType, selectedAnalyticsSessionId, selectedAnalyticsPhase, selectedReportCohort, selectedReportType, selectedReportSessionId,
     draftDivisionId, draftHqId, draftTeamId,
     draftLeaderGroup, draftCrossMode, draftCrossParentSessionId, draftCrossTeamIds, draftCrossMemberIds, draftCrossRandomCount,
+    draftAudienceScope, draftCustomTeamIds, draftCustomMemberIds, draftCustomRandomCount, draftSubject,
     sidebarCollapsed, collapsedSurveyIds, closedSurveysCollapsed, collapsedSessionTypeGroups, collapsedAnalyticsSections,
     pulseView, pulseScopeId, pulseLayer, pulseYear, pulseCommitments, pulseExpertSections,
     dashboardWeekOffset, dashboardSelectedDate, dashboardShowAllActions, dashboardExpandedActionGroups,
@@ -786,6 +793,35 @@ export function sessionsForTypeCohort(type, cohort) {
     .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
 }
 
+// 커스텀 세션 중 전사 스코프는 명단이 없는 1회성 설문이라 사전/사후 변화 비교나
+// 코호트 랭킹 대상이 아니다 (Pulse Survey와 동일하게 공식 밖 context로 취급).
+// 개별 세션 선택(scopedSessionOptions)에는 그대로 노출되므로 여기서는 걸러내지 않는다.
+export function rankableSessionsForTypeCohort(type, cohort) {
+  const sessions = sessionsForTypeCohort(type, cohort);
+  if (!sameSessionType(type, "커스텀")) return sessions;
+  return sessions.filter((s) => s.audienceScope !== "전사");
+}
+
+// 운영 서베이는 기수(시간 배치) 대신 주제로 묶인다. 문화 세션의 cohort 파이프라인은
+// 그대로 두고, 운영 서베이 전용으로 이 두 함수만 따로 둔다.
+export function subjectsForType(type) {
+  const subjects = (state.sessions || [])
+    .filter((s) => sameSessionType(s.type, type) && s.subject)
+    .map((s) => s.subject);
+  return [...new Set(subjects)].sort((a, b) => a.localeCompare(b, "ko"));
+}
+
+export function sessionsForTypeSubject(type, subject) {
+  if (subject === "all") {
+    return (state.sessions || [])
+      .filter((s) => sameSessionType(s.type, type))
+      .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
+  }
+  return (state.sessions || [])
+    .filter((s) => sameSessionType(s.type, type) && s.subject === subject)
+    .sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b), "ko"));
+}
+
 export function yearForCohortType(cohort, type) {
   const cohortNum = Number(cohort);
   const match = (state.sessions || []).find((s) => sameSessionType(s.type, type) && Number(s.cohort) === cohortNum);
@@ -834,16 +870,29 @@ export function ensureScopedSelection(kind) {
   }
   const type = normalizeSessionType(state[typeField]);
 
-  const cohorts = cohortsForType(type);
+  // 운영 서베이는 cohortField 슬롯을 그대로 재사용하되, 값이 기수(숫자)가 아니라
+  // 주제(문자열)다. 문화 타입의 숫자 강제변환 경로와 분리해 둔다.
+  const isOperational = type === "운영 서베이";
+  const cohorts = isOperational ? subjectsForType(type) : cohortsForType(type);
   if (state[cohortField] !== "all") {
-    const cVal = Number(state[cohortField]);
-    if (!cohorts.includes(cVal)) {
-      state[cohortField] = cohorts[0] || "";
+    if (isOperational) {
+      if (!cohorts.includes(state[cohortField])) {
+        state[cohortField] = cohorts[0] || "";
+      }
+    } else {
+      const cVal = Number(state[cohortField]);
+      if (!cohorts.includes(cVal)) {
+        state[cohortField] = cohorts[0] || "";
+      }
     }
   }
-  const cohort = state[cohortField] === "all" ? "all" : Number(state[cohortField] || 0);
+  const cohort = state[cohortField] === "all"
+    ? "all"
+    : isOperational
+      ? (state[cohortField] || "")
+      : Number(state[cohortField] || 0);
 
-  const sessions = sessionsForTypeCohort(type, cohort);
+  const sessions = isOperational ? sessionsForTypeSubject(type, cohort) : sessionsForTypeCohort(type, cohort);
   const sessIds = sessions.map(s => s.id);
   if (state[sessionField] !== "all" || !isReport) {
     if (!sessIds.includes(state[sessionField])) {

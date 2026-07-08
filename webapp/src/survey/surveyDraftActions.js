@@ -30,15 +30,32 @@ export function updateSurveyDraftField(field, val) {
 }
 
 export function updateSurveyDraftSessionType(value) {
-  state.draftSurveySessionType = value ? normalizeSessionType(value) : '';
+  const type = value ? normalizeSessionType(value) : '';
+  state.draftSurveySessionType = type;
   state.draftSurveyCohortKey = '';
   state.draftSurveySessionId = '';
+  // 운영 서베이는 사전/사후/팔로우업 구분이 없는 단발 설문이라 phase를 "실시"로 고정한다.
+  if (type === '운영 서베이') {
+    state.draftSurveyPhase = '실시';
+    state.draftSurveyQuestions = defaultQuestions('실시', type);
+  } else if (state.draftSurveyPhase === '실시') {
+    state.draftSurveyPhase = '사전';
+    state.draftSurveyQuestions = defaultQuestions('사전', type);
+  }
   saveState();
 }
 
 export function updateSurveyDraftCohort(value) {
   state.draftSurveyCohortKey = value || '';
   state.draftSurveySessionId = '';
+  saveState();
+}
+
+// select 값이라 saveStateQuiet()의 "타이핑 중 포커스 유지" 이유가 적용되지 않는다.
+// updateSurveyDraftField로 처리하면 saveStateQuiet()라 hasSession/isValid 같은 파생
+// 상태가 재렌더되지 않아 "선택해도 적용 안 됨"처럼 보인다.
+export function updateSurveyDraftSessionId(value) {
+  state.draftSurveySessionId = value || '';
   saveState();
 }
 

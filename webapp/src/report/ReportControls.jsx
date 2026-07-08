@@ -5,6 +5,8 @@ import {
   availableSessionTypes,
   ensureScopedSelection,
   sessionsForTypeCohort,
+  sessionsForTypeSubject,
+  subjectsForType,
   yearForCohortType,
 } from '../state.js';
 import { sameSessionType, sessionLabel, sessionTypeLabel } from '../utils.js';
@@ -21,6 +23,16 @@ function reportCohortOptions(type, selectedCohort) {
   ].map((option) => ({ ...option, selected: option.value === String(selectedCohort || '') }));
 }
 
+// 운영 서베이는 기수(시간 배치) 대신 주제로 그룹핑된다.
+function reportSubjectOptions(type, selectedSubject) {
+  const subjects = subjectsForType(type);
+  return [
+    { value: '', label: '-- 주제 선택 --' },
+    { value: 'all', label: '[전체 주제 비교]' },
+    ...subjects.map((subject) => ({ value: subject, label: subject })),
+  ].map((option) => ({ ...option, selected: option.value === (selectedSubject || '') }));
+}
+
 function reportSessionOptions(type, cohort, selectedId) {
   if (cohort === 'all') {
     return [{ value: 'all', label: '전체 세션 비교', selected: true }];
@@ -34,12 +46,28 @@ function reportSessionOptions(type, cohort, selectedId) {
   return options.map((option) => ({ ...option, selected: option.value === selectedId }));
 }
 
+function reportSubjectSessionOptions(type, subject, selectedId) {
+  if (subject === 'all') {
+    return [{ value: 'all', label: '전체 세션 비교', selected: true }];
+  }
+  const sessions = sessionsForTypeSubject(type, subject);
+  const options = [{ value: '', label: '-- 세션 선택 --' }];
+  if (sessions.length > 0) options.push({ value: 'all', label: '[주제 전체 팀 비교]' });
+  sessions.forEach((session) => {
+    options.push({ value: session.id, label: sessionLabel(session) });
+  });
+  return options.map((option) => ({ ...option, selected: option.value === selectedId }));
+}
+
 function currentFilterLabel(scope) {
   const { type, cohort, session } = scope;
+  const isOperational = type === '운영 서베이';
   if (vanillaState.selectedReportSessionId === 'all' && cohort) {
     const isAllCohorts = cohort === 'all';
-    const cohortText = isAllCohorts ? '전체 기수' : `${cohort}기`;
-    const yearPrefix = (!isAllCohorts && yearForCohortType(cohort, type)) ? `${yearForCohortType(cohort, type)}년 ` : '';
+    const cohortText = isOperational
+      ? (isAllCohorts ? '전체 주제' : cohort)
+      : (isAllCohorts ? '전체 기수' : `${cohort}기`);
+    const yearPrefix = (!isOperational && !isAllCohorts && yearForCohortType(cohort, type)) ? `${yearForCohortType(cohort, type)}년 ` : '';
     return `현재 적용: ${sessionTypeLabel(type)} · ${yearPrefix}${cohortText} 전체 비교 분석`;
   }
   return `현재 적용: ${session ? `${sessionTypeLabel(session.type)} · ${sessionLabel(session)}` : `${sessionTypeLabel(type)} · 선택된 세션 없음`}`;
@@ -63,8 +91,15 @@ export function ReportControls() {
     store.responses,
   ]);
   const types = useMemo(() => availableSessionTypes(), [store.sessions]);
-  const cohorts = useMemo(() => reportCohortOptions(draftType, draftCohort), [draftType, draftCohort, store.sessions]);
-  const sessions = useMemo(() => reportSessionOptions(draftType, draftCohort, draftSessionId), [draftType, draftCohort, draftSessionId, store.sessions]);
+  const isOperationalType = draftType === '운영 서베이';
+  const cohorts = useMemo(
+    () => (isOperationalType ? reportSubjectOptions(draftType, draftCohort) : reportCohortOptions(draftType, draftCohort)),
+    [draftType, draftCohort, store.sessions]
+  );
+  const sessions = useMemo(
+    () => (isOperationalType ? reportSubjectSessionOptions(draftType, draftCohort, draftSessionId) : reportSessionOptions(draftType, draftCohort, draftSessionId)),
+    [draftType, draftCohort, draftSessionId, store.sessions]
+  );
   const isCompareReport = vanillaState.selectedReportSessionId === 'all' && Boolean(scope.cohort);
   const canExportSingle = Boolean(scope.cohort && scope.session && !isCompareReport);
   const canExportPdf = Boolean(canExportSingle || isCompareReport);
@@ -137,7 +172,7 @@ export function ReportControls() {
               }
             </select>
           </label>
-          <label>대상 기수
+          <label>{isOperationalType ? '주제' : '대상 기수'}
             <select id="report-cohort-select" value={draftCohort} onChange={handleCohortChange}>
               {cohorts.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>

@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore.js';
 import { state as vanillaState } from '../state.js';
 import { buildSessionSurveyQuestionPrompt, pulseContextForSurveyPrompt } from '../survey/surveyPrompt.js';
 import { normalizeSessionType } from '../utils.js';
-import { selectedCrossMembers } from '../views/sessions.js';
+import { selectedCrossMembers, selectedCustomMembers } from '../views/sessions.js';
 
 export function SessionSurveyPromptCard() {
   const store = useAppStore();
@@ -37,6 +37,22 @@ export function SessionSurveyPromptCard() {
       const members = selectedCrossMembers();
       return {
         ...base,
+        participatingTeams: [...new Set(members.map((member) => member.teamName))].join(', '),
+        members,
+      };
+    }
+    if (type === '커스텀') {
+      const scope = vanillaState.draftAudienceScope;
+      // base.team은 팀빌딩 드릴다운의 잔여값이라 커스텀 스코프 표시와 무관하게
+      // 남아있을 수 있으므로, participatingTeams가 대상 라벨로 쓰이도록 비운다.
+      if (scope === '전사') {
+        return { ...base, team: '', audienceScope: scope, participatingTeams: '전사', members: [] };
+      }
+      const members = selectedCustomMembers();
+      return {
+        ...base,
+        team: '',
+        audienceScope: scope,
         participatingTeams: [...new Set(members.map((member) => member.teamName))].join(', '),
         members,
       };

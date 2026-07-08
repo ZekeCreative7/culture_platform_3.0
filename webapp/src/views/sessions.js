@@ -18,7 +18,8 @@ import { buildSessionSurveyQuestionPrompt, pulseContextForSurveyPrompt } from '.
 import {
   teamPath,
   teamMemberCandidates,
-  allMemberCandidates
+  allMemberCandidates,
+  allTeamUnits
 } from './org.js';
 import { getSessionOutcomeCopy } from '../sessions/sessionOutcomeCopy.js';
 
@@ -73,6 +74,30 @@ export function resetCrossDraft() {
   state.draftCrossTeamIds = [];
   state.draftCrossMemberIds = [];
   state.draftCrossParentSessionId = "";
+}
+
+// 커스텀 세션의 팀별 스코프는 협업과 달리 리더십 세션에 종속되지 않고
+// 조직 전체 팀 목록에서 자유롭게 다중 선택한다.
+export function customSourceTeams() {
+  return allTeamUnits();
+}
+
+export function customMemberPool() {
+  if (state.draftAudienceScope === "무작위") return allMemberCandidates(false);
+  if (state.draftAudienceScope === "팀별") {
+    return (state.draftCustomTeamIds || []).flatMap((teamId) => teamMemberCandidates(teamId, false));
+  }
+  return [];
+}
+
+export function selectedCustomMembers() {
+  const poolById = new Map(customMemberPool().map((member) => [member.id, member]));
+  return (state.draftCustomMemberIds || []).map((id) => poolById.get(id)).filter(Boolean);
+}
+
+export function resetCustomScopeDraft() {
+  state.draftCustomTeamIds = [];
+  state.draftCustomMemberIds = [];
 }
 
 export function getStatus(session) {
@@ -191,6 +216,15 @@ export function canCreateDraftSession() {
   if (type === "팀빌딩") return Boolean(state.draftTeamId);
   if (type === "리더십") return Boolean((state.draftLeaderGroup || []).length);
   if (type === "협업") return Boolean((state.draftCrossMemberIds || []).length);
+  if (type === "커스텀") {
+    if (state.draftAudienceScope === "전사") return true;
+    return Boolean((state.draftCustomMemberIds || []).length);
+  }
+  if (type === "운영 서베이") {
+    if (!(state.draftSubject || "").trim()) return false;
+    if (state.draftAudienceScope === "전사") return true;
+    return Boolean((state.draftCustomMemberIds || []).length);
+  }
   return false;
 }
 

@@ -1,10 +1,12 @@
 import { 
   state, 
   pulseCache,
-  availableSessionTypes, 
-  cohortsForType, 
-  sessionsForTypeCohort, 
-  yearForCohortType, 
+  availableSessionTypes,
+  cohortsForType,
+  sessionsForTypeCohort,
+  rankableSessionsForTypeCohort,
+  sessionsForTypeSubject,
+  yearForCohortType,
   statsForSession, 
   ensureScopedSelection, 
   questionSetForSession, 
@@ -691,7 +693,7 @@ export function renderCompareReport(type, cohort, options = {}) {
   const includeOutcomeIntro = options.includeOutcomeIntro !== false;
   const includeCompareSummary = options.includeCompareSummary !== false;
   const includeCompareRanking = options.includeCompareRanking !== false;
-  const sessions = sessionsForTypeCohort(type, cohort);
+  const sessions = type === "운영 서베이" ? sessionsForTypeSubject(type, cohort) : rankableSessionsForTypeCohort(type, cohort);
   const isAllCohorts = cohort === "all";
   const cohortText = isAllCohorts ? "전체 기수" : `${cohort}기`;
   const yearPrefix = (!isAllCohorts && yearForCohortType(cohort, type)) ? `${yearForCohortType(cohort, type)}년 ` : "";
@@ -875,6 +877,7 @@ export function getReportMetadata() {
   const cohort = scope.cohort;
   const cohorts = scope.cohorts;
   const session = scope.session;
+  const isChangeExcluded = session?.type === '커스텀' && session?.audienceScope === '전사';
 
   const sessionId = session?.id || "";
   const stats = cohort && sessionId ? statsForSession(cohort, sessionId) : [];
@@ -900,8 +903,9 @@ export function getReportMetadata() {
   const diagnosisTarget = session ? targetCountForSession(session) : 0;
   const outcomeStory = session ? buildSessionOutcomeStory({ stats, targetCount: diagnosisTarget }) : null;
 
-  // Comparison report data
-  const sessions = sessionsForTypeCohort(type, cohort);
+  // Comparison report data. 운영 서베이는 기수 대신 주제로 묶이므로 별도 조회 경로를 쓴다
+  // (랭킹 없는 팀 비교표는 OperationalCompareTable이 metadata.sessions로 직접 계산한다).
+  const sessions = type === "운영 서베이" ? sessionsForTypeSubject(type, cohort) : rankableSessionsForTypeCohort(type, cohort);
   const isAllCohorts = cohort === "all";
   
   const sessionScores = sessions.map(s => {
@@ -975,6 +979,7 @@ export function getReportMetadata() {
     hasPreData,
     hasPostData,
     hasFollowupData,
+    isChangeExcluded,
     diagnosis,
     pulseSessionInsight,
     outcomeStory,
@@ -1217,7 +1222,7 @@ export function renderReport(options = {}) {
         <h2>③ 변화 분석</h2>
         <span>사전 → 사후${hasFollowupData ? ' → 팔로우업' : ''} · N<3 마스킹 적용</span>
       </div>
-      ${!hasPreData && !hasPostData ? `<div class="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>` : `
+      ${session?.type === '커스텀' && session?.audienceScope === '전사' ? `<div class="empty">전사 1회성 설문은 사전·사후 변화 비교 대상이 아닙니다. 진단 결과는 위 요약에서 확인하세요.</div>` : !hasPreData && !hasPostData ? `<div class="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>` : `
       <div class="report-change-grid" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:14px;">
         ${REPORT_DIMS.map(dim => {
           const preValid       = pre      && pre.n      >= 3;

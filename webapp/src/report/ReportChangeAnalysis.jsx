@@ -2,7 +2,7 @@ import React from 'react';
 import { REPORT_DIMS, dimAvg, renderSlopeChart } from '../views/report.js';
 import { lockSvg } from '../utils.js';
 
-export function ReportChangeAnalysis({ pre, mid, post, followup, hasPreData, hasPostData, hasFollowupData }) {
+export function ReportChangeAnalysis({ pre, mid, post, followup, hasPreData, hasPostData, hasFollowupData, isChangeExcluded }) {
   const showContent = hasPreData || hasPostData;
 
   return (
@@ -11,7 +11,9 @@ export function ReportChangeAnalysis({ pre, mid, post, followup, hasPreData, has
         <h2>③ 변화 분석</h2>
         <span>사전 → 사후{hasFollowupData ? ' → 팔로우업' : ''} · N&lt;3 마스킹 적용</span>
       </div>
-      {!showContent ? (
+      {isChangeExcluded ? (
+        <div className="empty">전사 1회성 설문은 사전·사후 변화 비교 대상이 아닙니다. 진단 결과는 위 요약에서 확인하세요.</div>
+      ) : !showContent ? (
         <div className="empty">사전·사후 설문 데이터가 모두 있어야 변화 분석이 가능합니다.</div>
       ) : (
         <>

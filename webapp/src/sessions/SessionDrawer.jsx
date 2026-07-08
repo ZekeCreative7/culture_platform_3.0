@@ -10,6 +10,7 @@ import { ScheduleEditor } from './ScheduleEditor.jsx';
 import { TeamBuildingPanel } from './TeamBuildingPanel.jsx';
 import { LeaderGroupPanel } from './LeaderGroupPanel.jsx';
 import { CrossFunctionalPanel } from './CrossFunctionalPanel.jsx';
+import { CustomScopePanel } from './CustomScopePanel.jsx';
 
 export function SessionDrawer() {
   useVanillaStateTick();
@@ -37,15 +38,17 @@ export function SessionDrawer() {
                 ))}
               </select>
             </label>
-            <label>기수
-              <input
-                key={editingSessionId || 'new'}
-                type="number"
-                min="1"
-                defaultValue={vanillaState.draftCohort}
-                onChange={(e) => updateSessionCohort(e.target.value)}
-              />
-            </label>
+            {draftType !== '운영 서베이' && (
+              <label>기수
+                <input
+                  key={editingSessionId || 'new'}
+                  type="number"
+                  min="1"
+                  defaultValue={vanillaState.draftCohort}
+                  onChange={(e) => updateSessionCohort(e.target.value)}
+                />
+              </label>
+            )}
             <label>연도
               <input
                 key={editingSessionId || 'new'}
@@ -59,7 +62,9 @@ export function SessionDrawer() {
           <div className="session-form">
             {draftType === '팀빌딩' && <TeamBuildingPanel divisionList={divisionList} hqList={hqList} teamList={teamList} />}
             {draftType === '리더십' && <LeaderGroupPanel divisionList={divisionList} hqList={hqList} teamList={teamList} />}
-            {draftType !== '팀빌딩' && draftType !== '리더십' && <CrossFunctionalPanel />}
+            {draftType === '협업' && <CrossFunctionalPanel />}
+            {(draftType === '커스텀' || draftType === '운영 서베이') && <CustomScopePanel />}
+            {draftType !== '팀빌딩' && draftType !== '리더십' && draftType !== '협업' && draftType !== '커스텀' && draftType !== '운영 서베이' && <CrossFunctionalPanel />}
           </div>
           <ScheduleEditor />
         </div>

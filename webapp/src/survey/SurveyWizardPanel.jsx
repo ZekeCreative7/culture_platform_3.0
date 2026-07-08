@@ -14,6 +14,7 @@ import {
   updateSurveyDraftField,
   updateSurveyDraftSessionType,
   updateSurveyDraftCohort,
+  updateSurveyDraftSessionId,
   updateSurveyDraftPhase,
   updateSurveyDraftQuestionText,
   updateSurveyDraftQuestionType,
@@ -99,7 +100,7 @@ function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType,
           </select>
         </label>
         <label>팀 / 대상 세션
-          <select id="survey-session-select" value={vanillaState.draftSurveySessionId} onChange={(e) => updateSurveyDraftField('draftSurveySessionId', e.target.value)} disabled={!draftCohortKey}>
+          <select id="survey-session-select" value={vanillaState.draftSurveySessionId} onChange={(e) => updateSurveyDraftSessionId(e.target.value)} disabled={!draftCohortKey}>
             <option value="">-- 팀 선택 --</option>
             {sessionsForCohort.map((session) => (
               <option key={session.id} value={session.id}>{surveySessionTargetLabel(session)}</option>
@@ -107,6 +108,9 @@ function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType,
           </select>
         </label>
       </div>
+      {draftSessionType === '운영 서베이' ? (
+        <div className="config-note">설문 시점: 실시 (운영 서베이는 사전/사후 구분 없이 단발로 진행됩니다)</div>
+      ) : (
       <label>설문 시점
         <select id="survey-phase-select" value={vanillaState.draftSurveyPhase} onChange={(e) => updateSurveyDraftPhase(e.target.value)}>
           <option value="사전">사전</option>
@@ -114,6 +118,7 @@ function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType,
           <option value="팔로우업">팔로우업 (60일)</option>
         </select>
       </label>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
         <button className="primary" type="button" onClick={() => setSurveyCreatorStep(2)} style={{ width: '120px' }}>다음 단계 ➔</button>

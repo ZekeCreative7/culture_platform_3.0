@@ -11,9 +11,10 @@ import {
   emptyCard, 
   sectionTitle,
   POSITION_OPTIONS, 
-  UNIT_LEADER_LABELS, 
-  UNIT_LABELS, 
-  sameSessionType 
+  UNIT_LEADER_LABELS,
+  UNIT_LABELS,
+  sameSessionType,
+  setOrgHeadcountProvider
 } from '../utils.js';
 
 export function validateAndRepairSelectedOrg() {
@@ -405,6 +406,16 @@ export function allMemberCandidates(includeLeaders = false) {
     })
     .sort((a, b) => `${a.teamName}${a.name}`.localeCompare(`${b.teamName}${b.name}`, "ko"));
 }
+
+export function allTeamUnits() {
+  return state.orgUnits
+    .filter((unit) => unit.level === "team")
+    .map((unit) => teamPath(unit.id))
+    .filter(Boolean)
+    .sort((a, b) => `${a.divisionName}${a.hqName}${a.teamName}`.localeCompare(`${b.divisionName}${b.hqName}${b.teamName}`, "ko"));
+}
+
+setOrgHeadcountProvider(() => allMemberCandidates(true).length);
 
 export function persistOrganization() {
   saveOrgData();

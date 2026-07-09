@@ -3,6 +3,7 @@ import { state, subjectsForType } from '../state.js';
 import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
 import { normalizeSessionType } from '../utils.js';
 import { customSourceTeams, customMemberPool, selectedCustomMembers } from '../views/sessions.js';
+import { topLevelOrgUnits, hqUnitsForDivision, teamUnitsForSelection } from '../views/org.js';
 import {
   updateSubject,
   updateAudienceScope,
@@ -89,13 +90,13 @@ function OperationalTeamAddRow({ sourceTeams, selectedTeamIds }) {
   );
 }
 
-function SelectedOperationalTeams({ sourceTeams, selectedTeamIds, memberCount }) {
+function SelectedTeamsList({ sourceTeams, selectedTeamIds, summaryNote, onRemove }) {
   const selected = sourceTeams.filter((team) => selectedTeamIds.includes(team.teamId));
   return (
     <>
       <div className="selection-summary">
         <strong>선택된 팀 {selected.length}개</strong>
-        <span>예상 응답 대상 {memberCount}명 · 무기명 설문이라 팀원 개별 선택은 생략됩니다</span>
+        <span>{summaryNote}</span>
       </div>
       {selected.length ? (
         <div className="selection-chip-grid">
@@ -105,13 +106,60 @@ function SelectedOperationalTeams({ sourceTeams, selectedTeamIds, memberCount })
                 <strong>{team.teamName}</strong>
                 <span>{team.divisionName} &gt; {team.hqName}</span>
               </div>
-              <button type="button" aria-label="팀 제거" onClick={() => removeOperationalTeam(team.teamId)}>삭제</button>
+              <button type="button" aria-label="팀 제거" onClick={() => onRemove(team.teamId)}>삭제</button>
             </div>
           ))}
         </div>
       ) : (
         <div className="empty compact">아직 추가된 팀이 없습니다.</div>
       )}
+    </>
+  );
+}
+
+function CustomTeamAddRow({ selectedTeamIds }) {
+  const [divisionId, setDivisionId] = useState('');
+  const [hqId, setHqId] = useState('');
+  const [teamId, setTeamId] = useState('');
+
+  const divisions = topLevelOrgUnits();
+  const hqs = divisionId ? hqUnitsForDivision(divisionId) : [];
+  const teams = divisionId
+    ? teamUnitsForSelection(divisionId, hqId).filter((team) => !selectedTeamIds.includes(team.id))
+    : [];
+
+  const handleAdd = () => {
+    if (!teamId) return;
+    toggleCustomTeam(teamId, true);
+    setTeamId('');
+  };
+
+  return (
+    <>
+      <div className="session-org-row">
+        <label>부문명
+          <select value={divisionId} onChange={(e) => { setDivisionId(e.target.value); setHqId(''); setTeamId(''); }}>
+            <option value="">부문 선택</option>
+            {divisions.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
+          </select>
+        </label>
+        <label>본부명
+          <select value={hqId} disabled={!hqs.length} onChange={(e) => { setHqId(e.target.value); setTeamId(''); }}>
+            <option value="">{hqs.length ? '본부 선택' : '본부 없음/직속'}</option>
+            {hqs.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
+          </select>
+        </label>
+        <label>팀명
+          <select value={teamId} disabled={!divisionId} onChange={(e) => setTeamId(e.target.value)}>
+            <option value="">{teams.length ? '팀 선택' : '선택 가능한 팀이 없습니다'}</option>
+            {teams.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
+          </select>
+        </label>
+      </div>
+      <div className="session-picker-actions">
+        <span>부문 &gt; 본부 순서로 좁혀가며 팀을 찾습니다.</span>
+        <button type="button" className="primary compact" disabled={!teamId} onClick={handleAdd}>팀 추가</button>
+      </div>
     </>
   );
 }
@@ -184,32 +232,24 @@ export function CustomScopePanel() {
       {scope === '팀별' && isOperational && (
         <>
           <OperationalTeamAddRow sourceTeams={sourceTeams} selectedTeamIds={state.draftCustomTeamIds || []} />
-          <SelectedOperationalTeams
+          <SelectedTeamsList
             sourceTeams={sourceTeams}
             selectedTeamIds={state.draftCustomTeamIds || []}
-            memberCount={selectedMembers.length}
+            summaryNote={`예상 응답 대상 ${selectedMembers.length}명 · 무기명 설문이라 팀원 개별 선택은 생략됩니다`}
+            onRemove={removeOperationalTeam}
           />
         </>
       )}
 
       {scope === '팀별' && !isOperational && (
         <>
-          <div className="selection-summary">
-            <strong>참여 팀 선택</strong>
-            <span>{(state.draftCustomTeamIds || []).length}개 팀 선택</span>
-          </div>
-          <div className="checkbox-grid team-source-grid">
-            {sourceTeams.map((team) => (
-              <label key={team.teamId} className={`check-card ${(state.draftCustomTeamIds || []).includes(team.teamId) ? 'active' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={(state.draftCustomTeamIds || []).includes(team.teamId)}
-                  onChange={(e) => toggleCustomTeam(team.teamId, e.target.checked)}
-                />
-                <span><strong>{team.teamName}</strong><small>{team.divisionName} &gt; {team.hqName}</small></span>
-              </label>
-            ))}
-          </div>
+          <CustomTeamAddRow selectedTeamIds={state.draftCustomTeamIds || []} />
+          <SelectedTeamsList
+            sourceTeams={sourceTeams}
+            selectedTeamIds={state.draftCustomTeamIds || []}
+            summaryNote={`${(state.draftCustomTeamIds || []).length}개 팀 선택`}
+            onRemove={(teamId) => toggleCustomTeam(teamId, false)}
+          />
           {(state.draftCustomTeamIds || []).length ? <CustomMemberSelector memberPool={memberPool} selectedMembers={selectedMembers} /> : null}
         </>
       )}

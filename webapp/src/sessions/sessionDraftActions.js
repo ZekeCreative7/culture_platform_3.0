@@ -3,6 +3,32 @@ import { normalizeSessionType, sameSessionType, makeSchedule, sessionTypeDef, ui
 import { syncDraftOrgFromTeam } from '../views/org.js';
 import { selectedCrossMembers, resetCrossDraft, selectedCustomMembers, resetCustomScopeDraft, canCreateDraftSession } from '../views/sessions.js';
 
+export function resetNewSessionDraft(type = state.draftType || '팀빌딩') {
+  const normalizedType = normalizeSessionType(type);
+  state.editingSessionId = null;
+  state.draftType = normalizedType;
+  state.draftCohort = 1;
+  state.draftYear = new Date().getFullYear();
+  state.draftSchedule = makeSchedule(normalizedType);
+  state.draftDivisionId = '';
+  state.draftHqId = '';
+  state.draftTeamId = '';
+  state.draftDivision = '';
+  state.draftHq = '';
+  state.draftTeam = '';
+  state.draftLeader = '';
+  state.draftLeaderTitle = '';
+  state.draftMembers = [];
+  state.draftLeaderGroup = [];
+  state.draftCrossMode = 'leader-session';
+  state.draftCrossParentSessionId = '';
+  state.draftCrossTeamIds = [];
+  state.draftCrossMemberIds = [];
+  state.draftAudienceScope = '팀별';
+  state.draftSubject = '';
+  resetCustomScopeDraft();
+}
+
 export function updateSessionType(value) {
   state.draftType = normalizeSessionType(value);
   state.draftSchedule = makeSchedule(state.draftType);

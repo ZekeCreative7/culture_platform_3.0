@@ -11,6 +11,32 @@ import { SessionsCalendar } from '../sessions/SessionsCalendar.jsx';
 import { SessionDrawer } from '../sessions/SessionDrawer.jsx';
 import { AttendanceModal } from '../sessions/AttendanceModal.jsx';
 import { DuplicateWarningModal } from '../sessions/DuplicateWarningModal.jsx';
+import { buildSessionBoardSummary } from '../sessions/sessionBoardModel.js';
+import { openSessionDrawer } from '../sessions/sessionActions.js';
+
+function SessionsStoryBand({ summary }) {
+  return (
+    <section className="session-story-band" aria-label="세션 운영 흐름">
+      <div className="session-story-copy">
+        <span className="eyebrow">운영 흐름</span>
+        <h2>진단에서 나온 이슈를 실제 세션으로 운영합니다</h2>
+        <p>대상 구성, 회차 일정, 설문 배포, 응답 적재, 리포트 준비까지 한 화면에서 다음 일을 확인하세요.</p>
+      </div>
+      <div className="session-journey-grid">
+        {summary.map((item, index) => (
+          <article className={`session-journey-card ${item.tone}`} key={item.key}>
+            <span>{index + 1}</span>
+            <div>
+              <strong>{item.label}</strong>
+              <b>{item.value}</b>
+              <small>{item.detail}</small>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export const SessionsPage = memo(function SessionsPage() {
   const store = useAppStore();
@@ -31,8 +57,7 @@ export const SessionsPage = memo(function SessionsPage() {
   }, [menuOpen]);
 
   const handleOpenDrawer = () => {
-    store.setEditingSessionId(null);
-    store.setSessionDrawerOpen(true);
+    openSessionDrawer();
   };
 
   const handleDbUpload = (e) => {
@@ -71,7 +96,8 @@ export const SessionsPage = memo(function SessionsPage() {
       <section className="page-head">
         <div>
           <span className="eyebrow">세션 운영</span>
-          <h1>문화 세션 스케줄 관리</h1>
+          <h1>세션 운영 보드</h1>
+          <p>조직 이슈를 세션으로 배정하고 일정, 설문, 응답, 리포트 준비 상태를 관리합니다.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <div className="session-more-menu" style={{ position: 'relative' }}>
@@ -131,6 +157,8 @@ export const SessionsPage = memo(function SessionsPage() {
           </button>
         </div>
       </section>
+
+      <SessionsStoryBand summary={buildSessionBoardSummary(store)} />
 
       <div className="tab-header">
         <button

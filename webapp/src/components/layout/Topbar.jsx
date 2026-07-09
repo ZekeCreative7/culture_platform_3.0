@@ -192,9 +192,6 @@ export function Topbar({
   const { isMaster } = useAuth();
 
   const {
-    setSessionDrawerOpen,
-    setEditingSessionId,
-    setActiveSessionTab,
     setMobileNavOpen
   } = storeState;
 
@@ -214,11 +211,10 @@ export function Topbar({
     }
   }, [storeState, today]);
 
-  const handleNewSession = (e) => {
+  const handleNewSession = async (e) => {
     e.preventDefault();
-    setActiveSessionTab('list');
-    setEditingSessionId(null);
-    setSessionDrawerOpen(true);
+    const { openSessionDrawer } = await import('../../sessions/sessionActions.js');
+    openSessionDrawer({ switchToSessions: true });
     setMobileNavOpen(false);
     navigate('/sessions');
   };

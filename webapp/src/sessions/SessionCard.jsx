@@ -1,19 +1,27 @@
 import React from 'react';
-import { state as vanillaState, phasesForSession } from '../state.js';
+import { useNavigate } from 'react-router-dom';
+import { state as vanillaState } from '../state.js';
 import { sessionTypeLabel, sessionLabel } from '../utils.js';
 import { qualResponseRows } from '../views/analytics.js';
 import { getStatus } from '../views/sessions.js';
-import { startEditSession, deleteSession } from './sessionActions.js';
+import {
+  startEditSession,
+  deleteSession,
+  prepareSurveyDraftForSession,
+  prepareUploadForSession,
+  prepareReportForSession,
+} from './sessionActions.js';
 import { openQualAnalysisModal } from '../report/reportQualSignals.js';
+import { sessionDataState, sessionNextAction } from './sessionBoardModel.js';
 
 export function SessionCard({ session }) {
+  const navigate = useNavigate();
   const [status, tone] = getStatus(session);
   const confirmed = session.schedule.filter((item) => item.confirmed && item.date).length;
   const total = session.schedule.length;
-  const uploadedPhases = phasesForSession(session.id);
-  const uploadCount = uploadedPhases.length;
-  const hasFollowup = uploadedPhases.includes('팔로우업');
-  const uploadTotal = hasFollowup ? 3 : 2;
+  const dataState = sessionDataState(vanillaState, session);
+  const uploadCount = dataState.uploadCount;
+  const uploadTotal = dataState.uploadTotal;
   const isEditing = vanillaState.editingSessionId === session.id;
 
   const noDataWhileActive = uploadCount === 0 && status !== '시작전';
@@ -26,6 +34,28 @@ export function SessionCard({ session }) {
 
   const hasPreSig = (vanillaState.qualSignals || []).some((q) => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
   const hasPostSig = (vanillaState.qualSignals || []).some((q) => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
+  const nextAction = sessionNextAction(vanillaState, session, status);
+
+  const handleNextAction = () => {
+    if (nextAction.kind === 'schedule') {
+      startEditSession(session.id);
+      return;
+    }
+    if (nextAction.kind === 'survey') {
+      prepareSurveyDraftForSession(session.id);
+      navigate('/survey');
+      return;
+    }
+    if (nextAction.kind === 'upload') {
+      prepareUploadForSession(session.id);
+      navigate('/upload');
+      return;
+    }
+    if (nextAction.kind === 'report') {
+      prepareReportForSession(session.id);
+      navigate('/report');
+    }
+  };
 
   return (
     <article className={`session-card compact${isEditing ? ' editing' : ''}`}>
@@ -51,6 +81,10 @@ export function SessionCard({ session }) {
           {incompleteAfterDone && <span className="session-alert-badge amber">사전/사후 중 {2 - uploadCount}단계 미업로드</span>}
         </div>
       )}
+      <button className={`session-next-action ${nextAction.kind}`} type="button" onClick={handleNextAction}>
+        <span>{nextAction.label}</span>
+        <small>{nextAction.hint}</small>
+      </button>
       {(hasPreQual || hasPostQual) && (
         <div className="session-qual-actions" style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap', borderTop: '0.5px solid var(--color-border-tertiary,#eee)', paddingTop: '10px' }}>
           {hasPreQual && (

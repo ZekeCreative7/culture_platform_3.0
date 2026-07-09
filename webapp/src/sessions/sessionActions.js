@@ -1,6 +1,7 @@
 import { state, saveState, deleteSessionFromFirestore, subscribeResponsesFromFirestore } from '../state.js';
-import { normalizeSessionType } from '../utils.js';
+import { defaultQuestions, normalizeSessionType, sessionLabel, sessionYear } from '../utils.js';
 import { runDestructiveAction } from '../operational/destructiveAction.js';
+import { resetNewSessionDraft } from './sessionDraftActions.js';
 
 export function toggleSessionTypeGroup(type) {
   state.collapsedSessionTypeGroups = state.collapsedSessionTypeGroups || [];
@@ -77,6 +78,7 @@ export function openSessionDrawer({ switchToSessions = false } = {}) {
     state.activeSessionTab = 'list';
     state.mobileNavOpen = false;
   }
+  resetNewSessionDraft('팀빌딩');
   state.editingSessionId = null;
   state.sessionDrawerOpen = true;
   saveState();
@@ -85,5 +87,45 @@ export function openSessionDrawer({ switchToSessions = false } = {}) {
 export function closeSessionDrawer() {
   state.sessionDrawerOpen = false;
   state.editingSessionId = null;
+  saveState();
+}
+
+export function prepareSurveyDraftForSession(sessionId) {
+  const session = (state.sessions || []).find((item) => item.id === sessionId);
+  if (!session) return;
+  const type = normalizeSessionType(session.type);
+  const phase = type === '운영 서베이' ? '실시' : '사전';
+
+  state.editingSurveyId = null;
+  state.draftSurveySessionType = type;
+  state.draftSurveyCohortKey = `${sessionYear(session) || session.year || ''}:${Number(session.cohort) || ''}`;
+  state.draftSurveySessionId = sessionId;
+  state.draftSurveyPhase = phase;
+  state.draftSurveyTitle = `${sessionLabel(session)} ${phase} 설문`;
+  state.draftGoogleFormUrl = '';
+  state.draftSurveyQuestions = defaultQuestions(phase, type);
+  state.surveyCreatorStep = 1;
+  saveState();
+}
+
+export function prepareUploadForSession(sessionId) {
+  const session = (state.sessions || []).find((item) => item.id === sessionId);
+  if (!session) return;
+  state.selectedUploadSessionId = sessionId;
+  state.selectedAnalyticsType = normalizeSessionType(session.type);
+  state.selectedAnalyticsCohort = String(session.cohort || '');
+  state.selectedAnalyticsSessionId = sessionId;
+  saveState();
+}
+
+export function prepareReportForSession(sessionId) {
+  const session = (state.sessions || []).find((item) => item.id === sessionId);
+  if (!session) return;
+  state.selectedReportType = normalizeSessionType(session.type);
+  state.selectedReportCohort = String(session.cohort || '');
+  state.selectedReportSessionId = sessionId;
+  state.selectedAnalyticsType = normalizeSessionType(session.type);
+  state.selectedAnalyticsCohort = String(session.cohort || '');
+  state.selectedAnalyticsSessionId = sessionId;
   saveState();
 }

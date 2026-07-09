@@ -89,6 +89,7 @@ export function UploadPage() {
   const navigate = useNavigate();
   const {
     sessions,
+    selectedUploadSessionId,
     uploadRows,
     uploadErrors,
     uploadPiiDropped,
@@ -101,7 +102,10 @@ export function UploadPage() {
     setSelectedAnalyticsPhase,
   } = useAppStore();
 
-  const [selectedSessionId, setSelectedSessionId] = useState(sessions[0]?.id || '');
+  const initialSessionId = sessions.some((session) => session.id === selectedUploadSessionId)
+    ? selectedUploadSessionId
+    : sessions[0]?.id || '';
+  const [selectedSessionId, setSelectedSessionId] = useState(initialSessionId);
   const [selectedPhase, setSelectedPhase] = useState(PHASES[0]);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef(null);

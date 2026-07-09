@@ -73,6 +73,12 @@ function Stepper({ currentStep }) {
 function Step1Fields({ editingSurveyId, availableSessionTypes, draftSessionType, cohortOptions, draftCohortKey, sessionsForCohort }) {
   return (
     <div className="form-grid compact" style={{ gridTemplateColumns: '1fr', gap: '16px', marginTop: '14px' }}>
+      {availableSessionTypes.length === 0 && (
+        <div style={{ background: '#fef3c7', border: '1.5px solid #fbbf24', borderRadius: '8px', padding: '14px 16px', fontSize: '12.5px', color: '#92400e', lineHeight: '1.6' }}>
+          <strong>등록된 세션이 없습니다.</strong><br />
+          설문을 만들려면 먼저 사이드바의 <strong>세션 운영</strong> 페이지에서 세션을 등록해 주세요. 세션을 등록하면 여기서 해당 세션에 연결된 설문을 설계할 수 있습니다.
+        </div>
+      )}
       <label>설문 제목
         <input
           id="survey-title-input"
@@ -174,7 +180,7 @@ function Step2Fields({ editingSurveyId, draftQuestions }) {
           <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--blue-mid)' }}>URL</span>
           <strong style={{ fontSize: '13px', color: 'var(--ink)' }}>구글 폼 URL 연결 (권장)</strong>
         </div>
-        <p style={{ fontSize: '11.5px', color: 'var(--muted)', margin: '0 0 10px 0', lineHeight: '1.6' }}>구글 폼에서 설문을 직접 만들고 배포용 링크를 붙여넣으세요. 해당 링크로 QR 코드가 생성됩니다.</p>
+        <p style={{ fontSize: '11.5px', color: 'var(--muted)', margin: '0 0 10px 0', lineHeight: '1.6' }}>구글 폼에서 설문을 직접 만들고 배포용 링크를 붙여넣으세요. QR 코드가 생성됩니다.<br /><strong style={{ color: '#d97706' }}>응답은 구글 폼에 저장됩니다.</strong> 이 플랫폼의 분석 기능을 쓰려면 아래 자체 설문을 사용하세요.</p>
         <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--ink-2)' }}>구글 폼 URL
           <input
             id="survey-google-form-url"
@@ -192,6 +198,9 @@ function Step2Fields({ editingSurveyId, draftQuestions }) {
         또는 자체 설문 직접 설계
         <div style={{ flex: '1', height: '1px', background: 'var(--line)' }} />
       </div>
+      <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '-4px 0 4px', lineHeight: '1.5', textAlign: 'center' }}>
+        자체 설계 설문의 응답은 이 플랫폼에 자동 저장되어, 문항별 분포 분석과 세션 전·후 비교가 가능합니다.
+      </p>
 
       {hasTemplateSources && (
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>

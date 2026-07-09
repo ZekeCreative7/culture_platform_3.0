@@ -242,7 +242,16 @@ export function submitSurveyDraft() {
   state.draftSurveyTitle = '';
   state.draftGoogleFormUrl = '';
   state.draftSurveyQuestions = defaultQuestions(state.draftSurveyPhase, draftSessionType());
+  state.surveyCreatedToast = title;
   saveState();
+
+  // Auto-dismiss success toast after 5 seconds
+  setTimeout(() => {
+    if (state.surveyCreatedToast === title) {
+      state.surveyCreatedToast = '';
+      saveState();
+    }
+  }, 5000);
 
   updateSurveyInFirestore(newId, newSurveyData).catch((e) => {
     console.error('Firestore 설문 저장 실패:', e);

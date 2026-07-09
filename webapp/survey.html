@@ -226,6 +226,13 @@
         box-shadow: 0 6px 18px rgba(0, 114, 255, 0.4);
       }
 
+      .submit-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
       .success-view {
         text-align: center;
         padding: 40px 10px;
@@ -260,6 +267,42 @@
         line-height: 1.6;
         margin: 0;
         font-weight: 500;
+      }
+
+      .progress-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+
+      .progress-track {
+        flex: 1;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+        border-radius: 3px;
+        width: 0%;
+        transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .progress-fill.complete {
+        background: linear-gradient(90deg, #10b981, #34d399);
+      }
+
+      .progress-text {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-muted);
+        white-space: nowrap;
+        min-width: 48px;
+        text-align: right;
       }
     </style>
   </head>
@@ -309,7 +352,7 @@
 
       window.addEventListener('DOMContentLoaded', async () => {
         if (!surveyId) {
-          showError("설문 ID가 누락되었습니다. 정상적인 링크를 이용해 주세요.");
+          showError("설문 링크가 올바르지 않습니다.<br/>운영자에게 문의하거나 QR 코드를 다시 스캔해 주세요.");
           return;
         }
         try {
@@ -321,7 +364,7 @@
           const survey = { id: snap.id, ...snap.data() };
           const distributionActive = survey.distribution?.active ?? survey.distributionActive ?? (survey.status !== 'closed' && !survey.deletedAt);
           if (!distributionActive) {
-            showError("이 설문은 배포가 종료되었습니다.<br/>기존 응답은 안전하게 보관되어 있습니다.");
+            showError("이 설문은 마감되었습니다.<br/>참여해 주셔서 감사합니다.");
             return;
           }
           renderSurveyForm(survey, db, addDoc, collection, serverTimestamp);
@@ -347,10 +390,14 @@
         let html = `
           <header>
             <h1>${escapeHtml(survey.title)}</h1>
-            <p>${escapeHtml(survey.sessionType || '')} 대상 익명 설문조사입니다.</p>
+            <p>${survey.sessionType ? escapeHtml(survey.sessionType) + ' 대상 ' : ''}익명 설문조사입니다.</p>
           </header>
           <div class="section-info">
             본 설문조사는 완전히 익명으로 진행되며, 답변 내용은 통계적으로 합산하여 분석에만 활용됩니다. 개인 식별 정보는 일절 수집하지 않습니다.
+          </div>
+          <div class="progress-wrapper">
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <span class="progress-text" id="progress-text">0 / ${(survey.questions || []).length}</span>
           </div>
           <form id="survey-form">
         `;
@@ -373,14 +420,54 @@
         html += `<button type="submit" class="submit-btn">설문 제출하기</button></form>`;
         container.innerHTML = html;
 
+        // Progress tracking
+        const _qList = (survey.questions || []);
+        const _totalQ = _qList.length;
+        function updateProgress() {
+          let answered = 0;
+          _qList.forEach(q => {
+            if (q.type === 'quant') {
+              if (container.querySelector(`input[name="${q.id}"]:checked`)) answered++;
+            } else {
+              const ta = container.querySelector(`textarea[name="${q.id}"]`);
+              if (ta && ta.value.trim()) answered++;
+            }
+          });
+          const fill = document.getElementById('progress-fill');
+          const text = document.getElementById('progress-text');
+          if (fill) {
+            fill.style.width = `${_totalQ ? Math.round((answered / _totalQ) * 100) : 0}%`;
+            fill.classList.toggle('complete', answered === _totalQ);
+          }
+          if (text) text.textContent = `${answered} / ${_totalQ}`;
+        }
+
         // Radio click highlight
         container.querySelectorAll('.scale-option').forEach(el => {
           el.addEventListener('click', () => {
             el.closest('.scale-container').querySelectorAll('.scale-option').forEach(s => s.classList.remove('active'));
             el.classList.add('active');
             el.querySelector('input').checked = true;
+            updateProgress();
           });
         });
+
+        // Keyboard radio selection support
+        container.querySelectorAll('.scale-container input[type="radio"]').forEach(input => {
+          input.addEventListener('change', () => {
+            const scaleContainer = input.closest('.scale-container');
+            scaleContainer.querySelectorAll('.scale-option').forEach(s => s.classList.remove('active'));
+            input.closest('.scale-option').classList.add('active');
+            updateProgress();
+          });
+        });
+
+        // Textarea input tracking
+        container.querySelectorAll('textarea.input-text').forEach(ta => {
+          ta.addEventListener('input', updateProgress);
+        });
+
+        updateProgress();
 
         document.getElementById('survey-form').addEventListener('submit', async (e) => {
           e.preventDefault();
@@ -410,7 +497,7 @@
               <div class="success-view">
                 <div class="success-icon">✓</div>
                 <h2>제출 완료</h2>
-                <p>설문조사에 응해주셔서 대단히 감사합니다.<br />입력하신 답변이 성공적으로 기록되었습니다.</p>
+                <p>설문 제출이 성공적으로 완료되었습니다.</p>
               </div>
             `;
           } catch (err) {
@@ -450,7 +537,8 @@
         notice.className = 'section-info';
         notice.dataset.submitError = 'true';
         notice.style.borderColor = 'rgba(239,68,68,0.35)';
-        notice.style.color = '#991b1b';
+        notice.style.background = 'rgba(239,68,68,0.08)';
+        notice.style.color = '#fca5a5';
         notice.innerHTML = `제출이 완료되지 않았습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.<br/><small>${message}</small>`;
         form?.prepend(notice);
       }

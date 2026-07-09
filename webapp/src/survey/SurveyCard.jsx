@@ -103,6 +103,11 @@ export function SurveyCard({ survey, session }) {
         </div>
       </div>
       <SurveyResponsePanel survey={survey} session={session} />
+      {surveyRows(survey).length > 0 && !survey.googleFormUrl && (
+        <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '6px', textAlign: 'right' }}>
+          💡 응답 상세 분석은 사이드바 <strong style={{ color: 'var(--ink-2)' }}>변화 분석</strong>에서 세션별로 확인 가능합니다.
+        </div>
+      )}
     </div>
   );
 }

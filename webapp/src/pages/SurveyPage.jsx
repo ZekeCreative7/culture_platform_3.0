@@ -15,8 +15,8 @@ export const SurveyPage = memo(function SurveyPage() {
     <>
       <PageHead
         eyebrow="설문"
-        title="설문 설계와 배포 QR 생성"
-        description="세션 및 회차별 모바일 설문을 설계하고, 자동 생성된 QR 코드로 구성원들의 응답을 실시간으로 적재합니다."
+        title="설문 운영 보드"
+        description="세션에 연결된 설문을 만들고 QR로 배포하면, 구성원의 응답이 자동으로 쌓여 세션 전·후 변화를 측정합니다."
       />
       <div className="workspace-grid">
         <SurveyWizardPanel />

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildSessionWorkBuckets,
   buildSessionBoardSummary,
   sessionDataState,
   sessionNextAction,
   sessionRoundCounts,
+  sessionStageTrack,
+  sessionWorkBucket,
 } from '../src/sessions/sessionBoardModel.js';
 
 const baseState = {
@@ -23,6 +26,7 @@ const baseState = {
       type: '리더십',
       cohort: 1,
       year: 2026,
+      leaderGroup: [{ id: 'leader-1', teamId: 'team-1', teamName: 'A팀' }],
       schedule: [
         { confirmed: true, date: '2026-07-01' },
         { confirmed: true, date: '2026-07-08' },
@@ -33,6 +37,8 @@ const baseState = {
       type: '운영 서베이',
       cohort: 1,
       year: 2026,
+      subject: '안전점검',
+      audienceScope: '전사',
       schedule: [
         { confirmed: true, date: '2026-07-01' },
       ],
@@ -85,5 +91,31 @@ describe('sessionBoardModel', () => {
     expect(summary.find((item) => item.key === 'schedule').value).toBe('1회차');
     expect(summary.find((item) => item.key === 'survey').value).toBe('1개');
     expect(summary.find((item) => item.key === 'report').value).toBe('2개');
+  });
+
+  it('builds a compact status track for cards', () => {
+    const track = sessionStageTrack(baseState, baseState.sessions[1]);
+    expect(track.map((item) => [item.key, item.status])).toEqual([
+      ['target', 'done'],
+      ['schedule', 'done'],
+      ['survey', 'done'],
+      ['response', 'done'],
+      ['report', 'done'],
+    ]);
+
+    const scheduleNeeded = sessionStageTrack(baseState, baseState.sessions[0]);
+    expect(scheduleNeeded.find((item) => item.key === 'schedule').status).toBe('need');
+    expect(scheduleNeeded.find((item) => item.key === 'survey').status).toBe('need');
+  });
+
+  it('groups sessions into workboard buckets by next operational need', () => {
+    expect(sessionWorkBucket(baseState, baseState.sessions[0], '진행중')).toBe('schedule');
+    expect(sessionWorkBucket(baseState, baseState.sessions[1], '완료')).toBe('report');
+
+    const buckets = buildSessionWorkBuckets(baseState, baseState.sessions, (session) => (
+      session.id === 's1' ? ['진행중'] : ['완료']
+    ));
+    expect(buckets.find((bucket) => bucket.key === 'schedule').sessions.map((session) => session.id)).toEqual(['s1']);
+    expect(buckets.find((bucket) => bucket.key === 'report').sessions.map((session) => session.id)).toEqual(['s2', 's3']);
   });
 });

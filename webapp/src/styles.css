@@ -757,6 +757,7 @@ button:disabled { cursor: not-allowed; opacity: 0.42; transform: none !important
 .section-title { display: flex; align-items: flex-end; justify-content: space-between; margin: 28px 0 14px; }
 .section-title h2   { color: var(--ink); font-size: var(--fs-section); font-weight: 800; font-family: var(--font-display); letter-spacing: -0.02em; }
 .section-title span { color: var(--muted); font-size: 13px; font-weight: 600; }
+.section-title > div:first-child { display: grid; gap: 3px; min-width: 0; }
 .section-title-toggle {
   width: 100%; border: none; background: transparent; cursor: pointer; padding: 0;
   font: inherit; text-align: left;
@@ -1910,6 +1911,75 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: po
 .panel-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
 
 /* ─── Session Type Grouping ─── */
+.session-board-title {
+  align-items: center;
+  gap: 14px;
+}
+.session-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fafc;
+  flex: 0 0 auto;
+}
+.session-view-switch button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.session-view-switch button.active {
+  background: #ffffff;
+  color: var(--blue-deep);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .08);
+}
+.session-work-group {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.session-work-group-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 0 10px;
+  border-left: 3px solid #cbd5e1;
+}
+.session-work-group.schedule .session-work-group-head,
+.session-work-group.survey .session-work-group-head,
+.session-work-group.upload .session-work-group-head { border-left-color: #f59e0b; }
+.session-work-group.report .session-work-group-head { border-left-color: #10b981; }
+.session-work-group-head div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.session-work-group-head strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+.session-work-group-head span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+.session-work-group-head b {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
 .session-type-group { margin-bottom: 18px; }
 .session-type-group-head {
   --accent: var(--blue);
@@ -1953,6 +2023,61 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: po
 .status.muted  { background: #f1f5f9; border: 1.5px solid #cbd5e1;  color: var(--muted); }
 
 .session-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 5px; color: var(--muted); font-size: 10px; font-weight: 600; }
+.session-stage-track {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 10px;
+}
+.session-stage-step {
+  min-width: 0;
+  min-height: 46px;
+  padding: 7px 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+}
+.session-stage-step i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+.session-stage-step b {
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+.session-stage-step small {
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.1;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.session-stage-step.done {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.session-stage-step.done i { background: #059669; }
+.session-stage-step.need,
+.session-stage-step.progress {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+.session-stage-step.need i,
+.session-stage-step.progress i { background: #d97706; }
+.session-stage-step.blocked {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+.session-stage-step.blocked b,
+.session-stage-step.blocked small { color: #94a3b8; }
 .session-alert-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .session-more-item { display: block; width: 100%; padding: 10px 16px; text-align: left; font-size: 13px; font-weight: 600; color: var(--ink); background: none; border: none; cursor: pointer; white-space: nowrap; }
 .session-more-item:hover { background: #f5f5f7; }

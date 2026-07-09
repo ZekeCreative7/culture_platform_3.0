@@ -84,6 +84,93 @@ export function sessionNextAction(appState, session, status) {
   };
 }
 
+export function sessionTargetReady(session) {
+  const type = normalizeSessionType(session.type);
+  if (type === '팀빌딩') return Boolean(session.teamId || session.team || (session.members || []).length);
+  if (type === '리더십') return Boolean((session.leaderGroup || []).length || (session.members || []).length);
+  if (type === '운영 서베이') {
+    return Boolean(
+      (session.subject || '').trim() &&
+      (session.audienceScope === '전사' || (session.sourceTeamIds || []).length || session.participatingTeams)
+    );
+  }
+  if (session.audienceScope === '전사') return true;
+  return Boolean((session.members || []).length || session.participatingTeams);
+}
+
+export function sessionStageTrack(appState, session) {
+  const rounds = sessionRoundCounts(session);
+  const data = sessionDataState(appState, session);
+  const targetReady = sessionTargetReady(session);
+  const scheduleReady = rounds.total > 0 && rounds.pending === 0;
+  const surveyReady = data.surveyCount > 0;
+  const responseReady = data.analysisReady;
+
+  return [
+    {
+      key: 'target',
+      label: '대상',
+      status: targetReady ? 'done' : 'need',
+      text: targetReady ? '완료' : '필요',
+    },
+    {
+      key: 'schedule',
+      label: '일정',
+      status: scheduleReady ? 'done' : 'need',
+      text: scheduleReady ? '완료' : `${rounds.pending || rounds.total}회차`,
+    },
+    {
+      key: 'survey',
+      label: '설문',
+      status: surveyReady ? 'done' : 'need',
+      text: surveyReady ? '있음' : '필요',
+    },
+    {
+      key: 'response',
+      label: '응답',
+      status: responseReady ? 'done' : data.uploadCount > 0 ? 'progress' : surveyReady ? 'need' : 'blocked',
+      text: responseReady ? '완료' : data.uploadCount > 0 ? `${data.uploadCount}/${data.uploadTotal}` : surveyReady ? '필요' : '대기',
+    },
+    {
+      key: 'report',
+      label: '리포트',
+      status: responseReady ? 'done' : 'blocked',
+      text: responseReady ? '가능' : '대기',
+    },
+  ];
+}
+
+export function sessionWorkBucket(appState, session, status) {
+  const rounds = sessionRoundCounts(session);
+  const data = sessionDataState(appState, session);
+  if (rounds.pending > 0) return 'schedule';
+  if (data.surveyCount === 0) return 'survey';
+  if (!data.analysisReady && status !== '시작전') return 'upload';
+  if (data.analysisReady) return 'report';
+  return 'steady';
+}
+
+export const SESSION_WORK_BUCKETS = [
+  { key: 'schedule', title: '일정 필요', description: '날짜나 확정 상태를 정리해야 합니다.' },
+  { key: 'survey', title: '설문 필요', description: '설문/QR을 만들어야 응답을 모을 수 있습니다.' },
+  { key: 'upload', title: '응답 필요', description: '사전/사후 응답을 넣으면 분석으로 이어집니다.' },
+  { key: 'report', title: '리포트 가능', description: '분석과 보고서 확인이 가능합니다.' },
+  { key: 'steady', title: '진행 확인', description: '현재 일정과 배포 상태를 지켜보면 됩니다.' },
+];
+
+export function buildSessionWorkBuckets(appState, sessions, getStatus) {
+  const buckets = Object.fromEntries(SESSION_WORK_BUCKETS.map((bucket) => [bucket.key, []]));
+  sessions.forEach((session) => {
+    const status = getStatus(session);
+    const key = sessionWorkBucket(appState, session, Array.isArray(status) ? status[0] : status);
+    buckets[key].push(session);
+  });
+  return SESSION_WORK_BUCKETS.map((bucket) => ({
+    ...bucket,
+    sessions: buckets[bucket.key] || [],
+  }));
+}
+
 export function buildSessionBoardSummary(appState) {
   const sessions = appState.sessions || [];
   const pendingRounds = sessions.reduce((sum, session) => sum + sessionRoundCounts(session).pending, 0);

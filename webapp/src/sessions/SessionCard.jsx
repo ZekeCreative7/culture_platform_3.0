@@ -12,7 +12,7 @@ import {
   prepareReportForSession,
 } from './sessionActions.js';
 import { openQualAnalysisModal } from '../report/reportQualSignals.js';
-import { sessionDataState, sessionNextAction } from './sessionBoardModel.js';
+import { sessionDataState, sessionNextAction, sessionStageTrack } from './sessionBoardModel.js';
 
 export function SessionCard({ session }) {
   const navigate = useNavigate();
@@ -35,6 +35,7 @@ export function SessionCard({ session }) {
   const hasPreSig = (vanillaState.qualSignals || []).some((q) => q.session_id === session.id && q.phase === 'pre' && q.review?.status === 'confirmed');
   const hasPostSig = (vanillaState.qualSignals || []).some((q) => q.session_id === session.id && q.phase === 'post' && q.review?.status === 'confirmed');
   const nextAction = sessionNextAction(vanillaState, session, status);
+  const stageTrack = sessionStageTrack(vanillaState, session);
 
   const handleNextAction = () => {
     if (nextAction.kind === 'schedule') {
@@ -70,10 +71,18 @@ export function SessionCard({ session }) {
           <h3>{sessionLabel(session)}</h3>
         </div>
       </div>
+      <div className="session-stage-track" aria-label="세션 운영 단계">
+        {stageTrack.map((stage) => (
+          <span className={`session-stage-step ${stage.status}`} key={stage.key} title={`${stage.label}: ${stage.text}`}>
+            <i aria-hidden="true" />
+            <b>{stage.label}</b>
+            <small>{stage.text}</small>
+          </span>
+        ))}
+      </div>
       <div className="session-meta">
-        <span title="일정이 확정된 회차 수">일정 확정 {confirmed}/{total}회차</span>
-        <span title="날짜 미정 또는 미확정 회차">⏳ 미확정 {total - confirmed}회차</span>
-        <span title="사전/사후/팔로우업 설문 CSV 업로드 완료 단계">설문 응답 업로드 {uploadCount}/{uploadTotal}단계</span>
+        <span title="일정이 확정된 회차 수">일정 {confirmed}/{total}</span>
+        <span title="사전/사후/팔로우업 설문 CSV 업로드 완료 단계">응답 {uploadCount}/{uploadTotal}</span>
       </div>
       {(noDataWhileActive || incompleteAfterDone) && (
         <div className="session-alert-badges">

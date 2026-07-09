@@ -29,8 +29,9 @@ function AttendanceModalBody({ session, item }) {
         <strong>{title}</strong><br />
         {item.seq}회차 일정 · {item.date || '일정 미정'}
       </div>
+      <div style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--muted)', marginBottom: '6px' }}>결석자 체크 (체크된 인원이 결석 처리됩니다)</div>
       <div className="attendance-members-grid" style={{ maxHeight: '260px', overflowY: 'auto', border: '1px solid var(--line)', borderRadius: '8px', padding: '6px' }}>
-        {members.map((m) => (
+        {members.length ? members.map((m) => (
           <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderBottom: '1px solid var(--line-soft)', cursor: 'pointer' }}>
             <input type="checkbox" checked={absentIds.has(m.id)} onChange={() => toggleAbsent(m.id)} data-member-id={m.id} />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -38,7 +39,9 @@ function AttendanceModalBody({ session, item }) {
               <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{m.teamName} · {m.jobTitle || m.grade || ''}</span>
             </div>
           </label>
-        ))}
+        )) : (
+          <div style={{ padding: '12px', fontSize: '12px', color: 'var(--muted)', textAlign: 'center' }}>등록된 구성원이 없습니다. 세션 수정에서 대상을 추가해 주세요.</div>
+        )}
       </div>
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', fontSize: '12.5px', fontWeight: '700' }}>
         <input id="round-completed" type="checkbox" checked={completed} onChange={(e) => setCompleted(e.target.checked)} />

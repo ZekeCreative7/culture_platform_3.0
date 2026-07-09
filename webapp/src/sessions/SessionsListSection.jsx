@@ -66,6 +66,12 @@ export function SessionsListSection() {
           <button type="button" className={viewMode === 'type' ? 'active' : ''} onClick={() => setViewMode('type')}>유형별</button>
         </div>
       </div>
+      {vanillaState.sessionCreatedToast && (
+        <div style={{ background: '#ecfdf5', border: '1.5px solid #6ee7b7', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', color: '#065f46', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: '#d1fae5', color: '#059669', fontWeight: '800', fontSize: '12px' }}>✓</span>
+          "{vanillaState.sessionCreatedToast}" 세션이 등록됐습니다. 일정을 확정하고 설문을 준비하세요.
+        </div>
+      )}
       {sessionCount ? (
         viewMode === 'work' ? (
           <>

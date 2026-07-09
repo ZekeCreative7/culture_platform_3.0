@@ -269,7 +269,18 @@ export function createOrUpdateSession() {
   state.sessions.unshift(session);
   state.sessionDrawerOpen = false;
   state.draftSchedule = makeSchedule(type);
+  state.sessionCreatedToast = session.team || session.participatingTeams || sessionTypeDef(type).label;
   saveState();
+
+  // Auto-dismiss success toast after 5 seconds
+  const toastLabel = state.sessionCreatedToast;
+  setTimeout(() => {
+    if (state.sessionCreatedToast === toastLabel) {
+      state.sessionCreatedToast = '';
+      saveState();
+    }
+  }, 5000);
+
   saveSessionToFirestore(session);
   subscribeResponsesFromFirestore({ force: true });
 }

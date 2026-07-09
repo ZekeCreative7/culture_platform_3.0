@@ -188,16 +188,16 @@ export function buildSessionBoardSummary(appState) {
     {
       key: 'schedule',
       label: '일정 잡기',
-      value: pendingRounds ? `${pendingRounds}회차` : '완료',
-      detail: pendingRounds ? '날짜 또는 확정 필요' : '모든 회차 확정',
-      tone: pendingRounds ? 'attention' : 'ok',
+      value: !sessions.length ? '–' : pendingRounds ? `${pendingRounds}회차` : '완료',
+      detail: !sessions.length ? '세션을 먼저 등록하세요' : pendingRounds ? '날짜 또는 확정 필요' : '모든 회차 확정',
+      tone: !sessions.length ? 'muted' : pendingRounds ? 'attention' : 'ok',
     },
     {
       key: 'survey',
       label: '설문 준비',
-      value: sessionsWithoutSurvey ? `${sessionsWithoutSurvey}개` : '완료',
-      detail: sessionsWithoutSurvey ? '설문/QR 연결 필요' : '모든 세션 설문 있음',
-      tone: sessionsWithoutSurvey ? 'attention' : 'ok',
+      value: !sessions.length ? '–' : sessionsWithoutSurvey ? `${sessionsWithoutSurvey}개` : '완료',
+      detail: !sessions.length ? '세션을 먼저 등록하세요' : sessionsWithoutSurvey ? '설문/QR 연결 필요' : '모든 세션 설문 있음',
+      tone: !sessions.length ? 'muted' : sessionsWithoutSurvey ? 'attention' : 'ok',
     },
     {
       key: 'report',

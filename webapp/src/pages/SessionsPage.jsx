@@ -20,7 +20,7 @@ function SessionsStoryBand({ summary }) {
       <div className="session-story-copy">
         <span className="eyebrow">운영 흐름</span>
         <h2>진단에서 나온 이슈를 실제 세션으로 운영합니다</h2>
-        <p>대상 구성, 회차 일정, 설문 배포, 응답 적재, 리포트 준비까지 한 화면에서 다음 일을 확인하세요.</p>
+        <p>대상 구성, 회차 일정, 설문 배포, 응답 수집, 리포트 준비까지 한 화면에서 다음 일을 확인하세요.</p>
       </div>
       <div className="session-journey-grid">
         {summary.map((item, index) => (

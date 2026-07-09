@@ -1,6 +1,6 @@
 import { state, saveState } from '../state.js';
 import { customMemberPool } from '../views/sessions.js';
-import { allMemberCandidates } from '../views/org.js';
+import { allMemberCandidates, teamMemberCandidates } from '../views/org.js';
 
 export function updateSubject(value) {
   state.draftSubject = value || '';
@@ -23,6 +23,21 @@ export function toggleCustomTeam(teamId, checked) {
     state.draftCustomMemberIds = state.draftCustomMemberIds.filter((id) => validMemberIds.has(id));
   }
   saveState();
+}
+
+// 운영 서베이는 무기명이라 팀원을 개별 선택하지 않고, 팀을 추가하면
+// 해당 팀 구성원 전체가 자동으로 대상에 포함된다.
+export function addOperationalTeam(teamId) {
+  if (!teamId || state.draftCustomTeamIds.includes(teamId)) return;
+  state.draftCustomTeamIds.push(teamId);
+  const memberIds = new Set(state.draftCustomMemberIds || []);
+  teamMemberCandidates(teamId, false).forEach((member) => memberIds.add(member.id));
+  state.draftCustomMemberIds = Array.from(memberIds);
+  saveState();
+}
+
+export function removeOperationalTeam(teamId) {
+  toggleCustomTeam(teamId, false);
 }
 
 export function toggleCustomMember(memberId, checked) {

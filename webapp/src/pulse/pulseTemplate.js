@@ -28,7 +28,7 @@ function addInputStyles(ws, range) {
 function makeIntroSheet() {
   const XLSX = sheetjs();
   const rows = [
-    ["Pulse Survey 업로드 템플릿"],
+    ["조직 진단(Pulse) 업로드 템플릿"],
     [""],
     ["작성 순서"],
     ["1. Pulse 시트의 5/4/3/2/1 비율을 0~1 또는 %로 입력합니다. FAV는 수식으로 자동 계산됩니다."],

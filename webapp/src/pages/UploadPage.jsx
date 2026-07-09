@@ -162,7 +162,7 @@ export function UploadPage() {
 
   return (
     <>
-      <PageHead eyebrow="CSV 업로드" title="Validate anonymous survey files before they enter analysis." />
+      <PageHead eyebrow="CSV 업로드" title="분석에 넣기 전, 익명 설문 파일을 검증합니다" />
       <section className="panel">
         {sessions.length === 0 ? (
           <div className="empty-card">먼저 세션을 등록하세요.</div>

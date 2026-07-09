@@ -26,10 +26,10 @@ export function PulseSessionInsightPanel({ session, insight }) {
     return (
       <section className="panel report-export-section" style={{ marginBottom: '28px' }}>
         <div className="section-title" style={{ marginBottom: '12px' }}>
-          <h2>Pulse Survey 연결 인사이트</h2>
+          <h2>조직 진단 연결 인사이트</h2>
           <span>본부 Pulse 결과와 세션 설문을 함께 읽습니다</span>
         </div>
-        <div className="empty">Pulse Survey 데이터를 불러오면 본부 기준 신호와 세션 설문 변화가 함께 표시됩니다.</div>
+        <div className="empty">조직 진단 데이터를 불러오면 본부 기준 신호와 세션 설문 변화가 함께 표시됩니다.</div>
       </section>
     );
   }
@@ -38,7 +38,7 @@ export function PulseSessionInsightPanel({ session, insight }) {
     return (
       <section className="panel report-export-section" style={{ marginBottom: '28px' }}>
         <div className="section-title" style={{ marginBottom: '12px' }}>
-          <h2>Pulse Survey 연결 인사이트</h2>
+          <h2>조직 진단 연결 인사이트</h2>
           <span>{insight.year || '—'}년 Pulse 기준</span>
         </div>
         <div className="empty">이 팀과 연결된 Pulse 본부 매핑이 없습니다. 연도별 조직 매핑을 설정하면 본부 기준 Pulse 결과를 세션 분석에 연결할 수 있습니다.</div>
@@ -60,7 +60,7 @@ export function PulseSessionInsightPanel({ session, insight }) {
   return (
     <section className="panel report-export-section" style={{ marginBottom: '28px', border: '1.5px solid rgba(0,82,255,0.18)', background: 'linear-gradient(135deg,#ffffff 0%,#f8fbff 100%)' }}>
       <div className="section-title" style={{ marginBottom: '16px' }}>
-        <h2>Pulse Survey 연결 인사이트</h2>
+        <h2>조직 진단 연결 인사이트</h2>
         <span>본부 맥락 → 팀 세션 반응 → 다음 운영 액션</span>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>

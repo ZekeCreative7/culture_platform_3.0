@@ -188,7 +188,7 @@ export const CommPage = memo(function CommPage() {
     <div className="comm-wrapper">
       <header className="page-head">
         <div>
-          <span className="eyebrow">COMM</span>
+          <span className="eyebrow">커뮤니케이션</span>
           <h1>커뮤니케이션 기획</h1>
           <p>전략 방향과 데이터를 연결해 구성원 메시지를 기획하고, AI와 반복 다듬기 후 최종본을 저장합니다.</p>
         </div>
@@ -321,7 +321,7 @@ export const CommPage = memo(function CommPage() {
                 <div className="comm-step">
                   <div className="comm-step-label">
                     <span className="step-num">④</span>
-                    <strong>실행 계획 / 약속</strong>
+                    <strong>실행 계획 / 실행 과제</strong>
                     <span className="step-hint">실제로 할 수 있는 구체적 행동</span>
                   </div>
                   <textarea
@@ -504,7 +504,7 @@ export const CommPage = memo(function CommPage() {
                             rows="2"
                             value={extraFeedback}
                             onChange={(e) => setExtraFeedback(e.target.value)}
-                            placeholder="예: 도입부를 더 공감가게 바꿔줘, 약속 부분을 구체적으로 3가지로 나눠줘"
+                            placeholder="예: 도입부를 더 공감가게 바꿔줘, 실행 과제 부분을 구체적으로 3가지로 나눠줘"
                           />
                         </div>
 

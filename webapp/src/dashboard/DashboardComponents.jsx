@@ -78,7 +78,7 @@ export function DashboardStatusStrip({ snapshot, pulseYear, onNavigate }) {
         <div className="strip-quick-actions">
           <button className="primary compact quick-action-btn" onClick={() => onNavigate('sessions')}>세션 만들기</button>
           <button className="secondary compact quick-action-btn" onClick={() => onNavigate('survey')}>설문 만들기</button>
-          <button className="secondary compact quick-action-btn" onClick={() => onNavigate('pulse-report')}>약속 보드</button>
+          <button className="secondary compact quick-action-btn" onClick={() => onNavigate('pulse-report')}>답변 보드</button>
         </div>
       </div>
     </div>
@@ -91,7 +91,7 @@ export function DashboardKPIGrid({ isLoading, actionsReady, todayActionsCount, r
     <div className="dashboard-kpi-grid">
       <KPICard
         label="오늘 할 일"
-        helpText="기한 초과 약속, 오늘 세션, 사후설문 대기, 미정 회차처럼 오늘 직접 처리해야 하는 작업 개수입니다. 예정 알림과 보고 준비 완료는 제외합니다."
+        helpText="기한 초과 실행 과제, 오늘 세션, 사후설문 대기, 미정 회차처럼 오늘 직접 처리해야 하는 작업 개수입니다. 예정 알림과 보고 준비 완료는 제외합니다."
         value={isLoading || !actionsReady ? '—' : todayActionsCount}
         desc="즉시 조치 필요"
         highlightClass="highlight-red"
@@ -99,9 +99,9 @@ export function DashboardKPIGrid({ isLoading, actionsReady, todayActionsCount, r
       />
       <KPICard
         label="응답 대기"
-        helpText="작성 중이거나 공감 피드백(We Heard) 작성이 진행되지 않은 약속 개수입니다."
+        helpText="작성 중이거나 공감 답변이 작성되지 않은 실행 과제 개수입니다."
         value={isLoading ? '—' : responseWaiting}
-        desc="공감 피드백 미등록"
+        desc="공감 답변 미등록"
         highlightClass="highlight-purple"
         onClick={() => onNavigate('pulse-report', '', '', 'listening')}
       />
@@ -140,7 +140,7 @@ export function TeamPipelineSection({ teams, viewMode, onToggleViewMode, onNavig
     <section className="panel dashboard-section" id="dashboard-team-pipeline">
       <div className="section-header">
         <div>
-          <h3>팀 변화 파이프라인</h3>
+          <h3>팀별 진행 단계</h3>
           <span className="section-subtitle">각 팀의 세션 진행 → 사후 설문 → 팔로우업 단계 현황</span>
         </div>
         <div className="pipeline-view-toggle">
@@ -306,7 +306,7 @@ export function OutcomeSnapshotSection({ outcome, onNavigate }) {
         <>
           <div className="outcome-snapshot-grid">
             <article className="outcome-snapshot-card">
-              <span>변화 모멘텀</span>
+              <span>변화 지수</span>
               <strong>{outcome.avgMomentumIndex ?? '—'}</strong>
               <small>{outcome.improved}/{outcome.total}개 세션 개선</small>
             </article>
@@ -347,68 +347,98 @@ export function OutcomeSnapshotSection({ outcome, onNavigate }) {
   );
 }
 
-// ── 5.6 Operating Loop Nodes ────────────────────────────────────────
-export function OperatingLoopSection({ loop, pulseYear, pulseLoaded, onNavigate }) {
+// ── Dashboard-top storytelling band (연 누적 운영 루프) ───────────────
+export function DashboardStoryBand({ loopYear, onNavigate }) {
+  const [guideOpen, setGuideOpen] = useState(false);
+  const {
+    year,
+    diagnoseCount = 0,
+    listeningCount = 0,
+    commitMadeCount = 0,
+    practiceCount = 0,
+    reviewCount = 0,
+    hasAnyData = false
+  } = loopYear || {};
+
+  const nodes = [
+    { key: 'diagnose', label: '살피기', num: diagnoseCount, sub: '진단 조직', onClick: () => onNavigate('pulse-report') },
+    { key: 'listen', label: '듣기', num: listeningCount, sub: '문화 세션', onClick: () => onNavigate('sessions') },
+    { key: 'answer', label: '답하기', num: commitMadeCount, sub: '리더 답변', onClick: () => onNavigate('pulse-report') },
+    { key: 'practice', label: '실천하기', num: practiceCount, sub: '이행 중', onClick: () => onNavigate('sessions') },
+    { key: 'review', label: '돌아보기', num: reviewCount, sub: '변화 확인', onClick: () => onNavigate('report') }
+  ];
+
+  const steps = [
+    { n: 1, title: '세션 등록', desc: '문화 세션과 회차 일정을 만듭니다', onClick: () => onNavigate('sessions') },
+    { n: 2, title: '설문 만들기·배포', desc: '사전·사후 설문을 만들어 QR로 배포합니다', onClick: () => onNavigate('survey') },
+    { n: 3, title: '응답 업로드', desc: '수집한 응답 CSV를 올려 변화를 분석합니다', onClick: () => onNavigate('upload') }
+  ];
+
   return (
-    <section className="panel dashboard-section">
-      <div className="section-header">
-        <h3>조직문화 운영 루프</h3>
-        <span className="section-subtitle">기초체력 진단부터 사후 변화 확인까지의 순환 과정</span>
+    <section className="panel story-band">
+      <div className="story-band-head">
+        <span className="eyebrow">조직문화 운영 루프 · {year}년 누적</span>
+        {hasAnyData && (
+          <button
+            type="button"
+            className="story-guide-btn"
+            aria-expanded={guideOpen}
+            onClick={() => setGuideOpen(v => !v)}
+          >
+            시작 가이드 {guideOpen ? '닫기' : '보기'}
+          </button>
+        )}
       </div>
-      <div className="operating-loop-container">
-        <div className="loop-nodes">
-          <div className="loop-node cursor-pointer" onClick={() => onNavigate('pulse-report')}>
-            <div className={`node-circle ${pulseLoaded ? 'success' : 'empty'}`}>
-              <span className="node-num">{loop.diagnosticLabel === '데이터 없음' ? '—' : (pulseYear || '—')}</span>
-            </div>
-            <div className="node-info">
-              <strong className="node-name">진단</strong>
-              <span className="node-sub">Pulse 진단</span>
-            </div>
-          </div>
-          <div className="loop-arrow">→</div>
-          <div className="loop-node cursor-pointer" onClick={() => onNavigate('sessions')}>
-            <div className={`node-circle ${loop.listeningCount > 0 ? 'active' : 'empty'}`}>
-              <span className="node-num">{loop.listeningCount}</span>
-            </div>
-            <div className="node-info">
-              <strong className="node-name">듣기</strong>
-              <span className="node-sub">의견 청취 세션</span>
-            </div>
-          </div>
-          <div className="loop-arrow">→</div>
-          <div className="loop-node cursor-pointer" onClick={() => onNavigate('pulse-report')} style={{ position: 'relative' }}>
-            <div className={`node-circle ${loop.commitmentsCount > 0 ? 'active' : 'empty'}`}>
-              <span className="node-num">{loop.commitmentsCount}</span>
-              {loop.hasRedDot && <span className="node-red-dot"></span>}
-            </div>
-            <div className="node-info">
-              <strong className="node-name">응답</strong>
-              <span className="node-sub">공유·진행 약속</span>
-            </div>
-          </div>
-          <div className="loop-arrow">→</div>
-          <div className="loop-node cursor-pointer" onClick={() => onNavigate('sessions')}>
-            <div className={`node-circle ${loop.activeSessionsCount > 0 ? 'active' : 'empty'}`}>
-              <span className="node-num">{loop.activeSessionsCount}</span>
-            </div>
-            <div className="node-info">
-              <strong className="node-name">실행</strong>
-              <span className="node-sub">운영 중 세션</span>
-            </div>
-          </div>
-          <div className="loop-arrow">→</div>
-          <div className="loop-node cursor-pointer" onClick={() => onNavigate('report')}>
-            <div className={`node-circle ${loop.completedSessionsCount > 0 ? 'success' : 'empty'}`}>
-              <span className="node-num">{loop.completedSessionsCount}</span>
-            </div>
-            <div className="node-info">
-              <strong className="node-name">확인</strong>
-              <span className="node-sub">사후 변화 검증</span>
-            </div>
+
+      {hasAnyData ? (
+        <p className="story-line">
+          {year}년, 조직 진단으로 <b>{diagnoseCount}개 조직</b>을 살펴, <b>{listeningCount}번의 세션</b>에서 들은 목소리에 <b>{commitMadeCount}건의 답</b>을 내고 그중 <b>{practiceCount}건</b>을 실천해 <b>{reviewCount}개</b>의 변화를 확인했어요.
+        </p>
+      ) : (
+        <p className="story-line story-line-muted">
+          아직 {year}년에 기록된 활동이 없어요. 아래 <b>시작 가이드</b>의 3단계로 첫 바퀴를 시작해 보세요.
+        </p>
+      )}
+
+      <div className="story-loop">
+        {nodes.map((node, i) => (
+          <React.Fragment key={node.key}>
+            <button type="button" className="story-tile" onClick={node.onClick}>
+              <span className="story-tile-label">{node.label}</span>
+              <span className="story-tile-num">{node.num}</span>
+              <span className="story-tile-sub">{node.sub}</span>
+            </button>
+            {i < nodes.length - 1 && (
+              <span className="story-chev" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 0 1 0-1.414L10.586 10 7.293 6.707a1 1 0 0 1 1.414-1.414l4 4a1 1 0 0 1 0 1.414l-4 4a1 1 0 0 1-1.414 0Z" clipRule="evenodd"/></svg>
+              </span>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="story-loopback" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 4V1L6 5l4 4V6a4 4 0 1 1-4 4H4a6 6 0 1 0 6-6Z"/></svg>
+        <span>한 바퀴가 끝나면 <b>돌아보기</b> 결과로 다시 <b>살피기</b></span>
+      </div>
+
+      {(guideOpen || !hasAnyData) && (
+        <div className="story-guide">
+          <span className="story-guide-title">3단계로 시작하기</span>
+          <div className="story-guide-steps">
+            {steps.map(step => (
+              <button type="button" className="story-step" key={step.n} onClick={step.onClick}>
+                <span className="story-step-num">{step.n}</span>
+                <span className="story-step-copy">
+                  <strong>{step.title}</strong>
+                  <small>{step.desc}</small>
+                </span>
+                <span className="story-step-arrow" aria-hidden="true">→</span>
+              </button>
+            ))}
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }
@@ -686,7 +716,7 @@ export function PulseSignalsSection({ pulseSignals, pulseYear, pulseLoaded, onNa
   return (
     <section className="panel dashboard-section">
       <div className="section-header">
-        <h3>조직 기초체력 5개 신호</h3>
+        <h3>진단 5개 항목</h3>
         <span className="section-subtitle">
           {pulseSignals?.[0]?.previousYear ? `${pulseSignals[0].previousYear}년 대비 ${pulseYear}년` : `${pulseYear || '—'}년`} Pulse 진단 비교
         </span>
@@ -703,7 +733,7 @@ export function PulseSignalsSection({ pulseSignals, pulseYear, pulseLoaded, onNa
           </div>
         ) : !pulseSignals ? (
           <div className="empty-state-card">
-            <p>기초체력 데이터가 존재하지 않습니다. 먼저 Pulse 데이터를 업로드해 주세요.</p>
+            <p>조직 진단 데이터가 존재하지 않습니다. 먼저 조직 진단 데이터를 업로드해 주세요.</p>
             <button className="primary compact margin-top" onClick={() => onNavigate('upload')}>Pulse 업로드로 이동</button>
           </div>
         ) : (
@@ -774,15 +804,15 @@ export function TrustFunnelSection({ funnel, onNavigate }) {
   return (
     <section className="panel dashboard-section">
       <div className="section-header">
-        <h3>신뢰 회복 퍼널</h3>
-        <span className="section-subtitle">정성 의견이 약속과 조치로 연결되는 흐름</span>
+        <h3>답변 이행 현황</h3>
+        <span className="section-subtitle">정성 의견이 답변과 실행으로 연결되는 흐름</span>
       </div>
       <div className="trust-funnel-content">
         {funnel.youSaid === 0 ? (
           <div className="empty-state-card">
-            <p className="empty-state-title">등록된 약속이 아직 없습니다</p>
-            <p className="empty-state-desc">구성원의 정성 의견을 조직의 행동 약속으로 연결합니다.<br />첫 약속을 등록하면 이행 현황과 신뢰 회복 흐름이 여기 표시됩니다.</p>
-            <button className="primary compact margin-top" onClick={() => onNavigate('pulse-report', '', '', 'listening', true)}>첫 약속 등록</button>
+            <p className="empty-state-title">등록된 답변이 아직 없습니다</p>
+            <p className="empty-state-desc">구성원의 정성 의견을 조직의 실행 과제로 연결합니다.<br />첫 답변을 등록하면 이행 현황이 여기 표시됩니다.</p>
+            <button className="primary compact margin-top" onClick={() => onNavigate('pulse-report', '', '', 'listening', true)}>첫 답변 등록</button>
           </div>
         ) : (
           <>
@@ -801,7 +831,7 @@ export function TrustFunnelSection({ funnel, onNavigate }) {
               {/* Heard */}
               <div className={`funnel-step ${funnel.maxDropSegment === 'will' ? 'highlight-drop' : ''}`}>
                 <div className="funnel-step-meta">
-                  <span className="step-title"><i className="funnel-index">02</i> WE HEARD <small>공감</small></span>
+                  <span className="step-title"><i className="funnel-index">02</i> WE HEARD <small>공감 답변</small></span>
                   <strong className="step-num">{funnel.weHeard}</strong>
                 </div>
                 <div className="funnel-bar-track">
@@ -812,7 +842,7 @@ export function TrustFunnelSection({ funnel, onNavigate }) {
               {/* Will */}
               <div className={`funnel-step ${funnel.maxDropSegment === 'did' ? 'highlight-drop' : ''}`}>
                 <div className="funnel-step-meta">
-                  <span className="step-title"><i className="funnel-index">03</i> WE WILL <small>실행 약속</small></span>
+                  <span className="step-title"><i className="funnel-index">03</i> WE WILL <small>실행 과제</small></span>
                   <strong className="step-num">{funnel.weWill}</strong>
                 </div>
                 <div className="funnel-bar-track">
@@ -835,9 +865,9 @@ export function TrustFunnelSection({ funnel, onNavigate }) {
               <div className="funnel-insight-box">
                 <strong>병목 구간 감지</strong>
                 <p>
-                  {funnel.maxDropSegment === 'heard' ? '직원 의견 등록 대비 회사 공감(We Heard) 비율이 가장 낮습니다. 빠른 공감 표명이 필요합니다.' :
-                   funnel.maxDropSegment === 'will' ? '공감 대비 구체적인 약속(We Will) 도출이 막혀 있습니다. 아이디어를 현실화해 주세요.' :
-                   '실행 약속 대비 최종 마친(We Did) 완료 건이 적습니다. 마무리 조치 및 증거 등록에 힘써야 합니다.'}
+                  {funnel.maxDropSegment === 'heard' ? '직원 의견 등록 대비 공감 답변(We Heard) 비율이 가장 낮습니다. 빠른 공감 답변이 필요합니다.' :
+                   funnel.maxDropSegment === 'will' ? '공감 답변 대비 구체적인 실행 과제(We Will) 도출이 막혀 있습니다. 아이디어를 현실화해 주세요.' :
+                   '실행 과제 대비 최종 마친(We Did) 완료 건이 적습니다. 마무리 조치 및 증거 등록에 힘써야 합니다.'}
                 </p>
               </div>
             )}
@@ -931,7 +961,7 @@ export function SupportOrgsSection({ supportOrgs, pulseLoaded, onNavigate }) {
     <section className="panel dashboard-section">
       <div className="section-header">
         <h3>먼저 지원할 조직</h3>
-        <span className="section-subtitle">Pulse Survey 기반 우선 지원 신호</span>
+        <span className="section-subtitle">조직 진단 기반 우선 지원 신호</span>
       </div>
       <div className="support-orgs-content">
         {!pulseLoaded ? (

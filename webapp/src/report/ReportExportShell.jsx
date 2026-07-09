@@ -22,8 +22,8 @@ function ReportHeader({ isCompare, type, cohort }) {
   return (
     <section className="page-head report-export-header">
       <div>
-        <span className="eyebrow">변화 분석 리포트</span>
-        <h1>변화 분석 리포트</h1>
+        <span className="eyebrow">세션 리포트</span>
+        <h1>세션 변화 리포트</h1>
         <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
       </div>
     </section>

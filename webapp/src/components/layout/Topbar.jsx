@@ -22,8 +22,8 @@ function auditActionLabel(action) {
     session_deleted: '세션 삭제',
     survey_distribution_toggled: '설문 배포',
     response_deleted: '응답 삭제',
-    commitment_saved: '약속 저장',
-    commitment_deleted: '약속 삭제'
+    commitment_saved: '실행 과제 저장',
+    commitment_deleted: '실행 과제 삭제'
   })[action] || action || '-';
 }
 

@@ -455,7 +455,7 @@ export function trustRecoveryHeadline(doc, prevDoc) {
   }
   if (!prevDoc) {
     return {
-      title: "올해의 Pulse Survey 진단이 완료되었습니다.",
+      title: "올해의 조직 진단이 완료되었습니다.",
       description: "비교 대상 과거 연도 데이터가 없어 추세 분석은 제한되지만, 현재의 절대적인 상태를 진단할 수 있습니다.",
       direction: "지금 구성원들이 느끼는 절대 점수를 바탕으로 먼저 들을 주제를 정하세요.",
     };
@@ -519,7 +519,7 @@ export function trustRecoveryHeadline(doc, prevDoc) {
   }
 
   return {
-    title: "기초체력은 현 수준을 유지하고 있으나, 신뢰 기반 대화는 계속 이어져야 합니다.",
+    title: "조직 진단 결과는 현 수준을 유지하고 있으나, 신뢰 기반 대화는 계속 이어져야 합니다.",
     description: "전년 대비 큰 변동 없이 주요 지표들이 보합세를 띠고 있습니다. 아직 신뢰가 완전히 뿌리내렸다고 보기는 이릅니다.",
     direction: "각 부문별로 드러나는 미세한 불일치(깨진 커플링) 신호를 잡아내어 타겟형 대화를 연결하세요.",
   };

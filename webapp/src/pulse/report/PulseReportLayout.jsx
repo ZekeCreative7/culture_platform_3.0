@@ -86,8 +86,8 @@ export function PulseReportLayout({
       {/* ── Page Head ─────────────────────────────────────────────── */}
       <section className="page-head pr-page-head">
         <div>
-          <span className="eyebrow">Pulse 경영 보고서</span>
-          <h1>Pulse Survey Report</h1>
+          <span className="eyebrow">조직 진단(Pulse)</span>
+          <h1>조직 진단 경영 보고서</h1>
           <p>
             연간 Pulse 데이터를 바탕으로 조직 상태 신호를 보여주고,
             FGD/IDI 및 후속 조치의 근거를 경영진이 납득하도록 돕는 보고서입니다.

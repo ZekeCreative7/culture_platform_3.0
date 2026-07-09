@@ -8,7 +8,7 @@ import {
   dashboardActionQueue,
   dashboardActionDataReady,
   dashboardTrustFunnel,
-  dashboardOperatingLoop,
+  dashboardOperatingLoopYearly,
   dashboardOutcomeSnapshot,
   dashboardWeekSchedule,
   dashboardPulseSignals,
@@ -24,12 +24,12 @@ import {
   setTeamPipelineView
 } from '../dashboard/dashboardStateActions.js';
 import {
+  DashboardStoryBand,
   DashboardStatusStrip,
   DashboardKPIGrid,
   TeamPipelineSection,
   SupportTeamsSection,
   OutcomeSnapshotSection,
-  OperatingLoopSection,
   ActionQueueSection,
   PulseSignalsSection,
   SupportOrgsSection,
@@ -65,7 +65,11 @@ export const DashboardPage = memo(function DashboardPage() {
   const readyActions = useMemo(() => allActions.filter((act) => act.group === "ready"), [allActions]);
 
   const funnel = useMemo(() => dashboardTrustFunnel(store.pulseCommitments), [store.pulseCommitments]);
-  const loop = useMemo(() => dashboardOperatingLoop({ state: store, pulseCache }), [store.sessions, store.responses]);
+  const currentYear = useMemo(() => new Date(today).getFullYear(), [today]);
+  const loopYear = useMemo(
+    () => dashboardOperatingLoopYearly({ state: store, pulseCache, year: currentYear }),
+    [store.sessions, store.responses, store.pulseCommitments, pulseCache.loaded, currentYear]
+  );
   const outcome = useMemo(() => dashboardOutcomeSnapshot({ state: store }), [store.sessions, store.responses]);
 
   const weekOffset = store.dashboardWeekOffset || 0;
@@ -160,11 +164,17 @@ export const DashboardPage = memo(function DashboardPage() {
     <div className="dashboard-wrapper">
       <header className="dashboard-header-block">
         <div className="header-titles">
-          <span className="eyebrow">HOME DASHBOARD</span>
+          <span className="eyebrow">홈 대시보드</span>
           <h1>오늘의 판단과 실행</h1>
-          <p>조직문화 세션 운영, 구성원 정성 의견 피드백, 약속 이행 현황을 조망하고 오늘 필요한 액션을 결정합니다.</p>
+          <p>조직문화 세션 운영, 구성원 정성 의견 피드백, 실행 과제 이행 현황을 조망하고 오늘 필요한 액션을 결정합니다.</p>
         </div>
       </header>
+
+      {/* Storytelling band — 연 누적 운영 루프 + 첫 실행 안내 */}
+      <DashboardStoryBand
+        loopYear={loopYear}
+        onNavigate={handleNavigate}
+      />
 
       {/* 5.1 Status Strip */}
       <DashboardStatusStrip
@@ -210,14 +220,6 @@ export const DashboardPage = memo(function DashboardPage() {
         {/* Left Column (2/3 width) */}
         <div className="dashboard-body-left">
           
-          {/* Operating Loop 순환 과정 */}
-          <OperatingLoopSection
-            loop={loop}
-            pulseYear={pulseYear}
-            pulseLoaded={pulseLoaded}
-            onNavigate={handleNavigate}
-          />
-
           {/* Action Queue List */}
           <ActionQueueSection
             todayActions={todayActions}

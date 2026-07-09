@@ -115,7 +115,7 @@ export function getStatus(session) {
 export function renderSessionPulseSummary() {
   if (!state.draftDivisionId && !state.draftHqId && !state.draftTeamId) return "";
   if (!pulseCache.loaded) {
-    return `<div class="session-pulse-summary muted"><strong>Pulse Survey</strong><span>진단 정보를 불러오는 중입니다.</span></div>`;
+    return `<div class="session-pulse-summary muted"><strong>조직 진단(Pulse)</strong><span>진단 정보를 불러오는 중입니다.</span></div>`;
   }
 
   const year = Number(state.pulseYear || Math.max(...Object.keys(pulseCache.years || {}).map(Number).filter(Number.isFinite)));
@@ -127,7 +127,7 @@ export function renderSessionPulseSummary() {
   const row = mapping?.id ? diagnostics.rows.find(item => item.id === mapping.id) : null;
 
   if (!row) {
-    return `<div class="session-pulse-summary muted"><strong>Pulse Survey</strong><span>선택 조직과 명시 연결된 ${year}년 본부 진단 데이터가 없습니다.</span></div>`;
+    return `<div class="session-pulse-summary muted"><strong>조직 진단(Pulse)</strong><span>선택 조직과 명시 연결된 ${year}년 본부 진단 데이터가 없습니다.</span></div>`;
   }
 
   const delta = row.delta;
@@ -137,7 +137,7 @@ export function renderSessionPulseSummary() {
   const mappingLabel = mapping.confidence === "low" ? "본부 기준 · 매핑 확인 필요" : "본부 기준";
   return `
     <div class="session-pulse-summary">
-      <div><strong>Pulse Survey · ${escapeHtml(row.id)}</strong><span>${year}년 ${mappingLabel} · 선택 팀은 본부 결과를 기준으로 봅니다.</span></div>
+      <div><strong>조직 진단(Pulse) · ${escapeHtml(row.id)}</strong><span>${year}년 ${mappingLabel} · 선택 팀은 본부 결과를 기준으로 봅니다.</span></div>
       <span class="session-pulse-tag">${year} 긍정 ${row.overall !== null ? `${Math.round(row.overall * 100)}%` : "—"}</span>
       <span class="session-pulse-tag ${delta < 0 ? "risk" : ""}">${deltaText}</span>
       <span class="session-pulse-tag ${row.rag?.key === "R" ? "risk" : ""}">${escapeHtml(row.rag?.label || "상태 확인")}</span>

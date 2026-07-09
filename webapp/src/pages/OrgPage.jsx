@@ -175,7 +175,7 @@ export const OrgPage = memo(function OrgPage() {
       <section className="page-head">
         <div>
           <span className="eyebrow">조직 관리</span>
-          <h1>조직 구조 및 인원 관리</h1>
+          <h1>조직 구조와 인원 관리</h1>
           <p>전사 {divisions.length}개 부문 · {totalTeams}개 팀 · {totalMembers}명</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>

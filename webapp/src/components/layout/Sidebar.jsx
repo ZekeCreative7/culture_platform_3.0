@@ -13,11 +13,11 @@ const VIEWS = [
   ['sessions', 'Sessions', '세션'],
   ['org', 'Org', '조직도'],
   ['org-map', 'Org Map', '조직 지도'],
-  ['analytics', 'Survey Data', '분석'],
-  ['report', 'Analytics Report', '리포트'],
-  ['survey', 'Survey', '설문 설계'],
+  ['analytics', 'Survey Data', '설문 응답'],
+  ['report', 'Analytics Report', '세션 리포트'],
+  ['survey', 'Survey', '설문'],
   ['comm', 'Comm', '커뮤니케이션'],
-  ['pulse-report', 'Pulse Report', '펄스 보고서'],
+  ['pulse-report', 'Pulse Report', '진단 리포트'],
   ['upload', 'Upload', '업로드'],
 ];
 
@@ -121,8 +121,7 @@ export function Sidebar({
                   {badgeElement}
                 </span>
                 <span className="nav-text">
-                  <span className="nav-en">{en}</span>
-                  <span className="nav-ko">{ko}</span>
+                  <span className="nav-en">{ko}</span>
                 </span>
               </button>
             );

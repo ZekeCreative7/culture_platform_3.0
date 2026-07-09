@@ -133,27 +133,27 @@ export function dashboardSnapshot({ state, pulseCache, today }) {
     tone: "ready",
     label: "운영 준비",
     title: "새 운영 사이클을 준비할 수 있습니다",
-    description: "기한이 지난 약속이나 응답 대기 작업이 없습니다. 다음 세션과 설문 일정을 확인하세요."
+    description: "기한이 지난 실행 과제나 응답 대기 작업이 없습니다. 다음 세션과 설문 일정을 확인하세요."
   };
   if (overdueCommitments > 0) {
     focus = {
       tone: "urgent",
       label: "우선 조치",
-      title: `기한이 지난 약속 ${overdueCommitments}건`,
+      title: `기한이 지난 실행 과제 ${overdueCommitments}건`,
       description: "담당자와 진행 상황을 확인하고 기한 또는 실행 계획을 오늘 업데이트하세요."
     };
   } else if (responseWaiting > 0) {
     focus = {
       tone: "response",
       label: "응답 필요",
-      title: `구성원에게 답해야 할 약속 ${responseWaiting}건`,
-      description: "들은 내용을 어떻게 이해했고 무엇을 할지 공감 피드백을 작성하세요."
+      title: `공감 답변이 필요한 실행 과제 ${responseWaiting}건`,
+      description: "들은 내용을 어떻게 이해했고 무엇을 할지 공감 답변을 작성하세요."
     };
   } else if (activeCommitments > 0) {
     focus = {
       tone: "active",
       label: "실행 중",
-      title: `진행 중인 실행 약속 ${activeCommitments}건`,
+      title: `진행 중인 실행 과제 ${activeCommitments}건`,
       description: "약속별 진척 상황과 다음 공유 일정을 확인하세요."
     };
   } else if (activeSessions > 0) {
@@ -195,7 +195,7 @@ export function dashboardActionQueue({ state, today }) {
           group: "today",
           priority: 1,
           date: c.dueDate,
-          title: `[기한초과 약속] ${c.commitment} (담당: ${c.ownerRole || '미정'})`,
+          title: `[기한초과 실행 과제] ${c.commitment} (담당: ${c.ownerRole || '미정'})`,
           targetView: "pulse-report",
           id: c.id
         });
@@ -205,7 +205,7 @@ export function dashboardActionQueue({ state, today }) {
           group: "upcoming",
           priority: 3,
           date: c.dueDate,
-          title: `[약속 마감] ${c.commitment} (기한: ${c.dueDate})`,
+          title: `[실행 과제 마감] ${c.commitment} (기한: ${c.dueDate})`,
           targetView: "pulse-report",
           id: c.id
         });
@@ -403,6 +403,64 @@ export function dashboardOperatingLoop({ state, pulseCache }) {
     activeSessionsCount,
     completedSessionsCount,
     hasRedDot
+  };
+}
+
+// Dashboard-top storytelling loop. Unlike dashboardOperatingLoop (current-state
+// snapshot), every node here is a YEARLY CUMULATIVE count for the selected year,
+// so the numbers read as a progress board and do not shrink when work closes.
+export function dashboardOperatingLoopYearly({ state, pulseCache, year }) {
+  const yr = Number(year);
+  const yearStr = String(yr);
+
+  const sessionYearOf = (session) => {
+    const d = sessionStartDate(session) || sessionEndDate(session);
+    return d ? String(d).slice(0, 4) : "";
+  };
+
+  // 1. 살피기 — 해당 연도 진단으로 살펴본 조직 수
+  let diagnoseCount = 0;
+  const doc = pulseCache?.years?.[yr];
+  if (doc) {
+    const pair = comparisonPair(pulseCache.years, yr);
+    const prevDoc = pair?.previousYear ? pulseCache.years[pair.previousYear] : null;
+    const diagnostics = pulseDiagnostics(doc, prevDoc);
+    diagnoseCount = (diagnostics?.ranked || []).length;
+  }
+
+  // 2. 듣기 — 해당 연도에 구성원 정성 의견을 수집한 세션 수
+  const qualSessionIds = new Set(
+    (state.responses || []).filter(r => isQualText(r.val)).map(r => r.sessionId)
+  );
+  const listeningCount = (state.sessions || [])
+    .filter(s => qualSessionIds.has(s.id) && sessionYearOf(s) === yearStr).length;
+
+  // 3. 답하기 — 해당 연도에 만든 리더 답변(실행 과제) 누적 (상태 무관)
+  const commitMadeCount = (state.pulseCommitments || [])
+    .filter(c => Number(c.year) === yr).length;
+
+  // 4. 실천하기 — 해당 연도 실행 과제 중 실행 단계(진행 중·완료) 누적
+  const practiceCount = (state.pulseCommitments || [])
+    .filter(c => Number(c.year) === yr && ["in_progress", "done"].includes(c.status)).length;
+
+  // 5. 돌아보기 — 해당 연도에 사전·사후 검증까지 마친 세션 수
+  const reviewCount = (state.sessions || []).filter(s => {
+    if (sessionYearOf(s) !== yearStr) return false;
+    const hasPre = (state.responses || []).some(r => r.sessionId === s.id && r.phase === "사전");
+    const hasPost = (state.responses || []).some(r => r.sessionId === s.id && r.phase === "사후");
+    return hasPre && hasPost;
+  }).length;
+
+  const total = diagnoseCount + listeningCount + commitMadeCount + practiceCount + reviewCount;
+
+  return {
+    year: yr,
+    diagnoseCount,
+    listeningCount,
+    commitMadeCount,
+    practiceCount,
+    reviewCount,
+    hasAnyData: total > 0
   };
 }
 

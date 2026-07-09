@@ -131,7 +131,7 @@ export function AnalyticsPage() {
 
   return (
     <>
-      <PageHead eyebrow="문항별 응답" title="문항별 응답" />
+      <PageHead eyebrow="설문 응답" title="문항별 응답 결과" />
 
       {successMsg && <div className="upload-success-banner">{successMsg}</div>}
 

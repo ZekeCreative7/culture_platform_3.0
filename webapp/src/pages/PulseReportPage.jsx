@@ -232,7 +232,7 @@ export const PulseReportPage = memo(function PulseReportPage() {
       <div className="pr-no-data">
         <div className="pr-no-data-inner">
           <span className="pr-no-data-icon" aria-hidden="true" />
-          <h2>{year}년 Pulse 데이터가 없습니다</h2>
+          <h2>{year}년 조직 진단 데이터가 없습니다</h2>
           <p>
             업로드 페이지에서 {year}년 데이터를 업로드하거나,
             다른 연도를 선택하세요.

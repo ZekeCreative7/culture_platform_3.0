@@ -71,7 +71,7 @@ export const SessionsPage = memo(function SessionsPage() {
       <section className="page-head">
         <div>
           <span className="eyebrow">세션 운영</span>
-          <h1>조직문화 세션 스케줄 및 운영 관리</h1>
+          <h1>문화 세션 스케줄 관리</h1>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <div className="session-more-menu" style={{ position: 'relative' }}>

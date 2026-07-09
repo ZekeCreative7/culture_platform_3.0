@@ -199,10 +199,10 @@ function renderPulseSessionInsightPanel({ session, insight }) {
     return `
       <section class="panel report-export-section" style="margin-bottom:28px;">
         <div class="section-title" style="margin-bottom:12px;">
-          <h2>Pulse Survey 연결 인사이트</h2>
+          <h2>조직 진단 연결 인사이트</h2>
           <span>본부 Pulse 결과와 세션 설문을 함께 읽습니다</span>
         </div>
-        <div class="empty">Pulse Survey 데이터를 불러오면 본부 기준 신호와 세션 설문 변화가 함께 표시됩니다.</div>
+        <div class="empty">조직 진단 데이터를 불러오면 본부 기준 신호와 세션 설문 변화가 함께 표시됩니다.</div>
       </section>
     `;
   }
@@ -210,7 +210,7 @@ function renderPulseSessionInsightPanel({ session, insight }) {
     return `
       <section class="panel report-export-section" style="margin-bottom:28px;">
         <div class="section-title" style="margin-bottom:12px;">
-          <h2>Pulse Survey 연결 인사이트</h2>
+          <h2>조직 진단 연결 인사이트</h2>
           <span>${insight.year || '—'}년 Pulse 기준</span>
         </div>
         <div class="empty">이 팀과 연결된 Pulse 본부 매핑이 없습니다. 연도별 조직 매핑을 설정하면 본부 기준 Pulse 결과를 세션 분석에 연결할 수 있습니다.</div>
@@ -231,7 +231,7 @@ function renderPulseSessionInsightPanel({ session, insight }) {
   return `
     <section class="panel report-export-section" style="margin-bottom:28px; border:1.5px solid rgba(0,82,255,0.18); background:linear-gradient(135deg,#ffffff 0%,#f8fbff 100%);">
       <div class="section-title" style="margin-bottom:16px;">
-        <h2>Pulse Survey 연결 인사이트</h2>
+        <h2>조직 진단 연결 인사이트</h2>
         <span>본부 맥락 → 팀 세션 반응 → 다음 운영 액션</span>
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
@@ -1090,8 +1090,8 @@ export function renderReport(options = {}) {
     ${includeShell ? `<div id="report-export-content" class="report-export-content">
     <section class="page-head report-export-header">
       <div>
-        <span class="eyebrow">변화 분석 리포트</span>
-        <h1>변화 분석 리포트</h1>
+        <span class="eyebrow">세션 리포트</span>
+        <h1>세션 변화 리포트</h1>
         <p>현 상황 진단 · 세션 운영 제안 · 변화 분석을 통합한 조직문화 인사이트 보고서입니다.</p>
       </div>
     </section>

@@ -65,31 +65,6 @@ function SelectedCustomMembers({ selectedMembers }) {
   );
 }
 
-function OperationalTeamAddRow({ sourceTeams, selectedTeamIds }) {
-  const [pickedId, setPickedId] = useState('');
-  const availableTeams = sourceTeams.filter((team) => !selectedTeamIds.includes(team.teamId));
-
-  const handleAdd = () => {
-    if (!pickedId) return;
-    addOperationalTeam(pickedId);
-    setPickedId('');
-  };
-
-  return (
-    <div className="session-picker-actions">
-      <label style={{ flex: 1 }}>팀 선택
-        <select value={pickedId} onChange={(e) => setPickedId(e.target.value)} disabled={!availableTeams.length}>
-          <option value="">{availableTeams.length ? '팀을 선택하세요' : '추가할 수 있는 팀이 없습니다'}</option>
-          {availableTeams.map((team) => (
-            <option key={team.teamId} value={team.teamId}>{`${team.teamName} (${team.divisionName} > ${team.hqName})`}</option>
-          ))}
-        </select>
-      </label>
-      <button type="button" className="primary compact" disabled={!pickedId} onClick={handleAdd}>팀 추가</button>
-    </div>
-  );
-}
-
 function SelectedTeamsList({ sourceTeams, selectedTeamIds, summaryNote, onRemove }) {
   const selected = sourceTeams.filter((team) => selectedTeamIds.includes(team.teamId));
   return (
@@ -117,7 +92,7 @@ function SelectedTeamsList({ sourceTeams, selectedTeamIds, summaryNote, onRemove
   );
 }
 
-function CustomTeamAddRow({ selectedTeamIds }) {
+function TeamCascadeAddRow({ selectedTeamIds, onAdd }) {
   const [divisionId, setDivisionId] = useState('');
   const [hqId, setHqId] = useState('');
   const [teamId, setTeamId] = useState('');
@@ -130,7 +105,7 @@ function CustomTeamAddRow({ selectedTeamIds }) {
 
   const handleAdd = () => {
     if (!teamId) return;
-    toggleCustomTeam(teamId, true);
+    onAdd(teamId);
     setTeamId('');
   };
 
@@ -231,7 +206,7 @@ export function CustomScopePanel() {
 
       {scope === '팀별' && isOperational && (
         <>
-          <OperationalTeamAddRow sourceTeams={sourceTeams} selectedTeamIds={state.draftCustomTeamIds || []} />
+          <TeamCascadeAddRow selectedTeamIds={state.draftCustomTeamIds || []} onAdd={addOperationalTeam} />
           <SelectedTeamsList
             sourceTeams={sourceTeams}
             selectedTeamIds={state.draftCustomTeamIds || []}
@@ -243,7 +218,7 @@ export function CustomScopePanel() {
 
       {scope === '팀별' && !isOperational && (
         <>
-          <CustomTeamAddRow selectedTeamIds={state.draftCustomTeamIds || []} />
+          <TeamCascadeAddRow selectedTeamIds={state.draftCustomTeamIds || []} onAdd={(teamId) => toggleCustomTeam(teamId, true)} />
           <SelectedTeamsList
             sourceTeams={sourceTeams}
             selectedTeamIds={state.draftCustomTeamIds || []}

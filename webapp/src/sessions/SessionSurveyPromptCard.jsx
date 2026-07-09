@@ -8,6 +8,7 @@ import { selectedCrossMembers, selectedCustomMembers } from '../views/sessions.j
 export function SessionSurveyPromptCard() {
   const store = useAppStore();
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const type = normalizeSessionType(vanillaState.draftType);
   const base = {
@@ -87,16 +88,21 @@ export function SessionSurveyPromptCard() {
     <div className="session-survey-prompt-card">
       <div className="session-survey-prompt-head">
         <div>
-          <strong>설문 질문 생성 프롬프트</strong>
-          <span>{pulseText} · 사전/사후/팔로우업 질문을 한 번에 설계합니다.</span>
+          <strong>설문 질문 생성 프롬프트 (참고용)</strong>
+          <span>세션 등록 후 설문을 만들 때 쓸 수 있는 AI 프롬프트를 미리 준비해 둡니다. {pulseText}</span>
         </div>
         <div className="session-survey-prompt-actions">
-          <button type="button" className="secondary compact" onClick={handleCopy}>
-            {copied ? '복사됨' : '프롬프트 복사'}
+          <button type="button" className="ghost compact" onClick={() => setExpanded((v) => !v)}>
+            {expanded ? '접기' : '펼치기'}
           </button>
+          {expanded && (
+            <button type="button" className="secondary compact" onClick={handleCopy}>
+              {copied ? '복사됨' : '프롬프트 복사'}
+            </button>
+          )}
         </div>
       </div>
-      <textarea className="session-survey-prompt-text" readOnly value={prompt} />
+      {expanded && <textarea className="session-survey-prompt-text" readOnly value={prompt} />}
     </div>
   );
 }

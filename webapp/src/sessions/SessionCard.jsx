@@ -24,9 +24,6 @@ export function SessionCard({ session }) {
   const uploadTotal = dataState.uploadTotal;
   const isEditing = vanillaState.editingSessionId === session.id;
 
-  const noDataWhileActive = uploadCount === 0 && status !== '시작전';
-  const incompleteAfterDone = uploadCount > 0 && uploadCount < 2 && status === '완료';
-
   const preQual = qualResponseRows(session.cohort, session.type, session.id, '사전');
   const postQual = qualResponseRows(session.cohort, session.type, session.id, '사후');
   const hasPreQual = preQual.rows.length > 0;
@@ -68,7 +65,7 @@ export function SessionCard({ session }) {
       <div className="session-top">
         <div>
           <span>{sessionTypeLabel(session.type)}</span>
-          <h3>{sessionLabel(session)}</h3>
+          <h3 title={sessionLabel(session)}>{sessionLabel(session)}</h3>
         </div>
       </div>
       <div className="session-stage-track" aria-label="세션 운영 단계">
@@ -84,12 +81,6 @@ export function SessionCard({ session }) {
         <span title="일정이 확정된 회차 수">일정 {confirmed}/{total}</span>
         <span title="사전/사후/팔로우업 설문 CSV 업로드 완료 단계">응답 {uploadCount}/{uploadTotal}</span>
       </div>
-      {(noDataWhileActive || incompleteAfterDone) && (
-        <div className="session-alert-badges">
-          {noDataWhileActive && <span className="session-alert-badge amber">설문 데이터 없음</span>}
-          {incompleteAfterDone && <span className="session-alert-badge amber">사전/사후 중 {2 - uploadCount}단계 미업로드</span>}
-        </div>
-      )}
       <button className={`session-next-action ${nextAction.kind}`} type="button" onClick={handleNextAction}>
         <span>{nextAction.label}</span>
         <small>{nextAction.hint}</small>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { state as vanillaState } from '../state.js';
 import { useVanillaStateTick } from '../hooks/useVanillaStateTick.js';
-import { SESSION_TYPES, sessionTypeLabel, normalizeSessionType } from '../utils.js';
+import { SESSION_TYPES, sessionTypeLabel, sessionTypeDef, normalizeSessionType } from '../utils.js';
 import { ensureDraftOrgSelection } from '../views/org.js';
 import { canCreateDraftSession } from '../views/sessions.js';
 import { closeSessionDrawer } from './sessionActions.js';
@@ -37,6 +37,7 @@ export function SessionDrawer() {
                   <option key={type} value={type}>{sessionTypeLabel(type)}</option>
                 ))}
               </select>
+              <span className="field-hint">{sessionTypeDef(draftType).desc}</span>
             </label>
             {draftType !== '운영 서베이' && (
               <label>기수
@@ -46,7 +47,9 @@ export function SessionDrawer() {
                   min="1"
                   defaultValue={vanillaState.draftCohort}
                   onChange={(e) => updateSessionCohort(e.target.value)}
+                  title="같은 유형 세션을 몇 번째로 운영하는지 나타내는 회차 번호입니다"
                 />
+                <span className="field-hint">같은 유형을 몇 번째로 운영하는지 (1, 2, 3…)</span>
               </label>
             )}
             <label>연도

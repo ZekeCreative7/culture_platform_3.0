@@ -155,7 +155,7 @@ export const SESSION_WORK_BUCKETS = [
   { key: 'survey', title: '설문 필요', description: '설문/QR을 만들어야 응답을 모을 수 있습니다.' },
   { key: 'upload', title: '응답 필요', description: '사전/사후 응답을 넣으면 분석으로 이어집니다.' },
   { key: 'report', title: '리포트 가능', description: '분석과 보고서 확인이 가능합니다.' },
-  { key: 'steady', title: '진행 확인', description: '현재 일정과 배포 상태를 지켜보면 됩니다.' },
+  { key: 'steady', title: '정상 진행', description: '예정대로 진행 중입니다. 지금 처리할 일은 없습니다.' },
 ];
 
 export function buildSessionWorkBuckets(appState, sessions, getStatus) {

@@ -97,7 +97,7 @@ export const SessionsPage = memo(function SessionsPage() {
         <div>
           <span className="eyebrow">세션 운영</span>
           <h1>세션 운영 보드</h1>
-          <p>조직 이슈를 세션으로 배정하고 일정, 설문, 응답, 리포트 준비 상태를 관리합니다.</p>
+          <p>세션은 팀빌딩·리더십·협업 등 조직문화 이슈를 다루는 그룹 활동입니다. 대상을 배정하고 일정, 설문, 응답, 리포트 준비 상태를 관리합니다.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <div className="session-more-menu" style={{ position: 'relative' }}>

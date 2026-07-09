@@ -18,22 +18,29 @@ function ScheduleRow({ item }) {
       </label>
       <input
         type="date"
+        title="일정 날짜"
+        aria-label="일정 날짜"
         defaultValue={item.date}
         onChange={(e) => updateScheduleField(item.id, 'date', e.target.value)}
       />
       <input
         defaultValue={item.startTime}
         placeholder="10:00"
+        title="시작 시간"
+        aria-label="시작 시간"
         onChange={(e) => updateScheduleField(item.id, 'startTime', e.target.value)}
       />
       <input
         defaultValue={item.content}
         placeholder="내용"
+        title="세션 내용"
+        aria-label="세션 내용"
         onChange={(e) => updateScheduleField(item.id, 'content', e.target.value)}
       />
       <select
         className="round-type-select"
         title="회차 유형"
+        aria-label="회차 유형"
         defaultValue={item.roundType}
         onChange={(e) => updateScheduleField(item.id, 'roundType', e.target.value)}
       >
@@ -45,12 +52,17 @@ function ScheduleRow({ item }) {
         type="number"
         min="30"
         step="30"
+        placeholder="60"
+        title="소요 시간(분)"
+        aria-label="소요 시간(분)"
         defaultValue={item.duration}
         onChange={(e) => updateScheduleField(item.id, 'duration', Number(e.target.value))}
       />
       <input
         defaultValue={item.note}
         placeholder="메모"
+        title="메모"
+        aria-label="메모"
         onChange={(e) => updateScheduleField(item.id, 'note', e.target.value)}
       />
       <button className="icon-btn danger" onClick={() => deleteRound(item.id)} title="회차 삭제" aria-label="회차 삭제">×</button>

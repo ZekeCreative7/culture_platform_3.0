@@ -1803,6 +1803,8 @@ button:disabled { cursor: not-allowed; opacity: 0.42; transform: none !important
 }
 .session-survey-prompt-actions {
   flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
 }
 .session-survey-prompt-text {
   width: 100%;
@@ -1819,6 +1821,7 @@ button:disabled { cursor: not-allowed; opacity: 0.42; transform: none !important
 .selected-team-wrap { margin: 8px 0 0; min-width: 0; }
 
 label { display: grid; gap: 8px; color: var(--muted); font-size: 12.5px; font-weight: 700; }
+.field-hint { display: block; margin-top: -2px; color: var(--faint, var(--muted)); font-size: 11px; font-weight: 500; }
 
 /* ─── Inputs — 44px uniform height ─── */
 input, select {
@@ -3107,115 +3110,51 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 }
 
 /* 주간 캘린더 */
-.week-calendar-list {
-  background: var(--surface);
+.week-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  padding: 1px;
+  background: var(--line-strong);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-low);
   overflow: hidden;
+  box-shadow: var(--shadow-low);
+}
+.week-column {
+  background: var(--surface);
+  min-height: 220px;
   display: flex;
   flex-direction: column;
 }
-.week-day-row {
-  display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
+.week-column-header {
+  padding: 12px 10px;
+  text-align: center;
   border-bottom: 1px solid var(--line);
-  transition: background 0.15s;
-}
-.week-day-row:last-child {
-  border-bottom: none;
-}
-.week-day-row.today {
-  background: linear-gradient(90deg, rgba(14, 165, 233, 0.03) 0%, transparent 100%);
-  position: relative;
-}
-.week-day-row.today::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(to bottom, var(--blue-mid), var(--purple));
-}
-.week-day-meta {
-  padding: 20px;
-  border-right: 1px solid var(--line);
+  background: rgba(248, 250, 252, 0.95);
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  background: rgba(248, 250, 252, 0.4);
+  gap: 2px;
 }
-.week-day-meta strong {
-  font-size: 14.5px;
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-weight: 700;
-}
-.week-day-meta span {
-  font-size: 11.5px;
-  color: var(--muted);
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-.week-day-events {
-  padding: 16px 24px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  align-items: center;
-}
-.week-event-card {
-  --accent: var(--blue);
-  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--surface));
-  border-left: 4.5px solid var(--accent);
-  border-radius: 12px;
-  padding: 14px 18px;
-  min-width: 240px;
-  max-width: 320px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.week-event-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.02);
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--surface));
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-}
-.week-event-card .time-tag {
-  display: inline-block;
-  font-size: 10px;
+.week-column-header strong {
+  font-size: 12px;
   font-weight: 800;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  padding: 2px 8px;
-  border-radius: 10px;
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.week-event-card strong {
-  display: block;
-  font-size: 13.5px;
-  color: var(--ink);
-  margin-top: 8px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-.week-event-card small {
-  display: block;
-  font-size: 11.5px;
-  color: var(--muted);
-  margin-top: 6px;
-  font-weight: 500;
-}
-.no-events-placeholder, .empty-day-placeholder {
-  font-size: 12.5px;
+.week-column-header span {
+  font-size: 11px;
   color: var(--faint);
-  font-style: italic;
-  padding: 10px 0;
+  font-weight: 600;
+}
+.week-column-body {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
 }
 
 /* 일간 캘린더 */

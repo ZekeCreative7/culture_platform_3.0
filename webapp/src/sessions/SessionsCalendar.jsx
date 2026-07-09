@@ -64,15 +64,14 @@ function MonthCalendar({ year, month }) {
 
 function WeekCalendar({ baseDate }) {
   const day = baseDate.getDay();
-  const diff = baseDate.getDate() - day;
-  const monday = new Date(new Date(baseDate).setDate(diff + 1));
+  const sunday = new Date(new Date(baseDate).setDate(baseDate.getDate() - day));
   const weekDates = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
     weekDates.push(d);
   }
-  const daysHeader = ['월', '화', '수', '목', '금', '토', '일'];
+  const daysHeader = ['일', '월', '화', '수', '목', '금', '토'];
   return (
     <div className="week-calendar-grid">
       {daysHeader.map((label, i) => {

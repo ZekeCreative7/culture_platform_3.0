@@ -34,7 +34,8 @@ import {
   PulseSignalsSection,
   SupportOrgsSection,
   TrustFunnelSection,
-  WeeklyCalendarSection
+  WeeklyCalendarSection,
+  Reveal
 } from '../dashboard/DashboardComponents.jsx';
 
 export const DashboardPage = memo(function DashboardPage() {
@@ -171,102 +172,124 @@ export const DashboardPage = memo(function DashboardPage() {
       </header>
 
       {/* Storytelling band — 연 누적 운영 루프 + 첫 실행 안내 */}
-      <DashboardStoryBand
-        loopYear={loopYear}
-        onNavigate={handleNavigate}
-      />
+      <Reveal>
+        <DashboardStoryBand
+          loopYear={loopYear}
+          onNavigate={handleNavigate}
+        />
+      </Reveal>
 
       {/* 5.1 Status Strip */}
-      <DashboardStatusStrip
-        snapshot={snapshot}
-        pulseYear={pulseYear}
-        onNavigate={handleNavigate}
-      />
+      <Reveal>
+        <DashboardStatusStrip
+          snapshot={snapshot}
+          pulseYear={pulseYear}
+          onNavigate={handleNavigate}
+        />
+      </Reveal>
 
       {/* 5.2 KPI Grid */}
-      <DashboardKPIGrid
-        isLoading={isLoading}
-        actionsReady={actionsReady}
-        todayActionsCount={todayActions.length}
-        responseWaiting={snapshot.responseWaiting}
-        weekSessionsCount={displayWeekSessionsCount}
-        reportReady={snapshot.reportReady}
-        onNavigate={handleNavigate}
-        onScrollTo={handleScrollTo}
-      />
+      <Reveal>
+        <DashboardKPIGrid
+          isLoading={isLoading}
+          actionsReady={actionsReady}
+          todayActionsCount={todayActions.length}
+          responseWaiting={snapshot.responseWaiting}
+          weekSessionsCount={displayWeekSessionsCount}
+          reportReady={snapshot.reportReady}
+          onNavigate={handleNavigate}
+          onScrollTo={handleScrollTo}
+        />
+      </Reveal>
 
       {/* Team Pipeline Tracker */}
-      <TeamPipelineSection
-        teams={supportTeams}
-        viewMode={store.teamPipelineView || 'team'}
-        onToggleViewMode={handleToggleViewMode}
-        onNavigate={handleNavigate}
-      />
+      <Reveal>
+        <TeamPipelineSection
+          teams={supportTeams}
+          viewMode={store.teamPipelineView || 'team'}
+          onToggleViewMode={handleToggleViewMode}
+          onNavigate={handleNavigate}
+        />
+      </Reveal>
 
       {/* Pulse Team Support candidates */}
-      <SupportTeamsSection
-        supportTeams={supportTeams}
-        pulseLoaded={pulseLoaded}
-        onNavigate={handleNavigate}
-      />
+      <Reveal>
+        <SupportTeamsSection
+          supportTeams={supportTeams}
+          pulseLoaded={pulseLoaded}
+          onNavigate={handleNavigate}
+        />
+      </Reveal>
 
       {/* Change Verification Board */}
-      <OutcomeSnapshotSection
-        outcome={outcome}
-        onNavigate={handleNavigate}
-      />
+      <Reveal>
+        <OutcomeSnapshotSection
+          outcome={outcome}
+          onNavigate={handleNavigate}
+        />
+      </Reveal>
 
       <div className="dashboard-body-layout">
         {/* Left Column (2/3 width) */}
         <div className="dashboard-body-left">
-          
+
           {/* Action Queue List */}
-          <ActionQueueSection
-            todayActions={todayActions}
-            upcomingActions={upcomingActions}
-            readyActions={readyActions}
-            actionsReady={actionsReady}
-            expandedGroups={store.dashboardExpandedActionGroups || {}}
-            onToggleGroup={handleToggleGroup}
-            onActionClick={handleActionClick}
-            onNavigate={handleNavigate}
-          />
+          <Reveal>
+            <ActionQueueSection
+              todayActions={todayActions}
+              upcomingActions={upcomingActions}
+              readyActions={readyActions}
+              actionsReady={actionsReady}
+              expandedGroups={store.dashboardExpandedActionGroups || {}}
+              onToggleGroup={handleToggleGroup}
+              onActionClick={handleActionClick}
+              onNavigate={handleNavigate}
+            />
+          </Reveal>
 
           {/* Pulse 5-Signal Radar and List */}
-          <PulseSignalsSection
-            pulseSignals={pulseSignals}
-            pulseYear={pulseYear}
-            pulseLoaded={pulseLoaded}
-            onNavigate={handleNavigate}
-          />
+          <Reveal>
+            <PulseSignalsSection
+              pulseSignals={pulseSignals}
+              pulseYear={pulseYear}
+              pulseLoaded={pulseLoaded}
+              onNavigate={handleNavigate}
+            />
+          </Reveal>
         </div>
 
         {/* Right Column (1/3 width) */}
         <div className="dashboard-body-right">
-          
+
           {/* Trust Funnel */}
-          <TrustFunnelSection
-            funnel={funnel}
-            onNavigate={handleNavigate}
-          />
+          <Reveal>
+            <TrustFunnelSection
+              funnel={funnel}
+              onNavigate={handleNavigate}
+            />
+          </Reveal>
 
           {/* Calendar Weekly Schedule */}
-          <WeeklyCalendarSection
-            weekSchedule={weekSchedule}
-            selectedDate={selectedDate}
-            weekOffset={weekOffset}
-            selectedDayItems={selectedDayItems}
-            onSelectDate={handleSelectDate}
-            onToggleWeekOffset={handleToggleWeekOffset}
-            onNavigate={handleNavigate}
-          />
+          <Reveal>
+            <WeeklyCalendarSection
+              weekSchedule={weekSchedule}
+              selectedDate={selectedDate}
+              weekOffset={weekOffset}
+              selectedDayItems={selectedDayItems}
+              onSelectDate={handleSelectDate}
+              onToggleWeekOffset={handleToggleWeekOffset}
+              onNavigate={handleNavigate}
+            />
+          </Reveal>
 
           {/* First Orgs to Support */}
-          <SupportOrgsSection
-            supportOrgs={supportOrgs}
-            pulseLoaded={pulseLoaded}
-            onNavigate={handleNavigate}
-          />
+          <Reveal>
+            <SupportOrgsSection
+              supportOrgs={supportOrgs}
+              pulseLoaded={pulseLoaded}
+              onNavigate={handleNavigate}
+            />
+          </Reveal>
         </div>
       </div>
     </div>

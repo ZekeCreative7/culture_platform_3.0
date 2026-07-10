@@ -1,6 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import {
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   doc,
   addDoc,
@@ -63,7 +65,11 @@ export const appCheck = isLocalDevelopment ? null : initializeAppCheck(firebaseA
   provider: new ReCaptchaEnterpriseProvider('6LfuSSktAAAAANg8W3c0tVOUp6_aH99ZlZX8nbMg'),
   isTokenAutoRefreshEnabled: true
 });
-export const db = getFirestore(firebaseApp);
+// 오프라인/재방문 시 마지막으로 받은 문서를 IndexedDB에서 즉시 읽어 대시보드 숫자가
+// 네트워크 왕복(Auth → App Check → Firestore) 없이 먼저 그려지도록 한다.
+export const db = initializeFirestore(firebaseApp, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
 export const auth = getAuth(firebaseApp);
 setPersistence(auth, browserLocalPersistence).catch((error) => console.error('Firebase 로그인 유지 설정 실패:', error));
 export { collection, doc, addDoc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, limit };

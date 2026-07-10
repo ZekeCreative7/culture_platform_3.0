@@ -1,6 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PIPELINE_STAGES } from './dashboardEngine.js';
 import { sessionTypeLabel, SESSION_TYPES } from '../utils.js';
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+// ── 화면에 들어올 때 살짝 떠오르는 스크롤 리빌 래퍼 ──────────────────
+export function Reveal({ children, className = '' }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined' || prefersReducedMotion()) {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setVisible(true);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -60px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={`reveal-on-scroll${visible ? ' is-visible' : ''}${className ? ` ${className}` : ''}`}>
+      {children}
+    </div>
+  );
+}
+
+// ── 숫자가 바뀔 때 카운트업으로 이어주는 표시자 ──────────────────────
+function CountUp({ value, duration = 700 }) {
+  const target = Number(value) || 0;
+  const [display, setDisplay] = useState(target);
+  const fromRef = useRef(target);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    if (from === target || prefersReducedMotion()) {
+      setDisplay(target);
+      fromRef.current = target;
+      return;
+    }
+    const start = performance.now();
+    const step = (now) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(from + (target - from) * eased));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(step);
+      } else {
+        fromRef.current = target;
+      }
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => rafRef.current && cancelAnimationFrame(rafRef.current);
+  }, [target, duration]);
+
+  return display;
+}
 
 // ── KPI Card Component ──────────────────────────────────────────────
 function KPICard({ label, helpText, value, desc, highlightClass, onClick }) {
@@ -43,7 +112,7 @@ function KPICard({ label, helpText, value, desc, highlightClass, onClick }) {
           {helpText}
         </div>
       )}
-      <div className="kpi-value">{value}</div>
+      <div className="kpi-value">{typeof value === 'number' ? <CountUp value={value} /> : value}</div>
       <div className="kpi-desc">{desc}</div>
     </div>
   );
@@ -405,7 +474,7 @@ export function DashboardStoryBand({ loopYear, onNavigate }) {
           <React.Fragment key={node.key}>
             <button type="button" className="story-tile" onClick={node.onClick}>
               <span className="story-tile-label">{node.label}</span>
-              <span className="story-tile-num">{node.num}</span>
+              <span className="story-tile-num"><CountUp value={node.num} /></span>
               <span className="story-tile-sub">{node.sub}</span>
             </button>
             {i < nodes.length - 1 && (

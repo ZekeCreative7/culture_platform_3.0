@@ -323,7 +323,7 @@ function SearchResults({ results, onSelect, onManage }) {
 
 export const OrgMapPage = memo(function OrgMapPage() {
   const store = useAppStore();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(store.orgSearchQuery || '');
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [editor, setEditor] = useState(null);
@@ -331,6 +331,12 @@ export const OrgMapPage = memo(function OrgMapPage() {
   useEffect(() => {
     store.setActiveView('org-map');
   }, []);
+
+  useEffect(() => {
+    if (store.orgSearchQuery !== undefined) {
+      setQuery(store.orgSearchQuery);
+    }
+  }, [store.orgSearchQuery]);
 
   const model = useMemo(
     () => buildOrgMapModel(store.orgUnits || [], store.orgMembers || []),
@@ -413,8 +419,8 @@ export const OrgMapPage = memo(function OrgMapPage() {
     <>
       <section className="page-head org-map-page-head">
         <div>
-          <span className="eyebrow">조직 지도</span>
-          <h1>전사 조직 지도</h1>
+          <span className="eyebrow">조직도</span>
+          <h1>전사 조직도</h1>
           <p>
             부문 {model.ceoDivisions.length}개 · CEO 직속 본부 {model.ceoHqs.length}개 · 팀 {model.teamUnits.length}개 · 직속 인원 {model.directNonTeamMembers.length}명 · 전체 {model.members.length}명
           </p>

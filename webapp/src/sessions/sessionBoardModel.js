@@ -180,16 +180,16 @@ export function buildSessionBoardSummary(appState) {
   return [
     {
       key: 'target',
-      label: '대상 정하기',
+      label: '등록 세션',
       value: `${sessions.length}개`,
       detail: sessions.length ? '등록된 운영 단위' : '먼저 세션을 만드세요',
       tone: sessions.length ? 'ok' : 'attention',
     },
     {
       key: 'schedule',
-      label: '일정 잡기',
-      value: !sessions.length ? '–' : pendingRounds ? `${pendingRounds}회차` : '완료',
-      detail: !sessions.length ? '세션을 먼저 등록하세요' : pendingRounds ? '날짜 또는 확정 필요' : '모든 회차 확정',
+      label: '일정 확정',
+      value: !sessions.length ? '–' : pendingRounds ? `${pendingRounds}건 미확정` : '완료',
+      detail: !sessions.length ? '세션을 먼저 등록하세요' : pendingRounds ? '날짜 또는 확정 필요한 회차' : '모든 회차 확정',
       tone: !sessions.length ? 'muted' : pendingRounds ? 'attention' : 'ok',
     },
     {
@@ -201,7 +201,7 @@ export function buildSessionBoardSummary(appState) {
     },
     {
       key: 'report',
-      label: '리포트 준비',
+      label: '리포트 완료',
       value: `${reportReady}개`,
       detail: '사전/사후 응답 기준',
       tone: reportReady ? 'ok' : 'muted',

@@ -8,7 +8,7 @@ import { Sidebar } from './Sidebar.jsx';
 import { Topbar } from './Topbar.jsx';
 import { OperationalStatusPanel } from '../../operational/OperationalStatusPanel.jsx';
 
-const VALID_VIEWS = ['dashboard', 'sessions', 'org', 'org-map', 'upload', 'analytics', 'report', 'survey', 'comm', 'pulse-report'];
+const VALID_VIEWS = ['dashboard', 'sessions', 'survey', 'analytics', 'report', 'comm', 'pulse-report', 'org-map', 'upload'];
 
 export function AppLayout({ children }) {
   const navigate = useNavigate();
@@ -38,14 +38,14 @@ export function AppLayout({ children }) {
     const surveyKeywords = ['설문', '질문', '문항'];
     if (orgKeywords.some(k => q.includes(k))) {
       setOrgSearchQuery(query.trim());
-      navigate('/org');
+      navigate('/org-map');
     } else if (sessionKeywords.some(k => q.includes(k))) {
       navigate('/sessions');
     } else if (surveyKeywords.some(k => q.includes(k))) {
       navigate('/survey');
     } else {
       setOrgSearchQuery(query.trim());
-      navigate('/org');
+      navigate('/org-map');
     }
   };
 

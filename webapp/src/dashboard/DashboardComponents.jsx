@@ -364,7 +364,7 @@ export function DashboardStoryBand({ loopYear, onNavigate }) {
     { key: 'diagnose', label: '살피기', num: diagnoseCount, sub: '진단 조직', onClick: () => onNavigate('pulse-report') },
     { key: 'listen', label: '듣기', num: listeningCount, sub: '문화 세션', onClick: () => onNavigate('sessions') },
     { key: 'answer', label: '답하기', num: commitMadeCount, sub: '리더 답변', onClick: () => onNavigate('pulse-report') },
-    { key: 'practice', label: '실천하기', num: practiceCount, sub: '이행 중', onClick: () => onNavigate('sessions') },
+    { key: 'practice', label: '실천하기', num: practiceCount, sub: '세션·과제 실행', onClick: () => onNavigate('sessions') },
     { key: 'review', label: '돌아보기', num: reviewCount, sub: '변화 확인', onClick: () => onNavigate('report') }
   ];
 

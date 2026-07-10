@@ -12,11 +12,11 @@ export const QUANT_LABELS = {
 };
 
 export const ROUND_TYPES = {
-  '웰니스':    { label: '웰니스',      color: '#34c759' },
-  'OD-강의':  { label: 'OD 강의',     color: '#0071e3' },
-  'OD-간담회': { label: 'OD 간담회',   color: '#ff9500' },
-  '웰니스+OD': { label: '웰니스 + OD', color: '#5856d6' },
-  '기타':      { label: '기타',        color: '#8e8e93' },
+  '웰니스':    { label: '웰니스',        color: '#34c759' },
+  'OD-강의':  { label: '교육',         color: '#0071e3' },
+  'OD-간담회': { label: '간담회',       color: '#ff9500' },
+  '웰니스+OD': { label: '웰니스 + 교육', color: '#5856d6' },
+  '기타':      { label: '기타',          color: '#8e8e93' },
 };
 
 export const SESSION_TYPES = {

@@ -439,9 +439,13 @@ export function dashboardOperatingLoopYearly({ state, pulseCache, year }) {
   const commitMadeCount = (state.pulseCommitments || [])
     .filter(c => Number(c.year) === yr).length;
 
-  // 4. 실천하기 — 해당 연도 실행 과제 중 실행 단계(진행 중·완료) 누적
-  const practiceCount = (state.pulseCommitments || [])
+  // 4. 실천하기 — 실행 과제의 실행 단계(진행 중·완료) + 약속과 무관하게 실제로 운영한 세션(진행중·완료) 누적.
+  // 세션을 운영하는 것 자체가 실천이므로 실행 과제 유무와 관계없이 카운트한다.
+  const commitPracticeCount = (state.pulseCommitments || [])
     .filter(c => Number(c.year) === yr && ["in_progress", "done"].includes(c.status)).length;
+  const sessionPracticeCount = (state.sessions || [])
+    .filter(s => sessionYearOf(s) === yearStr && ["진행중", "완료"].includes(getSessionStatus(s))).length;
+  const practiceCount = commitPracticeCount + sessionPracticeCount;
 
   // 5. 돌아보기 — 해당 연도에 사전·사후 검증까지 마친 세션 수
   const reviewCount = (state.sessions || []).filter(s => {

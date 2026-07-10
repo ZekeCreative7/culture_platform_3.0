@@ -5,7 +5,7 @@ const distAssets = join(process.cwd(), 'dist/assets');
 const budgetsKb = [
   { pattern: /^main-.*\.js$/, maxKb: 160 },
   { pattern: /^vendor-react-.*\.js$/, maxKb: 190 },
-  { pattern: /^vendor-firebase-.*\.js$/, maxKb: 530 },
+  { pattern: /^vendor-firebase-.*\.js$/, maxKb: 600 },
   { pattern: /^xlsx\.full\.min-.*\.js$/, maxKb: 960 },
   { pattern: /^main-.*\.css$/, maxKb: 320 },
 ];

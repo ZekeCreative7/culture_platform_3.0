@@ -3276,6 +3276,37 @@ td.minus { color: #e11d48; font-family: var(--font-display); font-weight: 800; }
 .surveys-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); gap: 20px; }
 .survey-deploy-card { background: #ffffff; border: 1.5px solid #bae6fd; border-radius: var(--radius-lg); padding: 22px; display: flex; flex-direction: column; gap: 18px; position: relative; box-shadow: var(--shadow-low); transition: all 0.25s ease; }
 .survey-deploy-card:hover { border-color: var(--blue); box-shadow: var(--neon-glow); transform: translateY(-2px); }
+
+/* ─── Closed survey card (배포 종료 · 응답 보관) ───
+   버튼 4개가 좁은 화면에서 제목 칸을 0에 가깝게 밀어붙여 한글이 한 글자씩
+   세로로 쌓이던 버그. actions를 별도 그룹으로 감싸 wrap시켜, 좁아지면
+   버튼 줄이 제목 아래로 내려가도록 한다. */
+.survey-closed-card {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  gap: 10px 14px;
+}
+.survey-closed-card-info { flex: 1 1 200px; min-width: 0; }
+.survey-closed-card-title {
+  display: block; font-size: 14px; font-weight: 800; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.survey-closed-card-meta {
+  display: block; font-size: 11.5px; color: var(--muted); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.survey-closed-card-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+.survey-closed-card-btn {
+  background: none; border: 1.5px solid var(--line-strong); border-radius: 8px;
+  padding: 6px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
+}
+.survey-closed-card-btn--edit { color: var(--blue-mid); }
+.survey-closed-card-btn--reopen { color: var(--muted); }
+.survey-closed-card-btn--upload { color: #1d4ed8; }
+.survey-closed-card-btn--delete { color: #b45309; border-color: #fcd34d; }
 .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #00a866; box-shadow: 0 0 0 2px rgba(0,168,102,0.25); animation: livePulse 1.8s ease-in-out infinite; flex-shrink: 0; }
 @keyframes livePulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(0,168,102,0.25); } 50% { box-shadow: 0 0 0 5px rgba(0,168,102,0.08); } }
 .survey-deploy-info { display: flex; flex-direction: column; gap: 6px; }

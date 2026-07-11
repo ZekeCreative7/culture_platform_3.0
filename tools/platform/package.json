@@ -1,0 +1,10 @@
+{
+  "name": "culture-platform-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "코드 대화창 브릿지(길 A): Claude Code에서 실제 Firestore를 읽고 쓰는 로컬 운영 툴킷",
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

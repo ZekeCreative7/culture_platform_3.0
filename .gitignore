@@ -13,3 +13,5 @@ webapp/dist/
 _archive/
 feedback/
 .agents/
+tools/platform/node_modules/
+tools/platform/serviceAccount.json

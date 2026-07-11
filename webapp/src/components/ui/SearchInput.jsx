@@ -7,13 +7,18 @@ export function SearchInput({
   onEnter,
   variant = 'form'
 }) {
-  const className = variant === 'topbar' ? 'searchbox' : 'input-text';
-
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && onEnter) {
       onEnter(e.target.value);
     }
   };
+
+  // value가 주어지면 controlled, 아니면 uncontrolled로 동작한다.
+  // (Topbar 검색창은 상태를 상위에서 관리하지 않으므로 uncontrolled여야 타이핑이 먹는다.)
+  const isControlled = value !== undefined;
+  const bindProps = isControlled
+    ? { value, onChange: (e) => onChange && onChange(e.target.value) }
+    : { defaultValue: '', onChange: (e) => onChange && onChange(e.target.value) };
 
   if (variant === 'topbar') {
     return (
@@ -26,10 +31,9 @@ export function SearchInput({
           type="search"
           className="searchbox"
           placeholder={placeholder}
-          value={value ?? ''}
-          onChange={(e) => onChange && onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           autoComplete="off"
+          {...bindProps}
         />
       </div>
     );
@@ -40,10 +44,9 @@ export function SearchInput({
       type="search"
       className="input-text"
       placeholder={placeholder}
-      value={value ?? ''}
-      onChange={(e) => onChange && onChange(e.target.value)}
       onKeyDown={handleKeyDown}
       autoComplete="off"
+      {...bindProps}
     />
   );
 }

@@ -9,7 +9,6 @@ function lazyNamed(loader, exportName) {
   return lazy(() => loader().then((module) => ({ default: module[exportName] })));
 }
 
-const CommandPage = lazyNamed(() => import('./pages/CommandPage.jsx'), 'CommandPage');
 const DashboardPage = lazyNamed(() => import('./pages/DashboardPage.jsx'), 'DashboardPage');
 const SessionsPage = lazyNamed(() => import('./pages/SessionsPage.jsx'), 'SessionsPage');
 const OrgMapPage = lazyNamed(() => import('./pages/OrgMapPage.jsx'), 'OrgMapPage');
@@ -69,7 +68,6 @@ function App() {
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/command" element={<CommandPage />} />
                 <Route path="/sessions" element={<SessionsPage />} />
                 <Route path="/org" element={<Navigate to="/org-map" replace />} />
                 <Route path="/org-map" element={<OrgMapPage />} />

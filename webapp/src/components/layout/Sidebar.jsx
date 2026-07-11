@@ -6,10 +6,9 @@ import { commitmentsCache } from '../../state.js';
 import { todayISO } from '../../utils.js';
 import { StatusDot } from '../ui/index.js';
 
-const VALID_VIEWS = ['command', 'dashboard', 'sessions', 'survey', 'analytics', 'report', 'comm', 'pulse-report', 'org-map', 'upload'];
+const VALID_VIEWS = ['dashboard', 'sessions', 'survey', 'analytics', 'report', 'comm', 'pulse-report', 'org-map', 'upload'];
 
 const VIEWS = [
-  ['command', 'Command', '명령'],
   ['dashboard', 'Dashboard', '대시보드'],
   ['sessions', 'Sessions', '세션'],
   ['survey', 'Survey', '설문'],
@@ -22,7 +21,6 @@ const VIEWS = [
 ];
 
 const NAV_ICONS = {
-  command: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9.828a2 2 0 0 0-1.414.586l-1.707 1.707A1 1 0 0 1 5 15.707V14H4a2 2 0 0 1-2-2V5Zm4.293 2.293a1 1 0 0 1 1.414 0l2 2a1 1 0 0 1 0 1.414l-2 2a1 1 0 0 1-1.414-1.414L7.586 10 6.293 8.707a1 1 0 0 1 0-1.414ZM11 11a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2h-2Z" clip-rule="evenodd"/></svg>`,
   dashboard: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M2 10a8 8 0 1 1 16 0A8 8 0 0 1 2 10Zm8-5a1 1 0 0 1 1 1v4.586l2.707 2.707a1 1 0 0 1-1.414 1.414l-3-3A1 1 0 0 1 9 11V6a1 1 0 0 1 1-1Z"/></svg>`,
   sessions: `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M5 3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5Zm0 2h10v10H5V5Zm2 2a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2H7Zm0 4a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2H7Z" clip-rule="evenodd"/></svg>`,
   'org-map': `<svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 2a3 3 0 0 0-3 3v1H4a2 2 0 0 0-2 2v2h2V8h3v2h2V8h2v2h2V8h3v2h2V8a2 2 0 0 0-2-2h-3V5a3 3 0 0 0-3-3Zm-1 3a1 1 0 1 1 2 0v1H9V5ZM2 14a2 2 0 1 1 4 0 2 2 0 0 1-4 0Zm6 0a2 2 0 1 1 4 0 2 2 0 0 1-4 0Zm6 0a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z"/></svg>`,

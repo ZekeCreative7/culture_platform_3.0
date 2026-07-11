@@ -56,7 +56,46 @@ export function deriveTeam(teamId, org = loadOrg()) {
   };
 }
 
-// 리더십 그룹 항목 — 앱 draftLeaderGroup 항목 shape 재현
+// 협업 멤버 항목 — 앱 orgMemberCandidate → createOrUpdateSession(협업) 매핑 shape 재현
+// includeLeaders=false면 각 팀의 팀장(leaderMemberId)을 제외한다.
+export function deriveCollabMembers(teamId, org = loadOrg(), includeLeaders = false) {
+  const d = deriveTeam(teamId, org);
+  if (!d) return [];
+  const leaderId = d.leaderPersonId;
+  return org.members
+    .filter((m) => m.parentId === teamId)
+    .filter((m) => includeLeaders || m.id !== leaderId)
+    .map((m) => ({
+      id: m.id,
+      memberId: m.id,
+      name: m.name,
+      position: grade(m),
+      teamId: d.teamId,
+      teamName: d.teamName,
+      divisionName: d.division,
+      hqName: d.hq,
+    }));
+}
+
+// 전체 조직 구성원 후보(팀장 제외) — 무작위 모드용
+export function allCollabCandidates(org = loadOrg(), includeLeaders = false) {
+  const leaderIds = new Set(org.units.map((u) => u.leaderMemberId).filter(Boolean));
+  const teamById = Object.fromEntries(org.units.filter((u) => u.level === 'team').map((u) => [u.id, u]));
+  const seen = new Set();
+  const out = [];
+  for (const m of org.members) {
+    if (!teamById[m.parentId]) continue; // 팀 소속만
+    if (!includeLeaders && leaderIds.has(m.id)) continue; // 팀장 제외
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    const d = deriveTeam(m.parentId, org);
+    out.push({
+      id: m.id, memberId: m.id, name: m.name, position: grade(m),
+      teamId: d.teamId, teamName: d.teamName, divisionName: d.division, hqName: d.hq,
+    });
+  }
+  return out;
+}
 export function deriveLeaderEntry(teamId, org = loadOrg()) {
   const d = deriveTeam(teamId, org);
   if (!d) return null;

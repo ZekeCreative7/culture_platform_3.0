@@ -188,7 +188,7 @@ export const OrgPage = memo(function OrgPage() {
         <input
           type="search"
           className="input-text"
-          placeholder="이름, 직급, 직함으로 검색"
+          placeholder="팀 이름으로 검색"
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);

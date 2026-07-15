@@ -1,7 +1,7 @@
 import { state, saveState, saveSessionToFirestore, subscribeResponsesFromFirestore } from '../state.js';
 import { normalizeSessionType, sameSessionType, makeSchedule, sessionTypeDef, uid } from '../utils.js';
 import { syncDraftOrgFromTeam } from '../views/org.js';
-import { selectedCrossMembers, resetCrossDraft, selectedCustomMembers, resetCustomScopeDraft, canCreateDraftSession } from '../views/sessions.js';
+import { crossNameList, resetCrossDraft, selectedCustomMembers, customMemberPool, resetCustomScopeDraft, canCreateDraftSession } from '../views/sessions.js';
 
 export function resetNewSessionDraft(type = state.draftType || '팀빌딩') {
   const normalizedType = normalizeSessionType(type);
@@ -24,6 +24,7 @@ export function resetNewSessionDraft(type = state.draftType || '팀빌딩') {
   state.draftCrossParentSessionId = '';
   state.draftCrossTeamIds = [];
   state.draftCrossMemberIds = [];
+  state.draftCrossNames = '';
   state.draftAudienceScope = '팀별';
   state.draftSubject = '';
   resetCustomScopeDraft();
@@ -75,7 +76,7 @@ export function createOrUpdateSession() {
   const type = normalizeSessionType(state.draftType);
   const cohort = state.draftCohort;
   const year = state.draftYear;
-  const updatedSchedule = state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? 'confirmed' : 'planned', absences: item.absences || [] }));
+  const updatedSchedule = state.draftSchedule.map((item, index) => ({ ...item, seq: index + 1, status: item.confirmed ? 'confirmed' : 'planned', absenceCount: item.absenceCount || 0 }));
 
   if (state.editingSessionId) {
     const idx = state.sessions.findIndex((s) => s.id === state.editingSessionId);
@@ -96,38 +97,36 @@ export function createOrUpdateSession() {
         Object.assign(updatedSession, {
           participatingTeams: leaderGroup.map((l) => l.teamName).join(', '),
           leaderGroup, leader: `${leaderGroup.length}명 리더십 그룹`, leaderTitle: '팀장',
-          members: leaderGroup.map((l) => ({ id: l.id, name: l.name, position: l.position || '팀장', teamId: l.teamId, teamName: l.teamName, divisionName: l.divisionName, hqName: l.hqName })),
+          members: leaderGroup.map((l) => ({ id: l.id, position: l.position || '팀장', teamId: l.teamId, teamName: l.teamName, divisionName: l.divisionName, hqName: l.hqName })),
         });
         state.draftLeaderGroup = [];
       } else if (type === '협업') {
-        const members = selectedCrossMembers();
-        const sourceTeamIds = state.draftCrossMode === 'leader-session' ? [...state.draftCrossTeamIds] : [...new Set(members.map((m) => m.teamId))];
+        const names = crossNameList();
         Object.assign(updatedSession, {
-          sourceMode: state.draftCrossMode, parentSessionId: state.draftCrossMode === 'leader-session' ? state.draftCrossParentSessionId : '',
-          sourceTeamIds, participatingTeams: [...new Set(members.map((m) => m.teamName))].join(', '),
-          members: members.map((m) => ({ id: m.id, memberId: m.memberId, name: m.name, position: m.position, teamId: m.teamId, teamName: m.teamName, divisionName: m.divisionName, hqName: m.hqName })),
+          sourceMode: 'manual', parentSessionId: '', sourceTeamIds: [],
+          participatingTeams: '협업 그룹',
+          members: names.map((name, i) => ({ id: `cross-${i}`, name })),
         });
-        state.draftCrossMemberIds = [];
-        state.draftCrossTeamIds = [];
+        resetCrossDraft();
       } else if (type === '커스텀') {
         const scope = state.draftAudienceScope;
-        const members = scope === '전사' ? [] : selectedCustomMembers();
+        const members = scope === '전사' ? [] : (scope === '무작위' ? selectedCustomMembers() : customMemberPool());
         Object.assign(updatedSession, {
           audienceScope: scope,
           sourceTeamIds: scope === '팀별' ? [...state.draftCustomTeamIds] : [],
           participatingTeams: scope === '전사' ? '전사' : [...new Set(members.map((m) => m.teamName))].join(', '),
-          members: members.map((m) => ({ id: m.id, memberId: m.memberId, name: m.name, position: m.position, teamId: m.teamId, teamName: m.teamName, divisionName: m.divisionName, hqName: m.hqName })),
+          members: members.map((m) => ({ id: m.id, memberId: m.memberId, position: m.position, teamId: m.teamId, teamName: m.teamName, divisionName: m.divisionName, hqName: m.hqName })),
         });
         resetCustomScopeDraft();
       } else if (type === '운영 서베이') {
         const scope = state.draftAudienceScope;
-        const members = scope === '전사' ? [] : selectedCustomMembers();
+        const members = scope === '전사' ? [] : (scope === '무작위' ? selectedCustomMembers() : customMemberPool());
         Object.assign(updatedSession, {
           subject: state.draftSubject,
           audienceScope: scope,
           sourceTeamIds: scope === '팀별' ? [...state.draftCustomTeamIds] : [],
           participatingTeams: scope === '전사' ? '전사' : [...new Set(members.map((m) => m.teamName))].join(', '),
-          members: members.map((m) => ({ id: m.id, memberId: m.memberId, name: m.name, position: m.position, teamId: m.teamId, teamName: m.teamName, divisionName: m.divisionName, hqName: m.hqName })),
+          members: members.map((m) => ({ id: m.id, memberId: m.memberId, position: m.position, teamId: m.teamId, teamName: m.teamName, divisionName: m.divisionName, hqName: m.hqName })),
         });
         resetCustomScopeDraft();
       }
@@ -193,7 +192,6 @@ export function createOrUpdateSession() {
       leaderTitle: '팀장',
       members: leaderGroup.map((leader) => ({
         id: leader.id,
-        name: leader.name,
         position: leader.position || '팀장',
         teamId: leader.teamId,
         teamName: leader.teamName,
@@ -203,31 +201,18 @@ export function createOrUpdateSession() {
     });
     state.draftLeaderGroup = [];
   } else if (type === '협업') {
-    const members = selectedCrossMembers();
-    const sourceTeamIds = state.draftCrossMode === 'leader-session'
-      ? [...state.draftCrossTeamIds]
-      : [...new Set(members.map((member) => member.teamId))];
+    const names = crossNameList();
     Object.assign(session, {
-      sourceMode: state.draftCrossMode,
-      parentSessionId: state.draftCrossMode === 'leader-session' ? state.draftCrossParentSessionId : '',
-      sourceTeamIds,
-      participatingTeams: [...new Set(members.map((member) => member.teamName))].join(', '),
-      members: members.map((member) => ({
-        id: member.id,
-        memberId: member.memberId,
-        name: member.name,
-        position: member.position,
-        teamId: member.teamId,
-        teamName: member.teamName,
-        divisionName: member.divisionName,
-        hqName: member.hqName,
-      })),
+      sourceMode: 'manual',
+      parentSessionId: '',
+      sourceTeamIds: [],
+      participatingTeams: '협업 그룹',
+      members: names.map((name, i) => ({ id: `cross-${i}`, name })),
     });
-    state.draftCrossMemberIds = [];
-    state.draftCrossTeamIds = [];
+    resetCrossDraft();
   } else if (type === '커스텀') {
     const scope = state.draftAudienceScope;
-    const members = scope === '전사' ? [] : selectedCustomMembers();
+    const members = scope === '전사' ? [] : (scope === '무작위' ? selectedCustomMembers() : customMemberPool());
     Object.assign(session, {
       audienceScope: scope,
       sourceTeamIds: scope === '팀별' ? [...state.draftCustomTeamIds] : [],
@@ -235,7 +220,6 @@ export function createOrUpdateSession() {
       members: members.map((member) => ({
         id: member.id,
         memberId: member.memberId,
-        name: member.name,
         position: member.position,
         teamId: member.teamId,
         teamName: member.teamName,
@@ -246,7 +230,7 @@ export function createOrUpdateSession() {
     resetCustomScopeDraft();
   } else if (type === '운영 서베이') {
     const scope = state.draftAudienceScope;
-    const members = scope === '전사' ? [] : selectedCustomMembers();
+    const members = scope === '전사' ? [] : (scope === '무작위' ? selectedCustomMembers() : customMemberPool());
     Object.assign(session, {
       subject: state.draftSubject,
       audienceScope: scope,
@@ -255,7 +239,6 @@ export function createOrUpdateSession() {
       members: members.map((member) => ({
         id: member.id,
         memberId: member.memberId,
-        name: member.name,
         position: member.position,
         teamId: member.teamId,
         teamName: member.teamName,

@@ -216,6 +216,7 @@ export const blankState = () => ({
   draftCrossTeamIds: [],
   draftCrossMemberIds: [],
   draftCrossRandomCount: 6,
+  draftCrossNames: "",
   draftAudienceScope: "팀별",
   draftCustomTeamIds: [],
   draftCustomMemberIds: [],

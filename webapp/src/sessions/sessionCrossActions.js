@@ -9,6 +9,12 @@ export function updateCrossMode(mode) {
   saveState();
 }
 
+// 협업 세션 참여자 이름 직접 입력(쉼표/줄바꿈 구분).
+export function updateCrossNames(value) {
+  state.draftCrossNames = value;
+  saveState();
+}
+
 export function updateCrossParentSession(sessionId) {
   state.draftCrossParentSessionId = sessionId;
   state.draftCrossTeamIds = [];

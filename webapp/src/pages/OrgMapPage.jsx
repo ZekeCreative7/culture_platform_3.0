@@ -73,7 +73,7 @@ function TopUnitSection({ title, units, model, selectedUnitId, expandedUnit, sel
   );
 }
 
-function DirectMembers({ unit, model, selectedMemberId, onSelectMember }) {
+function DirectMembers({ unit, model }) {
   const members = model.directMembers(unit.id);
   if (!members.length) return null;
 
@@ -82,22 +82,6 @@ function DirectMembers({ unit, model, selectedMemberId, onSelectMember }) {
       <div className="org-map-subhead">
         <span>직속 인원</span>
         <b>{members.length}명</b>
-      </div>
-      <div className="org-map-member-chips">
-        {members.map((member) => {
-          const memberMeta = [model.memberGrade(member), model.memberJobTitle(member, unit)].filter(Boolean).join(' · ');
-          return (
-            <button
-              type="button"
-              key={member.id}
-              className={`org-map-member-chip ${member.id === selectedMemberId ? 'is-selected' : ''}`}
-              onClick={() => onSelectMember(unit.id, member.id)}
-            >
-              <strong>{member.name}</strong>
-              <small>{memberMeta}</small>
-            </button>
-          );
-        })}
       </div>
     </div>
   );
@@ -218,7 +202,6 @@ function DetailPanel({ unit, model, selectedMemberId, onManageUnit, onAddMember,
         </div>
         <div className="org-map-detail-actions">
           <button type="button" className="secondary compact" onClick={() => onManageUnit(unit.id)}>조직 설정</button>
-          <button type="button" className="ghost compact" onClick={() => onAddMember(unit.id)}>구성원 추가</button>
         </div>
       </div>
 
@@ -232,18 +215,6 @@ function DetailPanel({ unit, model, selectedMemberId, onManageUnit, onAddMember,
         <h3>{model.leaderRoleLabel(unit)}</h3>
         <p>{leader?.name ? `${leader.name}${leader.grade ? ` · ${leader.grade}` : ''}` : '미지정'}</p>
       </div>
-
-      {highlightedMember && (
-        <div className="org-map-detail-section is-highlighted">
-          <h3>검색한 구성원</h3>
-          <p>
-            {highlightedMember.name} · {[model.memberGrade(highlightedMember), model.memberJobTitle(highlightedMember, unit)].filter(Boolean).join(' · ')}
-          </p>
-          <button type="button" className="secondary compact" onClick={() => onManageMember(highlightedMember.id)}>
-            정보 수정 / 부서 이동
-          </button>
-        </div>
-      )}
 
       <div className="org-map-detail-section">
         <h3>하위 조직</h3>
@@ -267,25 +238,7 @@ function DetailPanel({ unit, model, selectedMemberId, onManageUnit, onAddMember,
 
       <div className="org-map-detail-section">
         <h3>직속 인원</h3>
-        {directMembers.length ? (
-          <div className="org-map-detail-list">
-            {directMembers.map((member) => (
-              <div key={member.id} className={`org-map-detail-member ${member.id === selectedMemberId ? 'is-selected' : ''}`}>
-                <span>
-                  {member.name}
-                  <small>
-                    {[model.memberGrade(member), model.memberJobTitle(member, unit)].filter(Boolean).join(' · ')}
-                  </small>
-                </span>
-                <button type="button" className="ghost compact" onClick={() => onManageMember(member.id)}>
-                  수정/이동
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p>직속 인원 없음</p>
-        )}
+        <p>{directMembers.length ? `${directMembers.length}명 · 개인정보 미보관(인원 수만 관리)` : '직속 인원 없음'}</p>
       </div>
     </aside>
   );
@@ -351,7 +304,11 @@ export const OrgMapPage = memo(function OrgMapPage() {
 
   const selectedUnit = model.unitById.get(selectedUnitId) || model.topUnits[0] || null;
   const rootUnit = selectedUnit ? model.topAncestor(selectedUnit.id) : null;
-  const searchResults = useMemo(() => searchOrgMap(model, query), [model, query]);
+  // 개인정보 미보관 방침: 검색은 조직/팀 단위만 노출하고 개인(구성원) 결과는 제외한다.
+  const searchResults = useMemo(
+    () => searchOrgMap(model, query).filter((result) => result.kind !== 'member'),
+    [model, query],
+  );
 
   const handleSelectUnit = (unitId) => {
     setSelectedUnitId(unitId);
@@ -441,7 +398,7 @@ export const OrgMapPage = memo(function OrgMapPage() {
         <input
           type="search"
           className="input-text"
-          placeholder="조직명, 구성원, 직급, 직책 검색"
+          placeholder="조직명 검색"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />

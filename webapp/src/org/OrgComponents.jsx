@@ -101,52 +101,32 @@ export function OrgActionMenu({ companyId }) {
 }
 
 // ── Search Results List ────────────────────────────────────────────
-export function OrgSearchResults({ query, onOpenEditor }) {
+// 개인정보 미보관 방침에 따라 개인(이름) 단위 검색은 지원하지 않는다.
+// 팀 이름으로 좁혀 인원 수를 확인하는 방식으로 대체.
+export function OrgSearchResults({ query }) {
   const store = useAppStore();
   const q = query.trim().toLowerCase();
-  const matches = (store.orgMembers || []).filter((m) =>
-    m.name?.toLowerCase().includes(q) ||
-    m.jobGrade?.toLowerCase().includes(q) ||
-    m.jobTitle?.toLowerCase().includes(q)
-  );
+  const teams = (store.orgUnits || []).filter((u) => u.level === 'team' && u.name?.toLowerCase().includes(q));
 
-  if (!matches.length) {
-    return <div className="org-search-empty">일치하는 구성원이 없습니다.</div>;
+  if (!teams.length) {
+    return <div className="org-search-empty">일치하는 팀이 없습니다. (개인 단위 검색은 지원하지 않습니다)</div>;
   }
-
-  const highlight = (text) => {
-    if (!text) return '';
-    const idx = text.toLowerCase().indexOf(q);
-    if (idx === -1) return text;
-    return (
-      <>
-        {text.slice(0, idx)}
-        <mark>{text.slice(idx, idx + q.length)}</mark>
-        {text.slice(idx + q.length)}
-      </>
-    );
-  };
 
   return (
     <div className="panel org-accordion-panel">
-      <div className="org-search-count">{matches.length}명 검색됨</div>
+      <div className="org-search-count">팀 {teams.length}개</div>
       <div className="org-search-list">
-        {matches.map((m) => {
-          const team = (store.orgUnits || []).find((u) => u.id === m.parentId);
-          const path = team?.level === 'team' ? teamPath(team.id) : null;
+        {teams.map((team) => {
+          const path = teamPath(team.id);
           const breadcrumb = path
-            ? [path.divisionName, path.hqName, path.teamName].filter(Boolean).join(' › ')
-            : (team?.name || '');
-          const isLeader = team?.leaderMemberId === m.id;
-          const grade = memberGrade(m);
-          const title = memberJobTitle(m);
-
+            ? [path.divisionName, path.hqName].filter(Boolean).join(' › ')
+            : '';
+          const count = (store.orgMembers || []).filter((m) => m.parentId === team.id).length;
           return (
-            <div className="org-search-item" key={m.id} onClick={() => onOpenEditor('member', 'edit', m.id)}>
+            <div className="org-search-item" key={team.id}>
               <div className="org-search-item-main">
-                <span className="org-search-name">{highlight(m.name)}</span>
-                {isLeader && <span className="org-panel-leader-badge">팀장</span>}
-                <span className="org-search-grade">{grade}{title ? ` · ${title}` : ''}</span>
+                <span className="org-search-name">{team.name}</span>
+                <span className="org-search-grade">{count}명</span>
               </div>
               <div className="org-search-breadcrumb">{breadcrumb}</div>
             </div>
@@ -202,47 +182,18 @@ export function OrgTeamPanel({ teamId, onOpenEditor, onClosePanel, isMobile = fa
           <div className="org-bottomsheet-header">
             <div>
               <div className="org-panel-team-name">{team.name}</div>
-              <div className="org-panel-team-meta">{members.length}명{leader ? ` · 팀장: ${leader.name}` : ''}</div>
+              <div className="org-panel-team-meta">{members.length}명</div>
             </div>
             <button className="org-bottomsheet-close" onClick={onClosePanel}>×</button>
           </div>
           <div className="org-bottomsheet-actions">
-            <button className="secondary compact" onClick={() => onOpenEditor('member', 'add', teamId)}>+ 구성원 추가</button>
             <button className="ghost compact" onClick={() => onOpenEditor('unit', 'edit', teamId)}>팀 수정</button>
             <button className="ghost compact danger" onClick={handleDeleteNode}>팀 삭제</button>
           </div>
           <div className="org-bottomsheet-members">
-            {members.length === 0 ? (
-              <div style={{ padding: '20px', fontSize: '13px', color: 'var(--text-secondary)' }}>구성원이 없습니다.</div>
-            ) : (
-              members.map((m) => {
-                const grade = memberGrade(m);
-                const title = memberJobTitle(m);
-                const isLeader = team.leaderMemberId === m.id;
-                return (
-                  <div
-                    className="org-bottomsheet-member list-card member-card"
-                    key={m.id}
-                    draggable
-                    onDragStart={(e) => dragStartHandler(e, m.id)}
-                    onDragEnd={dragEndHandler}
-                    style={{ cursor: 'grab' }}
-                  >
-                    <div className="org-panel-member-info">
-                      <span className="org-panel-member-name">
-                        {m.name}
-                        {isLeader && <span className="org-panel-leader-badge">팀장</span>}
-                      </span>
-                      <span className="org-panel-member-grade">{grade}{title ? ` · ${title}` : ''}</span>
-                    </div>
-                    <div className="member-actions" style={{ display: 'flex', gap: '4px' }}>
-                      <button className="ghost compact" onClick={() => onOpenEditor('member', 'edit', m.id)}>✎</button>
-                      <button className="ghost compact danger" onClick={() => handleDeleteMember(m.id)}>&times;</button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+            <div className="org-panel-headcount" style={{ padding: '18px 4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              구성원 <strong>{members.length}명</strong> · 개인정보 미보관(인원 수만 관리)
+            </div>
           </div>
         </div>
       </>
@@ -254,47 +205,18 @@ export function OrgTeamPanel({ teamId, onOpenEditor, onClosePanel, isMobile = fa
       <div className="org-panel-header">
         <div>
           <div className="org-panel-team-name">{team.name}</div>
-          <div className="org-panel-team-meta">{members.length}명{leader ? ` · 팀장: ${leader.name}` : ''}</div>
+          <div className="org-panel-team-meta">{members.length}명</div>
         </div>
         <button className="ghost compact" onClick={onClosePanel} title="닫기" style={{ marginLeft: 'auto', fontSize: '18px', lineHeight: 1, padding: '2px 6px' }}>×</button>
       </div>
       <div className="org-panel-actions">
-        <button className="secondary compact" onClick={() => onOpenEditor('member', 'add', teamId)}>+ 구성원 추가</button>
         <button className="ghost compact" onClick={() => onOpenEditor('unit', 'edit', teamId)}>팀 수정</button>
         <button className="ghost compact danger" onClick={handleDeleteNode}>팀 삭제</button>
       </div>
       <div className="org-panel-members">
-        {members.length === 0 ? (
-          <div className="acc-members-empty" style={{ padding: '20px 0' }}>구성원이 없습니다.</div>
-        ) : (
-          members.map((m) => {
-            const grade = memberGrade(m);
-            const title = memberJobTitle(m);
-            const isLeader = team.leaderMemberId === m.id;
-            return (
-              <div
-                className="org-panel-member list-card member-card"
-                key={m.id}
-                draggable
-                onDragStart={(e) => dragStartHandler(e, m.id)}
-                onDragEnd={dragEndHandler}
-                style={{ cursor: 'grab' }}
-              >
-                <div className="org-panel-member-info">
-                  <span className="org-panel-member-name">
-                    {m.name}
-                    {isLeader && <span className="org-panel-leader-badge">팀장</span>}
-                  </span>
-                  <span className="org-panel-member-grade">{grade}{title ? ` · ${title}` : ''}</span>
-                </div>
-                <div className="org-panel-member-actions">
-                  <button className="ghost compact" onClick={() => onOpenEditor('member', 'edit', m.id)}>수정</button>
-                  <button className="ghost compact danger" onClick={() => handleDeleteMember(m.id)}>삭제</button>
-                </div>
-              </div>
-            );
-          })
-        )}
+        <div className="org-panel-headcount" style={{ padding: '18px 4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+          구성원 <strong>{members.length}명</strong> · 개인정보 미보관(인원 수만 관리)
+        </div>
       </div>
     </>
   );
@@ -315,7 +237,7 @@ export function AccordionTeam({ team, selectedTeamId, onSelectTeam, onDragStart,
     >
       <div className="acc-row acc-row--team" onClick={() => onSelectTeam(team.id)}>
         <span className="acc-name">{team.name}</span>
-        <span className="acc-meta">{memberCount}명{leader ? ` · ${leader.name}` : ''}</span>
+        <span className="acc-meta">{memberCount}명</span>
         <span className="acc-team-arrow">›</span>
       </div>
     </div>
@@ -580,49 +502,6 @@ function UnitEditor({ editor, units, onClose }) {
                 {levelOptions}
               </select>
             </label>
-            {isEdit && (
-              <>
-                <label>{leaderRoleLabel} 지정
-                  <select
-                    value={leaderVal}
-                    onChange={(e) => setLeaderVal(e.target.value)}
-                    className="input-text"
-                  >
-                    <option value="">-- {leaderRoleLabel} 없음/직접 입력 --</option>
-                    {leaderOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.name} ({opt.position} · {opt.orgLabel})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="form-grid compact" style={{ gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '-4px' }}>
-                  <label>{leaderRoleLabel} 이름 (직접 지정 시)
-                    <input
-                      type="text"
-                      value={isManualDisabled ? '' : manualName}
-                      onChange={(e) => setManualName(e.target.value)}
-                      placeholder="이름"
-                      className="input-text"
-                      disabled={isManualDisabled}
-                    />
-                  </label>
-                  <label>{leaderRoleLabel} 직위/직급
-                    <select
-                      value={isManualDisabled ? '' : manualTitle}
-                      onChange={(e) => setManualTitle(e.target.value)}
-                      className="input-text"
-                      disabled={isManualDisabled}
-                    >
-                      <option value="">-- 직위 선택 --</option>
-                      {POSITION_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </>
-            )}
           </div>
         </div>
         <div className="modal-footer">

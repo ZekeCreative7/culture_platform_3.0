@@ -349,15 +349,13 @@ describe("Sessions runtime wiring", () => {
     // SessionSurveyPromptCard component, not a dangerouslySetInnerHTML fragment.
     expect(crossPanelSource).toContain("SessionSurveyPromptCard");
 
-    expect(crossActionsSource).toContain("export function updateCrossMode");
-    expect(crossActionsSource).toContain("export function toggleCrossTeam");
-    expect(crossActionsSource).toContain("export function toggleCrossMember");
-    expect(crossActionsSource).toContain("export function generateRandomCross");
-    expect(crossActionsSource).toContain("export function removeCrossMember");
-    // cross-random-count uses saveState() per keystroke like cohort/year did,
-    // so it must stay uncontrolled (defaultValue), not controlled (value).
-    expect(crossPanelSource).toContain("defaultValue={Number(state.draftCrossRandomCount");
-    expect(crossPanelSource).not.toContain("value={Number(state.draftCrossRandomCount");
+    // 협업은 개인정보 미보관 방침에 따라 조직도 명단 선택 대신 참여자 이름을
+    // 쉼표로 직접 입력한다(updateCrossNames). 이름 textarea는 cohort/year와
+    // 같은 이유로 uncontrolled(defaultValue)로 둔다.
+    expect(crossActionsSource).toContain("export function updateCrossNames");
+    expect(crossPanelSource).toContain("updateCrossNames");
+    expect(crossPanelSource).toContain("defaultValue={state.draftCrossNames");
+    expect(crossPanelSource).not.toContain("value={state.draftCrossNames");
 
     expect(drawerSource).toContain("CrossFunctionalPanel");
     expect(drawerSource).not.toContain("renderCrossFunctionalPanel");

@@ -70,10 +70,21 @@ export function selectedCrossMembers() {
   return (state.draftCrossMemberIds || []).map((id) => poolById.get(id)).filter(Boolean);
 }
 
+// 협업 세션은 여러 팀에서 사람이 모이므로 조직도 명단 대신
+// 운영자가 참여자 이름을 쉼표로 직접 입력한다. 여기서 파싱한다.
+export function crossNameList() {
+  return String(state.draftCrossNames || "")
+    .split(/[,\n]/)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .filter((name, index, list) => list.indexOf(name) === index);
+}
+
 export function resetCrossDraft() {
   state.draftCrossTeamIds = [];
   state.draftCrossMemberIds = [];
   state.draftCrossParentSessionId = "";
+  state.draftCrossNames = "";
 }
 
 // 커스텀 세션의 팀별 스코프는 협업과 달리 리더십 세션에 종속되지 않고
@@ -215,15 +226,17 @@ export function canCreateDraftSession() {
   const type = normalizeSessionType(state.draftType);
   if (type === "팀빌딩") return Boolean(state.draftTeamId);
   if (type === "리더십") return Boolean((state.draftLeaderGroup || []).length);
-  if (type === "협업") return Boolean((state.draftCrossMemberIds || []).length);
+  if (type === "협업") return Boolean(crossNameList().length);
   if (type === "커스텀") {
     if (state.draftAudienceScope === "전사") return true;
-    return Boolean((state.draftCustomMemberIds || []).length);
+    if (state.draftAudienceScope === "무작위") return Boolean((state.draftCustomMemberIds || []).length);
+    return Boolean((state.draftCustomTeamIds || []).length);
   }
   if (type === "운영 서베이") {
     if (!(state.draftSubject || "").trim()) return false;
     if (state.draftAudienceScope === "전사") return true;
-    return Boolean((state.draftCustomMemberIds || []).length);
+    if (state.draftAudienceScope === "무작위") return Boolean((state.draftCustomMemberIds || []).length);
+    return Boolean((state.draftCustomTeamIds || []).length);
   }
   return false;
 }

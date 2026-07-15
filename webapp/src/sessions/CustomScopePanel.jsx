@@ -42,26 +42,13 @@ function CustomMemberSelector({ memberPool, selectedMembers }) {
 
 function SelectedCustomMembers({ selectedMembers }) {
   if (!selectedMembers.length) {
-    return <div className="empty compact">아직 구성원이 선택되지 않았습니다.</div>;
+    return <div className="empty compact">아직 무작위 구성이 실행되지 않았습니다.</div>;
   }
   return (
-    <>
-      <div className="selection-summary">
-        <strong>선택된 구성원 {selectedMembers.length}명</strong>
-        <span>세션 등록 시 참여자로 저장됩니다.</span>
-      </div>
-      <div className="selection-chip-grid">
-        {selectedMembers.map((member) => (
-          <div className="selection-chip" key={member.id}>
-            <div>
-              <strong>{member.name}</strong>
-              <span>{member.teamName} · {member.position}</span>
-            </div>
-            <button type="button" aria-label="구성원 제거" onClick={() => removeCustomMember(member.id)}>삭제</button>
-          </div>
-        ))}
-      </div>
-    </>
+    <div className="selection-summary">
+      <strong>무작위 {selectedMembers.length}명 구성됨</strong>
+      <span>개인정보 미보관 · 인원 수만 대상으로 관리합니다.</span>
+    </div>
   );
 }
 
@@ -222,10 +209,9 @@ export function CustomScopePanel() {
           <SelectedTeamsList
             sourceTeams={sourceTeams}
             selectedTeamIds={state.draftCustomTeamIds || []}
-            summaryNote={`${(state.draftCustomTeamIds || []).length}개 팀 선택`}
+            summaryNote={`예상 응답 대상 ${memberPool.length}명 · 개인정보 미보관(인원 수만 관리)`}
             onRemove={(teamId) => toggleCustomTeam(teamId, false)}
           />
-          {(state.draftCustomTeamIds || []).length ? <CustomMemberSelector memberPool={memberPool} selectedMembers={selectedMembers} /> : null}
         </>
       )}
 

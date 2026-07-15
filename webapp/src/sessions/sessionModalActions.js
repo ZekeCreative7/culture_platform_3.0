@@ -13,11 +13,12 @@ export function closeAttendanceModal() {
   saveState();
 }
 
-export function saveAttendance(sessionId, itemId, { absences, completed, note }) {
+export function saveAttendance(sessionId, itemId, { absenceCount, completed, note }) {
   const session = state.sessions.find((s) => s.id === sessionId);
   const item = session ? session.schedule.find((i) => i.id === itemId) : null;
   if (!item) return;
-  item.absences = absences;
+  item.absenceCount = Number.isFinite(absenceCount) ? absenceCount : 0;
+  delete item.absences;
   item.status = completed ? 'completed' : (item.date ? 'confirmed' : 'planned');
   item.note = note.trim();
   state.showAttendanceModal = false;

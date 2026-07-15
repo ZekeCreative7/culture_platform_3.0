@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore.js';
 import { state as vanillaState } from '../state.js';
 import { buildSessionSurveyQuestionPrompt, pulseContextForSurveyPrompt } from '../survey/surveyPrompt.js';
 import { normalizeSessionType } from '../utils.js';
-import { selectedCrossMembers, selectedCustomMembers } from '../views/sessions.js';
+import { crossNameList, selectedCustomMembers } from '../views/sessions.js';
 
 export function SessionSurveyPromptCard() {
   const store = useAppStore();
@@ -35,11 +35,11 @@ export function SessionSurveyPromptCard() {
       };
     }
     if (type === '협업') {
-      const members = selectedCrossMembers();
+      const names = crossNameList();
       return {
         ...base,
-        participatingTeams: [...new Set(members.map((member) => member.teamName))].join(', '),
-        members,
+        participatingTeams: '협업 그룹',
+        members: names.map((name, i) => ({ id: `cross-${i}`, name })),
       };
     }
     if (type === '커스텀') {

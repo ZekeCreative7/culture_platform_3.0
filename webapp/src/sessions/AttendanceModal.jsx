@@ -8,20 +8,22 @@ import { closeAttendanceModal, saveAttendance } from './sessionModalActions.js';
 function AttendanceModalBody({ session, item }) {
   const type = normalizeSessionType(session.type);
   const title = type === '팀빌딩' ? session.team : sessionLabel(session);
-  const members = session.members || [];
+  const headcount = (session.members || []).length;
 
-  const [absentIds, setAbsentIds] = useState(() => new Set(item.absences || []));
+  // 개인 명단 없이 결석 "인원 수"만 기록한다(개인정보 미보관).
+  const initialAbsent = Number.isFinite(item.absenceCount)
+    ? item.absenceCount
+    : (Array.isArray(item.absences) ? item.absences.length : 0);
+  const [absentCount, setAbsentCount] = useState(initialAbsent);
   const [completed, setCompleted] = useState(item.status === 'completed');
   const [note, setNote] = useState(item.note || '');
 
-  function toggleAbsent(memberId) {
-    setAbsentIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(memberId)) next.delete(memberId);
-      else next.add(memberId);
-      return next;
-    });
-  }
+  const clampAbsent = (value) => {
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n) || n < 0) return 0;
+    if (headcount && n > headcount) return headcount;
+    return n;
+  };
 
   return (
     <>
@@ -29,19 +31,20 @@ function AttendanceModalBody({ session, item }) {
         <strong>{title}</strong><br />
         {item.seq}회차 일정 · {item.date || '일정 미정'}
       </div>
-      <div style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--muted)', marginBottom: '6px' }}>결석자 체크 (체크된 인원이 결석 처리됩니다)</div>
-      <div className="attendance-members-grid" style={{ maxHeight: '260px', overflowY: 'auto', border: '1px solid var(--line)', borderRadius: '8px', padding: '6px' }}>
-        {members.length ? members.map((m) => (
-          <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderBottom: '1px solid var(--line-soft)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={absentIds.has(m.id)} onChange={() => toggleAbsent(m.id)} data-member-id={m.id} />
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <strong style={{ fontSize: '13px' }}>{m.name}</strong>
-              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{m.teamName} · {m.jobTitle || m.grade || ''}</span>
-            </div>
-          </label>
-        )) : (
-          <div style={{ padding: '12px', fontSize: '12px', color: 'var(--muted)', textAlign: 'center' }}>등록된 구성원이 없습니다. 세션 수정에서 대상을 추가해 주세요.</div>
-        )}
+      <label style={{ display: 'block', marginTop: '4px' }}>
+        <span style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--muted)' }}>결석 인원 수</span>
+        <input
+          id="absence-count"
+          type="number"
+          min="0"
+          max={headcount || undefined}
+          value={absentCount}
+          onChange={(e) => setAbsentCount(clampAbsent(e.target.value))}
+          style={{ width: '100%', marginTop: '4px' }}
+        />
+      </label>
+      <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--muted)', fontWeight: '700' }}>
+        {headcount ? `참석 ${Math.max(headcount - absentCount, 0)} / ${headcount}명 (결석 ${absentCount}명)` : `결석 ${absentCount}명`}
       </div>
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', fontSize: '12.5px', fontWeight: '700' }}>
         <input id="round-completed" type="checkbox" checked={completed} onChange={(e) => setCompleted(e.target.checked)} />
@@ -51,13 +54,12 @@ function AttendanceModalBody({ session, item }) {
         <span style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--muted)' }}>메모</span>
         <textarea id="attendance-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} style={{ width: '100%', marginTop: '4px' }} />
       </label>
-      <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--muted)', fontWeight: '700' }}>결석: {absentIds.size} / {members.length}명</div>
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '14px' }}>
         <button className="ghost compact" id="cancel-attendance" onClick={() => closeAttendanceModal()}>취소</button>
         <button
           className="primary compact"
           id="save-attendance"
-          onClick={() => saveAttendance(session.id, item.id, { absences: [...absentIds], completed, note })}
+          onClick={() => saveAttendance(session.id, item.id, { absenceCount, completed, note })}
         >
           저장
         </button>
